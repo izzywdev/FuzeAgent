@@ -1,0 +1,73 @@
+# Claude Code Configuration for FuzeAgent Project
+# AI Team Orchestration Platform
+
+[project]
+name = "FuzeAgent"
+type = "ai_orchestration"
+description = "AI team orchestration platform using Claude Code SDK and CrewAI"
+
+[architecture]
+style = "microservices"
+containerization = "docker"
+orchestration = "docker-compose"
+production_orchestration = "kubernetes"
+
+[languages]
+primary = ["python", "typescript", "javascript"]
+secondary = ["sql", "yaml", "dockerfile", "bash"]
+
+[frameworks]
+backend = "fastapi"
+frontend = "react"
+ai_framework = "crewai"
+database = "postgresql"
+message_queue = "rabbitmq"
+cache = "redis"
+vector_db = "pgvector"
+
+[ai_specific]
+# AI/ML development settings
+default_model = "claude-3-5-sonnet-20241022"
+agent_temperature = 0.7
+enable_agent_memory = true
+context_window = 8192
+enable_claude_code_wrapper = true
+
+[services]
+# Service-specific configurations
+orchestrator_port = 8000
+ui_port = 3000
+database_port = 5432
+rabbitmq_port = 5672
+redis_port = 6379
+
+[development]
+# Development workflow
+auto_test = true
+test_framework_python = "pytest"
+test_framework_js = "jest"
+linting = true
+formatting = true
+type_checking = true
+
+[docker]
+# Container preferences
+base_python_image = "python:3.11-slim"
+base_node_image = "node:18-alpine"
+network_name = "ai-team-network"
+use_multi_stage = true
+non_root_user = true
+
+[monitoring]
+# Observability stack
+metrics = "prometheus"
+logging = "loki"
+dashboards = "grafana"
+tracing = "jaeger"
+
+[security]
+# Security configurations
+jwt_auth = true
+secrets_management = "environment"
+api_rate_limiting = true
+container_security = true
