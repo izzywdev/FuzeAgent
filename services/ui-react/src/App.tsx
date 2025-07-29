@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import axios from 'axios'
 import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle } from 'react-icons/fi'
 import AgentDashboard from './components/AgentDashboard'
@@ -16,7 +16,13 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
 
-  const loadData = async () => {
+  // Helper function to deep compare arrays
+  const arraysEqual = (a: any[], b: any[]): boolean => {
+    if (a.length !== b.length) return false
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+
+  const loadData = useCallback(async (forceRefresh = false) => {
     try {
       setLoading(true)
       const [agentsRes, tasksRes, templatesRes] = await Promise.all([
@@ -25,47 +31,72 @@ function App() {
         axios.get(`${API_BASE}/templates`)
       ])
       
-      setAgents(agentsRes.data)
-      setTasks(tasksRes.data)
-      setTemplates(templatesRes.data.templates)
+      const newAgents = agentsRes.data
+      const newTasks = tasksRes.data
+      const newTemplates = templatesRes.data.templates
+
+      // Only update state if data has actually changed
+      if (forceRefresh || !arraysEqual(agents, newAgents)) {
+        setAgents(newAgents)
+      }
+      if (forceRefresh || !arraysEqual(tasks, newTasks)) {
+        setTasks(newTasks)
+      }
+      if (forceRefresh || !arraysEqual(templates, newTemplates)) {
+        setTemplates(newTemplates)
+      }
     } catch (error) {
       console.error('Error loading data:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [agents, tasks, templates])
 
   useEffect(() => {
-    loadData()
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(loadData, 10000)
-    return () => clearInterval(interval)
+    loadData(true) // Force refresh on initial load
   }, [])
 
-  const handleCreateAgent = async (agentData: any) => {
+  // Smart polling - only check for updates, don't force re-render
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData(false) // Don't force refresh, only update if data changed
+    }, 30000) // Reduced frequency to 30 seconds
+    return () => clearInterval(interval)
+  }, [loadData])
+
+  const handleCreateAgent = useCallback(async (agentData: any) => {
     try {
       if (agentData.template_id) {
         await axios.post(`${API_BASE}/agents/from-template`, agentData)
       } else {
         await axios.post(`${API_BASE}/agents`, agentData)
       }
-      await loadData()
+      await loadData(true) // Force refresh after creating
       setShowCreateModal(false)
     } catch (error) {
       console.error('Error creating agent:', error)
       throw error
     }
-  }
+  }, [loadData])
 
-  const handleAssignTask = async (agentId: string, taskData: any) => {
+  const handleAssignTask = useCallback(async (agentId: string, taskData: any) => {
     try {
       await axios.post(`${API_BASE}/agents/${agentId}/tasks`, taskData)
-      await loadData()
+      await loadData(true) // Force refresh after task assignment
     } catch (error) {
       console.error('Error assigning task:', error)
       throw error
     }
-  }
+  }, [loadData])
+
+  const handleRefresh = useCallback(() => {
+    loadData(true) // Force refresh when user clicks refresh
+  }, [loadData])
+
+  // Memoize expensive computations
+  const memoizedAgents = useMemo(() => agents, [agents])
+  const memoizedTasks = useMemo(() => tasks, [tasks])
+  const memoizedTemplates = useMemo(() => templates, [templates])
 
   if (loading) {
     return (
@@ -93,8 +124,9 @@ function App() {
             </div>
             <div className="flex space-x-4 items-center">
               <button
-                onClick={loadData}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
+                onClick={handleRefresh}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors disabled:opacity-50"
               >
                 <FiRefreshCw className={loading ? 'animate-spin' : ''} />
                 Refresh
@@ -114,7 +146,7 @@ function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 px-4">
         {/* Statistics */}
-        <StatsCards agents={agents} tasks={tasks} />
+        <StatsCards agents={memoizedAgents} tasks={memoizedTasks} />
 
         {/* Agents Grid */}
         <div className="bg-white rounded-lg shadow mb-6">
@@ -127,8 +159,8 @@ function App() {
           </div>
           <div className="p-6">
             <AgentDashboard 
-              agents={agents} 
-              tasks={tasks}
+              agents={memoizedAgents} 
+              tasks={memoizedTasks}
               onAssignTask={handleAssignTask}
             />
           </div>
@@ -144,7 +176,7 @@ function App() {
             <p className="text-gray-600 mt-1">Track task assignments and progress</p>
           </div>
           <div className="p-6">
-            <TasksView tasks={tasks} agents={agents} />
+            <TasksView tasks={memoizedTasks} agents={memoizedAgents} />
           </div>
         </div>
       </main>
@@ -152,7 +184,7 @@ function App() {
       {/* Create Agent Modal */}
       {showCreateModal && (
         <CreateAgentModal
-          templates={templates}
+          templates={memoizedTemplates}
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleCreateAgent}
         />

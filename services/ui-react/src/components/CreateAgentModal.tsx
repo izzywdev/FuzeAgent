@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { FiX, FiFileText, FiSettings } from 'react-icons/fi'
 import type { AgentTemplate, CreateAgentFromTemplate, CreateCustomAgent } from '../types'
 
@@ -8,7 +8,7 @@ interface CreateAgentModalProps {
   onSubmit: (data: CreateAgentFromTemplate | CreateCustomAgent) => Promise<void>
 }
 
-const CreateAgentModal: React.FC<CreateAgentModalProps> = ({ templates, onClose, onSubmit }) => {
+const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ templates, onClose, onSubmit }) => {
   const [activeTab, setActiveTab] = useState<'template' | 'custom'>('template')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -30,9 +30,17 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = ({ templates, onClose,
     goal: ''
   })
 
-  const handleTemplateChange = (templateId: string) => {
+  // Memoize template lookup
+  const templateMap = useMemo(() => {
+    return templates.reduce((map, template) => {
+      map[template.template_id] = template
+      return map
+    }, {} as Record<string, AgentTemplate>)
+  }, [templates])
+
+  const handleTemplateChange = useCallback((templateId: string) => {
     setSelectedTemplate(templateId)
-    const template = templates.find(t => t.template_id === templateId)
+    const template = templateMap[templateId]
     if (template) {
       setTemplateForm(prev => ({
         ...prev,
@@ -42,9 +50,9 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = ({ templates, onClose,
         temperature: template.default_temperature
       }))
     }
-  }
+  }, [templateMap])
 
-  const handleTemplateSubmit = async (e: React.FormEvent) => {
+  const handleTemplateSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedTemplate) {
       setError('Please select a template')
@@ -70,9 +78,9 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = ({ templates, onClose,
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedTemplate, templateForm, onSubmit])
 
-  const handleCustomSubmit = async (e: React.FormEvent) => {
+  const handleCustomSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
@@ -95,9 +103,11 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = ({ templates, onClose,
     } finally {
       setLoading(false)
     }
-  }
+  }, [customForm, onSubmit])
 
-  const selectedTemplateData = templates.find(t => t.template_id === selectedTemplate)
+  const selectedTemplateData = useMemo(() => {
+    return templateMap[selectedTemplate]
+  }, [templateMap, selectedTemplate])
 
   // Group templates by category
   const groupedTemplates = templates.reduce((groups, template) => {
@@ -338,6 +348,6 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = ({ templates, onClose,
       </div>
     </div>
   )
-}
+})
 
 export default CreateAgentModal

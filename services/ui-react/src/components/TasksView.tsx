@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { FiClock, FiCheckCircle, FiAlertCircle, FiUser } from 'react-icons/fi'
 import type { Task, Agent } from '../types'
 
@@ -7,8 +7,8 @@ interface TasksViewProps {
   agents: Agent[]
 }
 
-const TasksView: React.FC<TasksViewProps> = ({ tasks, agents }) => {
-  const getStatusColor = (status: string) => {
+const TasksView: React.FC<TasksViewProps> = React.memo(({ tasks, agents }) => {
+  const getStatusColor = useCallback((status: string) => {
     switch (status.toLowerCase()) {
       case 'completed': return 'bg-green-100 text-green-800'
       case 'in_progress': return 'bg-blue-100 text-blue-800'
@@ -16,9 +16,9 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, agents }) => {
       case 'failed': return 'bg-red-100 text-red-800'
       default: return 'bg-gray-100 text-gray-800'
     }
-  }
+  }, [])
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = useCallback((status: string) => {
     switch (status.toLowerCase()) {
       case 'completed': return <FiCheckCircle className="w-4 h-4" />
       case 'in_progress': return <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -26,19 +26,26 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, agents }) => {
       case 'failed': return <FiAlertCircle className="w-4 h-4" />
       default: return <FiClock className="w-4 h-4" />
     }
-  }
+  }, [])
 
-  const getPriorityColor = (priority: number) => {
+  const getPriorityColor = useCallback((priority: number) => {
     if (priority >= 8) return 'text-red-600'
     if (priority >= 6) return 'text-yellow-600'
     if (priority >= 4) return 'text-blue-600'
     return 'text-gray-600'
-  }
+  }, [])
 
-  const getAgentName = (agentId: string) => {
-    const agent = agents.find(a => a.id === agentId)
-    return agent?.name || 'Unknown Agent'
-  }
+  // Memoize agent lookup map
+  const agentMap = useMemo(() => {
+    return agents.reduce((map, agent) => {
+      map[agent.id] = agent.name
+      return map
+    }, {} as Record<string, string>)
+  }, [agents])
+
+  const getAgentName = useCallback((agentId: string) => {
+    return agentMap[agentId] || 'Unknown Agent'
+  }, [agentMap])
 
   if (tasks.length === 0) {
     return (
@@ -49,10 +56,12 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, agents }) => {
     )
   }
 
-  // Sort tasks by created_at (most recent first)
-  const sortedTasks = [...tasks].sort((a, b) => 
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
+  // Memoize sorted tasks
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+  }, [tasks])
 
   return (
     <div className="overflow-x-auto">
@@ -110,6 +119,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, agents }) => {
       </table>
     </div>
   )
-}
+})
 
 export default TasksView
