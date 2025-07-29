@@ -1,5 +1,60 @@
+// Organization types
+export interface Organization {
+  id: string
+  name: string
+  description?: string
+  settings: Record<string, any>
+  created_at: string
+  updated_at: string
+  team_count?: number
+  agent_count?: number
+}
+
+export interface OrganizationCreate {
+  name: string
+  description?: string
+  settings?: Record<string, any>
+}
+
+export interface OrganizationUpdate {
+  name?: string
+  description?: string
+  settings?: Record<string, any>
+}
+
+// Team types
+export interface Team {
+  id: string
+  organization_id: string
+  name: string
+  description?: string
+  team_type: 'development' | 'qa' | 'design' | 'management' | 'general'
+  settings: Record<string, any>
+  created_at: string
+  updated_at: string
+  organization_name?: string
+  agent_count?: number
+}
+
+export interface TeamCreate {
+  organization_id: string
+  name: string
+  description?: string
+  team_type?: 'development' | 'qa' | 'design' | 'management' | 'general'
+  settings?: Record<string, any>
+}
+
+export interface TeamUpdate {
+  name?: string
+  description?: string
+  team_type?: 'development' | 'qa' | 'design' | 'management' | 'general'
+  settings?: Record<string, any>
+}
+
+// Agent types (updated)
 export interface Agent {
   id: string
+  team_id: string
   name: string
   role: string
   type: string
@@ -16,6 +71,9 @@ export interface Agent {
   }
   created_at: string
   updated_at: string
+  team_name?: string
+  organization_id?: string
+  organization_name?: string
 }
 
 export interface Task {
@@ -50,6 +108,7 @@ export interface AgentTemplate {
 export interface CreateAgentFromTemplate {
   template_id: string
   overrides: {
+    team_id: string
     name?: string
     goal?: string
     backstory?: string
@@ -59,6 +118,7 @@ export interface CreateAgentFromTemplate {
 }
 
 export interface CreateCustomAgent {
+  team_id: string
   name: string
   role: string
   type: string
@@ -68,4 +128,21 @@ export interface CreateCustomAgent {
     model: string
     temperature: number
   }
+}
+
+// Extended types with relationships
+export interface OrganizationWithTeams extends Organization {
+  teams: Team[]
+}
+
+export interface TeamWithAgents extends Team {
+  agents: Agent[]
+}
+
+// Hierarchy context
+export interface HierarchyContext {
+  currentOrganization: Organization | null
+  currentTeam: Team | null
+  organizations: Organization[]
+  teams: Team[]
 }

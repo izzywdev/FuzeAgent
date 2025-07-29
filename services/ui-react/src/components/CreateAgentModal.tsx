@@ -1,14 +1,15 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { FiX, FiFileText, FiSettings } from 'react-icons/fi'
-import type { AgentTemplate, CreateAgentFromTemplate, CreateCustomAgent } from '../types'
+import type { AgentTemplate, CreateAgentFromTemplate, CreateCustomAgent, Team } from '../types'
 
 interface CreateAgentModalProps {
   templates: AgentTemplate[]
+  currentTeam: Team | null
   onClose: () => void
   onSubmit: (data: CreateAgentFromTemplate | CreateCustomAgent) => Promise<void>
 }
 
-const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ templates, onClose, onSubmit }) => {
+const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ templates, currentTeam, onClose, onSubmit }) => {
   const [activeTab, setActiveTab] = useState<'template' | 'custom'>('template')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -59,6 +60,11 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ template
       return
     }
 
+    if (!currentTeam) {
+      setError('Please select a team first')
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -66,6 +72,7 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ template
       const data: CreateAgentFromTemplate = {
         template_id: selectedTemplate,
         overrides: {
+          team_id: currentTeam.id,
           name: templateForm.name,
           ...(templateForm.goal && { goal: templateForm.goal }),
           ...(templateForm.backstory && { backstory: templateForm.backstory }),
@@ -78,15 +85,22 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ template
     } finally {
       setLoading(false)
     }
-  }, [selectedTemplate, templateForm, onSubmit])
+  }, [selectedTemplate, templateForm, currentTeam, onSubmit])
 
   const handleCustomSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!currentTeam) {
+      setError('Please select a team first')
+      return
+    }
+
     setLoading(true)
     setError(null)
 
     try {
       const data: CreateCustomAgent = {
+        team_id: currentTeam.id,
         name: customForm.name,
         role: customForm.role,
         type: customForm.type,
@@ -103,7 +117,7 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ template
     } finally {
       setLoading(false)
     }
-  }, [customForm, onSubmit])
+  }, [customForm, currentTeam, onSubmit])
 
   const selectedTemplateData = useMemo(() => {
     return templateMap[selectedTemplate]
