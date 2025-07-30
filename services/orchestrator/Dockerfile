@@ -25,9 +25,16 @@ RUN useradd -m -u 1000 orchestrator && \
     chown -R orchestrator:orchestrator /app
 USER orchestrator
 
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8000/ || exit 1
+
+# Set environment variable for migrations
+ENV RUN_MIGRATIONS=true
 
 # Run the application
-CMD ["uvicorn", "main_with_hierarchy:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+ENTRYPOINT ["/app/entrypoint.sh"]

@@ -26,7 +26,6 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init_db.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ai-team-network
 
@@ -68,6 +67,19 @@ services:
       - orchestrator
     networks:
       - ai-team-network
+
+  # MCP Server for Claude Desktop Integration
+  mcp-server:
+    build: ./mcp-servers/fuzeagent-server
+    ports:
+      - "8001:8001"
+    environment:
+      FUZEAGENT_API_URL: http://orchestrator:8000
+    depends_on:
+      - orchestrator
+    networks:
+      - ai-team-network
+    restart: unless-stopped
 
 networks:
   ai-team-network:

@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  fuzeagent-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      FUZEAGENT_API_URL: ${FUZEAGENT_API_URL:-http://host.docker.internal:8000}
+    networks:
+      - fuzeagent-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  fuzeagent-network:
+    external: true
+    name: ai-team-network

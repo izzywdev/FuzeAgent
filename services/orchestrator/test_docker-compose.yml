@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Test Database
+  fuzeagent-test-db:
+    image: pgvector/pgvector:pg15
+    container_name: fuzeagent-test-db
+    environment:
+      POSTGRES_DB: ai_context_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5434:5432"  # Different port to avoid conflicts with main DB
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+      - ./init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql
+    networks:
+      - fuzeagent-test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_context_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Test Redis
+  fuzeagent-test-redis:
+    image: redis:7-alpine
+    container_name: fuzeagent-test-redis
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    networks:
+      - fuzeagent-test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Test API Service (for integration tests)
+  fuzeagent-test-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fuzeagent-test-api
+    environment:
+      - TESTING=1
+      - DATABASE_URL=postgresql://postgres:password@fuzeagent-test-db:5432/ai_context_test
+      - REDIS_URL=redis://fuzeagent-test-redis:6379
+      - ANTHROPIC_API_KEY=test-api-key
+      - PYTHONPATH=/app
+    ports:
+      - "8001:8000"  # Different port for testing
+    depends_on:
+      fuzeagent-test-db:
+        condition: service_healthy
+      fuzeagent-test-redis:
+        condition: service_healthy
+    networks:
+      - fuzeagent-test-network
+    volumes:
+      - .:/app
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        python -c 'import asyncio; from migration_manager import MigrationManager; asyncio.run(MigrationManager(\"postgresql://postgres:password@fuzeagent-test-db:5432/ai_context_test\").migrate_up())' &&
+        echo 'Starting test API server...' &&
+        uvicorn main_with_hierarchy:app --host 0.0.0.0 --port 8000 --reload
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  test_postgres_data:
+
+networks:
+  fuzeagent-test-network:
+    driver: bridge
