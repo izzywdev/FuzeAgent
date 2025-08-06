@@ -1,0 +1,103 @@
+# TypeScript Development Aliases for FuzeAgent
+
+# Node.js shortcuts
+alias node='node'
+alias npm='npm'
+alias npx='npx'
+alias yarn='yarn'
+alias pnpm='pnpm'
+
+# TypeScript compilation
+alias tsc='npx tsc'
+alias tsc-watch='npx tsc --watch'
+alias tsc-check='npx tsc --noEmit'
+alias tsx='npx tsx'
+
+# Development servers
+alias dev='npm run dev'
+alias start='npm start'
+alias build='npm run build'
+alias preview='npm run preview'
+
+# Testing shortcuts  
+alias test='npm test'
+alias test-watch='npm run test:watch'
+alias test-coverage='npm run test:coverage'
+alias jest='npx jest'
+
+# Code quality
+alias lint='npm run lint'
+alias lint-fix='npm run lint:fix'
+alias format='npm run format'
+alias format-check='npm run format:check'
+alias prettier='npx prettier'
+alias eslint='npx eslint'
+
+# Package management
+alias install='npm install'
+alias add='npm install'
+alias remove='npm uninstall'
+alias update='npm update'
+alias outdated='npm outdated'
+alias audit='npm audit'
+
+# Yarn alternatives
+alias y='yarn'
+alias ya='yarn add'
+alias yr='yarn remove'
+alias yi='yarn install'
+alias yu='yarn upgrade'
+
+# pnpm alternatives
+alias p='pnpm'
+alias pa='pnpm add'
+alias pr='pnpm remove'
+alias pi='pnpm install'
+alias pu='pnpm update'
+
+# Development utilities
+alias clean='npm run clean'
+alias reset='rm -rf node_modules package-lock.json && npm install'
+alias fresh='npm run clean && npm install && npm run build'
+
+# TypeScript specific
+alias ts-node='npx ts-node'
+alias ts-check='npx tsc --noEmit --skipLibCheck'
+alias ts-watch='npx tsc --watch --preserveWatchOutput'
+
+# Framework shortcuts
+alias next='npx next'
+alias nest='npx nest'
+alias vite='npx vite'
+alias webpack='npx webpack'
+alias rollup='npx rollup'
+
+# Database and ORM
+alias prisma='npx prisma'
+alias typeorm='npx typeorm'
+
+# API development
+alias swagger='npx swagger-codegen'
+alias openapi='npx @apidevtools/swagger-cli'
+
+# Process management
+alias pm2='npx pm2'
+alias nodemon='npx nodemon'
+alias concurrently='npx concurrently'
+
+# Debugging
+alias inspect='node --inspect'
+alias debug='npm run dev -- --inspect'
+
+# Documentation
+alias typedoc='npx typedoc'
+alias docs='npx typedoc src --out docs'
+
+# Project inspection
+alias deps='npm list --depth=0'
+alias scripts='npm run'
+alias info='npm info'
+
+# Performance
+alias bundle-analyze='npx webpack-bundle-analyzer'
+alias size='npm run build && du -sh dist/*'

@@ -1,0 +1,54 @@
+FROM ubuntu:22.04
+
+# Avoid interactive prompts during install
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install essential packages
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    curl \
+    wget \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create agent user
+RUN useradd -l -u 1000 -m -s /bin/bash agent \
+    && echo "agent ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Set up workspace directory
+RUN mkdir -p /workspaces && chown agent:agent /workspaces
+
+# Copy agent process files
+COPY agent-process/requirements.txt /tmp/agent-requirements.txt
+COPY agent-process/autonomous_agent_with_memory.py /usr/local/bin/autonomous_agent_with_memory.py
+COPY agent-process/agent_memory_manager.py /usr/local/bin/agent_memory_manager.py
+COPY agent-process/claude_client_with_memory.py /usr/local/bin/claude_client_with_memory.py
+
+# Install Python dependencies for agent process
+RUN pip3 install --no-cache-dir -r /tmp/agent-requirements.txt
+
+# Make agent process executable
+RUN chmod +x /usr/local/bin/autonomous_agent_with_memory.py
+
+# Set ownership
+RUN chown -R agent:agent /usr/local/bin/
+
+# Switch to agent user
+USER agent
+WORKDIR /workspaces
+
+# Set environment variables
+ENV USER=agent
+ENV HOME=/home/agent
+ENV PYTHONPATH=/usr/local/bin:$PYTHONPATH
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD [ "python3", "-c", "print('Agent container healthy')" ]
+
+# Default command starts the memory-enhanced autonomous agent
+CMD ["python3", "/usr/local/bin/autonomous_agent_with_memory.py"]

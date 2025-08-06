@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 FuzeAgent is an AI team orchestration platform that creates and manages autonomous AI agents using Claude Code SDK. The system implements a distributed architecture where multiple AI agents collaborate to complete complex software development tasks, with a digital CEO (IzzyAI) coordinating the team.
 
+### Key Features
+
+- **Hierarchical Knowledge Management**: Organization-level RAG system with knowledge propagation from agents → teams → organizations
+- **Goals Management System**: Comprehensive organizational goals with AI-powered milestone generation and task derivation
+- **Intelligent Conversations**: AI-powered goal planning conversations with automated milestone and action item extraction
+- **Progress Tracking**: Real-time progress monitoring with risk assessment and deadline management
+- **Cross-functional Task Generation**: Automatic task generation across different business functions
+
 ## Architecture Overview
 
 ```
@@ -73,6 +81,60 @@ docker-compose logs -f [service_name]
 
 # Check service status
 docker-compose ps
+```
+
+### Goals Management
+```bash
+# Create organizational goal via API
+curl -X POST http://localhost:8000/organizations/{org_id}/goals \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Reach $100K MRR",
+    "description": "Achieve $100,000 monthly recurring revenue in 6 months",
+    "goal_type": "business",
+    "target_value": 100000,
+    "target_unit": "USD",
+    "target_deadline": "2024-12-31",
+    "priority_level": 10,
+    "success_criteria": {
+      "revenue_target": 100000,
+      "sustainability": "3_consecutive_months"
+    }
+  }'
+
+# Generate execution plan with milestones and tasks
+curl -X POST http://localhost:8000/goals/{goal_id}/generate-execution-plan
+
+# Create AI-powered planning conversation
+curl -X POST http://localhost:8000/goals/{goal_id}/conversations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "conversation_type": "planning",
+    "conversation_title": "Strategic Planning Session",
+    "initial_context": {"focus": "revenue_growth"}
+  }'
+
+# Track progress with risk assessment
+curl -X POST http://localhost:8000/goals/{goal_id}/track-progress \
+  -H "Content-Type: application/json" \
+  -d '{
+    "progress_percentage": 25.5,
+    "current_value": 25000,
+    "confidence_score": 0.7,
+    "notes": "Good progress this month"
+  }'
+
+# Generate monthly milestones automatically
+curl -X POST http://localhost:8000/goals/{goal_id}/generate-monthly-milestones
+
+# Get comprehensive progress report
+curl http://localhost:8000/goals/{goal_id}/progress-report?report_period_days=30
+
+# Assess deadline risk
+curl http://localhost:8000/goals/{goal_id}/deadline-risk
+
+# Get organization goals dashboard
+curl http://localhost:8000/organizations/{org_id}/goals-dashboard
 ```
 
 ### Agent Management
@@ -167,6 +229,22 @@ curl http://localhost:8000/health
 - **Interactions Table**: Agent communication history with vector embeddings
 - **Agent Hierarchy Table**: Organizational relationships between agents
 
+### Knowledge Management System
+- **Location**: `services/orchestrator/organization_rag_manager.py`, `team_knowledge_manager.py`, `knowledge_propagation_engine.py`
+- **Organization RAG**: Semantic search and knowledge storage at organization level
+- **Knowledge Propagation**: Automatic knowledge flow from agents → teams → organizations
+- **Context Enhancement**: Inject relevant knowledge into agent contexts during task execution
+- **Knowledge Analytics**: Track knowledge utilization and effectiveness
+
+### Goals Management System
+- **Location**: `services/orchestrator/goals_management_service.py`, `milestone_task_engine.py`, `goal_conversation_service.py`, `goal_tracking_service.py`
+- **Goals Management**: Create, track, and manage organizational goals with deadlines and priorities
+- **Milestone Generation**: AI-powered breakdown of goals into actionable milestones
+- **Task Derivation**: Automatic task creation from milestones with team assignment
+- **Conversation Support**: AI-powered planning conversations with milestone extraction
+- **Progress Tracking**: Real-time monitoring with risk assessment and alerts
+- **Cross-functional Planning**: Task generation across development, marketing, sales, operations
+
 ## Agent Types and Capabilities
 
 ### Executive Agents
@@ -231,11 +309,21 @@ JWT_SECRET=your-jwt-secret
 ```
 
 ### Service Endpoints
-- **Management UI**: http://localhost:3000
+
+#### Direct Access (Docker ports)
+- **Management UI**: http://localhost:3031
 - **Orchestrator API**: http://localhost:8000
-- **RabbitMQ Management**: http://localhost:15672
-- **Database**: localhost:5432
-- **Redis**: localhost:6379
+- **RabbitMQ Management**: http://localhost:15673
+- **Database**: localhost:5434
+- **Redis**: localhost:6380
+
+#### Via FuzeInfra Nginx Proxy (Recommended)
+- **Management UI**: http://localhost/fuzeagent
+- **Documentation**: http://localhost/fuzeagent/docs
+- **API Playground**: http://localhost/fuzeagent/playground
+- **API Access**: http://localhost/api
+
+**Note**: FuzeInfra nginx proxy takes precedence on port 80. All FuzeAgent services are accessible through the `/fuzeagent` path prefix when using the nginx proxy.
 
 ## Monitoring and Observability
 

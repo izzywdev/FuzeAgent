@@ -82,6 +82,42 @@ FuzeAgent is a comprehensive AI team orchestration platform that creates and man
 - **Orchestrator** (port 8000): FastAPI service managing agents and tasks
 - **Management UI** (port 3000): React-based dashboard (coming soon)
 
+## 🎯 Goals Management System
+
+FuzeAgent includes a comprehensive Goals Management System for organizational planning and execution:
+
+### Key Features
+- **Strategic Goal Setting**: Create organizational objectives with deadlines and success criteria
+- **AI-Powered Planning**: Automatic milestone and task generation from goals
+- **Conversation Support**: AI-powered planning discussions and progress reviews
+- **Cross-functional Coordination**: Tasks distributed across development, marketing, sales, and operations teams
+- **Real-time Tracking**: Progress monitoring with risk assessment and automated alerts
+
+### Example: Achieving $100K MRR
+```bash
+# Create organizational goal
+curl -X POST http://localhost:8000/organizations/WCG/goals \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Reach $100K MRR",
+    "description": "Achieve $100,000 monthly recurring revenue in 6 months",
+    "target_value": 100000,
+    "target_deadline": "2024-12-31",
+    "priority_level": 10
+  }'
+
+# Generate execution plan with monthly milestones
+curl -X POST http://localhost:8000/goals/{goal_id}/generate-execution-plan
+
+# Create AI planning conversation
+curl -X POST http://localhost:8000/goals/{goal_id}/conversations \
+  -d '{"conversation_type": "planning", "conversation_title": "Strategic Planning"}'
+
+# Track progress
+curl -X POST http://localhost:8000/goals/{goal_id}/track-progress \
+  -d '{"progress_percentage": 25.5, "current_value": 25500}'
+```
+
 ## 🤖 Agent Types
 
 ### Executive Agents
@@ -138,6 +174,57 @@ GET /tasks
 
 # Get specific task
 GET /tasks/{task_id}
+```
+
+### Goals Management
+```bash
+# Create organizational goal
+POST /organizations/{org_id}/goals
+{
+  "title": "Reach $100K MRR",
+  "description": "Achieve revenue target in 6 months",
+  "goal_type": "business",
+  "target_value": 100000,
+  "target_deadline": "2024-12-31",
+  "priority_level": 10
+}
+
+# List organization goals
+GET /organizations/{org_id}/goals?status=active&limit=25
+
+# Get goal details
+GET /goals/{goal_id}
+
+# Update goal progress
+PUT /goals/{goal_id}/progress
+{
+  "progress_percentage": 25.5,
+  "current_value": 25000,
+  "notes": "Good progress this month"
+}
+
+# Generate execution plan
+POST /goals/{goal_id}/generate-execution-plan
+
+# Create planning conversation
+POST /goals/{goal_id}/conversations
+{
+  "conversation_type": "planning",
+  "conversation_title": "Strategic Planning Session"
+}
+
+# Track progress with risk assessment
+POST /goals/{goal_id}/track-progress
+{
+  "progress_percentage": 30.5,
+  "confidence_score": 0.8
+}
+
+# Get deadline risk assessment
+GET /goals/{goal_id}/deadline-risk
+
+# Organization dashboard
+GET /organizations/{org_id}/goals-dashboard
 ```
 
 ### System Health
@@ -221,6 +308,13 @@ The system uses both global and project-specific Claude Code configurations:
 - `strategic_planning`: High-level project planning and architecture decisions
 - `resource_allocation`: Distribute tasks and manage team capacity
 - `team_management`: Coordinate agent activities and resolve conflicts
+
+### Goals-Driven Task Generation
+- **Milestone Creation**: AI automatically generates time-bound milestones from organizational goals
+- **Cross-Functional Tasks**: Goals spawn tasks across development, marketing, sales, and operations teams
+- **Dynamic Assignment**: Tasks automatically assigned to appropriate agents based on skills and availability
+- **Progress Coordination**: Real-time progress updates flow from tasks → milestones → goals
+- **Risk Management**: Automated risk assessment and mitigation strategy generation
 
 ## 📊 Monitoring
 

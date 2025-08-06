@@ -155,6 +155,16 @@ jobs:
       run: |
         python -m pytest tests/ -m "mcp" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
     
+    - name: Run Goals Management tests
+      working-directory: services/orchestrator
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5434/ai_context_test
+        REDIS_URL: redis://localhost:6380
+        ANTHROPIC_API_KEY: test-api-key
+        TESTING: 1
+      run: |
+        python -m pytest tests/ -m "goals" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
+    
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:

@@ -1,0 +1,142 @@
+# Getting Started with FuzeAgent
+
+FuzeAgent is an AI team orchestration platform that creates and manages autonomous AI agents using Claude Code SDK. This guide will help you integrate FuzeAgent into your workflow and start building AI-powered development teams.
+
+## Quick Start
+
+### Prerequisites
+
+Before getting started with FuzeAgent, ensure you have:
+
+- **Node.js 18+** installed
+- **Docker and Docker Compose** for containerized deployment
+- **Anthropic API Key** for Claude AI integration
+- **PostgreSQL** for data persistence
+- **RabbitMQ** for message queuing
+
+### 1. Environment Setup
+
+Clone and set up the FuzeAgent platform:
+
+```bash
+git clone https://github.com/yourusername/FuzeAgent.git
+cd FuzeAgent
+
+# Copy environment template
+cp .env.example .env
+
+# Configure your API keys
+nano .env
+```
+
+Required environment variables:
+
+```env
+# AI Integration
+ANTHROPIC_API_KEY=your-claude-api-key
+
+# Database
+POSTGRES_PASSWORD=secure-password
+DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_context
+
+# Message Queue
+RABBITMQ_PASSWORD=secure-password
+RABBITMQ_URL=amqp://admin:password@rabbitmq:5672/
+
+# Cache
+REDIS_URL=redis://redis:6379
+
+# Security
+JWT_SECRET=your-jwt-secret
+```
+
+### 2. Quick Setup Script
+
+Use our automated setup script:
+
+```bash
+# Make setup script executable
+chmod +x setup.sh
+
+# Run quick setup
+./setup.sh
+```
+
+This script will:
+- Start PostgreSQL, RabbitMQ, and Redis containers
+- Initialize the database schema
+- Start the orchestration service
+- Launch the management UI
+
+### 3. Verify Installation
+
+Check that all services are running:
+
+```bash
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f orchestrator
+```
+
+Navigate to `http://localhost:3000` to access the FuzeAgent management interface.
+
+## Core Concepts
+
+### Organizations & Teams
+
+FuzeAgent uses a hierarchical structure:
+
+```
+Organization (e.g., "ACME Corp")
+└── Teams (e.g., "Frontend Team", "Backend Team")
+    └── Agents (e.g., "React Developer", "API Developer")
+```
+
+### Agent Types
+
+**Executive Agents:**
+- **CEO (IzzyAI)**: Strategic planning and team coordination
+- **CTO**: Technical architecture and developer oversight
+- **CPO**: Product planning and quality assurance
+
+**Developer Agents:**
+- **Frontend Developers**: React, TypeScript, UI/UX
+- **Backend Developers**: FastAPI, databases, APIs
+- **Full-Stack Developers**: End-to-end implementation
+
+**Specialist Agents:**
+- **QA Engineers**: Testing and automation
+- **DevOps Engineers**: Infrastructure and deployment
+- **Designers**: UI mockups and design systems
+
+### Task Distribution
+
+Tasks flow through the system as follows:
+
+1. **Task Creation**: Create tasks via API or UI
+2. **Analysis**: System analyzes required skills and complexity
+3. **Assignment**: Tasks assigned to appropriate agents
+4. **Execution**: Agents execute tasks using Claude Code SDK
+5. **Review**: Results reviewed and validated
+6. **Completion**: Tasks marked complete with deliverables
+
+## Next Steps
+
+Now that you have FuzeAgent running:
+
+1. [Create your first organization and team](./organizations-teams)
+2. [Deploy your first AI agent](./creating-agents)
+3. [Assign and manage tasks](./task-management)
+4. [Set up monitoring and alerts](./monitoring)
+
+## Getting Help
+
+- **Documentation**: Browse our comprehensive guides
+- **API Reference**: Detailed API documentation
+- **Examples**: Code samples and use cases
+- **Community**: Join our developer community
+- **Support**: Contact our support team
+
+Ready to build your AI development team? Let's get started!

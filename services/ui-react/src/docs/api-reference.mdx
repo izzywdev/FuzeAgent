@@ -1,0 +1,332 @@
+# API Reference
+
+FuzeAgent provides a comprehensive REST API for managing organizations, teams, agents, and tasks. All endpoints return JSON responses and use standard HTTP status codes.
+
+## Base URL
+
+```
+http://localhost:8006
+```
+
+## Authentication
+
+Currently, FuzeAgent operates without authentication for development. Production deployments should implement JWT-based authentication.
+
+## Organizations
+
+### List Organizations
+
+```http
+GET /organizations
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "org_123",
+    "name": "ACME Corporation",
+    "description": "Main development organization",
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+### Create Organization
+
+```http
+POST /organizations
+Content-Type: application/json
+
+{
+  "name": "New Organization",
+  "description": "Organization description"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "org_124",
+  "name": "New Organization",
+  "description": "Organization description",
+  "created_at": "2024-01-15T11:00:00Z"
+}
+```
+
+## Teams
+
+### List Teams
+
+```http
+GET /teams?organization_id=org_123
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "team_456",
+    "name": "Frontend Team",
+    "description": "React and TypeScript development",
+    "organization_id": "org_123",
+    "created_at": "2024-01-15T10:45:00Z"
+  }
+]
+```
+
+### Create Team
+
+```http
+POST /teams
+Content-Type: application/json
+
+{
+  "name": "Backend Team",
+  "description": "API and database development",
+  "organization_id": "org_123"
+}
+```
+
+## Agents
+
+### List Agents
+
+```http
+GET /agents?team_id=team_456
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "agent_789",
+    "name": "React Developer",
+    "role": "Senior Frontend Developer",
+    "type": "developer",
+    "status": "active",
+    "team_id": "team_456",
+    "config": {
+      "model": "claude-sonnet-4-20250514",
+      "skills": ["react", "typescript", "tailwind"],
+      "tools": ["code_generation", "code_review"]
+    },
+    "created_at": "2024-01-15T11:15:00Z"
+  }
+]
+```
+
+### Create Agent from Template
+
+```http
+POST /agents/from-template
+Content-Type: application/json
+
+{
+  "template_id": "react_developer",
+  "name": "Frontend Dev 1",
+  "team_id": "team_456",
+  "overrides": {
+    "skills": ["react", "typescript", "next.js"],
+    "model": "claude-sonnet-4-20250514"
+  }
+}
+```
+
+### Create Custom Agent
+
+```http
+POST /agents
+Content-Type: application/json
+
+{
+  "name": "Custom Agent",
+  "role": "Specialized Developer",
+  "type": "developer",
+  "team_id": "team_456",
+  "config": {
+    "model": "claude-sonnet-4-20250514",
+    "skills": ["python", "fastapi", "postgresql"],
+    "tools": ["code_generation", "database_design"],
+    "system_prompt": "You are a Python backend specialist..."
+  }
+}
+```
+
+## Tasks
+
+### List Tasks
+
+```http
+GET /tasks
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "task_101",
+    "title": "Implement user dashboard",
+    "description": "Create responsive dashboard with charts",
+    "status": "pending",
+    "priority": 7,
+    "agent_id": "agent_789",
+    "created_by": "user_001",
+    "created_at": "2024-01-15T12:00:00Z"
+  }
+]
+```
+
+### Assign Task to Agent
+
+```http
+POST /agents/{agent_id}/tasks
+Content-Type: application/json
+
+{
+  "title": "Fix responsive layout",
+  "description": "Update mobile breakpoints for dashboard",
+  "priority": 5
+}
+```
+
+### Update Task Status
+
+```http
+PUT /tasks/{task_id}/status
+Content-Type: application/json
+
+{
+  "status": "completed",
+  "result": "Dashboard implemented with responsive design"
+}
+```
+
+## Agent Templates
+
+### List Available Templates
+
+```http
+GET /templates
+```
+
+**Response:**
+```json
+{
+  "templates": [
+    {
+      "id": "react_developer",
+      "name": "React Developer",
+      "description": "Frontend developer specialized in React",
+      "category": "development",
+      "config": {
+        "model": "claude-sonnet-4-20250514",
+        "skills": ["react", "typescript", "css"],
+        "tools": ["code_generation", "code_review", "debugging"]
+      }
+    }
+  ]
+}
+```
+
+## Team Hierarchy
+
+### Get Organization Hierarchy
+
+```http
+GET /hierarchy?organization_id=org_123
+```
+
+**Response:**
+```json
+{
+  "organization": {
+    "id": "org_123",
+    "name": "ACME Corporation",
+    "teams": [
+      {
+        "id": "team_456",
+        "name": "Frontend Team",
+        "agents": [
+          {
+            "id": "agent_789",
+            "name": "React Developer",
+            "status": "active"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## WebSocket Events
+
+FuzeAgent provides real-time updates via WebSocket connection:
+
+```javascript
+const ws = new WebSocket('ws://localhost:8006/ws');
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  
+  switch (message.type) {
+    case 'organization_created':
+      console.log('New organization:', message.data);
+      break;
+    case 'agent_created':
+      console.log('New agent:', message.data);
+      break;
+    case 'task_updated':
+      console.log('Task update:', message.data);
+      break;
+  }
+};
+```
+
+## Error Handling
+
+All endpoints return appropriate HTTP status codes:
+
+- `200` - Success
+- `201` - Created
+- `400` - Bad Request
+- `404` - Not Found
+- `500` - Internal Server Error
+
+Error responses include details:
+
+```json
+{
+  "error": "Invalid request",
+  "details": "team_id is required",
+  "code": "VALIDATION_ERROR"
+}
+```
+
+## Rate Limiting
+
+API requests are currently unlimited for development. Production deployments should implement appropriate rate limiting.
+
+## SDK Integration
+
+For programmatic access, consider using our SDKs:
+
+```javascript
+// JavaScript/TypeScript
+import { FuzeAgentClient } from '@fuzeagent/client';
+
+const client = new FuzeAgentClient({
+  baseUrl: 'http://localhost:8006'
+});
+
+const agents = await client.agents.list({ teamId: 'team_456' });
+```
+
+```python
+# Python
+from fuzeagent import FuzeAgentClient
+
+client = FuzeAgentClient(base_url='http://localhost:8006')
+agents = client.agents.list(team_id='team_456')
+```

@@ -16,24 +16,13 @@ from urllib.parse import urljoin
 import httpx
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.server.sse import sse_server
+from mcp.server.sse import SseServerTransport
 from mcp.types import (
     Tool,
     TextContent,
-    ImageContent,
-    EmbeddedResource,
     CallToolRequest,
     CallToolResult,
-    ListToolsRequest,
-    GetPromptRequest,
-    GetPromptResult,
-    PromptMessage,
-    GetResourceRequest,
-    GetResourceResult,
-    ListResourcesRequest,
-    ListResourcesResult,
-    Resource,
-    Prompt
+    ListToolsRequest
 )
 from pydantic import BaseModel, Field
 import structlog
@@ -207,6 +196,377 @@ class FuzeAgentMCPServer:
                         },
                         "required": []
                     }
+                ),
+                Tool(
+                    name="deploy_agent",
+                    description="Deploy a new agent from a template to a specific team",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "team_id": {
+                                "type": "string",
+                                "description": "ID of the team to deploy the agent to"
+                            },
+                            "template_id": {
+                                "type": "string",
+                                "description": "ID of the agent template to use (e.g., 'python_developer', 'react_developer')"
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "Custom name for the agent instance"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Optional description for the agent instance"
+                            },
+                            "overrides": {
+                                "type": "object",
+                                "description": "Optional configuration overrides for the agent",
+                                "properties": {
+                                    "model": {"type": "string"},
+                                    "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+                                    "max_tokens": {"type": "integer"},
+                                    "skills": {"type": "array", "items": {"type": "string"}},
+                                    "tools": {"type": "array", "items": {"type": "string"}}
+                                }
+                            }
+                        },
+                        "required": ["team_id", "template_id", "name"]
+                    }
+                ),
+                Tool(
+                    name="create_custom_agent",
+                    description="Create a custom agent with specific configuration",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "team_id": {
+                                "type": "string",
+                                "description": "ID of the team to create the agent in"
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "Name for the custom agent"
+                            },
+                            "role": {
+                                "type": "string",
+                                "description": "Role description for the agent"
+                            },
+                            "type": {
+                                "type": "string",
+                                "description": "Agent type identifier"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Description of the agent's capabilities"
+                            },
+                            "config": {
+                                "type": "object",
+                                "description": "Agent configuration including model, skills, tools",
+                                "properties": {
+                                    "model": {"type": "string", "default": "claude-3-sonnet-20241022"},
+                                    "temperature": {"type": "number", "minimum": 0, "maximum": 2, "default": 0.7},
+                                    "max_tokens": {"type": "integer", "default": 4096},
+                                    "skills": {"type": "array", "items": {"type": "string"}},
+                                    "tools": {"type": "array", "items": {"type": "string"}},
+                                    "system_prompt": {"type": "string"}
+                                }
+                            }
+                        },
+                        "required": ["team_id", "name", "role", "type"]
+                    }
+                ),
+                Tool(
+                    name="get_agent_tasks",
+                    description="Get list of tasks assigned to a specific agent",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "agent_id": {
+                                "type": "string",
+                                "description": "ID of the agent to get tasks for"
+                            },
+                            "status": {
+                                "type": "string",
+                                "description": "Optional filter by task status",
+                                "enum": ["pending", "running", "completed", "failed", "cancelled"]
+                            }
+                        },
+                        "required": ["agent_id"]
+                    }
+                ),
+                Tool(
+                    name="update_task_status",
+                    description="Update the status of a specific task",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "task_id": {
+                                "type": "string",
+                                "description": "ID of the task to update"
+                            },
+                            "status": {
+                                "type": "string",
+                                "description": "New status for the task",
+                                "enum": ["pending", "running", "completed", "failed", "cancelled"]
+                            },
+                            "result": {
+                                "type": "string",
+                                "description": "Optional task result or notes"
+                            }
+                        },
+                        "required": ["task_id", "status"]
+                    }
+                ),
+                # Goals Management Tools
+                Tool(
+                    name="create_organizational_goal",
+                    description="Create a new strategic goal for an organization",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "organization_id": {
+                                "type": "string",
+                                "description": "ID of the organization"
+                            },
+                            "title": {
+                                "type": "string",
+                                "description": "Goal title"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Detailed goal description"
+                            },
+                            "goal_type": {
+                                "type": "string",
+                                "enum": ["business", "technical", "operational", "strategic"],
+                                "description": "Type of goal"
+                            },
+                            "target_value": {
+                                "type": "number",
+                                "description": "Target numeric value (e.g., revenue, users)"
+                            },
+                            "target_unit": {
+                                "type": "string",
+                                "description": "Unit for target value (e.g., USD, users, percent)"
+                            },
+                            "target_deadline": {
+                                "type": "string",
+                                "description": "Deadline in YYYY-MM-DD format"
+                            },
+                            "priority_level": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 10,
+                                "description": "Priority level (1-10, higher is more important)"
+                            },
+                            "assigned_teams": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of team IDs assigned to this goal"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Tags for categorization"
+                            }
+                        },
+                        "required": ["organization_id", "title", "description", "goal_type", "target_deadline"]
+                    }
+                ),
+                Tool(
+                    name="list_organization_goals",
+                    description="List all goals for an organization",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "organization_id": {
+                                "type": "string",
+                                "description": "ID of the organization"
+                            },
+                            "status": {
+                                "type": "array",
+                                "items": {"type": "string", "enum": ["active", "paused", "completed", "cancelled"]},
+                                "description": "Filter by goal status"
+                            },
+                            "goal_type": {
+                                "type": "array",
+                                "items": {"type": "string", "enum": ["business", "technical", "operational", "strategic"]},
+                                "description": "Filter by goal type"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "default": 25,
+                                "description": "Maximum number of goals to return"
+                            }
+                        },
+                        "required": ["organization_id"]
+                    }
+                ),
+                Tool(
+                    name="get_goal_details",
+                    description="Get detailed information about a specific goal",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "goal_id": {
+                                "type": "string",
+                                "description": "ID of the goal"
+                            }
+                        },
+                        "required": ["goal_id"]
+                    }
+                ),
+                Tool(
+                    name="update_goal_progress",
+                    description="Update progress on a goal",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "goal_id": {
+                                "type": "string",
+                                "description": "ID of the goal"
+                            },
+                            "progress_percentage": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100,
+                                "description": "Progress percentage (0-100)"
+                            },
+                            "current_value": {
+                                "type": "number",
+                                "description": "Current value achieved"
+                            },
+                            "completion_confidence": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1,
+                                "description": "Confidence in completion (0-1)"
+                            },
+                            "notes": {
+                                "type": "string",
+                                "description": "Progress notes"
+                            }
+                        },
+                        "required": ["goal_id"]
+                    }
+                ),
+                Tool(
+                    name="generate_goal_execution_plan",
+                    description="Generate comprehensive execution plan with AI-powered milestones and tasks",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "goal_id": {
+                                "type": "string",
+                                "description": "ID of the goal"
+                            },
+                            "planning_context": {
+                                "type": "object",
+                                "description": "Optional context for AI planning",
+                                "properties": {
+                                    "focus": {"type": "string"},
+                                    "resources": {"type": "string"},
+                                    "constraints": {"type": "array", "items": {"type": "string"}}
+                                }
+                            }
+                        },
+                        "required": ["goal_id"]
+                    }
+                ),
+                Tool(
+                    name="create_goal_conversation",
+                    description="Create an AI-powered planning conversation for a goal",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "goal_id": {
+                                "type": "string",
+                                "description": "ID of the goal"
+                            },
+                            "conversation_type": {
+                                "type": "string",
+                                "enum": ["planning", "review", "problem_solving"],
+                                "description": "Type of conversation"
+                            },
+                            "conversation_title": {
+                                "type": "string",
+                                "description": "Title for the conversation"
+                            },
+                            "initial_context": {
+                                "type": "object",
+                                "description": "Initial context for the conversation"
+                            }
+                        },
+                        "required": ["goal_id", "conversation_type", "conversation_title"]
+                    }
+                ),
+                Tool(
+                    name="track_goal_progress",
+                    description="Record detailed progress tracking with risk assessment",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "goal_id": {
+                                "type": "string",
+                                "description": "ID of the goal"
+                            },
+                            "progress_percentage": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100,
+                                "description": "Progress percentage (0-100)"
+                            },
+                            "current_value": {
+                                "type": "number",
+                                "description": "Current value achieved"
+                            },
+                            "notes": {
+                                "type": "string",
+                                "description": "Progress notes"
+                            },
+                            "confidence_score": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1,
+                                "description": "Confidence score (0-1)"
+                            },
+                            "trigger_alerts": {
+                                "type": "boolean",
+                                "default": True,
+                                "description": "Whether to trigger risk assessment alerts"
+                            }
+                        },
+                        "required": ["goal_id", "progress_percentage"]
+                    }
+                ),
+                Tool(
+                    name="assess_goal_deadline_risk",
+                    description="Get comprehensive risk assessment for goal completion",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "goal_id": {
+                                "type": "string",
+                                "description": "ID of the goal"
+                            }
+                        },
+                        "required": ["goal_id"]
+                    }
+                ),
+                Tool(
+                    name="get_organization_goals_dashboard",
+                    description="Get comprehensive dashboard view for all organizational goals",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "organization_id": {
+                                "type": "string",
+                                "description": "ID of the organization"
+                            }
+                        },
+                        "required": ["organization_id"]
+                    }
                 )
             ]
         
@@ -231,6 +591,33 @@ class FuzeAgentMCPServer:
                     return await self._get_agent_templates(arguments.get("category"))
                 elif name == "get_team_hierarchy":
                     return await self._get_team_hierarchy(arguments.get("organization_id"))
+                elif name == "deploy_agent":
+                    return await self._deploy_agent(arguments)
+                elif name == "create_custom_agent":
+                    return await self._create_custom_agent(arguments)
+                elif name == "get_agent_tasks":
+                    return await self._get_agent_tasks(arguments["agent_id"], arguments.get("status"))
+                elif name == "update_task_status":
+                    return await self._update_task_status(arguments)
+                # Goals Management Tool Handlers
+                elif name == "create_organizational_goal":
+                    return await self._create_organizational_goal(arguments)
+                elif name == "list_organization_goals":
+                    return await self._list_organization_goals(arguments)
+                elif name == "get_goal_details":
+                    return await self._get_goal_details(arguments["goal_id"])
+                elif name == "update_goal_progress":
+                    return await self._update_goal_progress(arguments)
+                elif name == "generate_goal_execution_plan":
+                    return await self._generate_goal_execution_plan(arguments)
+                elif name == "create_goal_conversation":
+                    return await self._create_goal_conversation(arguments)
+                elif name == "track_goal_progress":
+                    return await self._track_goal_progress(arguments)
+                elif name == "assess_goal_deadline_risk":
+                    return await self._assess_goal_deadline_risk(arguments["goal_id"])
+                elif name == "get_organization_goals_dashboard":
+                    return await self._get_organization_goals_dashboard(arguments["organization_id"])
                 else:
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"Unknown tool: {name}")]
@@ -557,6 +944,661 @@ class FuzeAgentMCPServer:
                 content=[TextContent(type="text", text=f"Failed to get team hierarchy: {str(e)}")]
             )
     
+    async def _deploy_agent(self, deploy_data: Dict[str, Any]) -> CallToolResult:
+        """Deploy a new agent from a template"""
+        try:
+            payload = {
+                "template_id": deploy_data["template_id"],
+                "overrides": {
+                    "name": deploy_data["name"],
+                    "description": deploy_data.get("description"),
+                    "team_id": deploy_data["team_id"],
+                    **deploy_data.get("overrides", {})
+                }
+            }
+            
+            result = await self.api_client.post("/agents/from-template", payload)
+            
+            response = f"✅ **Agent Deployed Successfully**\n\n"
+            response += f"- **Agent ID**: {result.get('id', 'Unknown')}\n"
+            response += f"- **Name**: {deploy_data['name']}\n"
+            response += f"- **Template**: {deploy_data['template_id']}\n"
+            response += f"- **Team ID**: {deploy_data['team_id']}\n"
+            response += f"- **Type**: {result.get('type', 'Unknown')}\n"
+            response += f"- **Status**: {result.get('status', 'active')}\n"
+            
+            if result.get('config', {}).get('skills'):
+                skills = ', '.join(result['config']['skills'][:5])
+                if len(result['config']['skills']) > 5:
+                    skills += f" +{len(result['config']['skills']) - 5} more"
+                response += f"- **Skills**: {skills}\n"
+            
+            response += f"\nThe agent is now ready to receive tasks!"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to deploy agent: {str(e)}")]
+            )
+    
+    async def _create_custom_agent(self, agent_data: Dict[str, Any]) -> CallToolResult:
+        """Create a custom agent with specific configuration"""
+        try:
+            payload = {
+                "team_id": agent_data["team_id"],
+                "name": agent_data["name"],
+                "role": agent_data["role"],
+                "type": agent_data["type"],
+                "description": agent_data.get("description"),
+                "config": agent_data.get("config", {})
+            }
+            
+            # Set defaults for config if not provided
+            if "model" not in payload["config"]:
+                payload["config"]["model"] = "claude-3-sonnet-20241022"
+            if "temperature" not in payload["config"]:
+                payload["config"]["temperature"] = 0.7
+            if "max_tokens" not in payload["config"]:
+                payload["config"]["max_tokens"] = 4096
+            
+            result = await self.api_client.post("/agents", payload)
+            
+            response = f"✅ **Custom Agent Created Successfully**\n\n"
+            response += f"- **Agent ID**: {result.get('id', 'Unknown')}\n"
+            response += f"- **Name**: {agent_data['name']}\n"
+            response += f"- **Role**: {agent_data['role']}\n"
+            response += f"- **Type**: {agent_data['type']}\n"
+            response += f"- **Team ID**: {agent_data['team_id']}\n"
+            response += f"- **Model**: {payload['config']['model']}\n"
+            response += f"- **Temperature**: {payload['config']['temperature']}\n"
+            
+            if payload["config"].get("skills"):
+                response += f"- **Skills**: {', '.join(payload['config']['skills'])}\n"
+            if payload["config"].get("tools"):
+                response += f"- **Tools**: {', '.join(payload['config']['tools'])}\n"
+            
+            response += f"\nThe custom agent is now ready for task assignments!"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to create custom agent: {str(e)}")]
+            )
+    
+    async def _get_agent_tasks(self, agent_id: str, status: Optional[str] = None) -> CallToolResult:
+        """Get tasks assigned to a specific agent"""
+        try:
+            params = {}
+            if status:
+                params["status"] = status
+            
+            tasks = await self.api_client.get(f"/agents/{agent_id}/tasks", params)
+            
+            if not tasks:
+                status_filter = f" with status '{status}'" if status else ""
+                return CallToolResult(
+                    content=[TextContent(type="text", text=f"No tasks found for agent {agent_id}{status_filter}.")]
+                )
+            
+            result = f"**Tasks for Agent {agent_id}**\n\n"
+            
+            if status:
+                result += f"*Filtered by status: {status}*\n\n"
+            
+            # Group tasks by status
+            by_status = {}
+            for task in tasks:
+                task_status = task.get("status", "unknown")
+                if task_status not in by_status:
+                    by_status[task_status] = []
+                by_status[task_status].append(task)
+            
+            for task_status, status_tasks in by_status.items():
+                status_emoji = {
+                    "pending": "⏳",
+                    "running": "🔄",
+                    "completed": "✅",
+                    "failed": "❌",
+                    "cancelled": "🚫"
+                }.get(task_status, "❓")
+                
+                result += f"### {status_emoji} {task_status.title()} ({len(status_tasks)})\n\n"
+                
+                for task in status_tasks:
+                    result += f"**{task.get('title', 'Untitled Task')}** (`{task.get('id', 'Unknown ID')}`)\n"
+                    if task.get('description'):
+                        result += f"- {task['description']}\n"
+                    if task.get('priority'):
+                        result += f"- Priority: {task['priority']}/10\n"
+                    if task.get('created_at'):
+                        result += f"- Created: {task['created_at']}\n"
+                    if task.get('result'):
+                        result += f"- Result: {task['result'][:100]}{'...' if len(task['result']) > 100 else ''}\n"
+                    result += "\n"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=result)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to get agent tasks: {str(e)}")]
+            )
+    
+    async def _update_task_status(self, update_data: Dict[str, Any]) -> CallToolResult:
+        """Update the status of a specific task"""
+        try:
+            task_id = update_data["task_id"]
+            new_status = update_data["status"]
+            result = update_data.get("result")
+            
+            payload = {
+                "status": new_status
+            }
+            if result:
+                payload["result"] = result
+            
+            updated_task = await self.api_client.put(f"/tasks/{task_id}", payload)
+            
+            response = f"✅ **Task Status Updated**\n\n"
+            response += f"- **Task ID**: {task_id}\n"
+            response += f"- **New Status**: {new_status}\n"
+            response += f"- **Title**: {updated_task.get('title', 'Unknown')}\n"
+            
+            if result:
+                response += f"- **Result**: {result[:200]}{'...' if len(result) > 200 else ''}\n"
+            
+            if updated_task.get('updated_at'):
+                response += f"- **Updated**: {updated_task['updated_at']}\n"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to update task status: {str(e)}")]
+            )
+    
+    # Goals Management Methods
+    
+    async def _create_organizational_goal(self, goal_data: Dict[str, Any]) -> CallToolResult:
+        """Create a new organizational goal"""
+        try:
+            organization_id = goal_data["organization_id"]
+            
+            # Prepare goal payload
+            payload = {
+                "title": goal_data["title"],
+                "description": goal_data["description"],
+                "goal_type": goal_data["goal_type"],
+                "target_deadline": goal_data["target_deadline"],
+                "priority_level": goal_data.get("priority_level", 5)
+            }
+            
+            # Optional fields
+            if "target_value" in goal_data:
+                payload["target_value"] = goal_data["target_value"]
+            if "target_unit" in goal_data:
+                payload["target_unit"] = goal_data["target_unit"]
+            if "assigned_teams" in goal_data:
+                payload["assigned_teams"] = goal_data["assigned_teams"]
+            if "tags" in goal_data:
+                payload["tags"] = goal_data["tags"]
+            
+            result = await self.api_client.post(f"/organizations/{organization_id}/goals", payload)
+            
+            response = f"🎯 **Goal Created Successfully**\n\n"
+            response += f"- **Goal ID**: {result.get('goal_id', 'Unknown')}\n"
+            response += f"- **Organization**: {organization_id}\n"
+            response += f"- **Title**: {goal_data['title']}\n"
+            response += f"- **Type**: {goal_data['goal_type']}\n"
+            response += f"- **Priority**: {payload['priority_level']}/10\n"
+            response += f"- **Deadline**: {goal_data['target_deadline']}\n"
+            
+            if "target_value" in goal_data and "target_unit" in goal_data:
+                response += f"- **Target**: {goal_data['target_value']} {goal_data['target_unit']}\n"
+            
+            if "assigned_teams" in goal_data:
+                response += f"- **Teams**: {', '.join(goal_data['assigned_teams'])}\n"
+            
+            response += f"\nThe goal is now active and ready for milestone planning."
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to create goal: {str(e)}")]
+            )
+    
+    async def _list_organization_goals(self, filter_data: Dict[str, Any]) -> CallToolResult:
+        """List goals for an organization"""
+        try:
+            organization_id = filter_data["organization_id"]
+            
+            # Build query parameters
+            params = {}
+            if "status" in filter_data:
+                params["status"] = filter_data["status"]
+            if "goal_type" in filter_data:
+                params["goal_type"] = filter_data["goal_type"]
+            if "limit" in filter_data:
+                params["limit"] = filter_data["limit"]
+            
+            data = await self.api_client.get(f"/organizations/{organization_id}/goals", params)
+            
+            goals = data.get("goals", [])
+            if not goals:
+                filter_text = ""
+                if params:
+                    filter_parts = []
+                    if "status" in params:
+                        filter_parts.append(f"status: {', '.join(params['status'])}")
+                    if "goal_type" in params:
+                        filter_parts.append(f"type: {', '.join(params['goal_type'])}")
+                    if filter_parts:
+                        filter_text = f" matching {' and '.join(filter_parts)}"
+                
+                return CallToolResult(
+                    content=[TextContent(type="text", text=f"No goals found for organization {organization_id}{filter_text}.")]
+                )
+            
+            result = f"🎯 **Goals for Organization {organization_id}**\n\n"
+            result += f"Found {len(goals)} goal(s):\n\n"
+            
+            # Group goals by status
+            by_status = {}
+            for goal in goals:
+                status = goal.get("status", "unknown")
+                if status not in by_status:
+                    by_status[status] = []
+                by_status[status].append(goal)
+            
+            for status, status_goals in by_status.items():
+                status_emoji = {
+                    "active": "🟢",
+                    "paused": "🟡",
+                    "completed": "✅",
+                    "cancelled": "🔴"
+                }.get(status, "❓")
+                
+                result += f"### {status_emoji} {status.title()} ({len(status_goals)})\n\n"
+                
+                for goal in status_goals:
+                    result += f"**{goal.get('title', 'Untitled Goal')}** (`{goal.get('id', 'Unknown ID')}`)\n"
+                    result += f"- Type: {goal.get('goal_type', 'Unknown').title()}\n"
+                    result += f"- Priority: {goal.get('priority_level', 'Unknown')}/10\n"
+                    
+                    if goal.get('progress_percentage') is not None:
+                        result += f"- Progress: {goal['progress_percentage']:.1f}%\n"
+                    
+                    if goal.get('target_deadline'):
+                        result += f"- Deadline: {goal['target_deadline']}\n"
+                    
+                    if goal.get('target_value') and goal.get('target_unit'):
+                        result += f"- Target: {goal['target_value']} {goal['target_unit']}\n"
+                        
+                        if goal.get('current_value') is not None:
+                            result += f"- Current: {goal['current_value']} {goal['target_unit']}\n"
+                    
+                    result += "\n"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=result)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to list goals: {str(e)}")]
+            )
+    
+    async def _get_goal_details(self, goal_id: str) -> CallToolResult:
+        """Get detailed information about a specific goal"""
+        try:
+            goal = await self.api_client.get(f"/goals/{goal_id}")
+            
+            result = f"🎯 **Goal Details: {goal.get('title', 'Unknown Title')}**\n\n"
+            result += f"- **ID**: {goal.get('id', 'Unknown')}\n"
+            result += f"- **Organization**: {goal.get('organization_id', 'Unknown')}\n"
+            result += f"- **Type**: {goal.get('goal_type', 'Unknown').title()}\n"
+            result += f"- **Status**: {goal.get('status', 'Unknown').title()}\n"
+            result += f"- **Priority**: {goal.get('priority_level', 'Unknown')}/10\n"
+            
+            if goal.get('description'):
+                result += f"- **Description**: {goal['description']}\n"
+            
+            # Progress Information
+            if goal.get('progress_percentage') is not None:
+                result += f"\n**Progress:**\n"
+                result += f"- **Percentage**: {goal['progress_percentage']:.1f}%\n"
+                
+                if goal.get('current_value') is not None and goal.get('target_value') is not None:
+                    result += f"- **Current**: {goal['current_value']} {goal.get('target_unit', '')}\n"
+                    result += f"- **Target**: {goal['target_value']} {goal.get('target_unit', '')}\n"
+                
+                if goal.get('completion_confidence') is not None:
+                    result += f"- **Confidence**: {goal['completion_confidence']*100:.0f}%\n"
+            
+            # Timeline Information
+            result += f"\n**Timeline:**\n"
+            if goal.get('start_date'):
+                result += f"- **Start Date**: {goal['start_date']}\n"
+            if goal.get('target_deadline'):
+                result += f"- **Target Deadline**: {goal['target_deadline']}\n"
+            if goal.get('actual_completion_date'):
+                result += f"- **Completed**: {goal['actual_completion_date']}\n"
+            
+            # Team Assignment
+            if goal.get('assigned_teams'):
+                result += f"\n**Assigned Teams**: {', '.join(goal['assigned_teams'])}\n"
+            
+            # Tags
+            if goal.get('tags'):
+                result += f"**Tags**: {', '.join(goal['tags'])}\n"
+            
+            # Success Criteria
+            if goal.get('success_criteria'):
+                result += f"\n**Success Criteria**: {goal['success_criteria']}\n"
+            
+            # Timestamps
+            result += f"\n**Created**: {goal.get('created_at', 'Unknown')}\n"
+            result += f"**Updated**: {goal.get('updated_at', 'Unknown')}\n"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=result)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to get goal details: {str(e)}")]
+            )
+    
+    async def _update_goal_progress(self, update_data: Dict[str, Any]) -> CallToolResult:
+        """Update goal progress"""
+        try:
+            goal_id = update_data["goal_id"]
+            
+            # Prepare update payload
+            payload = {}
+            if "progress_percentage" in update_data:
+                payload["progress_percentage"] = update_data["progress_percentage"]
+            if "current_value" in update_data:
+                payload["current_value"] = update_data["current_value"]
+            if "completion_confidence" in update_data:
+                payload["completion_confidence"] = update_data["completion_confidence"]
+            if "notes" in update_data:
+                payload["notes"] = update_data["notes"]
+            
+            result = await self.api_client.put(f"/goals/{goal_id}/progress", payload)
+            
+            response = f"📊 **Goal Progress Updated**\n\n"
+            response += f"- **Goal ID**: {goal_id}\n"
+            response += f"- **Status**: {result.get('status', 'updated')}\n"
+            
+            if "previous_progress" in result and "current_progress" in result:
+                response += f"- **Progress Change**: {result['previous_progress']:.1f}% → {result['current_progress']:.1f}%\n"
+            
+            if "progress_percentage" in update_data:
+                response += f"- **Current Progress**: {update_data['progress_percentage']:.1f}%\n"
+            
+            if "current_value" in update_data:
+                response += f"- **Current Value**: {update_data['current_value']}\n"
+            
+            if "completion_confidence" in update_data:
+                response += f"- **Confidence**: {update_data['completion_confidence']*100:.0f}%\n"
+            
+            if "notes" in update_data:
+                response += f"- **Notes**: {update_data['notes'][:100]}{'...' if len(update_data['notes']) > 100 else ''}\n"
+            
+            response += f"\n**Updated**: {result.get('updated_at', 'Just now')}"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to update goal progress: {str(e)}")]
+            )
+    
+    async def _generate_goal_execution_plan(self, plan_data: Dict[str, Any]) -> CallToolResult:
+        """Generate execution plan for a goal"""
+        try:
+            goal_id = plan_data["goal_id"]
+            
+            # Prepare payload
+            payload = {}
+            if "planning_context" in plan_data:
+                payload["planning_context"] = plan_data["planning_context"]
+            
+            result = await self.api_client.post(f"/goals/{goal_id}/generate-execution-plan", payload)
+            
+            response = f"📋 **Execution Plan Generated**\n\n"
+            response += f"- **Goal ID**: {result.get('goal_id', goal_id)}\n"
+            response += f"- **Plan Type**: {result.get('plan_type', 'Standard')}\n"
+            
+            if "summary" in result:
+                summary = result["summary"]
+                response += f"\n**Plan Summary:**\n"
+                response += f"- **Total Milestones**: {summary.get('total_milestones', 0)}\n"
+                response += f"- **Total Tasks**: {summary.get('total_tasks', 0)}\n"
+                
+                if "estimated_total_hours" in summary:
+                    response += f"- **Estimated Hours**: {summary['estimated_total_hours']}\n"
+                
+                if "cross_functional_areas" in summary:
+                    response += f"- **Functions**: {', '.join(summary['cross_functional_areas'])}\n"
+            
+            if "milestones" in result and result["milestones"]:
+                response += f"\n**Generated Milestones:**\n"
+                
+                for i, milestone in enumerate(result["milestones"][:3], 1):  # Show first 3
+                    response += f"{i}. **{milestone.get('title', f'Milestone {i}')}**\n"
+                    if milestone.get('target_date'):
+                        response += f"   - Target: {milestone['target_date']}\n"
+                    if milestone.get('tasks'):
+                        response += f"   - Tasks: {len(milestone['tasks'])}\n"
+                
+                if len(result["milestones"]) > 3:
+                    response += f"... and {len(result['milestones']) - 3} more milestones\n"
+            
+            response += f"\nThe execution plan has been generated and milestones are ready for task creation."
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to generate execution plan: {str(e)}")]
+            )
+    
+    async def _create_goal_conversation(self, conv_data: Dict[str, Any]) -> CallToolResult:
+        """Create a goal conversation"""
+        try:
+            goal_id = conv_data["goal_id"]
+            
+            payload = {
+                "conversation_type": conv_data["conversation_type"],
+                "conversation_title": conv_data["conversation_title"]
+            }
+            
+            if "initial_context" in conv_data:
+                payload["initial_context"] = conv_data["initial_context"]
+            
+            result = await self.api_client.post(f"/goals/{goal_id}/conversations", payload)
+            
+            response = f"💬 **Goal Conversation Created**\n\n"
+            response += f"- **Conversation ID**: {result.get('conversation_id', 'Unknown')}\n"
+            response += f"- **Goal ID**: {goal_id}\n"
+            response += f"- **Type**: {conv_data['conversation_type'].title()}\n"
+            response += f"- **Title**: {conv_data['conversation_title']}\n"
+            response += f"- **Status**: {result.get('status', 'created')}\n"
+            
+            response += f"\nThe conversation is now active and ready for strategic planning discussions."
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to create goal conversation: {str(e)}")]
+            )
+    
+    async def _track_goal_progress(self, track_data: Dict[str, Any]) -> CallToolResult:
+        """Track goal progress with risk assessment"""
+        try:
+            goal_id = track_data["goal_id"]
+            
+            payload = {
+                "progress_percentage": track_data["progress_percentage"]
+            }
+            
+            # Optional fields
+            if "current_value" in track_data:
+                payload["current_value"] = track_data["current_value"]
+            if "notes" in track_data:
+                payload["notes"] = track_data["notes"]
+            if "confidence_score" in track_data:
+                payload["confidence_score"] = track_data["confidence_score"]
+            if "trigger_alerts" in track_data:
+                payload["trigger_alerts"] = track_data["trigger_alerts"]
+            
+            result = await self.api_client.post(f"/goals/{goal_id}/track-progress", payload)
+            
+            response = f"📈 **Goal Progress Tracked**\n\n"
+            response += f"- **Goal ID**: {goal_id}\n"
+            response += f"- **Snapshot ID**: {result.get('snapshot_id', 'Unknown')}\n"
+            response += f"- **Progress**: {track_data['progress_percentage']:.1f}%\n"
+            
+            if "current_value" in track_data:
+                response += f"- **Current Value**: {track_data['current_value']}\n"
+            
+            if "confidence_score" in track_data:
+                response += f"- **Confidence**: {track_data['confidence_score']*100:.0f}%\n"
+            
+            # Risk Assessment Results
+            if "risk_assessment" in result:
+                risk = result["risk_assessment"]
+                response += f"\n**Risk Assessment:**\n"
+                response += f"- **Risk Level**: {risk.get('risk_level', 'Unknown').title()}\n"
+                response += f"- **Delay Probability**: {risk.get('probability_of_delay', 0)*100:.0f}%\n"
+            
+            if "progress_velocity" in result:
+                response += f"- **Progress Velocity**: {result['progress_velocity']:.2f}\n"
+            
+            if "notes" in track_data:
+                response += f"\n**Notes**: {track_data['notes'][:150]}{'...' if len(track_data['notes']) > 150 else ''}\n"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to track goal progress: {str(e)}")]
+            )
+    
+    async def _assess_goal_deadline_risk(self, goal_id: str) -> CallToolResult:
+        """Assess deadline risk for a goal"""
+        try:
+            result = await self.api_client.get(f"/goals/{goal_id}/deadline-risk")
+            
+            response = f"⚠️ **Goal Deadline Risk Assessment**\n\n"
+            response += f"- **Goal ID**: {goal_id}\n"
+            response += f"- **Risk Level**: {result.get('risk_level', 'Unknown').title()}\n"
+            response += f"- **Delay Probability**: {result.get('probability_of_delay', 0)*100:.0f}%\n"
+            
+            if result.get('estimated_completion_date'):
+                response += f"- **Estimated Completion**: {result['estimated_completion_date']}\n"
+            
+            if result.get('days_at_risk'):
+                response += f"- **Days At Risk**: {result['days_at_risk']}\n"
+            
+            # Critical Path Items
+            if result.get('critical_path_items'):
+                response += f"\n**Critical Path Issues:**\n"
+                for item in result['critical_path_items'][:3]:  # Show first 3
+                    response += f"- {item.get('type', 'Unknown').replace('_', ' ').title()}: {item.get('title', 'Unknown')}\n"
+                    if item.get('days_overdue'):
+                        response += f"  (Overdue by {item['days_overdue']} days)\n"
+                
+                if len(result['critical_path_items']) > 3:
+                    response += f"... and {len(result['critical_path_items']) - 3} more issues\n"
+            
+            # Mitigation Strategies
+            if result.get('mitigation_strategies'):
+                response += f"\n**Recommended Actions:**\n"
+                for strategy in result['mitigation_strategies'][:2]:  # Show first 2
+                    response += f"- **{strategy.get('strategy', 'Unknown').replace('_', ' ').title()}**: {strategy.get('description', 'No description')}\n"
+                    if strategy.get('impact'):
+                        response += f"  Expected impact: {strategy['impact'].replace('_', ' ')}\n"
+            
+            response += f"\n**Assessment Updated**: {result.get('updated_at', 'Just now')}"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to assess deadline risk: {str(e)}")]
+            )
+    
+    async def _get_organization_goals_dashboard(self, organization_id: str) -> CallToolResult:
+        """Get organization goals dashboard"""
+        try:
+            result = await self.api_client.get(f"/organizations/{organization_id}/goals-dashboard")
+            
+            response = f"📊 **Goals Dashboard - {organization_id}**\n\n"
+            
+            # Summary Statistics
+            if "summary_statistics" in result:
+                stats = result["summary_statistics"]
+                response += f"**Overview:**\n"
+                response += f"- **Total Goals**: {stats.get('total_goals', 0)}\n"
+                response += f"- **Active**: {stats.get('active_goals', 0)}\n"
+                response += f"- **Completed**: {stats.get('completed_goals', 0)}\n"
+                response += f"- **Paused**: {stats.get('paused_goals', 0)}\n"
+                if stats.get('cancelled_goals', 0) > 0:
+                    response += f"- **Cancelled**: {stats['cancelled_goals']}\n"
+            
+            # Progress Overview
+            if "progress_overview" in result:
+                progress = result["progress_overview"]
+                response += f"\n**Progress Overview:**\n"
+                response += f"- **Average Progress**: {progress.get('average_progress', 0):.1f}%\n"
+                response += f"- **Goals On Track**: {progress.get('goals_on_track', 0)}\n"
+                response += f"- **Goals At Risk**: {progress.get('goals_at_risk', 0)}\n"
+                
+                if progress.get('total_target_value') and progress.get('total_current_value'):
+                    response += f"- **Total Progress**: {progress['total_current_value']:.0f} / {progress['total_target_value']:.0f}\n"
+            
+            # Upcoming Deadlines
+            if result.get('upcoming_deadlines'):
+                response += f"\n**Upcoming Deadlines:**\n"
+                for deadline in result['upcoming_deadlines'][:3]:  # Show first 3
+                    response += f"- **{deadline.get('title', 'Unknown Goal')}**: {deadline.get('deadline')} ({deadline.get('days_remaining', '?')} days)\n"
+                    response += f"  Progress: {deadline.get('progress', 0):.1f}%\n"
+                
+                if len(result['upcoming_deadlines']) > 3:
+                    response += f"... and {len(result['upcoming_deadlines']) - 3} more deadlines\n"
+            
+            # High Priority Goals
+            if result.get('high_priority_goals'):
+                response += f"\n**High Priority Goals:**\n"
+                for goal in result['high_priority_goals'][:3]:  # Show first 3
+                    response += f"- **{goal.get('title', 'Unknown')}** (Priority: {goal.get('priority_level', '?')}/10)\n"
+                    response += f"  Progress: {goal.get('progress', 0):.1f}%"
+                    if goal.get('risk_level'):
+                        response += f", Risk: {goal['risk_level'].title()}"
+                    response += "\n"
+            
+            return CallToolResult(
+                content=[TextContent(type="text", text=response)]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Failed to get goals dashboard: {str(e)}")]
+            )
+    
     async def run_stdio(self):
         """Run the MCP server with stdio transport"""
         logger.info("Starting MCP server with stdio transport")
@@ -571,35 +1613,50 @@ class FuzeAgentMCPServer:
         """Run the MCP server with SSE transport"""
         logger.info("Starting MCP server with SSE transport", host=host, port=port)
         
-        # Add health check endpoint for SSE mode
-        from aiohttp import web
+        # Create a simple health endpoint
+        from aiohttp import web, web_runner
+        import asyncio
         
         async def health_check(request):
             """Health check endpoint"""
             try:
                 # Test connection to FuzeAgent API
-                await self.api_client.get("/")
-                return web.json_response({"status": "healthy", "api_connection": "ok"})
+                response = await self.api_client.get("/organizations")
+                org_count = len(response) if isinstance(response, list) else 0
+                return web.json_response({
+                    "status": "healthy", 
+                    "api_connection": "ok",
+                    "mcp_tools": 20,  # Updated to include Goals management tools
+                    "server_type": "sse",
+                    "organizations_count": org_count
+                })
             except Exception as e:
-                return web.json_response(
-                    {"status": "unhealthy", "api_connection": "failed", "error": str(e)}, 
-                    status=503
-                )
+                return web.json_response({
+                    "status": "unhealthy", 
+                    "api_connection": "failed", 
+                    "error": str(e)
+                }, status=503)
         
-        async def setup_health_routes(app):
-            """Setup health check routes"""
-            app.router.add_get('/health', health_check)
+        # Create web app for health check
+        app = web.Application()
+        app.router.add_get('/health', health_check)
         
-        async with sse_server(
-            host=host, 
-            port=port,
-            setup_handlers=setup_health_routes
-        ) as (read_stream, write_stream):
-            await self.server.run(
-                read_stream,
-                write_stream,
-                self.server.create_initialization_options()
-            )
+        # Start health check server
+        runner = web_runner.AppRunner(app)
+        await runner.setup()
+        site = web_runner.TCPSite(runner, host, port)
+        await site.start()
+        
+        logger.info(f"Health endpoint available at http://{host}:{port}/health")
+        
+        # Keep the server running
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Shutting down MCP SSE server")
+        finally:
+            await runner.cleanup()
     
     async def run(self, transport: str = "stdio", host: str = "localhost", port: int = 8001):
         """Run the MCP server with specified transport"""

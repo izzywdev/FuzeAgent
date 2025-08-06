@@ -1,0 +1,97 @@
+# React Development Aliases for FuzeAgent
+
+# React project creation
+alias create-react='npx create-react-app'
+alias create-vite='npm create vite@latest'
+alias create-next='npx create-next-app@latest'
+
+# Development servers
+alias react-dev='npm start'
+alias vite-dev='npm run dev'
+alias next-dev='npm run dev'
+alias preview='npm run preview'
+
+# Building
+alias react-build='npm run build'
+alias vite-build='npm run build'
+alias next-build='npm run build'
+
+# Testing shortcuts
+alias test-react='npm test'
+alias test-watch='npm test -- --watch'
+alias test-coverage='npm test -- --coverage --watchAll=false'
+alias test-ui='npm run test:ui'
+
+# Storybook
+alias storybook='npm run storybook'
+alias build-storybook='npm run build-storybook'
+alias sb='npx storybook'
+
+# Component generation helpers
+alias component='echo "Creating component..." && mkdir -p src/components'
+alias page='echo "Creating page..." && mkdir -p src/pages'
+alias hook='echo "Creating hook..." && mkdir -p src/hooks'
+
+# Styling shortcuts
+alias tailwind='npx tailwindcss'
+alias tw-init='npx tailwindcss init -p'
+alias tw-build='npx tailwindcss -i ./src/index.css -o ./dist/output.css --watch'
+
+# State management
+alias redux='echo "Redux Toolkit ready"'
+alias zustand='echo "Zustand ready"'
+
+# React DevTools
+alias react-devtools='npx react-devtools'
+
+# Bundle analysis
+alias analyze='npm run build && npx webpack-bundle-analyzer build/static/js/*.js'
+alias bundle-size='npm run build && ls -lah build/static/js/*.js'
+
+# Performance testing
+alias lighthouse='npx lighthouse'
+alias web-vitals='echo "Check Web Vitals in DevTools"'
+
+# Code quality for React
+alias lint-jsx='npx eslint "src/**/*.{js,jsx,ts,tsx}"'
+alias format-jsx='npx prettier --write "src/**/*.{js,jsx,ts,tsx,css,scss,json}"'
+
+# Testing shortcuts specific to React
+alias test-component='npx jest --testPathPattern=components'
+alias test-pages='npx jest --testPathPattern=pages'
+alias test-hooks='npx jest --testPathPattern=hooks'
+
+# Accessibility testing
+alias a11y='npx @axe-core/cli'
+alias a11y-test='npm test -- --coverage --watchAll=false'
+
+# React Router shortcuts
+alias router='echo "React Router DOM ready"'
+
+# UI component libraries shortcuts
+alias headless='echo "Headless UI ready"'
+alias icons='echo "Heroicons ready"'
+
+# Environment and config
+alias env-check='echo "Environment:" && env | grep REACT_APP'
+alias config='echo "Checking React configuration..."'
+
+# Debugging
+alias debug-react='BROWSER=none npm start'
+alias react-inspect='npm start -- --inspect'
+
+# Project structure helpers
+alias components='ls -la src/components'
+alias pages='ls -la src/pages'
+alias hooks='ls -la src/hooks'
+alias utils='ls -la src/utils'
+alias assets='ls -la src/assets'
+
+# Quick scaffolding
+alias scaffold-component='echo "Use: mkdir src/components/ComponentName && touch src/components/ComponentName/{index.tsx,ComponentName.tsx,ComponentName.test.tsx,ComponentName.stories.tsx}"'
+alias scaffold-page='echo "Use: mkdir src/pages/PageName && touch src/pages/PageName/{index.tsx,PageName.tsx,PageName.test.tsx}"'
+
+# React-specific utilities
+alias deps-react='npm list react react-dom'
+alias update-react='npm update react react-dom @types/react @types/react-dom'
+alias react-version='npm list react --depth=0'

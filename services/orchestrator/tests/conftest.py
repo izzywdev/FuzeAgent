@@ -228,6 +228,220 @@ def temp_directory():
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
+# Goals Management Test Fixtures
+@pytest.fixture
+def sample_goal():
+    """Sample goal data"""
+    from datetime import date, timedelta
+    return {
+        "id": "550e8400-e29b-41d4-a716-446655440010",
+        "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+        "title": "Reach $100K MRR",
+        "description": "Achieve $100,000 monthly recurring revenue in 6 months",
+        "goal_type": "business",
+        "priority_level": 10,
+        "target_value": 100000,
+        "target_unit": "USD",
+        "current_value": 0,
+        "success_criteria": {"revenue_target": 100000, "sustainability": "3_consecutive_months"},
+        "start_date": date.today(),
+        "target_deadline": date.today() + timedelta(days=180),
+        "status": "active",
+        "progress_percentage": 0,
+        "completion_confidence": 0.5,
+        "assigned_teams": ["team-1", "team-2"],
+        "tags": ["revenue", "growth"],
+        "metadata": {"business_critical": True}
+    }
+
+@pytest.fixture
+def sample_milestone():
+    """Sample milestone data"""
+    from datetime import date, timedelta
+    return {
+        "id": "550e8400-e29b-41d4-a716-446655440011",
+        "goal_id": "550e8400-e29b-41d4-a716-446655440010",
+        "title": "Month 1: Foundation Setup",
+        "description": "Establish foundational infrastructure and processes",
+        "milestone_type": "checkpoint",
+        "target_date": date.today() + timedelta(days=30),
+        "success_criteria": {"setup_completed": True, "team_aligned": True},
+        "deliverables": [{"type": "infrastructure", "description": "Basic setup completed"}],
+        "dependencies": [],
+        "status": "planned",
+        "progress_percentage": 0,
+        "assigned_teams": ["team-1"],
+        "priority_level": 8,
+        "weight_in_goal": 16.67
+    }
+
+@pytest.fixture
+def sample_goal_task():
+    """Sample goal task data"""
+    from datetime import date, timedelta
+    return {
+        "id": "550e8400-e29b-41d4-a716-446655440012",
+        "goal_id": "550e8400-e29b-41d4-a716-446655440010",
+        "milestone_id": "550e8400-e29b-41d4-a716-446655440011",
+        "title": "Develop marketing strategy",
+        "description": "Create comprehensive marketing strategy for customer acquisition",
+        "task_type": "marketing",
+        "complexity_level": "high",
+        "assigned_team_id": "550e8400-e29b-41d4-a716-446655440001",
+        "estimated_hours": 40,
+        "due_date": date.today() + timedelta(days=14),
+        "status": "pending",
+        "priority": 8,
+        "requirements": {"deliverable": "strategy_document"},
+        "acceptance_criteria": [{"criteria": "Strategy document completed and approved"}]
+    }
+
+@pytest.fixture
+def sample_conversation():
+    """Sample goal conversation data"""
+    return {
+        "id": "550e8400-e29b-41d4-a716-446655440013",
+        "goal_id": "550e8400-e29b-41d4-a716-446655440010",
+        "conversation_type": "planning",
+        "conversation_title": "Strategic Planning: Path to $100K MRR",
+        "conversation_summary": "Initial strategic planning conversation",
+        "conversation_context": {"focus": "revenue_growth", "timeline": "6_months"},
+        "participants": [{"type": "agent", "id": "izzy-ai", "name": "IzzyAI", "role": "CEO"}],
+        "messages": [],
+        "insights_generated": [],
+        "action_items": [],
+        "status": "active"
+    }
+
+@pytest.fixture
+def mock_goals_service():
+    """Mock Goals Management Service"""
+    service = AsyncMock()
+    service.create_goal = AsyncMock(return_value="goal-123")
+    service.get_goal = AsyncMock()
+    service.list_organization_goals = AsyncMock(return_value=[])
+    service.update_goal_progress = AsyncMock(return_value=True)
+    service.create_milestone = AsyncMock(return_value="milestone-123")
+    service.create_task_from_milestone = AsyncMock(return_value="task-123")
+    service.get_goal_overview = AsyncMock()
+    service.get_organization_goals_dashboard = AsyncMock()
+    return service
+
+@pytest.fixture
+def mock_milestone_engine():
+    """Mock Milestone Task Engine"""
+    engine = AsyncMock()
+    engine.generate_goal_execution_plan = AsyncMock()
+    engine.generate_monthly_milestones = AsyncMock(return_value=["milestone-1", "milestone-2"])
+    engine.generate_weekly_tasks_for_milestone = AsyncMock(return_value=["task-1", "task-2"])
+    engine.generate_cross_functional_tasks = AsyncMock()
+    return engine
+
+@pytest.fixture
+def mock_conversation_service():
+    """Mock Goal Conversation Service"""
+    service = AsyncMock()
+    service.create_goal_conversation = AsyncMock(return_value="conv-123")
+    service.get_conversation = AsyncMock()
+    service.add_message_to_conversation = AsyncMock(return_value="msg-123")
+    service.generate_planning_milestones = AsyncMock(return_value=[])
+    service.conduct_progress_review = AsyncMock()
+    service.extract_action_items_from_conversation = AsyncMock(return_value=[])
+    service.get_goal_conversations = AsyncMock(return_value=[])
+    return service
+
+@pytest.fixture
+def mock_tracking_service():
+    """Mock Goal Tracking Service"""
+    service = AsyncMock()
+    service.record_progress_update = AsyncMock(return_value="snapshot-123")
+    service.assess_goal_deadline_risk = AsyncMock()
+    service.generate_progress_report = AsyncMock()
+    service.get_organization_tracking_dashboard = AsyncMock()
+    return service
+
+# Test data factories for Goals
+class GoalDataFactory:
+    """Factory for creating test goal data"""
+    
+    @staticmethod
+    def create_goal_data(**overrides):
+        """Create goal data with optional overrides"""
+        from datetime import date, timedelta
+        
+        default_data = {
+            "title": "Test Goal",
+            "description": "Test goal description",
+            "goal_type": "business",
+            "target_value": 100000,
+            "target_unit": "USD",
+            "target_deadline": (date.today() + timedelta(days=180)).isoformat(),
+            "priority_level": 8,
+            "success_criteria": {"test": True},
+            "assigned_teams": ["team-1"],
+            "tags": ["test"],
+            "metadata": {"test_data": True}
+        }
+        
+        return {**default_data, **overrides}
+
+@pytest.fixture
+def goal_factory():
+    """Provide goal data factory"""
+    return GoalDataFactory()
+
+# Database test utilities for Goals
+class DatabaseTestUtils:
+    """Utilities for database testing"""
+    
+    @staticmethod
+    def mock_database_row(data_dict):
+        """Convert dict to mock database row"""
+        row = MagicMock()
+        for key, value in data_dict.items():
+            setattr(row, key, value)
+            row[key] = value  # Support both attribute and dict access
+        return row
+    
+    @staticmethod
+    def create_mock_goal_row():
+        """Create a mock goal database row"""
+        import uuid
+        from datetime import date, datetime, timedelta
+        from decimal import Decimal
+        
+        return DatabaseTestUtils.mock_database_row({
+            'id': str(uuid.uuid4()),
+            'organization_id': str(uuid.uuid4()),
+            'title': 'Mock Goal',
+            'description': 'Mock goal description',
+            'goal_type': 'business',
+            'priority_level': 8,
+            'target_value': Decimal('100000'),
+            'target_unit': 'USD',
+            'current_value': Decimal('25000'),
+            'success_criteria': '{"target_achieved": true}',
+            'start_date': date.today(),
+            'target_deadline': date.today() + timedelta(days=150),
+            'actual_completion_date': None,
+            'status': 'active',
+            'progress_percentage': Decimal('25.0'),
+            'completion_confidence': Decimal('0.7'),
+            'assigned_teams': ['team-1', 'team-2'],
+            'goal_owner_agent_id': None,
+            'stakeholder_agents': [],
+            'tags': ['test', 'mock'],
+            'metadata': '{"test": true}',
+            'created_by': None,
+            'created_at': datetime.now(),
+            'updated_at': datetime.now()
+        })
+
+@pytest.fixture
+def db_utils():
+    """Provide database test utilities"""
+    return DatabaseTestUtils()
+
 # Markers for different test categories
 pytest.mark.unit = pytest.mark.unit
 pytest.mark.integration = pytest.mark.integration
@@ -236,3 +450,4 @@ pytest.mark.rag = pytest.mark.rag
 pytest.mark.a2a = pytest.mark.a2a
 pytest.mark.database = pytest.mark.database
 pytest.mark.slow = pytest.mark.slow
+pytest.mark.goals = pytest.mark.goals

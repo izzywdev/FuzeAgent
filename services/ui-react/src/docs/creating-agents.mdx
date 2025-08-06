@@ -1,0 +1,377 @@
+# Creating and Managing Agents
+
+Learn how to create, configure, and manage AI agents in FuzeAgent. Agents are the core workers that execute tasks using Claude AI models.
+
+## Agent Types Overview
+
+FuzeAgent supports several types of AI agents, each optimized for specific roles:
+
+### Executive Agents
+- **CEO (IzzyAI)**: Strategic planning and team coordination
+- **CTO**: Technical architecture decisions
+- **CPO**: Product management and quality oversight
+
+### Development Agents
+- **Frontend Developers**: React, Vue, Angular specialists
+- **Backend Developers**: API and database experts
+- **Full-Stack Developers**: End-to-end development
+- **Mobile Developers**: iOS, Android, React Native
+
+### Specialist Agents
+- **QA Engineers**: Testing and quality assurance
+- **DevOps Engineers**: Infrastructure and deployment
+- **UI/UX Designers**: Design and user experience
+- **Data Engineers**: Analytics and data processing
+
+## Creating Agents from Templates
+
+The easiest way to create agents is using pre-built templates:
+
+### Step 1: Select a Template
+
+```javascript
+// List available templates
+const response = await fetch('/api/templates');
+const { templates } = await response.json();
+
+console.log(templates);
+// [
+//   {
+//     "id": "react_developer",
+//     "name": "React Developer",
+//     "category": "development",
+//     "skills": ["react", "typescript", "tailwind"]
+//   }
+// ]
+```
+
+### Step 2: Deploy from Template
+
+```javascript
+const agentData = {
+  template_id: "react_developer",
+  name: "Frontend Dev 1",
+  team_id: "team_456",
+  overrides: {
+    skills: ["react", "typescript", "next.js", "tailwind"],
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 4096
+  }
+};
+
+const response = await fetch('/api/agents/from-template', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(agentData)
+});
+```
+
+### Available Templates
+
+#### React Developer
+```json
+{
+  "id": "react_developer",
+  "name": "React Developer",
+  "description": "Frontend specialist for React applications",
+  "config": {
+    "model": "claude-sonnet-4-20250514",
+    "skills": ["react", "typescript", "css", "html"],
+    "tools": ["code_generation", "code_review", "debugging"],
+    "system_prompt": "You are a senior React developer..."
+  }
+}
+```
+
+#### Python Backend Developer
+```json
+{
+  "id": "python_developer",
+  "name": "Python Developer",
+  "description": "Backend specialist for Python/FastAPI",
+  "config": {
+    "model": "claude-sonnet-4-20250514",
+    "skills": ["python", "fastapi", "postgresql", "redis"],
+    "tools": ["code_generation", "database_design", "api_design"],
+    "system_prompt": "You are a senior Python backend developer..."
+  }
+}
+```
+
+## Creating Custom Agents
+
+For specialized needs, create custom agents with specific configurations:
+
+```javascript
+const customAgent = {
+  name: "DevOps Specialist",
+  role: "Senior DevOps Engineer",
+  type: "devops",
+  team_id: "team_456",
+  config: {
+    model: "claude-sonnet-4-20250514",
+    temperature: 0.3,
+    max_tokens: 6000,
+    skills: [
+      "docker",
+      "kubernetes",
+      "terraform",
+      "aws",
+      "monitoring"
+    ],
+    tools: [
+      "infrastructure_design",
+      "deployment_automation",
+      "monitoring_setup"
+    ],
+    system_prompt: `You are a senior DevOps engineer specializing in:
+    - Container orchestration with Kubernetes
+    - Infrastructure as Code with Terraform
+    - CI/CD pipeline design
+    - Cloud architecture on AWS
+    - Monitoring and observability
+    
+    Always consider security, scalability, and cost optimization.`
+  }
+};
+
+const response = await fetch('/api/agents', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(customAgent)
+});
+```
+
+## Agent Configuration Options
+
+### Model Selection
+
+Choose the appropriate Claude model based on task complexity:
+
+```javascript
+{
+  // For complex development tasks
+  "model": "claude-sonnet-4-20250514",
+  
+  // For simpler tasks (cost-effective)
+  "model": "claude-haiku-3-20240307",
+  
+  // For maximum capability
+  "model": "claude-opus-3-20240229"
+}
+```
+
+### Skills and Capabilities
+
+Define what your agent specializes in:
+
+```javascript
+{
+  "skills": [
+    // Programming languages
+    "typescript", "python", "rust", "go",
+    
+    // Frameworks
+    "react", "fastapi", "express", "django",
+    
+    // Tools and platforms
+    "docker", "kubernetes", "aws", "postgresql",
+    
+    // Methodologies
+    "tdd", "agile", "microservices", "rest_api"
+  ]
+}
+```
+
+### Tools Integration
+
+Specify which tools the agent can use:
+
+```javascript
+{
+  "tools": [
+    "code_generation",    // Generate code files
+    "code_review",        // Review existing code
+    "debugging",          // Debug issues
+    "testing",            // Write and run tests
+    "documentation",      // Create documentation
+    "database_design",    // Design database schemas
+    "api_design",         // Design REST APIs
+    "ui_design",          // Create UI mockups
+    "deployment",         // Deploy applications
+    "monitoring"          // Set up monitoring
+  ]
+}
+```
+
+## Agent Management
+
+### Monitoring Agent Status
+
+```javascript
+// Get agent details
+const agent = await fetch(`/api/agents/${agentId}`);
+const agentData = await agent.json();
+
+console.log(agentData.status);
+// "active" | "busy" | "idle" | "error"
+```
+
+### Updating Agent Configuration
+
+```javascript
+const updates = {
+  config: {
+    ...existingConfig,
+    skills: [...existingSkills, "graphql", "prisma"],
+    temperature: 0.2  // Make responses more deterministic
+  }
+};
+
+await fetch(`/api/agents/${agentId}`, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(updates)
+});
+```
+
+### Agent Performance Metrics
+
+Track agent productivity and success rates:
+
+```javascript
+const metrics = await fetch(`/api/agents/${agentId}/metrics`);
+const data = await metrics.json();
+
+console.log(data);
+// {
+//   "tasks_completed": 45,
+//   "success_rate": 0.92,
+//   "average_completion_time": "2.5 hours",
+//   "cost_per_task": "$0.15",
+//   "specialties": ["react", "typescript"]
+// }
+```
+
+## Best Practices
+
+### 1. Agent Specialization
+
+Create focused agents rather than generalists:
+
+```javascript
+// Good: Specialized agent
+{
+  "name": "React Testing Specialist",
+  "skills": ["react", "jest", "testing-library", "cypress"],
+  "tools": ["testing", "code_review"]
+}
+
+// Avoid: Overly broad agent
+{
+  "name": "Full Stack Everything",
+  "skills": ["react", "python", "devops", "design", "qa"],
+  "tools": ["everything"]
+}
+```
+
+### 2. Clear System Prompts
+
+Write specific, actionable system prompts:
+
+```javascript
+{
+  "system_prompt": `You are a React component specialist. When creating components:
+  
+  1. Use TypeScript with strict types
+  2. Follow React best practices (hooks, functional components)
+  3. Implement proper error boundaries
+  4. Include comprehensive PropTypes or TypeScript interfaces
+  5. Write unit tests with React Testing Library
+  6. Ensure accessibility (ARIA labels, semantic HTML)
+  7. Optimize for performance (React.memo, useMemo when needed)
+  
+  Always explain your architectural decisions.`
+}
+```
+
+### 3. Resource Management
+
+Monitor and optimize resource usage:
+
+```javascript
+{
+  "config": {
+    // Adjust based on task complexity
+    "max_tokens": 4096,        // For typical tasks
+    "max_tokens": 8192,        // For complex tasks
+    
+    // Control creativity vs consistency
+    "temperature": 0.1,        // More deterministic
+    "temperature": 0.7,        // More creative
+  }
+}
+```
+
+### 4. Team Coordination
+
+Organize agents into logical teams:
+
+```javascript
+// Frontend Team
+const frontendAgents = [
+  "React Component Specialist",
+  "CSS/Styling Expert",
+  "Frontend Testing Engineer"
+];
+
+// Backend Team  
+const backendAgents = [
+  "API Developer",
+  "Database Architect",
+  "Security Specialist"
+];
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Agent not responding:**
+```javascript
+// Check agent status
+const status = await fetch(`/api/agents/${agentId}/status`);
+
+// Restart if needed
+await fetch(`/api/agents/${agentId}/restart`, { method: 'POST' });
+```
+
+**Poor task performance:**
+```javascript
+// Review and update system prompt
+const updates = {
+  config: {
+    system_prompt: "More specific instructions...",
+    temperature: 0.2  // More focused responses
+  }
+};
+```
+
+**Resource constraints:**
+```javascript
+// Monitor token usage
+const usage = await fetch(`/api/agents/${agentId}/usage`);
+
+// Adjust limits if needed
+const config = {
+  max_tokens: 2048,  // Reduce for cost optimization
+  timeout: 300       // 5 minute timeout
+};
+```
+
+## Next Steps
+
+- [Assign tasks to your agents](./task-management)
+- [Monitor agent performance](./monitoring) 
+- [Set up team workflows](./workflows)
+- [Integrate with external tools](./integrations)

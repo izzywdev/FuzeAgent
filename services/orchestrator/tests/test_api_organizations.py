@@ -122,3 +122,76 @@ class TestOrganizationsAPI:
         
         response = client.delete(f"/organizations/{fake_id}")
         assert response.status_code == 404
+    
+    def test_create_organization_with_complex_settings(self, client: TestClient):
+        """Test creating organization with complex settings"""
+        org_data = {
+            "name": "Enterprise Organization",
+            "description": "Large enterprise organization",
+            "settings": {
+                "timezone": "America/New_York",
+                "max_teams": 50,
+                "features": ["analytics", "advanced_permissions"],
+                "integrations": {
+                    "slack": {"enabled": True, "webhook_url": "https://hooks.slack.com/test"},
+                    "email": {"enabled": True, "domain": "enterprise.com"}
+                }
+            }
+        }
+        
+        response = client.post("/organizations", json=org_data)
+        assert response.status_code == 201
+        
+        data = response.json()
+        assert data["settings"]["timezone"] == "America/New_York"
+        assert data["settings"]["max_teams"] == 50
+        assert "analytics" in data["settings"]["features"]
+        assert data["settings"]["integrations"]["slack"]["enabled"] is True
+    
+    def test_create_organization_name_validation(self, client: TestClient):
+        """Test organization name validation rules"""
+        # Test empty name
+        response = client.post("/organizations", json={"name": ""})
+        assert response.status_code == 422
+        
+        # Test very long name
+        long_name = "x" * 256
+        response = client.post("/organizations", json={"name": long_name})
+        assert response.status_code == 422
+        
+        # Test name with special characters (should be allowed)
+        response = client.post("/organizations", json={"name": "Test Org & Co. #1"})
+        assert response.status_code == 201
+    
+    def test_organization_duplicate_names_allowed(self, client: TestClient):
+        """Test that organizations can have duplicate names"""
+        org_data = {"name": "Duplicate Name Org", "description": "First org"}
+        response1 = client.post("/organizations", json=org_data)
+        assert response1.status_code == 201
+        
+        org_data2 = {"name": "Duplicate Name Org", "description": "Second org"}
+        response2 = client.post("/organizations", json=org_data2)
+        assert response2.status_code == 201
+        
+        # Both should exist
+        assert response1.json()["id"] != response2.json()["id"]
+    
+    def test_get_organizations_pagination_and_sorting(self, client: TestClient):
+        """Test organizations are returned in creation order (newest first)"""
+        # Create multiple organizations
+        org_names = ["First Org", "Second Org", "Third Org"]
+        created_ids = []
+        
+        for name in org_names:
+            response = client.post("/organizations", json={"name": name})
+            assert response.status_code == 201
+            created_ids.append(response.json()["id"])
+        
+        # Get all organizations
+        response = client.get("/organizations")
+        assert response.status_code == 200
+        
+        orgs = response.json()
+        # Should be sorted by created_at DESC (newest first)
+        org_names_returned = [org["name"] for org in orgs if org["name"] in org_names]
+        assert org_names_returned == ["Third Org", "Second Org", "First Org"]

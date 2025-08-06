@@ -2,7 +2,7 @@ import asyncio
 import aio_pika
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional, Any
 from .database import DatabaseManager
 
 class TaskQueue:
@@ -10,6 +10,7 @@ class TaskQueue:
         self.rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://admin:password@rabbitmq:5672/")
         self.connection = None
         self.channel = None
+        self.task_execution_engine = None  # Will be set by orchestrator
         
     async def connect(self):
         """Connect to RabbitMQ"""
@@ -72,6 +73,45 @@ class TaskQueue:
         """Get tasks assigned to specific agent"""
         tasks = await self.list_tasks()
         return [task for task in tasks if str(task['assigned_to']) == agent_id]
+    
+    async def start_autonomous_execution(self, task_id: str) -> Dict[str, Any]:
+        """Start autonomous execution of a task"""
+        if not self.task_execution_engine:
+            raise RuntimeError("TaskExecutionEngine not configured")
+            
+        return await self.task_execution_engine.start_task_execution(task_id)
+    
+    async def get_execution_status(self, task_id: str) -> Dict[str, Any]:
+        """Get execution status of a task"""
+        if not self.task_execution_engine:
+            raise RuntimeError("TaskExecutionEngine not configured")
+            
+        return await self.task_execution_engine.get_execution_status(task_id)
+    
+    async def get_task_iterations(self, task_id: str) -> List[Dict[str, Any]]:
+        """Get task iteration history"""
+        if not self.task_execution_engine:
+            raise RuntimeError("TaskExecutionEngine not configured")
+            
+        return await self.task_execution_engine.get_task_iterations(task_id)
+    
+    async def handle_human_response(self, task_id: str, response: str) -> bool:
+        """Handle human response to a task question"""
+        if not self.task_execution_engine:
+            raise RuntimeError("TaskExecutionEngine not configured")
+            
+        return await self.task_execution_engine.handle_human_response(task_id, response)
+    
+    async def cancel_task_execution(self, task_id: str) -> bool:
+        """Cancel autonomous execution of a task"""
+        if not self.task_execution_engine:
+            raise RuntimeError("TaskExecutionEngine not configured")
+            
+        return await self.task_execution_engine.cancel_task_execution(task_id)
+    
+    def set_task_execution_engine(self, engine):
+        """Set the task execution engine reference"""
+        self.task_execution_engine = engine
     
     async def close(self):
         """Close RabbitMQ connection"""

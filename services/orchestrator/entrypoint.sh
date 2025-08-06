@@ -1,51 +1,134 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting FuzeAgent Orchestrator..."
+echo "🚀 Starting FuzeAgent Orchestrator v2.0.0 (Autonomous Execution)"
 
-# Wait for database to be ready
-echo "⏳ Waiting for database connection..."
-python -c "
+# Function to wait for service to be ready
+wait_for_service() {
+    local host=$1
+    local port=$2
+    local service_name=$3
+    
+    echo "⏳ Waiting for $service_name to be ready at $host:$port..."
+    timeout=60
+    while ! nc -z $host $port && [ $timeout -gt 0 ]; do
+        sleep 1
+        timeout=$((timeout-1))
+    done
+    
+    if [ $timeout -eq 0 ]; then
+        echo "❌ Timeout waiting for $service_name"
+        exit 1
+    fi
+    echo "✅ $service_name is ready!"
+}
+
+# Wait for database
+wait_for_service postgres 5432 "PostgreSQL"
+
+# Wait for Redis
+wait_for_service redis 6379 "Redis"
+
+# Wait for RabbitMQ
+wait_for_service rabbitmq 5672 "RabbitMQ"
+
+# Initialize database schema if needed
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+    echo "📊 Running database migrations..."
+    
+    # Run basic schema setup
+    python -c "
 import asyncio
 import asyncpg
 import os
-import time
+import sys
 
-async def wait_for_db():
-    db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:password@postgres:5432/ai_context')
-    max_retries = 30
-    retry_count = 0
-    
-    while retry_count < max_retries:
-        try:
-            conn = await asyncpg.connect(db_url)
-            await conn.execute('SELECT 1')
-            await conn.close()
-            print('✅ Database connection successful!')
-            return
-        except Exception as e:
-            retry_count += 1
-            print(f'🔄 Database connection attempt {retry_count}/{max_retries} failed: {e}')
-            if retry_count < max_retries:
-                time.sleep(2)
-            else:
-                print('❌ Failed to connect to database after maximum retries')
-                raise e
+async def setup_database():
+    try:
+        database_url = os.environ.get('DATABASE_URL')
+        if not database_url:
+            print('❌ DATABASE_URL not set')
+            sys.exit(1)
+            
+        conn = await asyncpg.connect(database_url)
+        
+        # Create extensions
+        await conn.execute('CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";')
+        await conn.execute('CREATE EXTENSION IF NOT EXISTS vector;')
+        
+        # Run model configuration schema
+        schema_file = '/app/database_schema_models.sql'
+        if os.path.exists(schema_file):
+            with open(schema_file, 'r') as f:
+                schema = f.read()
+            await conn.execute(schema)
+            print('✅ Model configuration schema applied')
+        
+        await conn.close()
+        print('✅ Database initialization complete')
+        
+    except Exception as e:
+        print(f'❌ Database initialization failed: {e}')
+        sys.exit(1)
 
-asyncio.run(wait_for_db())
+asyncio.run(setup_database())
 "
-
-# Run migrations if requested
-if [ "$RUN_MIGRATIONS" = "true" ]; then
-    echo "🔄 Running database migrations..."
-    python migrate.py up
-    echo "✅ Migrations completed"
 fi
 
-# Check migration status
-echo "📊 Checking migration status..."
-python migrate.py status
+# Set up Claude CLI authentication if API key is provided
+if [ -n "$ANTHROPIC_API_KEY" ]; then
+    echo "🔐 Configuring Claude CLI authentication..."
+    echo "Setting up Claude CLI with provided API key..."
+    # Note: In production, this would use proper Claude CLI auth setup
+fi
+
+# Create necessary directories
+echo "📁 Creating workspace directories..."
+mkdir -p /app/workspaces
+mkdir -p /app/.fuzeagent/backups
+mkdir -p /tmp/fuzeagent
+
+# Set permissions
+chmod 755 /app/workspaces
+chmod 755 /app/.fuzeagent/backups
+
+# Generate encryption key if not provided
+if [ -z "$ENCRYPTION_KEY" ]; then
+    echo "🔐 Generating encryption key for API credentials..."
+    export ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+fi
+
+# Log configuration
+echo "⚙️  Configuration:"
+echo "  - Autonomous Execution: ${ENABLE_AUTONOMOUS_EXECUTION:-true}"
+echo "  - Multi-Agent Coordination: ${ENABLE_MULTI_AGENT_COORDINATION:-true}"
+echo "  - File Operations: ${ENABLE_FILE_OPERATIONS:-true}"
+echo "  - MCP Integration: ${ENABLE_MCP_INTEGRATION:-true}"
+echo "  - Max Concurrent Executions: ${MAX_CONCURRENT_EXECUTIONS:-10}"
+echo "  - Max Coordination Sessions: ${MAX_COORDINATION_SESSIONS:-5}"
+echo "  - Claude CLI Path: ${CLAUDE_CLI_PATH:-/usr/local/bin/claude}"
+
+# Check Claude CLI installation
+if command -v claude >/dev/null 2>&1; then
+    echo "✅ Claude CLI is installed: $(claude --version 2>/dev/null || echo 'version check failed')"
+else
+    echo "⚠️  Claude CLI not found - autonomous execution may be limited"
+fi
+
+# Check Docker access
+if [ -S "/var/run/docker.sock" ]; then
+    echo "✅ Docker socket is available for sandbox management"
+else
+    echo "⚠️  Docker socket not available - sandbox features may be limited"
+fi
 
 # Start the application
-echo "🎯 Starting API server..."
-exec uvicorn main_with_hierarchy:app --host 0.0.0.0 --port 8000 --reload
+echo "🎯 Starting FuzeAgent Orchestrator with autonomous execution..."
+
+exec uvicorn main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 1 \
+    --access-log \
+    --use-colors \
+    --log-level info

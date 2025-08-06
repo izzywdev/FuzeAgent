@@ -1,19 +1,21 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import axios from 'axios'
-import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle, FiUsers } from 'react-icons/fi'
+import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle, FiUsers, FiBook, FiCode, FiHelpCircle } from 'react-icons/fi'
 import AgentDashboard from './components/AgentDashboard'
 import CreateAgentModal from './components/CreateAgentModal'
 import TasksView from './components/TasksView'
 import StatsCards from './components/StatsCards'
 import OrganizationSelector from './components/OrganizationSelector'
 import TeamSelector from './components/TeamSelector'
+import HierarchyView from './components/HierarchyView'
 import type { 
   Agent, Task, AgentTemplate, 
   Organization, Team, 
   OrganizationCreate, TeamCreate 
 } from './types'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function App() {
   // Hierarchy state
@@ -30,6 +32,7 @@ function App() {
   // UI state
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showHierarchy, setShowHierarchy] = useState(false)
 
   // Helper function to deep compare arrays
   const arraysEqual = (a: any[], b: any[]): boolean => {
@@ -107,13 +110,80 @@ function App() {
     loadData(true) // Force refresh on initial load
   }, [])
 
-  // Smart polling - only check for updates, don't force re-render
+  // WebSocket for real-time updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      loadData(false) // Don't force refresh, only update if data changed
-    }, 30000) // Reduced frequency to 30 seconds
-    return () => clearInterval(interval)
-  }, [loadData])
+    const wsUrl = API_BASE.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws'
+    const ws = new WebSocket(wsUrl)
+    
+    ws.onopen = () => {
+      console.log('WebSocket connected')
+    }
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data)
+        console.log('WebSocket message:', message)
+        
+        switch (message.type) {
+          case 'organization_created':
+            setOrganizations(prev => {
+              const exists = prev.some(org => org.id === message.data.id)
+              if (!exists) {
+                return [message.data, ...prev]
+              }
+              return prev
+            })
+            break
+            
+          case 'team_created':
+            setTeams(prev => {
+              const exists = prev.some(team => team.id === message.data.id)
+              if (!exists) {
+                return [message.data, ...prev]
+              }
+              return prev
+            })
+            break
+            
+          case 'agent_created':
+            setAgents(prev => {
+              const exists = prev.some(agent => agent.id === message.data.id)
+              if (!exists) {
+                return [message.data, ...prev]
+              }
+              return prev
+            })
+            break
+            
+          default:
+            // For other types, do a selective reload
+            loadData(false)
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error)
+      }
+    }
+    
+    ws.onclose = () => {
+      console.log('WebSocket disconnected')
+    }
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+    }
+    
+    // Keep connection alive with ping
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send('ping')
+      }
+    }, 30000)
+    
+    return () => {
+      clearInterval(pingInterval)
+      ws.close()
+    }
+  }, [])
 
   // Organization management
   const handleSelectOrganization = useCallback(async (org: Organization) => {
@@ -177,12 +247,13 @@ function App() {
     }
 
     try {
-      // Ensure team_id is included in the request
+      // Ensure team_id is included in the request at the top level, not in overrides
       const agentPayload = {
         ...agentData,
+        team_id: currentTeam.id,
         overrides: {
-          ...agentData.overrides,
-          team_id: currentTeam.id
+          ...agentData.overrides
+          // Remove team_id from overrides - it's not customizable per API validation
         }
       }
 
@@ -243,6 +314,67 @@ function App() {
               <span className="ml-2 text-sm text-gray-500">AI Team Manager</span>
             </div>
             <div className="flex space-x-4 items-center">
+              {/* Help Menu */}
+              <div className="relative group">
+                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center gap-2 transition-colors">
+                  <FiHelpCircle />
+                  Help
+                </button>
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="py-2">
+                    <Link
+                      to="/docs"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <FiBook className="w-4 h-4" />
+                      Documentation
+                    </Link>
+                    <Link
+                      to="/docs/getting-started"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <FiActivity className="w-4 h-4" />
+                      Getting Started
+                    </Link>
+                    <Link
+                      to="/docs/api-reference"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <FiCode className="w-4 h-4" />
+                      API Reference
+                    </Link>
+                    <Link
+                      to="/playground"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <FiCode className="w-4 h-4" />
+                      API Playground
+                    </Link>
+                    <div className="border-t border-gray-100 my-2"></div>
+                    <a
+                      href="https://github.com/yourusername/fuzeagent"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <FiBook className="w-4 h-4" />
+                      GitHub Repository
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowHierarchy(!showHierarchy)}
+                className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
+                  showHierarchy 
+                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                <FiUsers />
+                {showHierarchy ? 'Hide Hierarchy' : 'Show Hierarchy'}
+              </button>
               <button
                 onClick={handleRefresh}
                 disabled={loading}
@@ -265,6 +397,20 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 px-4">
+        {/* Hierarchy View */}
+        {showHierarchy && (
+          <div className="mb-6">
+            <HierarchyView
+              organizations={organizations}
+              teams={teams}
+              agents={memoizedAgents}
+              currentOrganization={currentOrganization}
+              onSelectOrganization={handleSelectOrganization}
+              onSelectTeam={handleSelectTeam}
+            />
+          </div>
+        )}
+
         {/* Organization and Team Selection */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <OrganizationSelector

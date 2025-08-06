@@ -1,0 +1,74 @@
+# Python Development Aliases for FuzeAgent
+
+# Python execution shortcuts
+alias py='python'
+alias py3='python3'
+alias python='python3'
+
+# Virtual environment management
+alias venv='source ~/.venv/bin/activate'
+alias deactivate-venv='deactivate'
+alias pip='python -m pip'
+alias pipi='python -m pip install'
+alias pipu='python -m pip install --upgrade'
+alias pipr='python -m pip install -r requirements.txt'
+
+# Development server shortcuts
+alias rundev='uvicorn main:app --reload --host 0.0.0.0 --port 8000'
+alias runprod='uvicorn main:app --host 0.0.0.0 --port 8000'
+alias fastapi='uvicorn main:app --reload'
+
+# Testing shortcuts
+alias pytest='python -m pytest'
+alias test='python -m pytest -v'
+alias testcov='python -m pytest --cov=. --cov-report=html'
+alias testfast='python -m pytest -x'
+alias testwatch='python -m pytest -f'
+
+# Code quality shortcuts
+alias black='python -m black .'
+alias isort='python -m isort .'
+alias mypy='python -m mypy .'
+alias flake8='python -m flake8 .'
+alias lint='python -m black . && python -m isort . && python -m flake8 .'
+
+# Database shortcuts (for SQLAlchemy/Alembic projects)
+alias migrate='alembic upgrade head'
+alias makemigration='alembic revision --autogenerate'
+alias dbinit='alembic init alembic'
+alias dbcurrent='alembic current'
+alias dbhistory='alembic history'
+
+# FastAPI shortcuts
+alias docs='echo "API docs at: http://localhost:8000/docs"'
+alias redoc='echo "ReDoc at: http://localhost:8000/redoc"'
+
+# Package management
+alias freeze='pip freeze > requirements.txt'
+alias install-dev='pip install -e .'
+alias requirements='pip install -r requirements.txt'
+
+# Jupyter shortcuts
+alias notebook='jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root'
+alias lab='jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root'
+
+# Python REPL shortcuts
+alias ipython='python -m IPython'
+alias shell='python -c "import IPython; IPython.start_ipython()"'
+
+# Project structure shortcuts
+alias tree='find . -type f -name "*.py" | head -20'
+alias pyfiles='find . -name "*.py" -type f'
+alias pyclean='find . -name "*.pyc" -delete && find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true'
+
+# Performance and profiling
+alias profile='python -m cProfile -s cumulative'
+alias timeit='python -m timeit'
+
+# Documentation
+alias pydoc='python -m pydoc'
+alias help='python -c "help()"'
+
+# CrewAI shortcuts
+alias crew='python -m crewai'
+alias agent-test='python -c "from crewai import Agent; print(\"CrewAI available\")"'

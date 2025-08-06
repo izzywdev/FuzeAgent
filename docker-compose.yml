@@ -39,7 +39,7 @@ services:
     networks:
       - ai-team-network
 
-  # Orchestration Service
+  # Orchestration Service with Autonomous Execution
   orchestrator:
     build: ./services/orchestrator
     ports:
@@ -49,10 +49,53 @@ services:
       REDIS_URL: redis://redis:6379
       RABBITMQ_URL: amqp://admin:${RABBITMQ_PASSWORD}@rabbitmq:5672/
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      # Autonomous execution configuration
+      ENABLE_AUTONOMOUS_EXECUTION: "true"
+      ENABLE_MULTI_AGENT_COORDINATION: "true"
+      ENABLE_FILE_OPERATIONS: "true"
+      ENABLE_MCP_INTEGRATION: "true"
+      # Security and encryption
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # Claude SDK configuration
+      CLAUDE_CLI_PATH: "/usr/local/bin/claude"
+      # Sandbox configuration
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      # Resource limits
+      MAX_CONCURRENT_EXECUTIONS: "10"
+      MAX_COORDINATION_SESSIONS: "5"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - orchestrator_workspaces:/app/workspaces
+      - orchestrator_backups:/app/.fuzeagent/backups
     depends_on:
       - postgres
       - redis
       - rabbitmq
+    networks:
+      - ai-team-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Hierarchy API Service (Organizations and Teams)
+  hierarchy-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.hierarchy
+    ports:
+      - "8006:8006"
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/ai_context
+      ORCHESTRATOR_URL: http://orchestrator:8000
+    depends_on:
+      - postgres
+      - orchestrator
     networks:
       - ai-team-network
 
@@ -60,26 +103,35 @@ services:
   ui:
     build: ./services/ui-react
     ports:
-      - "3030:3000"
+      - "3031:3000"  # Changed from 3030 to 3031 to avoid any potential conflicts
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: http://localhost:8006
     depends_on:
       - orchestrator
     networks:
       - ai-team-network
 
-  # MCP Server for Claude Desktop Integration
+  # MCP Server for Claude Code Integration (SSE Mode)
   mcp-server:
     build: ./mcp-servers/fuzeagent-server
+    command: ["python", "server.py", "--transport", "sse", "--host", "0.0.0.0", "--port", "8003"]
     ports:
-      - "8001:8001"
+      - "8003:8003"
     environment:
-      FUZEAGENT_API_URL: http://orchestrator:8000
+      FUZEAGENT_API_URL: http://hierarchy-api:8006
+      PYTHONUNBUFFERED: 1
     depends_on:
+      - hierarchy-api
       - orchestrator
     networks:
       - ai-team-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 networks:
   ai-team-network:
@@ -89,3 +141,5 @@ volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
+  orchestrator_workspaces:
+  orchestrator_backups:

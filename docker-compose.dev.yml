@@ -1,0 +1,35 @@
+# Development override for faster builds and hot reloading
+version: '3.9'
+
+services:
+  # Use development UI build with hot reload
+  ui:
+    build:
+      context: ./services/ui-react
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./services/ui-react/src:/app/src:ro
+      - ./services/ui-react/public:/app/public:ro
+      - /app/node_modules  # Anonymous volume to preserve node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8006
+      - VITE_HMR_PORT=3000
+      - CHOKIDAR_USEPOLLING=true  # For WSL/Windows file watching
+    
+  # Orchestrator with source code mounted for development
+  orchestrator:
+    volumes:
+      - ./services/orchestrator:/app:ro
+      - /app/__pycache__  # Exclude cache
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - RELOAD=true
+
+  # Hierarchy API with source mounted
+  hierarchy-api:
+    volumes:
+      - ./hierarchy_endpoints.py:/app/hierarchy_endpoints.py:ro
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1

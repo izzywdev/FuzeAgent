@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "fuzeagent": {
+      "command": "./mcp-servers/fuzeagent-server/run-mcp.sh",
+      "args": [
+        "--transport",
+        "stdio",
+        "--api-url",
+        "http://localhost:8006"
+      ],
+      "env": {
+        "FUZEAGENT_API_URL": "http://localhost:8006"
+      }
+    }
+  }
+}
