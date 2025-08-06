@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, HTTPException, Query, Path, Body
+from fastapi import FastAPI, WebSocket, HTTPException, Query, Path, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
@@ -15,6 +15,11 @@ from .context_service import ContextService
 from .sandbox_manager import AgentSandboxManager
 from .task_execution_engine import TaskExecutionEngine
 from .database import get_db_connection
+from .knowledge_manager import knowledge_manager, DocumentMetadata
+from .container_manager import container_manager, ContainerStatus, ContainerConfig
+from .rag_integration import rag_system, RAGContext
+from .websocket_manager import websocket_manager, WebSocketUpdate, UpdateType, notify_agent_status_change, notify_task_progress, notify_container_status_change, notify_knowledge_update
+from hierarchy_endpoints import router as hierarchy_router
 
 logger = logging.getLogger(__name__)
 
@@ -427,6 +432,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include hierarchy router for organizational visualization
+app.include_router(hierarchy_router)
+
 # Health check endpoint
 @app.get("/health", 
          tags=["health"],
@@ -702,6 +710,111 @@ async def assign_task(agent_id: str = Path(..., description="Agent ID"),
 async def get_agent_status(agent_id: str):
     """Get detailed agent status"""
     return await app.state.agent_manager.get_agent_status(agent_id)
+
+@app.get("/agents/{agent_id}/tasks")
+async def get_agent_tasks(agent_id: str):
+    """Get tasks assigned to an agent"""
+    try:
+        # This would normally query the database for tasks assigned to the agent
+        # For now, return mock data
+        return [
+            {
+                "id": "1",
+                "title": "Strategic Planning Q4 2025",
+                "description": "Develop comprehensive strategic plan for Q4 2025 expansion",
+                "status": "completed",
+                "priority": "high",
+                "created_at": "2025-08-05T09:00:00Z",
+                "completed_at": "2025-08-05T17:30:00Z"
+            },
+            {
+                "id": "2",
+                "title": "Team Performance Review", 
+                "description": "Conduct quarterly performance review for all team leads",
+                "status": "in_progress",
+                "priority": "medium",
+                "created_at": "2025-08-06T08:00:00Z"
+            }
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get agent tasks: {str(e)}")
+
+@app.get("/teams")
+async def list_teams():
+    """List all teams"""
+    try:
+        # This would normally query the database for teams
+        # For now, return mock data
+        return [
+            {"id": "1", "name": "Executive Team", "description": "Strategic leadership and decision making"},
+            {"id": "2", "name": "Development Team", "description": "Frontend, backend, and full-stack development"},
+            {"id": "3", "name": "Quality Assurance", "description": "Testing, quality control, and bug detection"},
+            {"id": "4", "name": "DevOps Team", "description": "Infrastructure, deployment, and system operations"},
+            {"id": "5", "name": "Business Team", "description": "Marketing, sales, and customer relations"}
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list teams: {str(e)}")
+
+@app.get("/agent-templates")
+async def list_agent_templates():
+    """List available agent templates"""
+    try:
+        return [
+            {
+                "id": "react_developer",
+                "name": "React Developer",
+                "description": "Frontend developer specialized in React and TypeScript",
+                "type": "developer",
+                "defaultConfig": {
+                    "model": "claude-sonnet-4-20250514",
+                    "temperature": 0.7,
+                    "tools": ["code_generation", "code_review", "debugging", "testing"],
+                    "goal": "Build responsive and performant React applications",
+                    "backstory": "Experienced frontend developer with deep knowledge of React ecosystem"
+                }
+            },
+            {
+                "id": "python_developer",
+                "name": "Python Developer",
+                "description": "Backend developer specialized in Python and FastAPI", 
+                "type": "developer",
+                "defaultConfig": {
+                    "model": "claude-sonnet-4-20250514",
+                    "temperature": 0.7,
+                    "tools": ["code_generation", "api_development", "database_design", "testing"],
+                    "goal": "Develop robust and scalable backend systems",
+                    "backstory": "Senior Python developer with expertise in FastAPI and databases"
+                }
+            },
+            {
+                "id": "qa_engineer",
+                "name": "QA Engineer",
+                "description": "Quality assurance engineer focused on testing and automation",
+                "type": "qa",
+                "defaultConfig": {
+                    "model": "claude-sonnet-4-20250514", 
+                    "temperature": 0.6,
+                    "tools": ["test_automation", "bug_reporting", "quality_analysis", "performance_testing"],
+                    "goal": "Ensure high quality and reliability of software products",
+                    "backstory": "Experienced QA engineer with expertise in automated testing frameworks"
+                }
+            },
+            {
+                "id": "devops_engineer",
+                "name": "DevOps Engineer",
+                "description": "Infrastructure and deployment specialist",
+                "type": "devops",
+                "defaultConfig": {
+                    "model": "claude-sonnet-4-20250514",
+                    "temperature": 0.5,
+                    "tools": ["infrastructure_management", "deployment", "monitoring", "security"],
+                    "goal": "Maintain reliable and scalable infrastructure",
+                    "backstory": "DevOps engineer with expertise in cloud platforms and CI/CD"
+                }
+            }
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list agent templates: {str(e)}")
 
 @app.get("/tasks")
 async def list_tasks():
@@ -3287,4 +3400,1116 @@ async def get_tracking_dashboard(
         
     except Exception as e:
         logger.error(f"Error getting tracking dashboard: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ================================
+# Knowledge Management API Endpoints
+# ================================
+
+@app.post("/knowledge/organizations/{organization_id}/documents",
+          tags=["knowledge-management"],
+          summary="Upload Organizational Document",
+          response_model=DocumentMetadata)
+async def upload_organization_document(
+    organization_id: str = Path(..., description="Organization ID"),
+    file: UploadFile = File(..., description="Document file to upload"),
+    title: Optional[str] = Form(None, description="Document title"),
+    tags: Optional[str] = Form(None, description="Comma-separated tags")
+):
+    """Upload a document to organizational knowledge base"""
+    try:
+        tags_list = []
+        if tags:
+            tags_list = [tag.strip() for tag in tags.split(',')]
+        
+        document = await knowledge_manager.upload_document(
+            file_content=file.file,
+            filename=file.filename,
+            title=title,
+            organization_id=organization_id,
+            tags=tags_list
+        )
+        
+        return document
+        
+    except Exception as e:
+        logger.error(f"Error uploading organizational document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/knowledge/organizations/{organization_id}/url",
+          tags=["knowledge-management"],
+          summary="Add URL to Organizational Knowledge",
+          response_model=DocumentMetadata)
+async def add_organization_url(
+    organization_id: str = Path(..., description="Organization ID"),
+    url: str = Body(..., embed=True),
+    title: Optional[str] = Body(None, embed=True),
+    tags: Optional[List[str]] = Body(None, embed=True)
+):
+    """Add URL content to organizational knowledge base"""
+    try:
+        document = await knowledge_manager.upload_url(
+            url=url,
+            title=title,
+            organization_id=organization_id,
+            tags=tags or []
+        )
+        
+        return document
+        
+    except Exception as e:
+        logger.error(f"Error adding organizational URL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/organizations/{organization_id}/documents",
+         tags=["knowledge-management"],
+         summary="List Organizational Documents",
+         response_model=List[DocumentMetadata])
+async def list_organization_documents(
+    organization_id: str = Path(..., description="Organization ID")
+):
+    """Get list of organizational documents"""
+    try:
+        documents = await knowledge_manager.get_documents(organization_id=organization_id)
+        return documents
+        
+    except Exception as e:
+        logger.error(f"Error listing organizational documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/organizations/{organization_id}/documents/{doc_id}",
+         tags=["knowledge-management"],
+         summary="Get Organizational Document",
+         response_model=DocumentMetadata)
+async def get_organization_document(
+    organization_id: str = Path(..., description="Organization ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Get organizational document metadata"""
+    try:
+        document = await knowledge_manager.get_document_metadata(
+            doc_id=doc_id,
+            organization_id=organization_id
+        )
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return document
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting organizational document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/organizations/{organization_id}/documents/{doc_id}/content",
+         tags=["knowledge-management"],
+         summary="Get Organizational Document Content")
+async def get_organization_document_content(
+    organization_id: str = Path(..., description="Organization ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Get full content of organizational document"""
+    try:
+        content = await knowledge_manager.get_document_content(
+            doc_id=doc_id,
+            organization_id=organization_id
+        )
+        
+        if content is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return {"content": content}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting organizational document content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/knowledge/organizations/{organization_id}/documents/{doc_id}",
+         tags=["knowledge-management"],
+         summary="Update Organizational Document",
+         response_model=DocumentMetadata)
+async def update_organization_document(
+    organization_id: str = Path(..., description="Organization ID"),
+    doc_id: str = Path(..., description="Document ID"),
+    title: Optional[str] = Body(None, embed=True),
+    tags: Optional[List[str]] = Body(None, embed=True)
+):
+    """Update organizational document metadata"""
+    try:
+        document = await knowledge_manager.update_document(
+            doc_id=doc_id,
+            title=title,
+            tags=tags,
+            organization_id=organization_id
+        )
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return document
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating organizational document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/knowledge/organizations/{organization_id}/documents/{doc_id}",
+           tags=["knowledge-management"],
+           summary="Delete Organizational Document")
+async def delete_organization_document(
+    organization_id: str = Path(..., description="Organization ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Delete organizational document"""
+    try:
+        success = await knowledge_manager.delete_document(
+            doc_id=doc_id,
+            organization_id=organization_id
+        )
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return {"message": "Document deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting organizational document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Team Knowledge Management Endpoints
+
+@app.post("/knowledge/teams/{team_id}/documents",
+          tags=["knowledge-management"],
+          summary="Upload Team Document",
+          response_model=DocumentMetadata)
+async def upload_team_document(
+    team_id: str = Path(..., description="Team ID"),
+    file: UploadFile = File(..., description="Document file to upload"),
+    title: Optional[str] = Form(None, description="Document title"),
+    tags: Optional[str] = Form(None, description="Comma-separated tags")
+):
+    """Upload a document to team knowledge base"""
+    try:
+        tags_list = []
+        if tags:
+            tags_list = [tag.strip() for tag in tags.split(',')]
+        
+        document = await knowledge_manager.upload_document(
+            file_content=file.file,
+            filename=file.filename,
+            title=title,
+            team_id=team_id,
+            tags=tags_list
+        )
+        
+        return document
+        
+    except Exception as e:
+        logger.error(f"Error uploading team document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/knowledge/teams/{team_id}/url",
+          tags=["knowledge-management"],
+          summary="Add URL to Team Knowledge",
+          response_model=DocumentMetadata)
+async def add_team_url(
+    team_id: str = Path(..., description="Team ID"),
+    url: str = Body(..., embed=True),
+    title: Optional[str] = Body(None, embed=True),
+    tags: Optional[List[str]] = Body(None, embed=True)
+):
+    """Add URL content to team knowledge base"""
+    try:
+        document = await knowledge_manager.upload_url(
+            url=url,
+            title=title,
+            team_id=team_id,
+            tags=tags or []
+        )
+        
+        return document
+        
+    except Exception as e:
+        logger.error(f"Error adding team URL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/teams/{team_id}/documents",
+         tags=["knowledge-management"],
+         summary="List Team Documents",
+         response_model=List[DocumentMetadata])
+async def list_team_documents(
+    team_id: str = Path(..., description="Team ID")
+):
+    """Get list of team documents"""
+    try:
+        documents = await knowledge_manager.get_documents(team_id=team_id)
+        return documents
+        
+    except Exception as e:
+        logger.error(f"Error listing team documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/teams/{team_id}/documents/{doc_id}",
+         tags=["knowledge-management"],
+         summary="Get Team Document",
+         response_model=DocumentMetadata)
+async def get_team_document(
+    team_id: str = Path(..., description="Team ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Get team document metadata"""
+    try:
+        document = await knowledge_manager.get_document_metadata(
+            doc_id=doc_id,
+            team_id=team_id
+        )
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return document
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting team document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/teams/{team_id}/documents/{doc_id}/content",
+         tags=["knowledge-management"],
+         summary="Get Team Document Content")
+async def get_team_document_content(
+    team_id: str = Path(..., description="Team ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Get full content of team document"""
+    try:
+        content = await knowledge_manager.get_document_content(
+            doc_id=doc_id,
+            team_id=team_id
+        )
+        
+        if content is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return {"content": content}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting team document content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/knowledge/teams/{team_id}/documents/{doc_id}",
+         tags=["knowledge-management"],
+         summary="Update Team Document",
+         response_model=DocumentMetadata)
+async def update_team_document(
+    team_id: str = Path(..., description="Team ID"),
+    doc_id: str = Path(..., description="Document ID"),
+    title: Optional[str] = Body(None, embed=True),
+    tags: Optional[List[str]] = Body(None, embed=True)
+):
+    """Update team document metadata"""
+    try:
+        document = await knowledge_manager.update_document(
+            doc_id=doc_id,
+            title=title,
+            tags=tags,
+            team_id=team_id
+        )
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return document
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating team document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/knowledge/teams/{team_id}/documents/{doc_id}",
+           tags=["knowledge-management"],
+           summary="Delete Team Document")
+async def delete_team_document(
+    team_id: str = Path(..., description="Team ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Delete team document"""
+    try:
+        success = await knowledge_manager.delete_document(
+            doc_id=doc_id,
+            team_id=team_id
+        )
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return {"message": "Document deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting team document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Agent Knowledge Management Endpoints
+
+@app.post("/knowledge/agents/{agent_id}/documents",
+          tags=["knowledge-management"],
+          summary="Upload Agent Document",
+          response_model=DocumentMetadata)
+async def upload_agent_document(
+    agent_id: str = Path(..., description="Agent ID"),
+    file: UploadFile = File(..., description="Document file to upload"),
+    title: Optional[str] = Form(None, description="Document title"),
+    tags: Optional[str] = Form(None, description="Comma-separated tags")
+):
+    """Upload a document to agent knowledge base"""
+    try:
+        tags_list = []
+        if tags:
+            tags_list = [tag.strip() for tag in tags.split(',')]
+        
+        document = await knowledge_manager.upload_document(
+            file_content=file.file,
+            filename=file.filename,
+            title=title,
+            agent_id=agent_id,
+            tags=tags_list
+        )
+        
+        return document
+        
+    except Exception as e:
+        logger.error(f"Error uploading agent document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/knowledge/agents/{agent_id}/url",
+          tags=["knowledge-management"],
+          summary="Add URL to Agent Knowledge",
+          response_model=DocumentMetadata)
+async def add_agent_url(
+    agent_id: str = Path(..., description="Agent ID"),
+    url: str = Body(..., embed=True),
+    title: Optional[str] = Body(None, embed=True),
+    tags: Optional[List[str]] = Body(None, embed=True)
+):
+    """Add URL content to agent knowledge base"""
+    try:
+        document = await knowledge_manager.upload_url(
+            url=url,
+            title=title,
+            agent_id=agent_id,
+            tags=tags or []
+        )
+        
+        return document
+        
+    except Exception as e:
+        logger.error(f"Error adding agent URL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/agents/{agent_id}/documents",
+         tags=["knowledge-management"],
+         summary="List Agent Documents",
+         response_model=List[DocumentMetadata])
+async def list_agent_documents(
+    agent_id: str = Path(..., description="Agent ID")
+):
+    """Get list of agent documents"""
+    try:
+        documents = await knowledge_manager.get_documents(agent_id=agent_id)
+        return documents
+        
+    except Exception as e:
+        logger.error(f"Error listing agent documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/agents/{agent_id}/documents/{doc_id}",
+         tags=["knowledge-management"],
+         summary="Get Agent Document",
+         response_model=DocumentMetadata)
+async def get_agent_document(
+    agent_id: str = Path(..., description="Agent ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Get agent document metadata"""
+    try:
+        document = await knowledge_manager.get_document_metadata(
+            doc_id=doc_id,
+            agent_id=agent_id
+        )
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return document
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting agent document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/knowledge/agents/{agent_id}/documents/{doc_id}/content",
+         tags=["knowledge-management"],
+         summary="Get Agent Document Content")
+async def get_agent_document_content(
+    agent_id: str = Path(..., description="Agent ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Get full content of agent document"""
+    try:
+        content = await knowledge_manager.get_document_content(
+            doc_id=doc_id,
+            agent_id=agent_id
+        )
+        
+        if content is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return {"content": content}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting agent document content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/knowledge/agents/{agent_id}/documents/{doc_id}",
+         tags=["knowledge-management"],
+         summary="Update Agent Document",
+         response_model=DocumentMetadata)
+async def update_agent_document(
+    agent_id: str = Path(..., description="Agent ID"),
+    doc_id: str = Path(..., description="Document ID"),
+    title: Optional[str] = Body(None, embed=True),
+    tags: Optional[List[str]] = Body(None, embed=True)
+):
+    """Update agent document metadata"""
+    try:
+        document = await knowledge_manager.update_document(
+            doc_id=doc_id,
+            title=title,
+            tags=tags,
+            agent_id=agent_id
+        )
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return document
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating agent document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/knowledge/agents/{agent_id}/documents/{doc_id}",
+           tags=["knowledge-management"],
+           summary="Delete Agent Document")
+async def delete_agent_document(
+    agent_id: str = Path(..., description="Agent ID"),
+    doc_id: str = Path(..., description="Document ID")
+):
+    """Delete agent document"""
+    try:
+        success = await knowledge_manager.delete_document(
+            doc_id=doc_id,
+            agent_id=agent_id
+        )
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        return {"message": "Document deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting agent document: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Knowledge Search Endpoints
+
+@app.get("/knowledge/search",
+         tags=["knowledge-management"],
+         summary="Search Knowledge Base",
+         response_model=List[DocumentMetadata])
+async def search_knowledge(
+    query: str = Query(..., description="Search query"),
+    organization_id: Optional[str] = Query(None, description="Filter by organization"),
+    team_id: Optional[str] = Query(None, description="Filter by team"),
+    agent_id: Optional[str] = Query(None, description="Filter by agent"),
+    limit: int = Query(10, ge=1, le=100, description="Maximum number of results")
+):
+    """Search across knowledge base"""
+    try:
+        documents = await knowledge_manager.search_documents(
+            query=query,
+            organization_id=organization_id,
+            team_id=team_id,
+            agent_id=agent_id,
+            limit=limit
+        )
+        
+        return documents
+        
+    except Exception as e:
+        logger.error(f"Error searching knowledge: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ================================
+# Container Management API Endpoints  
+# ================================
+
+@app.post("/agents/{agent_id}/container/create",
+          tags=["container-management"],
+          summary="Create Agent Container",
+          response_model=ContainerStatus)
+async def create_agent_container(
+    agent_id: str = Path(..., description="Agent ID"),
+    config: Optional[ContainerConfig] = Body(None, description="Container configuration")
+):
+    """Create a new container for an AI agent"""
+    try:
+        status = await container_manager.create_agent_container(agent_id, config)
+        return status
+        
+    except Exception as e:
+        logger.error(f"Error creating container for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/agents/{agent_id}/container/start",
+          tags=["container-management"],
+          summary="Start Agent Container",
+          response_model=ContainerStatus)
+async def start_agent_container(agent_id: str = Path(..., description="Agent ID")):
+    """Start an agent container"""
+    try:
+        status = await container_manager.start_container(agent_id)
+        return status
+        
+    except RuntimeError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error starting container for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/agents/{agent_id}/container/stop",
+          tags=["container-management"],
+          summary="Stop Agent Container",
+          response_model=ContainerStatus)
+async def stop_agent_container(
+    agent_id: str = Path(..., description="Agent ID"),
+    timeout: int = Body(30, description="Stop timeout in seconds")
+):
+    """Stop an agent container"""
+    try:
+        status = await container_manager.stop_container(agent_id, timeout)
+        return status
+        
+    except RuntimeError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error stopping container for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/agents/{agent_id}/container/restart",
+          tags=["container-management"],
+          summary="Restart Agent Container",
+          response_model=ContainerStatus)
+async def restart_agent_container(
+    agent_id: str = Path(..., description="Agent ID"),
+    timeout: int = Body(30, description="Restart timeout in seconds")
+):
+    """Restart an agent container"""
+    try:
+        status = await container_manager.restart_container(agent_id, timeout)
+        return status
+        
+    except RuntimeError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error restarting container for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/agents/{agent_id}/container",
+           tags=["container-management"],
+           summary="Remove Agent Container")
+async def remove_agent_container(
+    agent_id: str = Path(..., description="Agent ID"),
+    force: bool = Query(False, description="Force removal of running container")
+):
+    """Remove an agent container"""
+    try:
+        success = await container_manager.remove_container(agent_id, force)
+        
+        if success:
+            return {"message": f"Container for agent {agent_id} removed successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to remove container")
+        
+    except Exception as e:
+        logger.error(f"Error removing container for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/agents/{agent_id}/container/status",
+         tags=["container-management"],
+         summary="Get Agent Container Status",
+         response_model=Optional[ContainerStatus])
+async def get_agent_container_status(agent_id: str = Path(..., description="Agent ID")):
+    """Get container status for an agent"""
+    try:
+        status = await container_manager.get_container_status(agent_id)
+        return status
+        
+    except Exception as e:
+        logger.error(f"Error getting container status for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/containers/agents",
+         tags=["container-management"],
+         summary="List Agent Containers",
+         response_model=List[ContainerStatus])
+async def list_agent_containers():
+    """List all agent containers"""
+    try:
+        containers = await container_manager.list_agent_containers()
+        return containers
+        
+    except Exception as e:
+        logger.error(f"Error listing agent containers: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/agents/{agent_id}/container/logs",
+         tags=["container-management"],
+         summary="Get Agent Container Logs")
+async def get_agent_container_logs(
+    agent_id: str = Path(..., description="Agent ID"),
+    tail: int = Query(100, ge=1, le=10000, description="Number of log lines to return"),
+    since: Optional[str] = Query(None, description="Show logs since timestamp (ISO format)")
+):
+    """Get container logs for an agent"""
+    try:
+        since_dt = None
+        if since:
+            try:
+                since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid timestamp format")
+        
+        logs = await container_manager.get_container_logs(
+            agent_id=agent_id,
+            tail=tail,
+            since=since_dt
+        )
+        
+        return {"logs": logs}
+        
+    except RuntimeError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting container logs for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/agents/{agent_id}/container/execute",
+          tags=["container-management"],
+          summary="Execute Command in Container")
+async def execute_container_command(
+    agent_id: str = Path(..., description="Agent ID"),
+    command: str = Body(..., description="Command to execute"),
+    working_dir: Optional[str] = Body(None, description="Working directory")
+):
+    """Execute a command in the agent container"""
+    try:
+        result = await container_manager.execute_command(
+            agent_id=agent_id,
+            command=command,
+            working_dir=working_dir
+        )
+        
+        return result
+        
+    except RuntimeError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error executing command in container for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# WebSocket endpoint for real-time log streaming
+@app.websocket("/agents/{agent_id}/container/logs/stream")
+async def stream_agent_container_logs(websocket: WebSocket, agent_id: str):
+    """Stream container logs in real-time via WebSocket"""
+    await websocket.accept()
+    
+    try:
+        # Check if container exists
+        status = await container_manager.get_container_status(agent_id)
+        if not status:
+            await websocket.send_json({"error": "Container not found"})
+            await websocket.close()
+            return
+        
+        await websocket.send_json({"status": "connected", "agent_id": agent_id})
+        
+        # Stream logs
+        async for log_entry in container_manager.stream_container_logs(agent_id):
+            await websocket.send_json({
+                "timestamp": log_entry.timestamp.isoformat(),
+                "stream": log_entry.stream,
+                "message": log_entry.message
+            })
+            
+    except Exception as e:
+        logger.error(f"Error in log stream for agent {agent_id}: {e}")
+        try:
+            await websocket.send_json({"error": str(e)})
+        except:
+            pass
+        finally:
+            try:
+                await websocket.close()
+            except:
+                pass
+
+# ============================================================================
+# RAG (Retrieval-Augmented Generation) Endpoints
+# ============================================================================
+
+@app.post("/rag/search")
+async def search_knowledge_context(
+    query: str = Body(..., embed=True),
+    organization_id: Optional[str] = Body(None, embed=True),
+    team_id: Optional[str] = Body(None, embed=True),
+    agent_id: Optional[str] = Body(None, embed=True),
+    max_results: int = Body(5, embed=True),
+    similarity_threshold: float = Body(0.7, embed=True)
+):
+    """Search for relevant knowledge context using RAG"""
+    try:
+        context = await rag_system.search_relevant_context(
+            query=query,
+            organization_id=organization_id,
+            team_id=team_id,
+            agent_id=agent_id,
+            max_results=max_results,
+            similarity_threshold=similarity_threshold
+        )
+        
+        return {
+            "query": context.query,
+            "relevant_chunks": [
+                {
+                    "document_id": chunk.document_id,
+                    "document_title": chunk.metadata.get("document_title", "Unknown"),
+                    "content": chunk.content,
+                    "chunk_index": chunk.chunk_index,
+                    "metadata": chunk.metadata
+                }
+                for chunk in context.relevant_chunks
+            ],
+            "similarity_scores": context.similarity_scores,
+            "total_documents": context.total_documents,
+            "context_length": context.context_length
+        }
+        
+    except Exception as e:
+        logger.error(f"Error searching knowledge context: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/rag/enhance-prompt")
+async def enhance_prompt_with_context(
+    message: str = Body(..., embed=True),
+    organization_id: Optional[str] = Body(None, embed=True),
+    team_id: Optional[str] = Body(None, embed=True),
+    agent_id: Optional[str] = Body(None, embed=True),
+    max_context_length: int = Body(4000, embed=True)
+):
+    """Enhance a prompt with relevant context using RAG"""
+    try:
+        enhanced_prompt = await rag_system.get_contextual_prompt(
+            user_message=message,
+            organization_id=organization_id,
+            team_id=team_id,
+            agent_id=agent_id,
+            max_context_length=max_context_length
+        )
+        
+        return {
+            "original_message": message,
+            "enhanced_prompt": enhanced_prompt,
+            "context_added": len(enhanced_prompt) > len(message)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error enhancing prompt with context: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/rag/reindex")
+async def reindex_knowledge_base(
+    organization_id: Optional[str] = Body(None, embed=True),
+    team_id: Optional[str] = Body(None, embed=True),
+    agent_id: Optional[str] = Body(None, embed=True)
+):
+    """Reindex all documents in a scope for RAG"""
+    try:
+        results = await rag_system.index_all_documents(
+            organization_id=organization_id,
+            team_id=team_id,
+            agent_id=agent_id
+        )
+        
+        return {
+            "scope": {
+                "organization_id": organization_id,
+                "team_id": team_id,
+                "agent_id": agent_id
+            },
+            "results": results,
+            "message": f"Indexed {results['indexed']} documents, {results['failed']} failed, {results['skipped']} skipped"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error reindexing knowledge base: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/rag/stats")
+async def get_rag_index_stats():
+    """Get statistics about the RAG index"""
+    try:
+        stats = await rag_system.get_index_stats()
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Error getting RAG stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/rag/documents/{doc_id}/reindex")
+async def reindex_document(
+    doc_id: str,
+    organization_id: Optional[str] = Body(None, embed=True),
+    team_id: Optional[str] = Body(None, embed=True),
+    agent_id: Optional[str] = Body(None, embed=True)
+):
+    """Reindex a specific document for RAG"""
+    try:
+        # Get document metadata
+        document = await knowledge_manager.get_document_metadata(
+            doc_id=doc_id,
+            organization_id=organization_id,
+            team_id=team_id,
+            agent_id=agent_id
+        )
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Reindex the document
+        success = await rag_system.index_document(document)
+        
+        if success:
+            return {
+                "document_id": doc_id,
+                "status": "reindexed",
+                "message": f"Document '{document.title}' has been reindexed successfully"
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to reindex document")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reindexing document {doc_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# Real-time WebSocket Endpoints
+# ============================================================================
+
+@app.websocket("/ws/updates")
+async def websocket_real_time_updates(
+    websocket: WebSocket,
+    organization_id: Optional[str] = None,
+    team_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    subscriptions: Optional[str] = None
+):
+    """Main WebSocket endpoint for real-time updates"""
+    import uuid
+    
+    connection_id = str(uuid.uuid4())
+    
+    # Parse subscriptions
+    subscription_list = []
+    if subscriptions:
+        subscription_list = subscriptions.split(',')
+    
+    try:
+        connection = await websocket_manager.connect(
+            websocket=websocket,
+            connection_id=connection_id,
+            organization_id=organization_id,
+            team_id=team_id,
+            agent_id=agent_id,
+            user_id=user_id,
+            subscriptions=subscription_list
+        )
+        
+        # Keep connection alive and handle pings
+        while True:
+            try:
+                # Wait for ping messages or disconnection
+                message = await websocket.receive_text()
+                
+                # Handle ping/pong
+                if message == "ping":
+                    await websocket.send_text("pong")
+                    connection.last_ping = datetime.now()
+                else:
+                    # Parse other messages (subscription updates, etc.)
+                    try:
+                        data = json.loads(message)
+                        if data.get("type") == "subscribe":
+                            # Update subscriptions
+                            new_subs = data.get("subscriptions", [])
+                            connection.scope.subscriptions.clear()
+                            for sub in new_subs:
+                                try:
+                                    connection.scope.subscriptions.add(UpdateType(sub))
+                                except ValueError:
+                                    pass
+                            
+                            await connection.send_update(WebSocketUpdate(
+                                type=UpdateType.SYSTEM_NOTIFICATION,
+                                data={
+                                    "message": "Subscriptions updated",
+                                    "subscriptions": list(connection.scope.subscriptions)
+                                }
+                            ))
+                    except json.JSONDecodeError:
+                        pass
+                        
+            except WebSocketDisconnect:
+                break
+                
+    except Exception as e:
+        logger.error(f"WebSocket error for connection {connection_id}: {e}")
+    finally:
+        await websocket_manager.disconnect(connection_id)
+
+@app.websocket("/ws/agent/{agent_id}/updates")
+async def websocket_agent_updates(websocket: WebSocket, agent_id: str):
+    """WebSocket endpoint for specific agent updates"""
+    import uuid
+    
+    connection_id = f"agent-{agent_id}-{uuid.uuid4()}"
+    
+    try:
+        connection = await websocket_manager.connect(
+            websocket=websocket,
+            connection_id=connection_id,
+            agent_id=agent_id,
+            subscriptions=[
+                UpdateType.AGENT_STATUS.value,
+                UpdateType.TASK_STATUS.value,
+                UpdateType.TASK_PROGRESS.value,
+                UpdateType.CONTAINER_STATUS.value,
+                UpdateType.CHAT_MESSAGE.value,
+                UpdateType.CHAT_TYPING.value
+            ]
+        )
+        
+        # Keep connection alive
+        while True:
+            try:
+                message = await websocket.receive_text()
+                if message == "ping":
+                    await websocket.send_text("pong")
+                    connection.last_ping = datetime.now()
+            except WebSocketDisconnect:
+                break
+                
+    except Exception as e:
+        logger.error(f"Agent WebSocket error for {agent_id}: {e}")
+    finally:
+        await websocket_manager.disconnect(connection_id)
+
+@app.websocket("/ws/organization/{organization_id}/updates")
+async def websocket_organization_updates(websocket: WebSocket, organization_id: str):
+    """WebSocket endpoint for organization-wide updates"""
+    import uuid
+    
+    connection_id = f"org-{organization_id}-{uuid.uuid4()}"
+    
+    try:
+        connection = await websocket_manager.connect(
+            websocket=websocket,
+            connection_id=connection_id,
+            organization_id=organization_id,
+            subscriptions=[
+                UpdateType.AGENT_CREATED.value,
+                UpdateType.AGENT_UPDATED.value,
+                UpdateType.AGENT_DELETED.value,
+                UpdateType.KNOWLEDGE_UPDATED.value,
+                UpdateType.KNOWLEDGE_INDEXED.value,
+                UpdateType.SYSTEM_NOTIFICATION.value
+            ]
+        )
+        
+        # Keep connection alive
+        while True:
+            try:
+                message = await websocket.receive_text()
+                if message == "ping":
+                    await websocket.send_text("pong")
+                    connection.last_ping = datetime.now()
+            except WebSocketDisconnect:
+                break
+                
+    except Exception as e:
+        logger.error(f"Organization WebSocket error for {organization_id}: {e}")
+    finally:
+        await websocket_manager.disconnect(connection_id)
+
+# WebSocket Statistics Endpoint
+@app.get("/ws/stats")
+async def get_websocket_stats():
+    """Get WebSocket connection statistics"""
+    try:
+        stats = websocket_manager.get_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting WebSocket stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Manual notification endpoints for testing
+@app.post("/ws/test/agent/{agent_id}/status")
+async def test_agent_status_notification(
+    agent_id: str,
+    status: str = Body(..., embed=True),
+    message: Optional[str] = Body(None, embed=True)
+):
+    """Test endpoint to send agent status notifications"""
+    try:
+        await notify_agent_status_change(
+            agent_id=agent_id,
+            status=status,
+            additional_data={"message": message} if message else None
+        )
+        return {"status": "notification_sent", "agent_id": agent_id}
+    except Exception as e:
+        logger.error(f"Error sending test notification: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -8,6 +8,11 @@ export default defineConfig({
     { enforce: 'pre', ...mdx() },
     react()
   ],
+  resolve: {
+    alias: {
+      "@": "/app/src",
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,

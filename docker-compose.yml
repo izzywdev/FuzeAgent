@@ -66,9 +66,10 @@ services:
       MAX_CONCURRENT_EXECUTIONS: "10"
       MAX_COORDINATION_SESSIONS: "5"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - orchestrator_workspaces:/app/workspaces
       - orchestrator_backups:/app/.fuzeagent/backups
+      # Docker socket mounting disabled due to Windows/WSL compatibility issues
+      # - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - postgres
       - redis

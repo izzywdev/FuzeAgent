@@ -21,6 +21,7 @@ from models import (
     CreateAgentFromTemplate, CreateCustomAgent
 )
 from agent_templates import template_manager, AgentCategory
+from hierarchy_endpoints import router as hierarchy_router
 
 # Default IDs for initial setup
 DEFAULT_ORG_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -161,6 +162,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include hierarchy router for organizational visualization
+app.include_router(hierarchy_router)
 
 # ============================================================================
 # ORGANIZATION ENDPOINTS
