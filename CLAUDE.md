@@ -185,21 +185,299 @@ docker-compose exec -T postgres psql -U postgres ai_context < backup.sql
 ```
 
 ### Development Workflow
+
+#### Docker Build Optimization Strategy
+
+**Multi-Stage Build Optimization:**
 ```bash
-# Build all containers
-docker-compose build
+# Optimized build with layer caching and parallel builds
+docker-compose build --parallel --progress=plain
 
-# Build specific service
-docker-compose build orchestrator
+# Build specific service with optimized caching
+docker-compose build --no-cache orchestrator
 
+# Build with BuildKit for advanced caching (recommended)
+DOCKER_BUILDKIT=1 docker-compose build
+
+# Build with build arguments for cache optimization
+docker-compose build --build-arg BUILDKIT_INLINE_CACHE=1
+```
+
+**Layer Caching Best Practices:**
+```dockerfile
+# Example optimized Dockerfile structure
+FROM node:20-alpine AS dependencies
+WORKDIR /app
+# Copy package files first for better caching
+COPY package*.json ./
+# Install dependencies in separate layer
+RUN npm ci --only=production --cache /tmp/cache
+
+FROM node:20-alpine AS development
+WORKDIR /app
+COPY package*.json ./
+# Development dependencies layer
+RUN npm ci --cache /tmp/cache
+
+FROM dependencies AS build
+# Copy source code only after dependencies
+COPY . .
+# Build in separate layer
+RUN npm run build
+
+FROM nginx:alpine AS production
+# Copy only built assets
+COPY --from=build /app/dist /usr/share/nginx/html
+```
+
+**Advanced Build Optimization:**
+```bash
+# Use buildx for advanced features and caching
+docker buildx create --use --driver docker-container
+
+# Build with remote cache (for CI/CD)
+docker buildx build --cache-from=type=registry,ref=myregistry/cache \
+                   --cache-to=type=registry,ref=myregistry/cache,mode=max \
+                   --tag myapp:latest .
+
+# Build with local cache directory
+docker buildx build --cache-from=type=local,src=/tmp/cache \
+                   --cache-to=type=local,dest=/tmp/cache .
+
+# Parallel multi-platform builds with caching
+docker buildx build --platform linux/amd64,linux/arm64 \
+                   --cache-from=type=registry,ref=cache:latest \
+                   --push -t myapp:latest .
+```
+
+**Container Build Performance:**
+```bash
+# Monitor build performance
+time docker-compose build --progress=plain
+
+# Build with specific memory and CPU limits
+docker-compose build --memory=4g --cpus=2.0
+
+# Use .dockerignore to exclude unnecessary files
+echo "node_modules
+.git
+*.log
+.env*
+coverage/
+.nyc_output/" > .dockerignore
+
+# Optimize package manager caching
+# For Node.js projects
+RUN npm ci --prefer-offline --no-audit --cache /tmp/npm-cache
+
+# For Python projects  
+RUN pip install --cache-dir /tmp/pip-cache -r requirements.txt
+
+# For both with cache mounts (BuildKit)
+RUN --mount=type=cache,target=/tmp/npm-cache npm ci
+RUN --mount=type=cache,target=/tmp/pip-cache pip install -r requirements.txt
+```
+
+**Development Build Strategy:**
+```bash
+# Full rebuild when code changes (always rebuild containers)
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+# Incremental rebuild with dependency tracking
+docker-compose build --pull
+docker-compose up -d --force-recreate
+
+# Development with volume mounts (faster iteration)
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Production-like builds with optimizations
+DOCKER_BUILDKIT=1 docker-compose -f docker-compose.prod.yml build
+```
+
+**Build Context Optimization:**
+```bash
+# Use .dockerignore effectively
+.git/
+node_modules/
+coverage/
+*.log
+.env*
+README.md
+docs/
+*.md
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+build/
+
+# Minimize build context size
+du -sh . # Check current directory size before build
+docker build --no-cache . # Monitor context transfer time
+```
+
+**Container Registry and Caching:**
+```bash
+# Use registry cache for team development
+docker buildx build --cache-from=registry:cache --cache-to=registry:cache .
+
+# Multi-stage build with selective caching
+docker build --target=development --cache-from=registry:dev-cache .
+docker build --target=production --cache-from=registry:prod-cache .
+
+# Tag and push intermediate layers for caching
+docker build --tag myapp:cache-stage --target dependencies .
+docker push myapp:cache-stage
+```
+
+**Monitoring and Debugging Builds:**
+```bash
+# Debug build issues with detailed output
+docker-compose build --progress=plain --no-cache 2>&1 | tee build.log
+
+# Analyze build performance
+docker system df # Check disk usage
+docker builder prune # Clean build cache
+docker system prune -a # Clean all unused containers/images
+
+# Build timing analysis
+time docker-compose build
+docker-compose build --progress=plain | ts # Add timestamps
+
+# Memory and resource monitoring during builds
+docker stats $(docker ps -q) # Monitor running containers during build
+```
+
+**Automated Build Scripts:**
+```bash
+#!/bin/bash
+# optimized-build.sh - Smart rebuild script
+
+set -e
+
+echo "🔧 FuzeAgent Optimized Container Build"
+
+# Check if docker buildx is available
+if docker buildx version >/dev/null 2>&1; then
+    echo "✅ Using Docker BuildKit for optimized builds"
+    export DOCKER_BUILDKIT=1
+fi
+
+# Clean up old containers and images
+echo "🧹 Cleaning up old containers..."
+docker-compose down --remove-orphans
+docker system prune -f
+
+# Build with optimized settings
+echo "🏗️ Building containers with cache optimization..."
+docker-compose build \
+    --parallel \
+    --pull \
+    --build-arg BUILDKIT_INLINE_CACHE=1
+
+# Verify builds completed successfully
+echo "🔍 Verifying container builds..."
+docker-compose config --quiet
+
+# Start services with health checks
+echo "🚀 Starting services..."
+docker-compose up -d --wait
+
+# Display build summary
+echo "📊 Build Summary:"
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" | head -10
+docker system df
+
+echo "✅ Build completed successfully!"
+```
+
+**CI/CD Integration:**
+```yaml
+# .github/workflows/docker-build.yml
+name: Docker Build and Deploy
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+      with:
+        driver-opts: |
+          image=moby/buildkit:master
+          
+    - name: Login to Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Build and push with cache
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ghcr.io/${{ github.repository }}:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+```
+
+**Regular Development Workflow:**
+```bash
+# Daily development cycle
+./scripts/dev-build.sh      # Optimized development build
+./scripts/test-build.sh     # Run tests in containers
+./scripts/deploy-build.sh   # Deploy to staging/production
+
+# Code change detection and rebuilding
+find . -name "*.py" -o -name "*.js" -o -name "*.ts" | entr -r docker-compose restart
+
+# Watch for changes and rebuild specific services
+watchman-make -p 'services/orchestrator/**/*.py' -t orchestrator-rebuild
+watchman-make -p 'services/ui-react/src/**/*' -t ui-rebuild
+```
+
+**Performance Monitoring:**
+```bash
+# Monitor build performance over time
+echo "$(date): $(time docker-compose build 2>&1)" >> build-performance.log
+
+# Track image sizes
+docker images --format "{{.Repository}}:{{.Tag}} {{.Size}}" | grep fuzeagent
+
+# Build cache hit rate analysis
+docker buildx du # Show build cache usage
+docker system events --filter type=container # Monitor container events
+```
+
+**Container Health and Readiness:**
+```bash
 # View real-time agent updates
-# Navigate to http://localhost:3000 for WebSocket dashboard
+# Navigate to http://localhost:3031 for WebSocket dashboard
 
 # Monitor message queue
-# Navigate to http://localhost:15672 (admin/password from .env)
+# Navigate to http://localhost:15673 (admin/password from .env)
 
 # Check orchestrator health
 curl http://localhost:8000/health
+
+# Comprehensive health check script
+./scripts/health-check.sh
 ```
 
 ## Key Components

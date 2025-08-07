@@ -33,9 +33,8 @@ FROM base as runtime
 
 # Copy installed packages from dependencies stage
 COPY --from=dependencies /root/.local /root/.local
-COPY --from=dependencies /usr/local/bin/claude /usr/local/bin/claude
 
-# Make sure scripts in .local are usable
+# Make sure scripts in .local are usable (Claude CLI is installed here)
 ENV PATH=/root/.local/bin:$PATH
 
 # Copy source code
