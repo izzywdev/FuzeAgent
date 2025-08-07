@@ -40,14 +40,14 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy source code
 COPY . .
 
-# Create non-root user
+# Copy entrypoint script and set permissions before switching user
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Create non-root user and set ownership
 RUN useradd -m -u 1000 orchestrator && \
     chown -R orchestrator:orchestrator /app
 USER orchestrator
-
-# Copy entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
