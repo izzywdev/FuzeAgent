@@ -153,7 +153,7 @@ export function DashboardPage() {
         formData.append('title', file.name)
 
         try {
-          const response = await api.upload('/knowledge/documents', formData)
+          await api.upload('/knowledge/documents', formData)
           newProgress[file.name] = 100
           setUploadProgress({...newProgress})
           

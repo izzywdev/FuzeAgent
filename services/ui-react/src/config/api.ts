@@ -6,7 +6,7 @@ const getAPIEndpoints = () => {
   const hostname = window.location.hostname
   
   // Development vs Production configuration
-  const isDevelopment = process.env.NODE_ENV === 'development' || hostname === 'localhost'
+  const isDevelopment = import.meta.env.NODE_ENV === 'development' || hostname === 'localhost'
   
   if (isDevelopment) {
     return {

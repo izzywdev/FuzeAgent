@@ -165,7 +165,7 @@ export function OrganizationProfilePage() {
       })
       
       if (response.ok) {
-        const updatedData = await response.json()
+        await response.json()
         setOriginalOrgInfo({...orgInfo})
         setIsEditing(false)
         setSaveMessage({type: 'success', text: 'Organization profile updated successfully!'})

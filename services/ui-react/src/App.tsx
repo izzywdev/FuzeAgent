@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import axios from 'axios'
 import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle, FiUsers, FiBook, FiCode, FiHelpCircle } from 'react-icons/fi'
 import AgentDashboard from './components/AgentDashboard'
 import CreateAgentModal from './components/CreateAgentModal'
