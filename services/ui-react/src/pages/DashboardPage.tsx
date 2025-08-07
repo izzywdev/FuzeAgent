@@ -480,7 +480,6 @@ export function DashboardPage() {
                   ))}
                 </div>
               )}
-              </div>
               
               <div style={{marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem'}}>
                 <Button variant="outline" onClick={() => {
