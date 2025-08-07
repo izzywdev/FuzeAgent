@@ -40,9 +40,11 @@ export function OrganizationProfilePage() {
     founded: '2025',
     website: 'https://worldclassgroup.ai'
   })
+  const [originalOrgInfo, setOriginalOrgInfo] = useState<OrganizationInfo | null>(null)
   
   const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDocument[]>([])
   const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeDocument | null>(null)
@@ -52,15 +54,71 @@ export function OrganizationProfilePage() {
   const [ragQuery, setRagQuery] = useState('')
   const [ragResults, setRagResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
 
-  // Load knowledge documents on component mount
+  // Load organization data and knowledge documents on component mount
   useEffect(() => {
-    loadKnowledgeDocuments()
+    loadFirstOrganization()
   }, [])
 
-  const loadKnowledgeDocuments = async () => {
+  // Clear save message after 3 seconds
+  useEffect(() => {
+    if (saveMessage) {
+      const timer = setTimeout(() => setSaveMessage(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [saveMessage])
+
+  const loadFirstOrganization = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/documents`)
+      // First, get all organizations to find the first one
+      const orgsResponse = await fetch('http://localhost:8006/organizations')
+      if (orgsResponse.ok) {
+        const organizations = await orgsResponse.json()
+        if (organizations && organizations.length > 0) {
+          const firstOrg = organizations[0]
+          await loadOrganizationData(firstOrg.id)
+          await loadKnowledgeDocuments(firstOrg.id)
+        } else {
+          console.error('No organizations found')
+        }
+      } else {
+        console.error('Failed to load organizations')
+      }
+    } catch (error) {
+      console.error('Error loading organizations:', error)
+    }
+  }
+
+  const loadOrganizationData = async (orgId?: string) => {
+    const targetId = orgId || orgInfo.id
+    try {
+      const response = await fetch(`http://localhost:8006/organizations/${targetId}`)
+      if (response.ok) {
+        const data = await response.json()
+        const loadedOrgInfo: OrganizationInfo = {
+          id: data.id,
+          name: data.name,
+          description: data.description || '',
+          industry: data.industry || 'Technology / AI Services',
+          size: data.size || '10-50 employees', 
+          founded: data.founded || '2025',
+          website: data.website || ''
+        }
+        setOrgInfo(loadedOrgInfo)
+        setOriginalOrgInfo({...loadedOrgInfo})
+      } else {
+        console.error('Failed to load organization data')
+      }
+    } catch (error) {
+      console.error('Error loading organization data:', error)
+    }
+  }
+
+  const loadKnowledgeDocuments = async (orgId?: string) => {
+    const targetId = orgId || orgInfo.id
+    try {
+      const response = await fetch(`http://localhost:8000/knowledge/organizations/${targetId}/documents`)
       if (response.ok) {
         const documents = await response.json()
         setKnowledgeDocs(documents)
@@ -69,6 +127,66 @@ export function OrganizationProfilePage() {
       }
     } catch (error) {
       console.error('Error loading documents:', error)
+    }
+  }
+
+  const handleStartEditing = () => {
+    setOriginalOrgInfo({...orgInfo})
+    setIsEditing(true)
+    setSaveMessage(null)
+  }
+
+  const handleCancelEditing = () => {
+    if (originalOrgInfo) {
+      setOrgInfo({...originalOrgInfo})
+    }
+    setIsEditing(false)
+    setSaveMessage(null)
+  }
+
+  const handleSaveChanges = async () => {
+    setIsSaving(true)
+    setSaveMessage(null)
+    
+    try {
+      const response = await fetch(`http://localhost:8006/organizations/${orgInfo.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: orgInfo.name,
+          description: orgInfo.description,
+          industry: orgInfo.industry,
+          size: orgInfo.size,
+          founded: orgInfo.founded,
+          website: orgInfo.website
+        })
+      })
+      
+      if (response.ok) {
+        const updatedData = await response.json()
+        setOriginalOrgInfo({...orgInfo})
+        setIsEditing(false)
+        setSaveMessage({type: 'success', text: 'Organization profile updated successfully!'})
+        
+        // Reload the data to ensure consistency
+        await loadOrganizationData()
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        setSaveMessage({
+          type: 'error', 
+          text: errorData.detail || 'Failed to update organization profile'
+        })
+      }
+    } catch (error) {
+      console.error('Error saving organization:', error)
+      setSaveMessage({
+        type: 'error', 
+        text: 'Network error. Please check your connection and try again.'
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -245,29 +363,39 @@ export function OrganizationProfilePage() {
             
             <div style={{display: 'flex', gap: '0.5rem'}}>
               <button 
-                onClick={() => setIsEditing(!isEditing)}
+                onClick={isEditing ? handleCancelEditing : handleStartEditing}
+                disabled={isSaving}
                 style={{
                   padding: '0.5rem 1rem',
                   border: '1px solid #d1d5db',
                   borderRadius: '0.375rem',
                   fontSize: '0.875rem',
                   backgroundColor: 'white',
-                  cursor: 'pointer'
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  opacity: isSaving ? 0.6 : 1
                 }}
               >
                 {isEditing ? 'Cancel' : 'Edit Profile'}
               </button>
               {isEditing && (
-                <button style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#2563eb',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer'
-                }}>
-                  Save Changes
+                <button 
+                  onClick={handleSaveChanges}
+                  disabled={isSaving}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: isSaving ? '#9ca3af' : '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {isSaving && <span style={{animation: 'spin 1s linear infinite'}}>⏳</span>}
+                  {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               )}
             </div>
@@ -277,6 +405,24 @@ export function OrganizationProfilePage() {
 
       {/* Main Content */}
       <main style={{maxWidth: '80rem', margin: '0 auto', padding: '2rem 1rem'}}>
+        {/* Success/Error Messages */}
+        {saveMessage && (
+          <div style={{
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            marginBottom: '1.5rem',
+            backgroundColor: saveMessage.type === 'success' ? '#dcfce7' : '#fee2e2',
+            border: `1px solid ${saveMessage.type === 'success' ? '#16a34a' : '#dc2626'}`,
+            color: saveMessage.type === 'success' ? '#15803d' : '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>{saveMessage.type === 'success' ? '✅' : '❌'}</span>
+            <span>{saveMessage.text}</span>
+          </div>
+        )}
+
         {/* Header */}
         <div style={{backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #e5e7eb', marginBottom: '2rem'}}>
           <div style={{padding: '2rem'}}>
@@ -897,6 +1043,16 @@ export function OrganizationProfilePage() {
           </div>
         )}
       </main>
+
+      {/* CSS Animations */}
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
     </div>
   )
 }

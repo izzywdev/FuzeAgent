@@ -1,13 +1,25 @@
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-const teams = [
+interface Team {
+  id: string
+  name: string
+  description: string
+  members: string[]
+  status: string
+  color: string
+  team_type?: string
+}
+
+const mockTeams: Team[] = [
   {
     id: '1',
     name: 'Executive Team',
     description: 'Strategic leadership and decision making',
     members: ['IzzyAI CEO', 'Alex CTO', 'Sarah CPO'],
     status: 'active',
-    color: '#7c3aed'
+    color: '#7c3aed',
+    team_type: 'executive'
   },
   {
     id: '2', 
@@ -15,7 +27,8 @@ const teams = [
     description: 'Frontend, backend, and full-stack development',
     members: ['React Developer', 'Python Developer', 'TypeScript Developer'],
     status: 'active',
-    color: '#2563eb'
+    color: '#2563eb',
+    team_type: 'development'
   },
   {
     id: '3',
@@ -23,7 +36,8 @@ const teams = [
     description: 'Testing, quality control, and bug detection',
     members: ['QA Engineer'],
     status: 'active',
-    color: '#16a34a'
+    color: '#16a34a',
+    team_type: 'qa'
   },
   {
     id: '4',
@@ -31,7 +45,8 @@ const teams = [
     description: 'Infrastructure, deployment, and system operations',
     members: ['DevOps Engineer'],
     status: 'active',
-    color: '#ea580c'
+    color: '#ea580c',
+    team_type: 'devops'
   },
   {
     id: '5',
@@ -39,12 +54,59 @@ const teams = [
     description: 'Marketing, sales, and customer relations',
     members: ['Marketing Agent', 'Sales Agent'],
     status: 'active',
-    color: '#dc2626'
+    color: '#dc2626',
+    team_type: 'business'
   }
 ]
 
 export function FixedTeamsPage() {
+  const [teams, setTeams] = useState<Team[]>([])
+  const [filteredTeams, setFilteredTeams] = useState<Team[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const navigate = useNavigate()
+
+  // Filter teams based on search term and type
+  useEffect(() => {
+    let filtered = teams
+
+    if (searchTerm) {
+      filtered = filtered.filter(team => 
+        team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        team.description.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    if (typeFilter) {
+      filtered = filtered.filter(team => team.team_type === typeFilter)
+    }
+
+    setFilteredTeams(filtered)
+  }, [teams, searchTerm, typeFilter])
+
+  useEffect(() => {
+    // Try to fetch from API first, fallback to mock data
+    fetch('http://localhost:8006/teams')
+      .then(res => res.json())
+      .then(data => {
+        const teamData = Array.isArray(data) ? data : []
+        setTeams(teamData)
+        setFilteredTeams(teamData)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('Failed to load teams:', err)
+        setLoading(false)
+        // Use mock data on error
+        setTeams(mockTeams)
+        setFilteredTeams(mockTeams)
+      })
+  }, [])
+
+  const handleCreateTeam = () => {
+    navigate('/teams/create')
+  }
   
   return (
     <div style={{minHeight: '100vh', backgroundColor: '#f9fafb'}}>
@@ -108,6 +170,8 @@ export function FixedTeamsPage() {
             <input
               type="text"
               placeholder="Search teams..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               style={{
                 padding: '0.5rem 0.75rem',
                 border: '1px solid #d1d5db',
@@ -116,24 +180,104 @@ export function FixedTeamsPage() {
                 width: '20rem'
               }}
             />
+            <select 
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem'
+              }}
+            >
+              <option value="">All Types</option>
+              <option value="executive">Executive</option>
+              <option value="development">Development</option>
+              <option value="qa">Quality Assurance</option>
+              <option value="devops">DevOps</option>
+              <option value="business">Business</option>
+              <option value="design">Design</option>
+            </select>
           </div>
-          <button style={{
-            backgroundColor: '#2563eb',
-            color: 'white',
-            padding: '0.5rem 1rem',
-            borderRadius: '0.375rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            border: 'none',
-            cursor: 'pointer'
-          }}>
+          <button 
+            onClick={handleCreateTeam}
+            style={{
+              backgroundColor: '#2563eb',
+              color: 'white',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
             + Create Team
           </button>
         </div>
 
+        {/* Search Results Info */}
+        {!loading && (
+          <div style={{marginBottom: '1rem', color: '#6b7280', fontSize: '0.875rem'}}>
+            {searchTerm || typeFilter ? (
+              <span>
+                Found {filteredTeams.length} of {teams.length} teams
+                {searchTerm && ` matching "${searchTerm}"`}
+                {typeFilter && ` of type "${typeFilter}"`}
+                {(searchTerm || typeFilter) && (
+                  <button 
+                    onClick={() => {setSearchTerm(''); setTypeFilter('')}}
+                    style={{
+                      marginLeft: '0.5rem',
+                      color: '#2563eb',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span>Showing all {teams.length} teams</span>
+            )}
+          </div>
+        )}
+
         {/* Teams Grid */}
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem'}}>
-          {teams.map((team) => (
+        {loading ? (
+          <div style={{textAlign: 'center', padding: '3rem'}}>
+            <p style={{color: '#6b7280'}}>Loading teams...</p>
+          </div>
+        ) : filteredTeams.length === 0 ? (
+          <div style={{textAlign: 'center', padding: '3rem'}}>
+            {teams.length === 0 ? (
+              <p style={{color: '#6b7280'}}>No teams found</p>
+            ) : (
+              <div>
+                <p style={{color: '#6b7280'}}>No teams match your search criteria</p>
+                <button 
+                  onClick={() => {setSearchTerm(''); setTypeFilter('')}}
+                  style={{
+                    marginTop: '1rem',
+                    color: '#2563eb',
+                    background: 'none',
+                    border: '1px solid #2563eb',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem'}}>
+            {filteredTeams.map((team) => (
             <div key={team.id} style={{
               backgroundColor: 'white',
               borderRadius: '0.75rem',
@@ -258,8 +402,9 @@ export function FixedTeamsPage() {
                 </button>
               </div>
             </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Team Stats */}
         <div style={{marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem'}}>

@@ -1,9 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { api } from '../../config/api'
 
 export function CreateTeamPage() {
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
+  const [organizations, setOrganizations] = useState<any[]>([])
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
+  const [error, setError] = useState<string>('')
   
   const [formData, setFormData] = useState({
     name: '',
@@ -11,6 +15,24 @@ export function CreateTeamPage() {
     type: 'development',
     color: '#2563eb'
   })
+
+  useEffect(() => {
+    loadOrganizations()
+  }, [])
+
+  const loadOrganizations = async () => {
+    try {
+      const orgs = await api.hierarchy.get('/organizations')
+      setOrganizations(orgs)
+      // Auto-select first organization if available
+      if (orgs.length > 0) {
+        setSelectedOrgId(orgs[0].id)
+      }
+    } catch (error) {
+      console.error('Error loading organizations:', error)
+      setError('Failed to load organizations')
+    }
+  }
 
   const teamTypes = [
     { id: 'executive', name: 'Executive', description: 'Leadership and strategic planning' },
@@ -30,27 +52,41 @@ export function CreateTeamPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreating(true)
+    setError('')
+
+    if (!selectedOrgId) {
+      setError('Please select an organization')
+      setCreating(false)
+      return
+    }
 
     try {
-      // Since we don't have a teams creation endpoint yet, simulate success
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Create team data matching the backend API expectations
+      const teamData = {
+        organization_id: selectedOrgId,
+        name: formData.name,
+        description: formData.description,
+        team_type: formData.type,
+        settings: {
+          mission: formData.description,
+          category: formData.type,
+          color: formData.color,
+          // Add additional team settings based on type
+          planned_agents: [],
+          success_metrics: {},
+          technical_stack: {},
+          communication_channels: [`${formData.name.toLowerCase().replace(/\s+/g, '-')}-general`]
+        }
+      }
+
+      const newTeam = await api.hierarchy.post('/teams', teamData)
       
-      // In a real implementation, this would be:
-      // const response = await fetch('http://localhost:8000/teams', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // })
-      // if (response.ok) {
-      //   const newTeam = await response.json()
-      //   navigate(`/teams/${newTeam.id}/details`)
-      // }
+      // Navigate to team details page with success message
+      navigate(`/teams/${newTeam.id}?created=true`)
       
-      // For now, just redirect to teams page
-      navigate('/teams')
     } catch (error) {
       console.error('Error creating team:', error)
-      alert('Error creating team. Please try again.')
+      setError(error instanceof Error ? error.message : 'Failed to create team. Please check your input and try again.')
     } finally {
       setCreating(false)
     }
@@ -118,7 +154,48 @@ export function CreateTeamPage() {
           <div style={{backgroundColor: 'white', borderRadius: '0.75rem', border: '1px solid #e5e7eb', padding: '2rem'}}>
             <h3 style={{fontSize: '1.25rem', fontWeight: '600', marginBottom: '1.5rem'}}>Team Information</h3>
             
+            {/* Error Message */}
+            {error && (
+              <div style={{
+                padding: '1rem',
+                marginBottom: '1.5rem',
+                backgroundColor: '#fee2e2',
+                border: '1px solid #dc2626',
+                borderRadius: '0.5rem',
+                color: '#dc2626',
+                fontSize: '0.875rem'
+              }}>
+                ❌ {error}
+              </div>
+            )}
+            
             <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+              {/* Organization Selector */}
+              <div>
+                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  Organization *
+                </label>
+                <select
+                  required
+                  value={selectedOrgId}
+                  onChange={(e) => setSelectedOrgId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white'
+                  }}
+                >
+                  <option value="">Select an organization</option>
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                   Team Name *
@@ -298,24 +375,38 @@ export function CreateTeamPage() {
               </Link>
               <button
                 type="submit"
-                disabled={creating || !formData.name || !formData.description}
+                disabled={creating || !formData.name || !formData.description || !selectedOrgId}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  backgroundColor: creating || !formData.name || !formData.description ? '#9ca3af' : '#2563eb',
+                  backgroundColor: creating || !formData.name || !formData.description || !selectedOrgId ? '#9ca3af' : '#2563eb',
                   color: 'white',
                   border: 'none',
                   borderRadius: '0.375rem',
                   fontSize: '0.875rem',
                   fontWeight: '500',
-                  cursor: creating || !formData.name || !formData.description ? 'not-allowed' : 'pointer'
+                  cursor: creating || !formData.name || !formData.description || !selectedOrgId ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
                 }}
               >
+                {creating && <span style={{animation: 'spin 1s linear infinite'}}>⏳</span>}
                 {creating ? 'Creating Team...' : 'Create Team'}
               </button>
             </div>
           </div>
         </form>
       </main>
+
+      {/* CSS Animations */}
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
     </div>
   )
 }

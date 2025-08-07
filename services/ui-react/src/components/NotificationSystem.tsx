@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useDashboardWebSocket, WebSocketMessage } from '../hooks/useWebSocket'
+import { useDashboardWebSocket, type WebSocketMessage } from '../hooks/useWebSocket'
 
 export interface Notification {
   id: string
@@ -25,7 +25,7 @@ export function NotificationSystem({
   maxNotifications = 5 
 }: NotificationSystemProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [isVisible, setIsVisible] = useState(true)
+  const [isVisible] = useState(true)
   
   const { isConnected, lastMessage, connectionStatus } = useDashboardWebSocket({
     organizationId,

@@ -9,13 +9,12 @@ import StatsCards from './components/StatsCards'
 import OrganizationSelector from './components/OrganizationSelector'
 import TeamSelector from './components/TeamSelector'
 import HierarchyView from './components/HierarchyView'
+import { api, API_ENDPOINTS } from './config/api'
 import type { 
   Agent, Task, AgentTemplate, 
   Organization, Team, 
   OrganizationCreate, TeamCreate 
 } from './types'
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 function App() {
   // Hierarchy state
@@ -44,14 +43,11 @@ function App() {
     try {
       setLoading(true)
       
-      // Load organizations and templates first
-      const [orgsRes, templatesRes] = await Promise.all([
-        axios.get(`${API_BASE}/organizations`),
-        axios.get(`${API_BASE}/templates`)
+      // Load organizations from hierarchy API and templates from orchestrator API
+      const [newOrganizations, newTemplates] = await Promise.all([
+        api.hierarchy.get('/organizations'),
+        api.orchestrator.get('/templates').then(res => res.templates)
       ])
-      
-      const newOrganizations = orgsRes.data
-      const newTemplates = templatesRes.data.templates
 
       // Update organizations and templates
       if (forceRefresh || !arraysEqual(organizations, newOrganizations)) {
@@ -69,8 +65,7 @@ function App() {
 
       // Load teams for current organization
       if (currentOrganization) {
-        const teamsRes = await axios.get(`${API_BASE}/teams?organization_id=${currentOrganization.id}`)
-        const newTeams = teamsRes.data
+        const newTeams = await api.hierarchy.get(`/teams?organization_id=${currentOrganization.id}`)
         
         if (forceRefresh || !arraysEqual(teams, newTeams)) {
           setTeams(newTeams)
@@ -84,13 +79,10 @@ function App() {
 
       // Load agents and tasks for current team
       if (currentTeam) {
-        const [agentsRes, tasksRes] = await Promise.all([
-          axios.get(`${API_BASE}/agents?team_id=${currentTeam.id}`),
-          axios.get(`${API_BASE}/tasks`)
+        const [newAgents, newTasks] = await Promise.all([
+          api.hierarchy.get(`/agents?team_id=${currentTeam.id}`),
+          api.orchestrator.get('/tasks')
         ])
-        
-        const newAgents = agentsRes.data
-        const newTasks = tasksRes.data
 
         if (forceRefresh || !arraysEqual(agents, newAgents)) {
           setAgents(newAgents)
@@ -112,8 +104,7 @@ function App() {
 
   // WebSocket for real-time updates
   useEffect(() => {
-    const wsUrl = API_BASE.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws'
-    const ws = new WebSocket(wsUrl)
+    const ws = new WebSocket(`${API_ENDPOINTS.WEBSOCKET_BASE}/ws`)
     
     ws.onopen = () => {
       console.log('WebSocket connected')
@@ -193,8 +184,7 @@ function App() {
     
     // Load teams for the selected organization
     try {
-      const teamsRes = await axios.get(`${API_BASE}/teams?organization_id=${org.id}`)
-      const newTeams = teamsRes.data
+      const newTeams = await api.hierarchy.get(`/teams?organization_id=${org.id}`)
       setTeams(newTeams)
       
       // Auto-select first team if available
@@ -208,7 +198,7 @@ function App() {
 
   const handleCreateOrganization = useCallback(async (orgData: OrganizationCreate) => {
     try {
-      await axios.post(`${API_BASE}/organizations`, orgData)
+      await api.hierarchy.post('/organizations', orgData)
       await loadData(true) // Reload all data
     } catch (error) {
       console.error('Error creating organization:', error)
@@ -223,8 +213,8 @@ function App() {
     
     // Load agents for the selected team
     try {
-      const agentsRes = await axios.get(`${API_BASE}/agents?team_id=${team.id}`)
-      setAgents(agentsRes.data)
+      const newAgents = await api.hierarchy.get(`/agents?team_id=${team.id}`)
+      setAgents(newAgents)
     } catch (error) {
       console.error('Error loading agents:', error)
     }
@@ -232,7 +222,7 @@ function App() {
 
   const handleCreateTeam = useCallback(async (teamData: TeamCreate) => {
     try {
-      await axios.post(`${API_BASE}/teams`, teamData)
+      await api.hierarchy.post('/teams', teamData)
       await loadData(true) // Reload data
     } catch (error) {
       console.error('Error creating team:', error)
@@ -258,9 +248,9 @@ function App() {
       }
 
       if (agentData.template_id) {
-        await axios.post(`${API_BASE}/agents/from-template`, agentPayload)
+        await api.orchestrator.post('/agents/from-template', agentPayload)
       } else {
-        await axios.post(`${API_BASE}/agents`, { ...agentPayload, team_id: currentTeam.id })
+        await api.orchestrator.post('/agents', { ...agentPayload, team_id: currentTeam.id })
       }
       await loadData(true) // Force refresh after creating
       setShowCreateModal(false)
@@ -272,7 +262,7 @@ function App() {
 
   const handleAssignTask = useCallback(async (agentId: string, taskData: any) => {
     try {
-      await axios.post(`${API_BASE}/agents/${agentId}/tasks`, taskData)
+      await api.orchestrator.post(`/agents/${agentId}/tasks`, taskData)
       await loadData(true) // Force refresh after task assignment
     } catch (error) {
       console.error('Error assigning task:', error)

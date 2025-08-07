@@ -4513,3 +4513,130 @@ async def test_agent_status_notification(
     except Exception as e:
         logger.error(f"Error sending test notification: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# Missing API Endpoints (Goals, Teams, Organizations)
+# ============================================================================
+
+@app.get("/teams")
+async def get_teams():
+    """Get list of teams"""
+    # Mock data for now
+    return [
+        {
+            "id": "1",
+            "name": "Development Team",
+            "description": "Frontend and backend developers",
+            "member_count": 5,
+            "organization_id": "1"
+        },
+        {
+            "id": "2", 
+            "name": "Executive Team",
+            "description": "Leadership and strategy",
+            "member_count": 3,
+            "organization_id": "1"
+        }
+    ]
+
+@app.get("/organizations/{organization_id}/goals")
+async def get_organization_goals(organization_id: str):
+    """Get goals for an organization"""
+    # Mock data for now
+    return [
+        {
+            "id": "1",
+            "title": "Increase Development Velocity",
+            "description": "Improve team productivity and code quality",
+            "status": "active",
+            "progress": 75,
+            "organization_id": organization_id,
+            "created_at": "2024-01-15T10:00:00Z",
+            "due_date": "2024-12-31T23:59:59Z"
+        },
+        {
+            "id": "2",
+            "title": "Enhance AI Capabilities", 
+            "description": "Expand AI agent capabilities and intelligence",
+            "status": "active",
+            "progress": 50,
+            "organization_id": organization_id,
+            "created_at": "2024-02-01T10:00:00Z",
+            "due_date": "2024-11-30T23:59:59Z"
+        }
+    ]
+
+@app.get("/goals/{goal_id}")
+async def get_goal_details(goal_id: str):
+    """Get detailed information about a specific goal"""
+    # Mock data for now
+    return {
+        "id": goal_id,
+        "title": "Increase Development Velocity",
+        "description": "Improve team productivity and code quality through better tooling, processes, and automation",
+        "status": "active",
+        "progress": 75,
+        "organization_id": "1",
+        "team_id": "1",
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2024-08-06T16:30:00Z",
+        "due_date": "2024-12-31T23:59:59Z",
+        "milestones": [
+            {
+                "id": "1",
+                "title": "Implement CI/CD Pipeline",
+                "description": "Set up automated testing and deployment",
+                "status": "completed",
+                "progress": 100,
+                "due_date": "2024-03-15T23:59:59Z"
+            },
+            {
+                "id": "2", 
+                "title": "Enhance Code Review Process",
+                "description": "Streamline code review workflow with automated tools",
+                "status": "in_progress",
+                "progress": 80,
+                "due_date": "2024-09-30T23:59:59Z"
+            },
+            {
+                "id": "3",
+                "title": "Deploy AI-Powered Testing",
+                "description": "Implement intelligent test generation and execution",
+                "status": "planned",
+                "progress": 25,
+                "due_date": "2024-12-15T23:59:59Z"
+            }
+        ],
+        "metrics": {
+            "deployment_frequency": "Daily",
+            "lead_time": "2.3 days",
+            "mttr": "45 minutes",
+            "change_failure_rate": "5%"
+        },
+        "assigned_agents": [
+            {
+                "id": "1",
+                "name": "DevOps Agent",
+                "role": "CI/CD Specialist"
+            },
+            {
+                "id": "2",
+                "name": "QA Agent", 
+                "role": "Test Automation Engineer"
+            }
+        ]
+    }
+
+@app.get("/agents/{agent_id}/tasks")
+async def get_agent_tasks_list(agent_id: str):
+    """Get tasks for a specific agent - GET method"""
+    try:
+        # Get tasks from task queue
+        tasks = await app.state.task_queue.get_agent_tasks(agent_id)
+        return {
+            "agent_id": agent_id,
+            "tasks": tasks
+        }
+    except Exception as e:
+        logger.error(f"Error getting tasks for agent {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

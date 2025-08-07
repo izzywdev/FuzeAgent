@@ -13,21 +13,44 @@ interface Agent {
 
 export function FixedAgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([])
+  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const navigate = useNavigate()
+
+  // Filter agents based on search term and type
+  useEffect(() => {
+    let filtered = agents
+
+    if (searchTerm) {
+      filtered = filtered.filter(agent => 
+        agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        agent.role.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    if (typeFilter) {
+      filtered = filtered.filter(agent => agent.type === typeFilter)
+    }
+
+    setFilteredAgents(filtered)
+  }, [agents, searchTerm, typeFilter])
 
   useEffect(() => {
     fetch('http://localhost:8000/agents')
       .then(res => res.json())
       .then(data => {
-        setAgents(Array.isArray(data) ? data : [])
+        const agentData = Array.isArray(data) ? data : []
+        setAgents(agentData)
+        setFilteredAgents(agentData)
         setLoading(false)
       })
       .catch(err => {
         console.error('Failed to load agents:', err)
         setLoading(false)
         // Use mock data on error
-        setAgents([
+        const mockData = [
           {
             id: '1',
             name: 'IzzyAI CEO',
@@ -55,7 +78,9 @@ export function FixedAgentsPage() {
             created_at: '2025-08-06T11:50:18.161127',
             updated_at: '2025-08-06T11:50:18.161141'
           }
-        ])
+        ]
+        setAgents(mockData)
+        setFilteredAgents(mockData)
       })
   }, [])
 
@@ -121,6 +146,8 @@ export function FixedAgentsPage() {
             <input
               type="text"
               placeholder="Search agents..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               style={{
                 padding: '0.5rem 0.75rem',
                 border: '1px solid #d1d5db',
@@ -129,12 +156,16 @@ export function FixedAgentsPage() {
                 width: '20rem'
               }}
             />
-            <select style={{
-              padding: '0.5rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              fontSize: '0.875rem'
-            }}>
+            <select 
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              style={{
+                padding: '0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem'
+              }}
+            >
               <option value="">All Types</option>
               <option value="executive">Executive</option>
               <option value="developer">Developer</option>
@@ -155,18 +186,68 @@ export function FixedAgentsPage() {
           </button>
         </div>
 
+        {/* Search Results Info */}
+        {!loading && (
+          <div style={{marginBottom: '1rem', color: '#6b7280', fontSize: '0.875rem'}}>
+            {searchTerm || typeFilter ? (
+              <span>
+                Found {filteredAgents.length} of {agents.length} agents
+                {searchTerm && ` matching "${searchTerm}"`}
+                {typeFilter && ` of type "${typeFilter}"`}
+                {(searchTerm || typeFilter) && (
+                  <button 
+                    onClick={() => {setSearchTerm(''); setTypeFilter('')}}
+                    style={{
+                      marginLeft: '0.5rem',
+                      color: '#2563eb',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </span>
+            ) : (
+              <span>Showing all {agents.length} agents</span>
+            )}
+          </div>
+        )}
+
         {/* Agents Grid */}
         {loading ? (
           <div style={{textAlign: 'center', padding: '3rem'}}>
             <p style={{color: '#6b7280'}}>Loading agents...</p>
           </div>
-        ) : agents.length === 0 ? (
+        ) : filteredAgents.length === 0 ? (
           <div style={{textAlign: 'center', padding: '3rem'}}>
-            <p style={{color: '#6b7280'}}>No agents found</p>
+            {agents.length === 0 ? (
+              <p style={{color: '#6b7280'}}>No agents found</p>
+            ) : (
+              <div>
+                <p style={{color: '#6b7280'}}>No agents match your search criteria</p>
+                <button 
+                  onClick={() => {setSearchTerm(''); setTypeFilter('')}}
+                  style={{
+                    marginTop: '1rem',
+                    color: '#2563eb',
+                    background: 'none',
+                    border: '1px solid #2563eb',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem'}}>
-            {agents.map((agent) => (
+            {filteredAgents.map((agent) => (
               <div key={agent.id} style={{
                 backgroundColor: 'white',
                 borderRadius: '0.5rem',
