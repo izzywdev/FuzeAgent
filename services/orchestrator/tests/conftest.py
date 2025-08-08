@@ -17,6 +17,8 @@ from faker import Faker
 os.environ["TESTING"] = "1"
 os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5434/ai_context_test"
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key"
+os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
+os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy1sb25n"
 
 # Import after setting environment variables
 from main_with_hierarchy import app

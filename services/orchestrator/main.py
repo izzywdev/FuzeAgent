@@ -66,6 +66,20 @@ class AgentMCPSetupRequest(BaseModel):
     task_id: str = Field(..., description="Task ID for MCP setup")
     session_id: Optional[str] = Field(None, description="Optional session ID")
 
+class ConversationCreateRequest(BaseModel):
+    title: str = "New Conversation"
+    initial_message: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+class ConversationMessage(BaseModel):
+    role: str  # 'user' or 'agent'
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+
+class ChatMessageRequest(BaseModel):
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+
 # Model Configuration Models
 class ProviderCredentialsRequest(BaseModel):
     provider: str = Field(..., description="Model provider (anthropic, openai, google, etc.)")
@@ -953,6 +967,121 @@ async def get_agent_memory(agent_id: str, limit: int = 10):
     """Get agent memory"""
     memory = await app.state.context_service.get_agent_memory(agent_id, limit)
     return memory
+
+# Agent Conversation Endpoints
+@app.get("/agents/{agent_id}/conversations",
+         tags=["conversations"],
+         summary="Get Agent Conversations",
+         description="Get all conversations for a specific agent")
+async def get_agent_conversations(agent_id: str):
+    """Get all conversations for a specific agent"""
+    try:
+        async with get_db_connection() as conn:
+            conversations = await conn.fetch("""
+                SELECT cs.*, COUNT(ac.id) as message_count,
+                       (SELECT content FROM agent_conversations 
+                        WHERE session_id = cs.id 
+                        ORDER BY created_at DESC LIMIT 1) as last_message
+                FROM chat_sessions cs
+                LEFT JOIN agent_conversations ac ON cs.id = ac.session_id
+                WHERE cs.agent_id = $1
+                GROUP BY cs.id
+                ORDER BY cs.last_activity DESC
+            """, agent_id)
+            
+            return [dict(row) for row in conversations]
+            
+    except Exception as e:
+        logger.error(f"Error getting agent conversations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/agents/{agent_id}/conversations",
+          tags=["conversations"],
+          summary="Create New Agent Conversation",
+          description="Create a new conversation with an agent")
+async def create_agent_conversation(agent_id: str, request: ConversationCreateRequest):
+    """Create a new conversation with an agent"""
+    try:
+        async with get_db_connection() as conn:
+            # Create new chat session
+            session_id = await conn.fetchval("""
+                INSERT INTO chat_sessions (agent_id, session_name, context, status)
+                VALUES ($1, $2, $3, 'active')
+                RETURNING id
+            """, agent_id, request.title, request.context or {})
+            
+            # Add initial message if provided
+            if request.initial_message:
+                await conn.execute("""
+                    INSERT INTO agent_conversations (session_id, agent_id, message_type, content)
+                    VALUES ($1, $2, 'system', $3)
+                """, session_id, agent_id, request.initial_message)
+            
+            # Get the created conversation
+            conversation = await conn.fetchrow("""
+                SELECT * FROM chat_sessions WHERE id = $1
+            """, session_id)
+            
+            return dict(conversation)
+            
+    except Exception as e:
+        logger.error(f"Error creating agent conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/agents/{agent_id}/conversations/{conversation_id}/messages",
+         tags=["conversations"],
+         summary="Get Conversation Messages",
+         description="Get all messages in a conversation")
+async def get_conversation_messages(agent_id: str, conversation_id: str):
+    """Get all messages in a conversation"""
+    try:
+        async with get_db_connection() as conn:
+            messages = await conn.fetch("""
+                SELECT * FROM agent_conversations 
+                WHERE session_id = $1 AND agent_id = $2
+                ORDER BY created_at ASC
+            """, conversation_id, agent_id)
+            
+            return [dict(row) for row in messages]
+            
+    except Exception as e:
+        logger.error(f"Error getting conversation messages: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/agents/{agent_id}/conversations/{conversation_id}/messages",
+          tags=["conversations"],
+          summary="Send Message to Agent",
+          description="Send a message to an agent in a conversation")
+async def send_message_to_agent(agent_id: str, conversation_id: str, request: ChatMessageRequest):
+    """Send a message to an agent in a conversation"""
+    try:
+        async with get_db_connection() as conn:
+            # Insert user message
+            user_message_id = await conn.fetchval("""
+                INSERT INTO agent_conversations (session_id, agent_id, message_type, content, metadata)
+                VALUES ($1, $2, 'user', $3, $4)
+                RETURNING id
+            """, conversation_id, agent_id, request.content, request.metadata or {})
+            
+            # Update session last activity
+            await conn.execute("""
+                UPDATE chat_sessions 
+                SET last_activity = CURRENT_TIMESTAMP, message_count = message_count + 1
+                WHERE id = $1
+            """, conversation_id)
+            
+            # TODO: Here we would integrate with the actual agent to generate a response
+            # For now, return a simple acknowledgment
+            
+            return {
+                "id": str(user_message_id),
+                "status": "sent",
+                "message": "Message sent to agent"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error sending message to agent: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/knowledge/search")
 async def search_knowledge(query: str, limit: int = 10):
@@ -4446,6 +4575,110 @@ async def websocket_agent_updates(websocket: WebSocket, agent_id: str):
         logger.error(f"Agent WebSocket error for {agent_id}: {e}")
     finally:
         await websocket_manager.disconnect(connection_id)
+
+@app.websocket("/ws/agents/{agent_id}/conversations/{conversation_id}")
+async def websocket_agent_conversation(websocket: WebSocket, agent_id: str, conversation_id: str):
+    """WebSocket endpoint for real-time agent conversation"""
+    import uuid
+    
+    connection_id = f"conversation-{conversation_id}-{uuid.uuid4()}"
+    
+    await websocket.accept()
+    
+    try:
+        # Store connection for broadcasting
+        active_conversations = getattr(app.state, 'active_conversations', {})
+        if conversation_id not in active_conversations:
+            active_conversations[conversation_id] = []
+        active_conversations[conversation_id].append(websocket)
+        app.state.active_conversations = active_conversations
+        
+        while True:
+            try:
+                # Receive message from client
+                data = await websocket.receive_json()
+                
+                if data.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif data.get("type") == "message":
+                    # Handle new message
+                    message_content = data.get("content", "")
+                    if message_content:
+                        # Store message in database
+                        async with get_db_connection() as conn:
+                            message_id = await conn.fetchval("""
+                                INSERT INTO agent_conversations (session_id, agent_id, message_type, content)
+                                VALUES ($1, $2, 'user', $3)
+                                RETURNING id
+                            """, conversation_id, agent_id, message_content)
+                            
+                            # Update session activity
+                            await conn.execute("""
+                                UPDATE chat_sessions 
+                                SET last_activity = CURRENT_TIMESTAMP, message_count = message_count + 1
+                                WHERE id = $1
+                            """, conversation_id)
+                        
+                        # Broadcast to all connected clients for this conversation
+                        message_data = {
+                            "type": "new_message",
+                            "message": {
+                                "id": str(message_id),
+                                "conversation_id": conversation_id,
+                                "role": "user",
+                                "content": message_content,
+                                "timestamp": datetime.now().isoformat(),
+                                "status": "sent"
+                            }
+                        }
+                        
+                        for conn in active_conversations.get(conversation_id, []):
+                            try:
+                                await conn.send_json(message_data)
+                            except:
+                                pass  # Connection might be closed
+                        
+                        # TODO: Here we would trigger agent response generation
+                        # For now, send a simple acknowledgment after a delay
+                        await asyncio.sleep(1)
+                        
+                        agent_response = {
+                            "type": "new_message", 
+                            "message": {
+                                "id": str(uuid.uuid4()),
+                                "conversation_id": conversation_id,
+                                "role": "agent",
+                                "content": f"I received your message: {message_content}",
+                                "timestamp": datetime.now().isoformat(),
+                                "status": "received"
+                            }
+                        }
+                        
+                        for conn in active_conversations.get(conversation_id, []):
+                            try:
+                                await conn.send_json(agent_response)
+                            except:
+                                pass
+                        
+                        # Store agent response in database
+                        async with get_db_connection() as conn:
+                            await conn.execute("""
+                                INSERT INTO agent_conversations (session_id, agent_id, message_type, content)
+                                VALUES ($1, $2, 'agent', $3)
+                            """, conversation_id, agent_id, agent_response["message"]["content"])
+                
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                logger.error(f"Error in conversation WebSocket: {e}")
+                
+    except Exception as e:
+        logger.error(f"Conversation WebSocket error for {conversation_id}: {e}")
+    finally:
+        # Clean up connection
+        if hasattr(app.state, 'active_conversations') and conversation_id in app.state.active_conversations:
+            if websocket in app.state.active_conversations[conversation_id]:
+                app.state.active_conversations[conversation_id].remove(websocket)
 
 @app.websocket("/ws/organization/{organization_id}/updates")
 async def websocket_organization_updates(websocket: WebSocket, organization_id: str):

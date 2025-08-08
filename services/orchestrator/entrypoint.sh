@@ -3,7 +3,7 @@ set -e
 
 echo "🚀 Starting FuzeAgent Orchestrator v2.0.0 (Autonomous Execution)"
 
-# Function to wait for service to be ready
+# Function to wait for service to be ready using Python
 wait_for_service() {
     local host=$1
     local port=$2
@@ -11,7 +11,10 @@ wait_for_service() {
     
     echo "⏳ Waiting for $service_name to be ready at $host:$port..."
     timeout=60
-    while ! nc -z $host $port && [ $timeout -gt 0 ]; do
+    while [ $timeout -gt 0 ]; do
+        if python -c "import socket; sock = socket.socket(); sock.settimeout(1); result = sock.connect_ex(('$host', $port)); sock.close(); exit(result)" 2>/dev/null; then
+            break
+        fi
         sleep 1
         timeout=$((timeout-1))
     done

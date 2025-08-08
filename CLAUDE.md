@@ -570,6 +570,8 @@ Agents are selected based on:
 ```bash
 # API Keys
 ANTHROPIC_API_KEY=your-claude-api-key
+OPENAI_API_KEY=your-openai-api-key
+ENCRYPTION_KEY=your-base64-encoded-encryption-key
 
 # Database
 POSTGRES_PASSWORD=secure-password

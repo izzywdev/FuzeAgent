@@ -75,7 +75,23 @@ export function CreateAgentPage() {
     fetch('http://localhost:8000/agent-templates')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
+        if (data && data.templates && Array.isArray(data.templates)) {
+          // Transform API response to match UI interface
+          const transformedTemplates = data.templates.map((template: any) => ({
+            id: template.template_id,
+            name: template.name,
+            description: template.description,
+            type: template.category || 'developer',
+            defaultConfig: {
+              model: template.default_model || 'claude-sonnet-4-20250514',
+              temperature: template.default_temperature || 0.7,
+              tools: template.tools || [],
+              goal: template.default_goal || '',
+              backstory: template.default_backstory || ''
+            }
+          }))
+          setTemplates(transformedTemplates)
+        } else if (Array.isArray(data)) {
           setTemplates(data)
         } else {
           // Mock templates data
@@ -179,7 +195,14 @@ export function CreateAgentPage() {
 
       if (response.ok) {
         const newAgent = await response.json()
-        navigate(`/agents/${newAgent.id}`)
+        // Handle different possible response structures
+        const agentId = newAgent.agent_id || newAgent.agent?.id || newAgent.id
+        if (agentId) {
+          navigate(`/agents/${agentId}`)
+        } else {
+          console.error('No agent ID found in response:', newAgent)
+          alert('Agent created but unable to navigate. Please check the agents list.')
+        }
       } else {
         alert('Failed to create agent. Please try again.')
       }

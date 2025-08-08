@@ -12,9 +12,27 @@ from agent_templates import template_manager, AgentCategory
 # Simple in-memory storage for demonstration
 agents_db = {}
 tasks_db = {}
+teams_db = {}
+conversations_db = {}
+
+# Initialize some mock data
+def initialize_mock_data():
+    # Create a default team
+    default_team_id = str(uuid.uuid4())
+    teams_db[default_team_id] = {
+        "id": default_team_id,
+        "name": "Default Team",
+        "description": "Default team for agents",
+        "organization_id": "1",
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat()
+    }
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize mock data
+    initialize_mock_data()
+    
     # Startup - create IzzyAI CEO
     izzy_id = str(uuid.uuid4())
     agents_db[izzy_id] = {
@@ -321,6 +339,91 @@ async def create_sample_agents():
             created_agents.append(result)
     
     return {"created_agents": created_agents}
+
+# Missing endpoints that the UI expects
+@app.get("/teams")
+async def list_teams():
+    """List all teams"""
+    return list(teams_db.values())
+
+@app.get("/agent-templates")
+async def list_agent_templates():
+    """Alternative endpoint for templates (UI compatibility)"""
+    try:
+        templates = template_manager.list_templates()
+        return {"templates": templates}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/agents/{agent_id}/conversations")
+async def get_agent_conversations(agent_id: str):
+    """Get agent conversations"""
+    if agent_id not in agents_db:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Return mock conversations for now
+    agent_conversations = conversations_db.get(agent_id, [])
+    return agent_conversations
+
+@app.post("/agents/{agent_id}/conversations")
+async def create_agent_conversation(agent_id: str, conversation_data: dict):
+    """Create a new conversation for agent"""
+    if agent_id not in agents_db:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    conversation_id = str(uuid.uuid4())
+    conversation = {
+        "id": conversation_id,
+        "agent_id": agent_id,
+        "title": conversation_data.get("title", "New Conversation"),
+        "messages": [],
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat()
+    }
+    
+    if agent_id not in conversations_db:
+        conversations_db[agent_id] = []
+    
+    conversations_db[agent_id].append(conversation)
+    return conversation
+
+@app.get("/agents/{agent_id}/tasks")
+async def get_agent_tasks(agent_id: str):
+    """Get tasks for a specific agent"""
+    if agent_id not in agents_db:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    agent_tasks = [task for task in tasks_db.values() if task["assigned_to"] == agent_id]
+    return agent_tasks
+
+@app.get("/agents/{agent_id}/container/status")
+async def get_agent_container_status(agent_id: str):
+    """Get agent container status"""
+    if agent_id not in agents_db:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Mock container status
+    return {
+        "status": "running",
+        "container_id": f"container_{agent_id[:8]}",
+        "health": "healthy",
+        "uptime": "5m30s",
+        "memory_usage": "256MB",
+        "cpu_usage": "15%"
+    }
+
+@app.get("/knowledge/agents/{agent_id}/documents")
+async def get_agent_documents(agent_id: str):
+    """Get agent knowledge documents"""
+    if agent_id not in agents_db:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Mock documents
+    return {
+        "documents": [],
+        "total_count": 0,
+        "agent_id": agent_id
+    }
 
 if __name__ == "__main__":
     import uvicorn

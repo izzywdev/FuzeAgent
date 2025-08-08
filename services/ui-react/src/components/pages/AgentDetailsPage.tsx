@@ -96,7 +96,6 @@ export function AgentDetailsPage() {
   const { agentId } = useParams<{ agentId: string }>()
   const [agent, setAgent] = useState<Agent | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
-  const [conversations, setConversations] = useState<Conversation[]>([])
   const [containerInfo, setContainerInfo] = useState<ContainerInfo | null>(null)
   const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDocument[]>([])
   const [loading, setLoading] = useState(true)
@@ -116,7 +115,6 @@ export function AgentDetailsPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [showChatModal, setShowChatModal] = useState(false)
   const [chatWebSocket, setChatWebSocket] = useState<WebSocket | null>(null)
   const [isAgentTyping, setIsAgentTyping] = useState(false)
 
@@ -189,33 +187,10 @@ export function AgentDetailsPage() {
         ])
       })
 
-    // Load conversations (mock data for now)
-    setConversations([
-      {
-        id: '1',
-        title: 'Strategic Planning Discussion',
-        message_count: 23,
-        last_message: 'Approved the Q4 expansion strategy with focus on AI development tools market',
-        timestamp: '2025-08-06T14:30:00Z',
-        status: 'active'
-      },
-      {
-        id: '2', 
-        title: 'Team Coordination Meeting',
-        message_count: 15,
-        last_message: 'Discussed resource allocation between development and marketing teams',
-        timestamp: '2025-08-06T11:15:00Z',
-        status: 'completed'
-      },
-      {
-        id: '3',
-        title: 'Product Roadmap Review',
-        message_count: 31,
-        last_message: 'Finalized product roadmap priorities for next 6 months',
-        timestamp: '2025-08-05T16:45:00Z',
-        status: 'completed'
-      }
-    ])
+    // Load agent's primary conversation from API
+    if (agentId) {
+      loadAgentPrimaryConversation()
+    }
 
     // Load container info
     if (agentId) {
@@ -238,6 +213,70 @@ export function AgentDetailsPage() {
       }
     } catch (error) {
       console.error('Error loading agent documents:', error)
+    }
+  }
+
+  // Load agent's primary conversation and messages
+  const loadAgentPrimaryConversation = async () => {
+    if (!agentId) return
+    
+    try {
+      const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations`)
+      if (response.ok) {
+        const conversations = await response.json()
+        
+        if (conversations.length > 0) {
+          // Use the first (most recent) conversation as the primary one
+          const primaryConversation = conversations[0]
+          setSelectedConversation(primaryConversation)
+          
+          // Load messages for this conversation
+          await loadConversationMessages(primaryConversation.id)
+          
+          // Start WebSocket connection
+          startChatWebSocket(primaryConversation.id)
+        } else {
+          // No conversations exist yet - will be created when user sends first message
+          console.log('No conversations found for agent')
+        }
+      } else {
+        console.error('Failed to load agent conversations')
+      }
+    } catch (error) {
+      console.error('Error loading agent primary conversation:', error)
+    }
+  }
+
+  // Create primary conversation for agent
+  const createPrimaryConversation = async () => {
+    if (!agentId) return
+    
+    try {
+      const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: `Conversation with ${agent?.name || 'Agent'}`,
+          initial_message: null
+        })
+      })
+      
+      if (response.ok) {
+        const conversation = await response.json()
+        setSelectedConversation(conversation)
+        setChatMessages([])
+        
+        // Start WebSocket connection
+        startChatWebSocket(conversation.id)
+        
+        console.log('Created primary conversation')
+      } else {
+        console.error('Failed to create primary conversation')
+      }
+    } catch (error) {
+      console.error('Error creating primary conversation:', error)
     }
   }
 
@@ -545,44 +584,7 @@ export function AgentDetailsPage() {
     }
   }, [containerLogs, autoScroll, showContainerLogs])
 
-  // Chat Functions
-  const startNewConversation = async () => {
-    if (!agentId) return
-
-    try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          title: `Conversation with ${agent?.name || 'Agent'}`,
-          initial_message: 'Hello! How can I help you today?'
-        })
-      })
-
-      if (response.ok) {
-        const conversation = await response.json()
-        setSelectedConversation(conversation)
-        setChatMessages([])
-        setShowChatModal(true)
-        await loadConversationMessages(conversation.id)
-        startChatWebSocket(conversation.id)
-      } else {
-        console.error('Failed to create new conversation')
-      }
-    } catch (error) {
-      console.error('Error creating new conversation:', error)
-    }
-  }
-
-  const openExistingConversation = async (conversation: Conversation) => {
-    setSelectedConversation(conversation)
-    setChatMessages([])
-    setShowChatModal(true)
-    await loadConversationMessages(conversation.id)
-    startChatWebSocket(conversation.id)
-  }
+  // Chat Message Loading
 
   const loadConversationMessages = async (conversationId: string) => {
     if (!agentId) return
@@ -604,33 +606,38 @@ export function AgentDetailsPage() {
     if (!agentId || chatWebSocket) return
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/agents/${agentId}/conversations/${conversationId}/chat`
+    const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/ws/agents/${agentId}/conversations/${conversationId}`
     
     const ws = new WebSocket(wsUrl)
     
     ws.onopen = () => {
       console.log('Chat WebSocket connected')
       setChatWebSocket(ws)
+      // Send ping to keep connection alive
+      ws.send(JSON.stringify({ type: 'ping' }))
     }
     
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
         
-        if (data.type === 'message') {
+        if (data.type === 'new_message') {
           const newMessage: ChatMessage = {
-            id: data.id,
-            conversation_id: conversationId,
-            role: data.role,
-            content: data.content,
-            timestamp: data.timestamp,
-            status: 'sent',
-            metadata: data.metadata
+            id: data.message.id,
+            conversation_id: data.message.conversation_id,
+            role: data.message.role,
+            content: data.message.content,
+            timestamp: data.message.timestamp,
+            status: data.message.status || 'sent',
+            metadata: data.message.metadata
           }
           setChatMessages(prev => [...prev, newMessage])
           setIsAgentTyping(false)
         } else if (data.type === 'typing') {
           setIsAgentTyping(data.typing)
+        } else if (data.type === 'pong') {
+          // Keep alive response
+          console.log('WebSocket pong received')
         } else if (data.type === 'error') {
           console.error('Chat error:', data.message)
           setIsAgentTyping(false)
@@ -652,7 +659,16 @@ export function AgentDetailsPage() {
   }
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation || !agentId || isSendingMessage) return
+    if (!newMessage.trim() || !agentId || isSendingMessage) return
+
+    // If no conversation exists, create one automatically
+    if (!selectedConversation) {
+      await createPrimaryConversation()
+      if (!selectedConversation) {
+        console.error('Failed to create conversation')
+        return
+      }
+    }
 
     setIsSendingMessage(true)
     
@@ -700,21 +716,17 @@ export function AgentDetailsPage() {
         console.warn('RAG enhancement error, using original message:', ragError)
       }
 
-      // Send the message (enhanced or original)
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations/${selectedConversation.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          role: 'user',
+      // Send the message via WebSocket (enhanced or original)
+      if (chatWebSocket && chatWebSocket.readyState === WebSocket.OPEN) {
+        chatWebSocket.send(JSON.stringify({
+          type: 'message',
           content: enhancedMessage,
-          original_content: messageToSend, // Keep track of original user message
-          rag_enhanced: enhancedMessage !== messageToSend
-        })
-      })
-
-      if (response.ok) {
+          metadata: {
+            original_content: messageToSend, // Keep track of original user message
+            rag_enhanced: enhancedMessage !== messageToSend
+          }
+        }))
+        
         // Update message status to sent
         setChatMessages(prev => 
           prev.map(msg => 
@@ -724,15 +736,41 @@ export function AgentDetailsPage() {
           )
         )
       } else {
-        // Update message status to error
-        setChatMessages(prev => 
-          prev.map(msg => 
-            msg.id === userMessage.id 
-              ? { ...msg, status: 'error' as const }
-              : msg
+        // WebSocket not connected, fall back to HTTP POST
+        const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations/${selectedConversation.id}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            content: enhancedMessage,
+            metadata: {
+              original_content: messageToSend,
+              rag_enhanced: enhancedMessage !== messageToSend
+            }
+          })
+        })
+
+        if (response.ok) {
+          // Update message status to sent
+          setChatMessages(prev => 
+            prev.map(msg => 
+              msg.id === userMessage.id 
+                ? { ...msg, status: 'sent' as const }
+                : msg
+            )
           )
-        )
-        setIsAgentTyping(false)
+        } else {
+          // Update message status to error
+          setChatMessages(prev => 
+            prev.map(msg => 
+              msg.id === userMessage.id 
+                ? { ...msg, status: 'error' as const }
+                : msg
+            )
+          )
+          setIsAgentTyping(false)
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -749,17 +787,6 @@ export function AgentDetailsPage() {
     setIsSendingMessage(false)
   }
 
-  const closeChatModal = () => {
-    setShowChatModal(false)
-    setSelectedConversation(null)
-    setChatMessages([])
-    setNewMessage('')
-    setIsAgentTyping(false)
-    if (chatWebSocket) {
-      chatWebSocket.close()
-    }
-  }
-
   // Cleanup chat WebSocket on component unmount
   useEffect(() => {
     return () => {
@@ -771,13 +798,11 @@ export function AgentDetailsPage() {
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
-    if (showChatModal) {
-      const chatContainer = document.getElementById('chat-messages-container')
-      if (chatContainer) {
-        chatContainer.scrollTop = chatContainer.scrollHeight
-      }
+    const chatContainer = document.getElementById('chat-messages-container')
+    if (chatContainer) {
+      chatContainer.scrollTop = chatContainer.scrollHeight
     }
-  }, [chatMessages, showChatModal])
+  }, [chatMessages])
 
   if (loading) {
     return (
@@ -987,9 +1012,9 @@ export function AgentDetailsPage() {
                 </div>
                 <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
                   <div style={{fontSize: '2rem', color: '#ea580c', textAlign: 'center', marginBottom: '0.5rem'}}>
-                    {conversations.length}
+                    {chatMessages.length}
                   </div>
-                  <div style={{fontSize: '0.875rem', color: '#6b7280', textAlign: 'center'}}>Conversations</div>
+                  <div style={{fontSize: '0.875rem', color: '#6b7280', textAlign: 'center'}}>Messages</div>
                 </div>
               </div>
 
@@ -1375,84 +1400,182 @@ export function AgentDetailsPage() {
         )}
 
         {activeTab === 'conversations' && (
-          <div>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-              <h3 style={{fontSize: '1.25rem', fontWeight: '600'}}>Conversation History</h3>
-              <button 
-                onClick={startNewConversation}
-                style={{
-                  padding: '0.5rem 1rem',
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '70vh',
+            backgroundColor: 'white',
+            borderRadius: '0.5rem',
+            border: '1px solid #e5e7eb',
+            overflow: 'hidden'
+          }}>
+            {/* Chat Header */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#f9fafb'
+            }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                <div style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
                   backgroundColor: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer'
-                }}
-              >
-                + New Chat
-              </button>
+                  fontWeight: '600'
+                }}>
+                  {agent?.name?.charAt(0) || 'A'}
+                </div>
+                <div>
+                  <h3 style={{fontSize: '1.125rem', fontWeight: '600', margin: 0}}>
+                    {agent?.name || 'Agent'}
+                  </h3>
+                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>
+                    {chatWebSocket ? 'Online' : 'Connecting...'}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-              {conversations.map(conv => (
-                <div key={conv.id} style={{
-                  backgroundColor: 'white',
-                  padding: '1.5rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #e5e7eb',
-                  cursor: 'pointer',
-                  transition: 'box-shadow 0.2s'
-                }}
-                onClick={() => openExistingConversation(conv)}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}
-                onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.75rem'}}>
-                    <h4 style={{fontSize: '1rem', fontWeight: '600', color: '#111827', margin: 0}}>{conv.title}</h4>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#9ca3af'}}>
-                      <span>{conv.message_count} messages</span>
-                      <span>{new Date(conv.timestamp).toLocaleDateString()}</span>
+            {/* Messages Container */}
+            <div 
+              id="chat-messages-container"
+              style={{
+                flex: 1,
+                padding: '1rem',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}
+            >
+              {chatMessages.length === 0 ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  textAlign: 'center',
+                  color: '#6b7280'
+                }}>
+                  <div style={{fontSize: '3rem', marginBottom: '1rem'}}>💬</div>
+                  <h4 style={{fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem'}}>
+                    Start a conversation
+                  </h4>
+                  <p style={{fontSize: '0.875rem', maxWidth: '24rem'}}>
+                    Send a message to {agent?.name || 'this agent'} to begin your conversation.
+                  </p>
+                </div>
+              ) : (
+                chatMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                      marginBottom: '0.5rem'
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxWidth: '70%',
+                        padding: '0.75rem 1rem',
+                        borderRadius: '1rem',
+                        backgroundColor: message.role === 'user' ? '#2563eb' : '#f3f4f6',
+                        color: message.role === 'user' ? 'white' : '#111827',
+                        fontSize: '0.875rem',
+                        lineHeight: '1.5',
+                        wordWrap: 'break-word'
+                      }}
+                    >
+                      {message.content}
                       <div style={{
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '0.25rem',
-                        fontSize: '0.625rem',
-                        fontWeight: '500',
-                        backgroundColor: conv.status === 'active' ? '#dcfce7' : '#f3f4f6',
-                        color: conv.status === 'active' ? '#15803d' : '#6b7280'
+                        fontSize: '0.75rem',
+                        opacity: 0.7,
+                        marginTop: '0.25rem'
                       }}>
-                        {conv.status}
+                        {new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {message.status === 'sending' && ' • Sending...'}
+                        {message.status === 'error' && ' • Failed'}
                       </div>
                     </div>
                   </div>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', lineHeight: '1.5', margin: 0}}>
-                    {conv.last_message}
-                  </p>
-                </div>
-              ))}
-              
-              {conversations.length === 0 && (
-                <div style={{backgroundColor: 'white', padding: '3rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', textAlign: 'center'}}>
-                  <div style={{fontSize: '3rem', marginBottom: '1rem'}}>💬</div>
-                  <h4 style={{fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', color: '#111827'}}>No Conversations Yet</h4>
-                  <p style={{color: '#6b7280', marginBottom: '1.5rem'}}>
-                    Start a conversation with this agent to see chat history here.
-                  </p>
-                  <button 
-                    onClick={startNewConversation}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      backgroundColor: '#2563eb',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.875rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Start First Conversation
-                  </button>
+                ))
+              )}
+
+              {isAgentTyping && (
+                <div style={{display: 'flex', justifyContent: 'flex-start', marginBottom: '0.5rem'}}>
+                  <div style={{
+                    maxWidth: '70%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '1rem',
+                    backgroundColor: '#f3f4f6',
+                    color: '#111827',
+                    fontSize: '0.875rem',
+                    fontStyle: 'italic'
+                  }}>
+                    {agent?.name || 'Agent'} is typing...
+                  </div>
                 </div>
               )}
+            </div>
+
+            {/* Message Input */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid #e5e7eb',
+              backgroundColor: '#f9fafb'
+            }}>
+              <div style={{display: 'flex', gap: '0.75rem', alignItems: 'flex-end'}}>
+                <textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      sendMessage()
+                    }
+                  }}
+                  placeholder={`Message ${agent?.name || 'agent'}...`}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem 1rem',
+                    borderRadius: '1.5rem',
+                    border: '1px solid #d1d5db',
+                    resize: 'none',
+                    outline: 'none',
+                    fontSize: '0.875rem',
+                    minHeight: '2.5rem',
+                    maxHeight: '8rem',
+                    lineHeight: '1.5'
+                  }}
+                  rows={1}
+                  disabled={isSendingMessage}
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={!newMessage.trim() || isSendingMessage}
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: !newMessage.trim() || isSendingMessage ? '#9ca3af' : '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    cursor: !newMessage.trim() || isSendingMessage ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '2.5rem',
+                    height: '2.5rem'
+                  }}
+                >
+                  {isSendingMessage ? '...' : '↑'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2133,8 +2256,8 @@ export function AgentDetailsPage() {
         </div>
       )}
 
-      {/* Chat Modal */}
-      {showChatModal && selectedConversation && (
+      {/* Old chat modal code removed - now using persistent chat interface */}
+      {false && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -2167,7 +2290,7 @@ export function AgentDetailsPage() {
             }}>
               <div>
                 <h3 style={{fontSize: '1.25rem', fontWeight: '600', margin: 0}}>
-                  {selectedConversation.title}
+                  {selectedConversation?.title || 'Conversation'}
                 </h3>
                 <div style={{fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem'}}>
                   Chat with {agent?.name} • {chatMessages.length} messages
@@ -2179,7 +2302,7 @@ export function AgentDetailsPage() {
                 </div>
               </div>
               <button 
-                onClick={closeChatModal}
+                onClick={() => {}}
                 style={{
                   padding: '0.5rem',
                   border: 'none',

@@ -31,6 +31,7 @@ export default function AppRouter() {
         <Route path="/teams/:teamId/manage" element={<TeamDetailsPage />} />
         <Route path="/teams/:teamId/settings" element={<TeamDetailsPage />} />
         <Route path="/goals" element={<GoalsPage />} />
+        <Route path="/goals/:goalId" element={<GoalsPage />} />
         <Route path="/organization-chart" element={<FixedOrgChartPage />} />
         <Route path="/organization/profile" element={<OrganizationProfilePage />} />
         <Route 
