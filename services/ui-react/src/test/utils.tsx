@@ -1,6 +1,7 @@
-import { render, RenderOptions, RenderResult } from '@testing-library/react'
+import { render } from '@testing-library/react'
+import type { RenderOptions, RenderResult } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
-import { ReactElement, ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { vi } from 'vitest'
 
 // Test data factories
@@ -75,7 +76,7 @@ interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   initialEntries?: string[]
 }
 
-function AllTheProviders({ children, initialEntries = ['/'] }: { children: ReactNode, initialEntries?: string[] }) {
+function AllTheProviders({ children }: { children: ReactNode, initialEntries?: string[] }) {
   return (
     <BrowserRouter>
       {children}
@@ -84,9 +85,9 @@ function AllTheProviders({ children, initialEntries = ['/'] }: { children: React
 }
 
 export function renderWithRouter(ui: ReactElement, options: CustomRenderOptions = {}): RenderResult {
-  const { initialEntries, ...renderOptions } = options
+  const { ...renderOptions } = options
   return render(ui, {
-    wrapper: ({ children }) => <AllTheProviders children={children} initialEntries={initialEntries} />,
+    wrapper: ({ children }) => <AllTheProviders children={children} />,
     ...renderOptions,
   })
 }

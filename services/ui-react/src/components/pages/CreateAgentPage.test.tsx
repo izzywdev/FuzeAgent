@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CreateAgentPage } from './CreateAgentPage'
-import { renderWithRouter, mockApiResponses, mockFetch, testIds } from '../../test/utils'
+import { renderWithRouter, mockApiResponses, mockFetch } from '../../test/utils'
 
 // Mock react-router-dom navigate
 const mockNavigate = vi.fn()

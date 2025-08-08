@@ -175,26 +175,8 @@ describe('Frontend Test Infrastructure - Working Tests', () => {
   })
 
   describe('Error Boundaries', () => {
-    function ErrorComponent() {
+    function ErrorComponent(): React.ReactElement {
       throw new Error('Test error')
-    }
-
-    function ErrorBoundary({ children }: { children: React.ReactNode }) {
-      const [hasError, setHasError] = React.useState(false)
-      
-      React.useEffect(() => {
-        const handler = (error: ErrorEvent) => {
-          setHasError(true)
-        }
-        window.addEventListener('error', handler)
-        return () => window.removeEventListener('error', handler)
-      }, [])
-      
-      if (hasError) {
-        return <div>Something went wrong</div>
-      }
-      
-      return <>{children}</>
     }
 
     it('should handle component errors', () => {
@@ -218,9 +200,9 @@ describe('Frontend Test Infrastructure - Working Tests', () => {
         </div>
       )
       
-      expect(screen.getByLabelText('Close dialog')).toBeInTheDocument()
-      expect(screen.getByLabelText('Search')).toBeInTheDocument()
-      expect(screen.getByRole('main')).toBeInTheDocument()
+      expect(screen.getByLabelText('Close dialog')).toBeDefined()
+      expect(screen.getByLabelText('Search')).toBeDefined()
+      expect(screen.getByRole('main')).toBeDefined()
     })
 
     it('should have proper heading hierarchy', () => {
@@ -232,9 +214,9 @@ describe('Frontend Test Infrastructure - Working Tests', () => {
         </div>
       )
       
-      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { level: 3 })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1 })).toBeDefined()
+      expect(screen.getByRole('heading', { level: 2 })).toBeDefined()
+      expect(screen.getByRole('heading', { level: 3 })).toBeDefined()
     })
   })
 })
