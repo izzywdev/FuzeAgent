@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import ErrorBoundary from '../ErrorBoundary'
 
 interface Team {
   id: string
@@ -9,6 +10,36 @@ interface Team {
   status: string
   color: string
   team_type?: string
+}
+
+interface ApiTeamsResponse {
+  teams?: Team[]
+}
+
+// Type guard to check if a team object is valid
+const isValidTeam = (team: any): team is Team => {
+  return (
+    team &&
+    typeof team.id === 'string' &&
+    typeof team.name === 'string' &&
+    typeof team.description === 'string' &&
+    Array.isArray(team.members) &&
+    typeof team.status === 'string' &&
+    typeof team.color === 'string'
+  )
+}
+
+// Normalize team data to ensure consistent structure
+const normalizeTeam = (team: any): Team => {
+  return {
+    id: team?.id || '',
+    name: team?.name || 'Unknown Team',
+    description: team?.description || 'No description available',
+    members: Array.isArray(team?.members) ? team.members : [],
+    status: team?.status || 'inactive',
+    color: team?.color || '#6b7280',
+    team_type: team?.team_type || 'general'
+  }
 }
 
 const mockTeams: Team[] = [
@@ -59,49 +90,112 @@ const mockTeams: Team[] = [
   }
 ]
 
-export function FixedTeamsPage() {
+function FixedTeamsPageCore() {
   const [teams, setTeams] = useState<Team[]>([])
   const [filteredTeams, setFilteredTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const navigate = useNavigate()
 
-  // Filter teams based on search term and type
+  // Filter teams based on search term and type - with defensive programming
   useEffect(() => {
-    let filtered = teams
+    // Ensure teams is always an array
+    const safeTeams = Array.isArray(teams) ? teams : []
+    let filtered = safeTeams
 
-    if (searchTerm) {
-      filtered = filtered.filter(team => 
-        team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        team.description.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+    if (searchTerm && searchTerm.trim()) {
+      filtered = filtered.filter(team => {
+        const name = team?.name || ''
+        const description = team?.description || ''
+        const searchLower = searchTerm.toLowerCase()
+        return (
+          name.toLowerCase().includes(searchLower) ||
+          description.toLowerCase().includes(searchLower)
+        )
+      })
     }
 
-    if (typeFilter) {
-      filtered = filtered.filter(team => team.team_type === typeFilter)
+    if (typeFilter && typeFilter.trim()) {
+      filtered = filtered.filter(team => team?.team_type === typeFilter)
     }
 
     setFilteredTeams(filtered)
   }, [teams, searchTerm, typeFilter])
 
   useEffect(() => {
-    // Try to fetch from API first, fallback to mock data
-    fetch('http://localhost:8006/teams')
-      .then(res => res.json())
-      .then(data => {
-        const teamData = Array.isArray(data) ? data : []
-        setTeams(teamData)
-        setFilteredTeams(teamData)
-        setLoading(false)
-      })
-      .catch(err => {
+    const loadTeams = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        console.log('Fetching teams from API...')
+        const response = await fetch('http://localhost:8006/teams')
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        console.log('API response:', data)
+        
+        // Handle different response structures
+        let teamData: Team[]
+        
+        if (Array.isArray(data)) {
+          // Direct array response
+          teamData = data
+        } else if (data && Array.isArray(data.teams)) {
+          // Object with teams property
+          teamData = data.teams
+        } else if (data && typeof data === 'object') {
+          // Single team object or other structure
+          teamData = Object.values(data).filter(item => 
+            item && typeof item === 'object' && 'id' in item
+          ) as Team[]
+        } else {
+          // Unexpected format
+          console.warn('Unexpected API response format:', data)
+          teamData = []
+        }
+        
+        // Validate and normalize team data
+        const validatedTeams = teamData
+          .map(team => {
+            if (isValidTeam(team)) {
+              return team
+            } else {
+              console.warn('Invalid team data, normalizing:', team)
+              return normalizeTeam(team)
+            }
+          })
+          .filter(team => team.id) // Remove teams without IDs
+        
+        console.log('Processed teams:', validatedTeams)
+        setTeams(validatedTeams)
+        setFilteredTeams(validatedTeams)
+        
+      } catch (err) {
         console.error('Failed to load teams:', err)
-        setLoading(false)
-        // Use mock data on error
+        setError(err instanceof Error ? err.message : 'Failed to load teams')
+        
+        // Use mock data as fallback
+        console.log('Using mock data as fallback')
         setTeams(mockTeams)
         setFilteredTeams(mockTeams)
-      })
+        
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadTeams()
+
+    // Cleanup function to prevent state updates on unmounted component
+    return () => {
+      setLoading(false)
+    }
   }, [])
 
   const handleCreateTeam = () => {
@@ -221,7 +315,7 @@ export function FixedTeamsPage() {
           <div style={{marginBottom: '1rem', color: '#6b7280', fontSize: '0.875rem'}}>
             {searchTerm || typeFilter ? (
               <span>
-                Found {filteredTeams.length} of {teams.length} teams
+                Found {(filteredTeams || []).length} of {(teams || []).length} teams
                 {searchTerm && ` matching "${searchTerm}"`}
                 {typeFilter && ` of type "${typeFilter}"`}
                 {(searchTerm || typeFilter) && (
@@ -241,8 +335,27 @@ export function FixedTeamsPage() {
                 )}
               </span>
             ) : (
-              <span>Showing all {teams.length} teams</span>
+              <span>Showing all {(teams || []).length} teams</span>
             )}
+          </div>
+        )}
+        
+        {/* Error Display */}
+        {error && !loading && (
+          <div style={{
+            marginBottom: '1rem', 
+            padding: '1rem',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '0.5rem',
+            color: '#dc2626'
+          }}>
+            <h3 style={{margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600'}}>
+              ⚠️ Loading Error
+            </h3>
+            <p style={{margin: 0, fontSize: '0.75rem'}}>
+              {error}. Using cached data as fallback.
+            </p>
           </div>
         )}
 
@@ -251,10 +364,17 @@ export function FixedTeamsPage() {
           <div style={{textAlign: 'center', padding: '3rem'}}>
             <p style={{color: '#6b7280'}}>Loading teams...</p>
           </div>
-        ) : filteredTeams.length === 0 ? (
+        ) : !Array.isArray(filteredTeams) || filteredTeams.length === 0 ? (
           <div style={{textAlign: 'center', padding: '3rem'}}>
-            {teams.length === 0 ? (
-              <p style={{color: '#6b7280'}}>No teams found</p>
+            {!Array.isArray(teams) || teams.length === 0 ? (
+              <div>
+                <p style={{color: '#6b7280'}}>No teams found</p>
+                {error && (
+                  <p style={{color: '#dc2626', fontSize: '0.875rem', marginTop: '0.5rem'}}>
+                    There was an error loading teams from the server.
+                  </p>
+                )}
+              </div>
             ) : (
               <div>
                 <p style={{color: '#6b7280'}}>No teams match your search criteria</p>
@@ -277,7 +397,14 @@ export function FixedTeamsPage() {
           </div>
         ) : (
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem'}}>
-            {filteredTeams.map((team) => (
+            {filteredTeams.map((team) => {
+              // Defensive check for team object
+              if (!team || typeof team !== 'object' || !team.id) {
+                console.warn('Invalid team object in render:', team)
+                return null
+              }
+              
+              return (
             <div key={team.id} style={{
               backgroundColor: 'white',
               borderRadius: '0.75rem',
@@ -292,27 +419,29 @@ export function FixedTeamsPage() {
                 <div style={{
                   width: '3rem',
                   height: '3rem',
-                  backgroundColor: team.color + '20',
+                  backgroundColor: (team.color || '#6b7280') + '20',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginRight: '1rem'
                 }}>
-                  <span style={{fontSize: '1.5rem', color: team.color}}>👥</span>
+                  <span style={{fontSize: '1.5rem', color: team.color || '#6b7280'}}>👥</span>
                 </div>
                 <div style={{flex: 1}}>
-                  <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827', margin: 0}}>{team.name}</h3>
+                  <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827', margin: 0}}>
+                    {team.name || 'Unknown Team'}
+                  </h3>
                   <div style={{display: 'flex', alignItems: 'center', marginTop: '0.25rem'}}>
                     <div style={{
                       width: '0.5rem',
                       height: '0.5rem',
                       borderRadius: '50%',
-                      backgroundColor: team.status === 'active' ? '#22c55e' : '#eab308',
+                      backgroundColor: (team.status === 'active' || !team.status) ? '#22c55e' : '#eab308',
                       marginRight: '0.5rem'
                     }}></div>
                     <span style={{fontSize: '0.75rem', color: '#6b7280', textTransform: 'capitalize'}}>
-                      {team.status}
+                      {team.status || 'inactive'}
                     </span>
                   </div>
                 </div>
@@ -320,7 +449,7 @@ export function FixedTeamsPage() {
 
               {/* Description */}
               <p style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem', lineHeight: '1.5'}}>
-                {team.description}
+                {team.description || 'No description available'}
               </p>
 
               {/* Team Members */}
@@ -335,22 +464,32 @@ export function FixedTeamsPage() {
                     backgroundColor: '#f3f4f6',
                     color: '#374151'
                   }}>
-                    {team.members.length}
+                    {Array.isArray(team.members) ? team.members.length : 0}
                   </span>
                 </div>
                 <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem'}}>
-                  {team.members.map((member, index) => (
-                    <span key={index} style={{
+                  {Array.isArray(team.members) && team.members.length > 0 ? (
+                    team.members.map((member, index) => (
+                      <span key={index} style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '0.25rem',
+                        backgroundColor: (team.color || '#6b7280') + '10',
+                        color: team.color || '#6b7280',
+                        border: `1px solid ${(team.color || '#6b7280')}30`
+                      }}>
+                        {member || 'Unknown Member'}
+                      </span>
+                    ))
+                  ) : (
+                    <span style={{
                       fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '0.25rem',
-                      backgroundColor: team.color + '10',
-                      color: team.color,
-                      border: `1px solid ${team.color}30`
+                      color: '#6b7280',
+                      fontStyle: 'italic'
                     }}>
-                      {member}
+                      No members assigned
                     </span>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -402,47 +541,64 @@ export function FixedTeamsPage() {
                 </button>
               </div>
             </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
         {/* Team Stats */}
-        <div style={{marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem'}}>
-          <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
-            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-              <div>
-                <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Total Teams</p>
-                <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>{teams.length}</p>
+        {!loading && (
+          <div style={{marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem'}}>
+            <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                <div>
+                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Total Teams</p>
+                  <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
+                    {Array.isArray(teams) ? teams.length : 0}
+                  </p>
+                </div>
+                <span style={{fontSize: '2rem'}}>👥</span>
               </div>
-              <span style={{fontSize: '2rem'}}>👥</span>
             </div>
-          </div>
 
-          <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
-            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-              <div>
-                <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Active Teams</p>
-                <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
-                  {teams.filter(t => t.status === 'active').length}
-                </p>
+            <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                <div>
+                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Active Teams</p>
+                  <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
+                    {Array.isArray(teams) ? teams.filter(t => t?.status === 'active').length : 0}
+                  </p>
+                </div>
+                <span style={{fontSize: '2rem'}}>⚡</span>
               </div>
-              <span style={{fontSize: '2rem'}}>⚡</span>
             </div>
-          </div>
 
-          <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
-            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-              <div>
-                <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Total Members</p>
-                <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
-                  {teams.reduce((acc, team) => acc + team.members.length, 0)}
-                </p>
+            <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
+              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                <div>
+                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Total Members</p>
+                  <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
+                    {Array.isArray(teams) ? teams.reduce((acc, team) => {
+                      const memberCount = Array.isArray(team?.members) ? team.members.length : 0
+                      return acc + memberCount
+                    }, 0) : 0}
+                  </p>
+                </div>
+                <span style={{fontSize: '2rem'}}>🤖</span>
               </div>
-              <span style={{fontSize: '2rem'}}>🤖</span>
             </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
+  )
+}
+
+// Export wrapped with error boundary
+export function FixedTeamsPage() {
+  return (
+    <ErrorBoundary>
+      <FixedTeamsPageCore />
+    </ErrorBoundary>
   )
 }
