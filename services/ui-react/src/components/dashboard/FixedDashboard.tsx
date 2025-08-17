@@ -14,35 +14,27 @@ interface Agent {
   lastActivity: string
 }
 
-const mockAgents: Agent[] = [
-  {
-    id: '1',
-    name: 'IzzyAI CEO',
-    type: 'Executive',
-    status: 'active',
-    tasks: { completed: 23, running: 2, pending: 1 },
-    lastActivity: '2 minutes ago'
-  },
-  {
-    id: '2',
-    name: 'CTO Agent',
-    type: 'Executive', 
-    status: 'active',
-    tasks: { completed: 18, running: 1, pending: 3 },
-    lastActivity: '5 minutes ago'
-  },
-  {
-    id: '3',
-    name: 'Frontend Dev',
-    type: 'Developer',
-    status: 'idle',
-    tasks: { completed: 42, running: 0, pending: 2 },
-    lastActivity: '1 hour ago'
+// Real data will be fetched from API
+const [agents, setAgents] = useState<Agent[]>([])
+
+// Fetch agents data
+useEffect(() => {
+  const fetchAgents = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/agents')
+      if (response.ok) {
+        const agentsData = await response.json()
+        setAgents(agentsData)
+      }
+    } catch (error) {
+      console.error('Error fetching agents:', error)
+    }
   }
-]
+  
+  fetchAgents()
+}, [])
 
 export function FixedDashboard() {
-  const [agents] = useState<Agent[]>(mockAgents)
   const [teamsCount, setTeamsCount] = useState<number>(5)
   const [orgName] = useState<string>('WCG - World Class Group')
   const navigate = useNavigate()

@@ -35,88 +35,19 @@ export function GoalsPage() {
         if (Array.isArray(data)) {
           setGoals(data)
         } else {
-          // Use mock data if API returns non-array
-          setGoals(mockGoals)
+          // No goals available
+          setGoals([])
         }
         setLoading(false)
       })
       .catch(() => {
         // Use mock data on error
-        setGoals(mockGoals)
+        setGoals([])
         setLoading(false)
       })
   }, [])
 
-  const mockGoals: Goal[] = [
-    {
-      id: '1',
-      title: 'Expand AI Agent Capabilities',
-      description: 'Develop advanced AI agents with enhanced reasoning and task execution capabilities across multiple domains.',
-      priority: 'high',
-      status: 'active',
-      target_completion_date: '2025-12-31',
-      progress_percentage: 75,
-      assigned_teams: ['Development Team', 'Executive Team'],
-      milestones: [
-        { id: '1', title: 'Deploy 10 specialized agents', status: 'completed', due_date: '2025-08-15' },
-        { id: '2', title: 'Implement cross-team coordination', status: 'active', due_date: '2025-09-30' },
-        { id: '3', title: 'Launch advanced reasoning system', status: 'planning', due_date: '2025-11-15' }
-      ],
-      created_at: '2025-08-01T10:00:00Z',
-      updated_at: '2025-08-06T14:30:00Z'
-    },
-    {
-      id: '2',
-      title: 'Establish Market Leadership',
-      description: 'Position WCG as the leading AI-powered software development organization in the market.',
-      priority: 'critical',
-      status: 'active',
-      target_completion_date: '2025-10-31',
-      progress_percentage: 45,
-      assigned_teams: ['Business Team', 'Executive Team'],
-      milestones: [
-        { id: '4', title: 'Complete market analysis', status: 'completed', due_date: '2025-08-10' },
-        { id: '5', title: 'Launch marketing campaign', status: 'active', due_date: '2025-09-01' },
-        { id: '6', title: 'Secure 5 enterprise clients', status: 'planning', due_date: '2025-10-15' }
-      ],
-      created_at: '2025-08-01T10:00:00Z',
-      updated_at: '2025-08-06T12:00:00Z'
-    },
-    {
-      id: '3',
-      title: 'Optimize Development Workflow',
-      description: 'Implement automated CI/CD pipelines and development tools to increase team productivity by 40%.',
-      priority: 'medium',
-      status: 'active',
-      target_completion_date: '2025-09-30',
-      progress_percentage: 60,
-      assigned_teams: ['Development Team', 'DevOps Team'],
-      milestones: [
-        { id: '7', title: 'Set up automated testing', status: 'completed', due_date: '2025-08-20' },
-        { id: '8', title: 'Deploy CI/CD pipeline', status: 'active', due_date: '2025-09-05' },
-        { id: '9', title: 'Integrate monitoring tools', status: 'planning', due_date: '2025-09-20' }
-      ],
-      created_at: '2025-08-01T10:00:00Z',
-      updated_at: '2025-08-06T09:15:00Z'
-    },
-    {
-      id: '4',
-      title: 'Quality Assurance Excellence',
-      description: 'Achieve 99.9% uptime and zero-defect releases through advanced QA processes and automation.',
-      priority: 'high',
-      status: 'planning',
-      target_completion_date: '2025-11-30',
-      progress_percentage: 25,
-      assigned_teams: ['Quality Assurance', 'Development Team'],
-      milestones: [
-        { id: '10', title: 'Implement automated testing suite', status: 'planning', due_date: '2025-09-15' },
-        { id: '11', title: 'Set up performance monitoring', status: 'planning', due_date: '2025-10-01' },
-        { id: '12', title: 'Establish quality gates', status: 'planning', due_date: '2025-10-30' }
-      ],
-      created_at: '2025-08-01T10:00:00Z',
-      updated_at: '2025-08-05T16:45:00Z'
-    }
-  ]
+  // Goals will be fetched from API
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {

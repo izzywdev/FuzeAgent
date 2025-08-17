@@ -49,38 +49,9 @@ export function FixedAgentsPage() {
       .catch(err => {
         console.error('Failed to load agents:', err)
         setLoading(false)
-        // Use mock data on error
-        const mockData = [
-          {
-            id: '1',
-            name: 'IzzyAI CEO',
-            role: 'Digital CEO',
-            type: 'executive',
-            status: 'active',
-            created_at: '2025-08-06T11:16:04.060569',
-            updated_at: '2025-08-06T11:16:04.060598'
-          },
-          {
-            id: '2', 
-            name: 'Alex CTO',
-            role: 'Development Team Manager',
-            type: 'executive',
-            status: 'active',
-            created_at: '2025-08-06T11:50:10.278440',
-            updated_at: '2025-08-06T11:50:10.278457'
-          },
-          {
-            id: '3',
-            name: 'Sarah CPO',
-            role: 'Chief Product Officer', 
-            type: 'executive',
-            status: 'active',
-            created_at: '2025-08-06T11:50:18.161127',
-            updated_at: '2025-08-06T11:50:18.161141'
-          }
-        ]
-        setAgents(mockData)
-        setFilteredAgents(mockData)
+        // No fallback data - show empty state
+        setAgents([])
+        setFilteredAgents([])
       })
   }, [])
 

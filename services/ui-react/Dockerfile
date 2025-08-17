@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies with caching optimizations
-RUN npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+RUN npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
 # Build stage
 FROM dependencies as build

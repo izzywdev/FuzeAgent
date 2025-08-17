@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install -y \
     wget \
     openssh-client \
     gnupg \
-    software-properties-common \
     build-essential \
     libffi-dev \
     libssl-dev \

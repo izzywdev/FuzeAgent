@@ -94,72 +94,19 @@ export function CreateAgentPage() {
         } else if (Array.isArray(data)) {
           setTemplates(data)
         } else {
-          // Mock templates data
-          setTemplates(mockTemplates)
+          // No templates available
+          setTemplates([])
         }
         setLoading(false)
       })
       .catch(() => {
-        // Mock templates data on error
-        setTemplates(mockTemplates)
+        // No templates on error
+        setTemplates([])
         setLoading(false)
       })
   }, [])
 
-  const mockTemplates: AgentTemplate[] = [
-    {
-      id: 'react_developer',
-      name: 'React Developer',
-      description: 'Frontend developer specialized in React and TypeScript',
-      type: 'developer',
-      defaultConfig: {
-        model: 'claude-sonnet-4-20250514',
-        temperature: 0.7,
-        tools: ['code_generation', 'code_review', 'debugging', 'testing'],
-        goal: 'Build responsive and performant React applications',
-        backstory: 'Experienced frontend developer with deep knowledge of React ecosystem and modern development practices'
-      }
-    },
-    {
-      id: 'python_developer',
-      name: 'Python Developer', 
-      description: 'Backend developer specialized in Python and FastAPI',
-      type: 'developer',
-      defaultConfig: {
-        model: 'claude-sonnet-4-20250514',
-        temperature: 0.7,
-        tools: ['code_generation', 'api_development', 'database_design', 'testing'],
-        goal: 'Develop robust and scalable backend systems',
-        backstory: 'Senior Python developer with expertise in FastAPI, databases, and system architecture'
-      }
-    },
-    {
-      id: 'qa_engineer',
-      name: 'QA Engineer',
-      description: 'Quality assurance engineer focused on testing and automation',
-      type: 'qa',
-      defaultConfig: {
-        model: 'claude-sonnet-4-20250514',
-        temperature: 0.6,
-        tools: ['test_automation', 'bug_reporting', 'quality_analysis', 'performance_testing'],
-        goal: 'Ensure high quality and reliability of software products',
-        backstory: 'Experienced QA engineer with expertise in automated testing frameworks and quality processes'
-      }
-    },
-    {
-      id: 'devops_engineer',
-      name: 'DevOps Engineer',
-      description: 'Infrastructure and deployment specialist',
-      type: 'devops',
-      defaultConfig: {
-        model: 'claude-sonnet-4-20250514',
-        temperature: 0.5,
-        tools: ['infrastructure_management', 'deployment', 'monitoring', 'security'],
-        goal: 'Maintain reliable and scalable infrastructure',
-        backstory: 'DevOps engineer with expertise in cloud platforms, containerization, and CI/CD pipelines'
-      }
-    }
-  ]
+  // Templates will be fetched from API
 
   const handleTemplateSelect = (template: AgentTemplate) => {
     setFormData({

@@ -10,71 +10,19 @@ import { Badge } from '../components/ui/badge'
 import { NotificationSystem } from '../components/NotificationSystem'
 import { api } from '../config/api'
 
-// Mock data - replace with real API calls
-const mockMetrics = {
-  totalAgents: 12,
-  activeAgents: 8,
-  tasksCompleted: 145,
-  averageResponseTime: '2.3s'
-}
+// Real data will be fetched from API
+const [metrics, setMetrics] = useState({
+  totalAgents: 0,
+  activeAgents: 0,
+  tasksCompleted: 0,
+  averageResponseTime: '0s'
+})
 
-const mockAgents = [
-  {
-    id: '1',
-    name: 'IzzyAI CEO',
-    type: 'Executive',
-    status: 'active' as const,
-    tasks: { completed: 23, running: 2, pending: 1 },
-    lastActivity: '2 minutes ago'
-  },
-  {
-    id: '2',
-    name: 'CTO Agent',
-    type: 'Executive',
-    status: 'active' as const,
-    tasks: { completed: 18, running: 1, pending: 3 },
-    lastActivity: '5 minutes ago'
-  },
-  {
-    id: '3',
-    name: 'Frontend Dev 1',
-    type: 'Developer',
-    status: 'idle' as const,
-    tasks: { completed: 42, running: 0, pending: 2 },
-    lastActivity: '1 hour ago'
-  }
-]
-
-const recentActivity = [
-  {
-    id: '1',
-    type: 'task_completed',
-    agent: 'IzzyAI CEO',
-    message: 'Completed strategic planning task',
-    time: '2 minutes ago',
-    status: 'success'
-  },
-  {
-    id: '2',
-    type: 'agent_created',
-    agent: 'System',
-    message: 'New React Developer agent deployed',
-    time: '15 minutes ago',
-    status: 'info'
-  },
-  {
-    id: '3',
-    type: 'task_failed',
-    agent: 'Backend Dev 2',
-    message: 'Database migration task failed',
-    time: '1 hour ago',
-    status: 'error'
-  }
-]
+const [agents, setAgents] = useState<any[]>([])
+const [recentActivity, setRecentActivity] = useState<any[]>([])
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const [agents] = useState(mockAgents)
   const [knowledgeStats, setKnowledgeStats] = useState({
     totalDocuments: 0,
     recentDocuments: []
@@ -86,7 +34,30 @@ export function DashboardPage() {
 
   useEffect(() => {
     fetchKnowledgeStats()
+    fetchDashboardData()
   }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch agents
+      const agentsResponse = await fetch('http://localhost:8000/agents')
+      if (agentsResponse.ok) {
+        const agentsData = await agentsResponse.json()
+        setAgents(agentsData)
+        setMetrics(prev => ({
+          ...prev,
+          totalAgents: agentsData.length,
+          activeAgents: agentsData.filter((a: any) => a.status === 'active').length
+        }))
+      }
+
+      // Fetch recent activity (this would be replaced with actual API endpoint)
+      // For now, set empty array
+      setRecentActivity([])
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+    }
+  }
 
   const fetchKnowledgeStats = async () => {
     try {
@@ -191,25 +162,25 @@ export function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             title="Total Agents"
-            value={mockMetrics.totalAgents}
+            value={metrics.totalAgents}
             change={{ value: '+2', type: 'increase' }}
             icon={<Bot className="w-6 h-6 text-primary" />}
           />
           <MetricCard
             title="Active Agents"
-            value={mockMetrics.activeAgents}
+            value={metrics.activeAgents}
             change={{ value: '+1', type: 'increase' }}
             icon={<Activity className="w-6 h-6 text-primary" />}
           />
           <MetricCard
             title="Tasks Completed"
-            value={mockMetrics.tasksCompleted}
+            value={metrics.tasksCompleted}
             change={{ value: '+12%', type: 'increase' }}
             icon={<TrendingUp className="w-6 h-6 text-primary" />}
           />
           <MetricCard
             title="Avg Response Time"
-            value={mockMetrics.averageResponseTime}
+            value={metrics.averageResponseTime}
             change={{ value: '-0.5s', type: 'increase' }}
             icon={<Users className="w-6 h-6 text-primary" />}
           />

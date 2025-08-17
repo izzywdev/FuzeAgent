@@ -12,46 +12,28 @@ interface SearchableContent {
   type: 'page' | 'section' | 'api'
 }
 
-// Mock search data - in a real app, this would come from your documentation content
-const searchableContent: SearchableContent[] = [
-  {
-    id: 'getting-started',
-    title: 'Getting Started',
-    content: 'Quick start guide for FuzeAgent AI team orchestration platform. Set up your first agents and teams.',
-    path: '/docs/getting-started',
-    type: 'page'
-  },
-  {
-    id: 'api-organizations',
-    title: 'Organizations API',
-    content: 'Create and manage organizations. List, create, update, and delete organizations.',
-    path: '/docs/api-reference#organizations',
-    section: 'API Reference',
-    type: 'api'
-  },
-  {
-    id: 'api-agents',
-    title: 'Agents API',
-    content: 'Manage AI agents. Create agents from templates, assign tasks, monitor performance.',
-    path: '/docs/api-reference#agents',
-    section: 'API Reference',
-    type: 'api'
-  },
-  {
-    id: 'creating-agents',
-    title: 'Creating Agents',
-    content: 'Learn how to create and configure AI agents. Agent types, templates, custom configurations.',
-    path: '/docs/creating-agents',
-    type: 'page'
-  },
-  {
-    id: 'task-management',
-    title: 'Task Management',
-    content: 'Assign and manage tasks across your AI team. Task distribution, monitoring, and completion.',
-    path: '/docs/task-management',
-    type: 'page'
+// Searchable content will be loaded from API or documentation files
+const [searchableContent, setSearchableContent] = useState<SearchableContent[]>([])
+
+// Load searchable content from API
+useEffect(() => {
+  const loadSearchableContent = async () => {
+    try {
+      // This would be replaced with actual API call to get documentation content
+      const response = await fetch('/api/docs/searchable-content')
+      if (response.ok) {
+        const data = await response.json()
+        setSearchableContent(data)
+      }
+    } catch (error) {
+      console.error('Failed to load searchable content:', error)
+      // Fallback to empty array
+      setSearchableContent([])
+    }
   }
-]
+  
+  loadSearchableContent()
+}, [])
 
 interface DocsSearchProps {
   query: string

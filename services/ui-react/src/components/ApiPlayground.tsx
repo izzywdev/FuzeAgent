@@ -185,13 +185,22 @@ export default function ApiPlayground() {
       // Simulate API request
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      // Return mock response based on the endpoint
-      const mockResponse = {
-        status: currentEndpoint.responses[0].status,
-        data: currentEndpoint.responses[0].example
-      }
+      // Make actual API request
+      const response = await fetch(`http://localhost:8006${currentEndpoint.path}`, {
+        method: currentEndpoint.method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: currentEndpoint.method !== 'GET' && currentEndpoint.requestBody 
+          ? JSON.stringify(currentEndpoint.requestBody.example) 
+          : undefined
+      })
       
-      setResponse(mockResponse)
+      const responseData = await response.json()
+      setResponse({
+        status: response.status,
+        data: responseData
+      })
     } catch (error) {
       setResponse({
         status: 500,

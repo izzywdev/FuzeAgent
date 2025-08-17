@@ -12,9 +12,7 @@ interface Team {
   team_type?: string
 }
 
-interface ApiTeamsResponse {
-  teams?: Team[]
-}
+
 
 // Type guard to check if a team object is valid
 const isValidTeam = (team: any): team is Team => {
@@ -42,53 +40,7 @@ const normalizeTeam = (team: any): Team => {
   }
 }
 
-const mockTeams: Team[] = [
-  {
-    id: '1',
-    name: 'Executive Team',
-    description: 'Strategic leadership and decision making',
-    members: ['IzzyAI CEO', 'Alex CTO', 'Sarah CPO'],
-    status: 'active',
-    color: '#7c3aed',
-    team_type: 'executive'
-  },
-  {
-    id: '2', 
-    name: 'Development Team',
-    description: 'Frontend, backend, and full-stack development',
-    members: ['React Developer', 'Python Developer', 'TypeScript Developer'],
-    status: 'active',
-    color: '#2563eb',
-    team_type: 'development'
-  },
-  {
-    id: '3',
-    name: 'Quality Assurance',
-    description: 'Testing, quality control, and bug detection',
-    members: ['QA Engineer'],
-    status: 'active',
-    color: '#16a34a',
-    team_type: 'qa'
-  },
-  {
-    id: '4',
-    name: 'DevOps Team',
-    description: 'Infrastructure, deployment, and system operations',
-    members: ['DevOps Engineer'],
-    status: 'active',
-    color: '#ea580c',
-    team_type: 'devops'
-  },
-  {
-    id: '5',
-    name: 'Business Team',
-    description: 'Marketing, sales, and customer relations',
-    members: ['Marketing Agent', 'Sales Agent'],
-    status: 'active',
-    color: '#dc2626',
-    team_type: 'business'
-  }
-]
+
 
 function FixedTeamsPageCore() {
   const [teams, setTeams] = useState<Team[]>([])
@@ -180,10 +132,10 @@ function FixedTeamsPageCore() {
         console.error('Failed to load teams:', err)
         setError(err instanceof Error ? err.message : 'Failed to load teams')
         
-        // Use mock data as fallback
-        console.log('Using mock data as fallback')
-        setTeams(mockTeams)
-        setFilteredTeams(mockTeams)
+        // No fallback data - show empty state
+        console.log('No teams available')
+        setTeams([])
+        setFilteredTeams([])
         
       } finally {
         setLoading(false)

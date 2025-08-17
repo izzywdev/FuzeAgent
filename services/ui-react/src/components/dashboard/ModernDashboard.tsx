@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
 interface Agent {
@@ -14,63 +14,30 @@ interface Agent {
   lastActivity: string
 }
 
-// Mock data
-const mockAgents: Agent[] = [
-  {
-    id: '1',
-    name: 'IzzyAI CEO',
-    type: 'Executive',
-    status: 'active',
-    tasks: { completed: 23, running: 2, pending: 1 },
-    lastActivity: '2 minutes ago'
-  },
-  {
-    id: '2',
-    name: 'CTO Agent',
-    type: 'Executive',
-    status: 'active',
-    tasks: { completed: 18, running: 1, pending: 3 },
-    lastActivity: '5 minutes ago'
-  },
-  {
-    id: '3',
-    name: 'Frontend Dev 1',
-    type: 'Developer',
-    status: 'idle',
-    tasks: { completed: 42, running: 0, pending: 2 },
-    lastActivity: '1 hour ago'
-  }
-]
+// Real data will be fetched from API
+const [agents, setAgents] = useState<Agent[]>([])
+const [recentActivity, setRecentActivity] = useState<any[]>([])
 
-const recentActivity = [
-  {
-    id: '1',
-    type: 'task_completed',
-    agent: 'IzzyAI CEO',
-    message: 'Completed strategic planning task',
-    time: '2 minutes ago',
-    status: 'success'
-  },
-  {
-    id: '2',
-    type: 'agent_created',
-    agent: 'System',
-    message: 'New React Developer agent deployed',
-    time: '15 minutes ago',
-    status: 'info'
-  },
-  {
-    id: '3',
-    type: 'task_failed',
-    agent: 'Backend Dev 2',
-    message: 'Database migration task failed',
-    time: '1 hour ago',
-    status: 'error'
+// Fetch data on component mount
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const agentsResponse = await fetch('http://localhost:8000/agents')
+      if (agentsResponse.ok) {
+        const agentsData = await agentsResponse.json()
+        setAgents(agentsData)
+      }
+      // Recent activity would be fetched from API
+      setRecentActivity([])
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    }
   }
-]
+  
+  fetchData()
+}, [])
 
 export function ModernDashboard() {
-  const [agents] = useState<Agent[]>(mockAgents)
 
   return (
     <div className="min-h-screen bg-gray-50">

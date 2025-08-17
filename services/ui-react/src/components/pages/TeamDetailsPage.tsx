@@ -62,101 +62,57 @@ export function TeamDetailsPage() {
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeDocument | null>(null)
   const [showDocumentViewer, setShowDocumentViewer] = useState(false)
   const [documentContent, setDocumentContent] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
+
+  // Display error if there is one
+  if (error) {
+    return (
+      <div style={{minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <div style={{textAlign: 'center'}}>
+          <div style={{fontSize: '2rem', marginBottom: '1rem'}}>⚠️</div>
+          <p style={{color: '#dc2626', marginBottom: '1rem'}}>{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              cursor: 'pointer'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   useEffect(() => {
     if (!teamId) return
 
-    // Mock team data for demonstration
-    const mockTeam: Team = {
-      id: teamId,
-      name: teamId === '1' ? 'Executive Team' : teamId === '2' ? 'Development Team' : 'Quality Assurance',
-      description: teamId === '1' 
-        ? 'Strategic leadership and decision making' 
-        : teamId === '2' 
-        ? 'Frontend, backend, and full-stack development'
-        : 'Testing, quality control, and bug detection',
-      color: teamId === '1' ? '#7c3aed' : teamId === '2' ? '#2563eb' : '#16a34a',
-      status: 'active',
-      created: '2025-08-01',
-      members: teamId === '1' 
-        ? [
-            {
-              id: '1',
-              name: 'IzzyAI CEO',
-              role: 'Digital CEO',
-              type: 'executive',
-              status: 'active',
-              joinedDate: '2025-08-01',
-              performance: { tasksCompleted: 23, tasksActive: 2, efficiency: '98%' }
-            },
-            {
-              id: '2',
-              name: 'Alex CTO',
-              role: 'Development Team Manager',
-              type: 'executive',
-              status: 'active',
-              joinedDate: '2025-08-01',
-              performance: { tasksCompleted: 18, tasksActive: 1, efficiency: '95%' }
-            },
-            {
-              id: '3',
-              name: 'Sarah CPO',
-              role: 'Chief Product Officer',
-              type: 'executive',
-              status: 'active',
-              joinedDate: '2025-08-01',
-              performance: { tasksCompleted: 15, tasksActive: 3, efficiency: '92%' }
-            }
-          ]
-        : teamId === '2'
-        ? [
-            {
-              id: '4',
-              name: 'React Developer',
-              role: 'Senior Frontend Developer',
-              type: 'developer',
-              status: 'active',
-              joinedDate: '2025-08-02',
-              performance: { tasksCompleted: 42, tasksActive: 2, efficiency: '89%' }
-            },
-            {
-              id: '5',
-              name: 'Python Developer',
-              role: 'Backend Developer',
-              type: 'developer',
-              status: 'active',
-              joinedDate: '2025-08-02',
-              performance: { tasksCompleted: 38, tasksActive: 3, efficiency: '91%' }
-            }
-          ]
-        : [
-            {
-              id: '6',
-              name: 'QA Engineer',
-              role: 'Quality Assurance Engineer',
-              type: 'qa',
-              status: 'active',
-              joinedDate: '2025-08-03',
-              performance: { tasksCompleted: 28, tasksActive: 1, efficiency: '94%' }
-            }
-          ],
-      stats: {
-        totalTasks: teamId === '1' ? 62 : teamId === '2' ? 85 : 29,
-        completedTasks: teamId === '1' ? 56 : teamId === '2' ? 80 : 28,
-        activeTasks: teamId === '1' ? 6 : teamId === '2' ? 5 : 1,
-        avgResponseTime: teamId === '1' ? '1.2s' : teamId === '2' ? '2.8s' : '1.5s'
-      },
-      knowledgeBase: []
+    // Load team data from API
+    const loadTeamData = async () => {
+      try {
+        const response = await fetch(`http://localhost:8006/teams/${teamId}`)
+        if (response.ok) {
+          const teamData = await response.json()
+          setTeam(teamData)
+        } else {
+          setError('Failed to load team data')
+        }
+      } catch (err) {
+        setError('Error loading team data')
+      } finally {
+        setLoading(false)
+        if (teamId) {
+          loadKnowledgeDocuments()
+        }
+      }
     }
 
-    setTimeout(() => {
-      setTeam(mockTeam)
-      setLoading(false)
-      // Load knowledge documents after team is set
-      if (teamId) {
-        loadKnowledgeDocuments()
-      }
-    }, 500)
+    loadTeamData()
   }, [teamId])
 
   // Load knowledge documents for the team
