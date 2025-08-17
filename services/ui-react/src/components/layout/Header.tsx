@@ -10,7 +10,7 @@
  * @version 1.0.0
  */
 
-import { Bell, Search, Settings, User } from 'lucide-react'
+import { Bell, Search, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'

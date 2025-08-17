@@ -10,19 +10,20 @@ import { Badge } from '../components/ui/badge'
 import { NotificationSystem } from '../components/NotificationSystem'
 import { api } from '../config/api'
 
-// Real data will be fetched from API
-const [metrics, setMetrics] = useState({
-  totalAgents: 0,
-  activeAgents: 0,
-  tasksCompleted: 0,
-  averageResponseTime: '0s'
-})
-
-const [agents, setAgents] = useState<any[]>([])
-const [recentActivity, setRecentActivity] = useState<any[]>([])
-
 export function DashboardPage() {
   const navigate = useNavigate()
+  
+  // Real data will be fetched from API
+  const [metrics, setMetrics] = useState({
+    totalAgents: 0,
+    activeAgents: 0,
+    tasksCompleted: 0,
+    averageResponseTime: '0s'
+  })
+
+  const [agents, setAgents] = useState<any[]>([])
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  
   const [knowledgeStats, setKnowledgeStats] = useState({
     totalDocuments: 0,
     recentDocuments: []
@@ -69,11 +70,6 @@ export function DashboardPage() {
     } catch (error) {
       console.error('Error fetching knowledge stats:', error)
     }
-  }
-
-  const handleAssignTask = (agentId: string) => {
-    // Navigate to agent details with task assignment mode
-    navigate(`/agents/${agentId}?action=assign-task`)
   }
 
   const handleViewDetails = (agentId: string) => {
@@ -201,8 +197,7 @@ export function DashboardPage() {
                 <AgentCard
                   key={agent.id}
                   agent={agent}
-                  onAssignTask={handleAssignTask}
-                  onViewDetails={handleViewDetails}
+                  onClick={handleViewDetails}
                 />
               ))}
             </div>

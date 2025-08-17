@@ -35,17 +35,6 @@ interface Agent {
 }
 
 /**
- * Represents a recent activity item
- */
-interface ActivityItem {
-  id: string
-  agent: string
-  message: string
-  status: 'success' | 'info' | 'error'
-  time: string
-}
-
-/**
  * Dashboard metrics data
  */
 interface DashboardMetrics {

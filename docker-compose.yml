@@ -104,8 +104,8 @@ services:
       - ai-team-network
 
   # Management UI (React)
-  ui:
-    build: ./services/ui-react
+  frontend:
+    build: ./services/frontend
     ports:
       - "3031:3000"  # Changed from 3030 to 3031 to avoid any potential conflicts
     environment:
