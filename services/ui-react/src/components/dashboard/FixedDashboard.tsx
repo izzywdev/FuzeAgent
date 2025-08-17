@@ -1,6 +1,26 @@
+/**
+ * FixedDashboard - Main dashboard component for the FuzeAgent application
+ * 
+ * This component provides a comprehensive overview of the AI agent ecosystem including:
+ * - Key performance metrics and statistics
+ * - Active agent status and task information
+ * - Recent activity feed
+ * - Quick action buttons for common tasks
+ * 
+ * @author FuzeAgent Team
+ * @version 1.0.0
+ */
+
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
+// ============================================================================
+// TYPES AND INTERFACES
+// ============================================================================
+
+/**
+ * Represents an AI agent in the system
+ */
 interface Agent {
   id: string
   name: string
@@ -14,113 +34,289 @@ interface Agent {
   lastActivity: string
 }
 
-// Real data will be fetched from API
-const [agents, setAgents] = useState<Agent[]>([])
+/**
+ * Represents a recent activity item
+ */
+interface ActivityItem {
+  id: string
+  agent: string
+  message: string
+  status: 'success' | 'info' | 'error'
+  time: string
+}
 
-// Fetch agents data
-useEffect(() => {
-  const fetchAgents = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/agents')
-      if (response.ok) {
-        const agentsData = await response.json()
-        setAgents(agentsData)
-      }
-    } catch (error) {
-      console.error('Error fetching agents:', error)
-    }
-  }
+/**
+ * Dashboard metrics data
+ */
+interface DashboardMetrics {
+  totalAgents: number
+  activeAgents: number
+  tasksCompleted: number
+  teamsCount: number
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/**
+ * Default organization name
+ */
+const DEFAULT_ORG_NAME = 'WCG - World Class Group'
+
+/**
+ * API endpoints for data fetching
+ */
+const API_ENDPOINTS = {
+  agents: 'http://localhost:8000/agents',
+  teams: 'http://localhost:8000/teams'
+} as const
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
+/**
+ * Main dashboard component that displays system overview and metrics
+ * 
+ * @returns JSX.Element - The rendered dashboard
+ */
+export function FixedDashboard(): JSX.Element {
+  // ============================================================================
+  // STATE MANAGEMENT
+  // ============================================================================
   
-  fetchAgents()
-}, [])
-
-export function FixedDashboard() {
-  const [teamsCount, setTeamsCount] = useState<number>(5)
-  const [orgName] = useState<string>('WCG - World Class Group')
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    totalAgents: 0,
+    activeAgents: 0,
+    tasksCompleted: 0,
+    teamsCount: 0
+  })
+  const [orgName] = useState<string>(DEFAULT_ORG_NAME)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  
   const navigate = useNavigate()
 
+  // ============================================================================
+  // EFFECTS AND DATA FETCHING
+  // ============================================================================
+
+  /**
+   * Fetch dashboard data on component mount
+   */
   useEffect(() => {
-    // Load teams count
-    fetch('http://localhost:8000/teams')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setTeamsCount(data.length)
-        }
-      })
-      .catch(() => {
-        // Keep default count
-      })
+    fetchDashboardData()
   }, [])
 
+  /**
+   * Fetch all required data for the dashboard
+   */
+  const fetchDashboardData = async (): Promise<void> => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      // Fetch agents and teams data in parallel
+      const [agentsResponse, teamsResponse] = await Promise.all([
+        fetch(API_ENDPOINTS.agents),
+        fetch(API_ENDPOINTS.teams)
+      ])
+
+      if (!agentsResponse.ok) {
+        throw new Error(`Failed to fetch agents: ${agentsResponse.status}`)
+      }
+      
+      if (!teamsResponse.ok) {
+        throw new Error(`Failed to fetch teams: ${teamsResponse.status}`)
+      }
+
+      const agentsData: Agent[] = await agentsResponse.json()
+      const teamsData = await teamsResponse.json()
+
+      // Update state with fetched data
+      setAgents(agentsData)
+      setMetrics({
+        totalAgents: agentsData.length,
+        activeAgents: agentsData.filter(agent => agent.status === 'active').length,
+        tasksCompleted: agentsData.reduce((total, agent) => total + agent.tasks.completed, 0),
+        teamsCount: Array.isArray(teamsData) ? teamsData.length : 0
+      })
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
+      setError(errorMessage)
+      console.error('Error fetching dashboard data:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // ============================================================================
+  // EVENT HANDLERS
+  // ============================================================================
+
+  /**
+   * Handle navigation to create agent page
+   */
+  const handleCreateAgent = (): void => {
+    navigate('/agents/create')
+  }
+
+  /**
+   * Handle navigation to create team page
+   */
+  const handleCreateTeam = (): void => {
+    navigate('/teams/create')
+  }
+
+  /**
+   * Handle navigation to organization profile
+   */
+  const handleViewOrganization = (): void => {
+    navigate('/organization/profile')
+  }
+
+  /**
+   * Handle navigation to goals page
+   */
+  const handleViewGoals = (): void => {
+    navigate('/goals')
+  }
+
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
+
+  /**
+   * Get status color based on agent status
+   */
+  const getStatusColor = (status: Agent['status']): string => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-500'
+      case 'idle':
+        return 'bg-yellow-500'
+      case 'error':
+        return 'bg-red-500'
+      default:
+        return 'bg-gray-500'
+    }
+  }
+
+  /**
+   * Get status text color based on agent status
+   */
+  const getStatusTextColor = (status: Agent['status']): string => {
+    switch (status) {
+      case 'active':
+        return 'text-green-700'
+      case 'idle':
+        return 'text-yellow-700'
+      case 'error':
+        return 'text-red-700'
+      default:
+        return 'text-gray-700'
+    }
+  }
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchDashboardData}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div style={{minHeight: '100vh', backgroundColor: '#f9fafb'}}>
-      {/* Navigation */}
-      <nav style={{backgroundColor: 'white', borderBottom: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
-        <div style={{maxWidth: '80rem', margin: '0 auto', padding: '0 1rem'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '4rem'}}>
-            <div style={{display: 'flex', alignItems: 'center'}}>
-              <div style={{display: 'flex', alignItems: 'center'}}>
-                <div style={{
-                  width: '2rem', 
-                  height: '2rem', 
-                  backgroundColor: '#2563eb', 
-                  borderRadius: '0.5rem', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  marginRight: '0.75rem'
-                }}>
-                  <span style={{color: 'white', fontWeight: 'bold'}}>F</span>
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation Header */}
+      <nav className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            {/* Logo and Brand */}
+            <div className="flex items-center">
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                  <span className="text-white font-bold text-lg">F</span>
                 </div>
-                <h1 style={{fontSize: '1.25rem', fontWeight: 'bold', color: '#111827'}}>FuzeAgent</h1>
+                <h1 className="text-xl font-bold text-gray-900">FuzeAgent</h1>
               </div>
               
               {/* Navigation Links */}
-              <div style={{display: 'flex', marginLeft: '1.5rem', gap: '2rem'}}>
-                <Link to="/" style={{color: '#2563eb', fontWeight: '500', fontSize: '0.875rem', textDecoration: 'none', borderBottom: '2px solid #2563eb', paddingBottom: '1rem'}}>
+              <div className="hidden md:ml-6 md:flex md:space-x-8">
+                <Link 
+                  to="/" 
+                  className="text-blue-600 border-b-2 border-blue-600 px-1 pt-1 pb-4 text-sm font-medium"
+                >
                   Dashboard
                 </Link>
-                <Link to="/agents" style={{color: '#6b7280', fontWeight: '500', fontSize: '0.875rem', textDecoration: 'none'}}>
+                <Link 
+                  to="/agents" 
+                  className="text-gray-500 hover:text-gray-700 px-1 pt-1 pb-4 text-sm font-medium"
+                >
                   Agents
                 </Link>
-                <Link to="/teams" style={{color: '#6b7280', fontWeight: '500', fontSize: '0.875rem', textDecoration: 'none'}}>
+                <Link 
+                  to="/teams" 
+                  className="text-gray-500 hover:text-gray-700 px-1 pt-1 pb-4 text-sm font-medium"
+                >
                   Teams
                 </Link>
-                <Link to="/goals" style={{color: '#6b7280', fontWeight: '500', fontSize: '0.875rem', textDecoration: 'none'}}>
+                <Link 
+                  to="/goals" 
+                  className="text-gray-500 hover:text-gray-700 px-1 pt-1 pb-4 text-sm font-medium"
+                >
                   Goals
-                </Link>
-                <Link to="/organization-chart" style={{color: '#6b7280', fontWeight: '500', fontSize: '0.875rem', textDecoration: 'none'}}>
-                  Organization Chart
                 </Link>
               </div>
             </div>
 
-            <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-              {/* Search */}
-              <input
-                type="text"
-                placeholder="Search..."
-                style={{
-                  width: '16rem',
-                  padding: '0.5rem 0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  fontSize: '0.875rem'
-                }}
-              />
+            {/* Search and User */}
+            <div className="flex items-center space-x-4">
+              {/* Search Input */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
               
               {/* User Avatar */}
-              <div style={{
-                width: '2rem',
-                height: '2rem',
-                backgroundColor: '#d1d5db',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <span style={{color: '#4b5563', fontWeight: '600', fontSize: '0.875rem'}}>U</span>
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                <span className="text-gray-600 font-semibold text-sm">U</span>
               </div>
             </div>
           </div>
@@ -128,260 +324,192 @@ export function FixedDashboard() {
       </nav>
 
       {/* Main Content */}
-      <main style={{maxWidth: '80rem', margin: '0 auto', padding: '1.5rem 1rem'}}>
-        {/* Header */}
-        <div style={{marginBottom: '2rem'}}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start'}}>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <div className="flex justify-between items-start">
             <div>
-              <h2 style={{fontSize: '1.875rem', fontWeight: 'bold', color: '#111827'}}>Dashboard</h2>
-              <p style={{marginTop: '0.25rem', fontSize: '0.875rem', color: '#6b7280'}}>
+              <h2 className="text-3xl font-bold text-gray-900">Dashboard</h2>
+              <p className="mt-2 text-gray-600">
                 Monitor your AI agents and team performance
               </p>
             </div>
-            <Link to="/organization/profile" style={{
-              backgroundColor: 'white', 
-              padding: '1rem', 
-              borderRadius: '0.5rem', 
-              border: '1px solid #e5e7eb',
-              textDecoration: 'none',
-              display: 'block',
-              transition: 'border-color 0.2s, box-shadow 0.2s',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#2563eb'
-              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#e5e7eb'
-              e.currentTarget.style.boxShadow = 'none'
-            }}>
-              <div style={{fontSize: '0.875rem', color: '#6b7280'}}>Organization</div>
-              <div style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827', marginTop: '0.25rem'}}>{orgName}</div>
+            
+            {/* Organization Info Card */}
+            <Link 
+              to="/organization/profile"
+              className="bg-white p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
+            >
+              <div className="text-sm text-gray-600">Organization</div>
+              <div className="text-lg font-semibold text-gray-900 mt-1">{orgName}</div>
             </Link>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem'}}>
-          <div style={{backgroundColor: 'white', padding: '1.25rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
-            <div style={{display: 'flex', alignItems: 'center'}}>
-              <div style={{
-                width: '2rem',
-                height: '2rem',
-                backgroundColor: '#dbeafe',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: '1rem'
-              }}>
-                <span style={{color: '#2563eb', fontSize: '1rem'}}>👥</span>
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Total Agents */}
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                <span className="text-blue-600 text-xl">👥</span>
               </div>
               <div>
-                <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280'}}>Total Agents</div>
-                <div style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>10</div>
+                <div className="text-sm font-medium text-gray-600">Total Agents</div>
+                <div className="text-2xl font-semibold text-gray-900">{metrics.totalAgents}</div>
               </div>
             </div>
           </div>
 
-          <div style={{backgroundColor: 'white', padding: '1.25rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
-            <div style={{display: 'flex', alignItems: 'center'}}>
-              <div style={{
-                width: '2rem',
-                height: '2rem',
-                backgroundColor: '#dcfce7',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: '1rem'
-              }}>
-                <span style={{color: '#16a34a', fontSize: '1rem'}}>⚡</span>
+          {/* Active Agents */}
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
+                <span className="text-green-600 text-xl">⚡</span>
               </div>
               <div>
-                <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280'}}>Active Agents</div>
-                <div style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>8</div>
+                <div className="text-sm font-medium text-gray-600">Active Agents</div>
+                <div className="text-2xl font-semibold text-gray-900">{metrics.activeAgents}</div>
               </div>
             </div>
           </div>
 
-          <div style={{backgroundColor: 'white', padding: '1.25rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
-            <div style={{display: 'flex', alignItems: 'center'}}>
-              <div style={{
-                width: '2rem',
-                height: '2rem',
-                backgroundColor: '#f3e8ff',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: '1rem'
-              }}>
-                <span style={{color: '#9333ea', fontSize: '1rem'}}>✅</span>
+          {/* Tasks Completed */}
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-4">
+                <span className="text-purple-600 text-xl">✅</span>
               </div>
               <div>
-                <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280'}}>Tasks Completed</div>
-                <div style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>145</div>
+                <div className="text-sm font-medium text-gray-600">Tasks Completed</div>
+                <div className="text-2xl font-semibold text-gray-900">{metrics.tasksCompleted}</div>
               </div>
             </div>
           </div>
 
-          <div style={{backgroundColor: 'white', padding: '1.25rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
-            <div style={{display: 'flex', alignItems: 'center'}}>
-              <div style={{
-                width: '2rem',
-                height: '2rem',
-                backgroundColor: '#fed7aa',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: '1rem'
-              }}>
-                <span style={{color: '#ea580c', fontSize: '1rem'}}>👥</span>
+          {/* Teams */}
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-4">
+                <span className="text-orange-600 text-xl">👥</span>
               </div>
               <div>
-                <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#6b7280'}}>Teams</div>
-                <div style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>{teamsCount}</div>
+                <div className="text-sm font-medium text-gray-600">Teams</div>
+                <div className="text-2xl font-semibold text-gray-900">{metrics.teamsCount}</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Content Grid */}
-        <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem'}}>
-          {/* Active Agents */}
-          <div style={{backgroundColor: 'white', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
-            <div style={{padding: '1.5rem 1.5rem 0 1.5rem', borderBottom: '1px solid #e5e7eb'}}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-                <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827'}}>Active Agents</h3>
-                <button 
-                  onClick={() => navigate('/agents/create')}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    color: 'white',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  + Create Agent
-                </button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          {/* Active Agents Section */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold text-gray-900">Active Agents</h3>
+                  <button 
+                    onClick={handleCreateAgent}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    + Create Agent
+                  </button>
+                </div>
               </div>
-            </div>
-            <div style={{padding: '1.5rem'}}>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                {agents.map((agent) => (
-                  <div key={agent.id} style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '0.5rem',
-                    padding: '1rem',
-                    transition: 'box-shadow 0.2s'
-                  }}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem'}}>
-                      <div style={{display: 'flex', alignItems: 'center'}}>
-                        <div style={{
-                          width: '2.5rem',
-                          height: '2.5rem',
-                          backgroundColor: '#f3f4f6',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginRight: '0.75rem'
-                        }}>
-                          <span style={{fontSize: '1rem'}}>🤖</span>
-                        </div>
-                        <div>
-                          <h4 style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', margin: 0}}>{agent.name}</h4>
-                          <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{agent.type}</p>
-                        </div>
-                      </div>
-                      <div style={{display: 'flex', alignItems: 'center'}}>
-                        <div style={{
-                          width: '0.5rem',
-                          height: '0.5rem',
-                          borderRadius: '50%',
-                          backgroundColor: agent.status === 'active' ? '#22c55e' : agent.status === 'idle' ? '#eab308' : '#ef4444',
-                          marginRight: '0.5rem'
-                        }}></div>
-                        <span style={{fontSize: '0.875rem', color: '#6b7280', textTransform: 'capitalize'}}>{agent.status}</span>
-                      </div>
-                    </div>
-                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', textAlign: 'center'}}>
-                      <div>
-                        <div style={{fontSize: '1.125rem', fontWeight: '600', color: '#16a34a'}}>{agent.tasks.completed}</div>
-                        <div style={{fontSize: '0.75rem', color: '#6b7280'}}>Completed</div>
-                      </div>
-                      <div>
-                        <div style={{fontSize: '1.125rem', fontWeight: '600', color: '#2563eb'}}>{agent.tasks.running}</div>
-                        <div style={{fontSize: '0.75rem', color: '#6b7280'}}>Running</div>
-                      </div>
-                      <div>
-                        <div style={{fontSize: '1.125rem', fontWeight: '600', color: '#6b7280'}}>{agent.tasks.pending}</div>
-                        <div style={{fontSize: '0.75rem', color: '#6b7280'}}>Pending</div>
-                      </div>
-                    </div>
+              
+              <div className="p-6">
+                {agents.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-4xl mb-2">🤖</div>
+                    <p>No agents found</p>
+                    <button
+                      onClick={handleCreateAgent}
+                      className="mt-2 text-blue-600 hover:text-blue-700 text-sm"
+                    >
+                      Create your first agent
+                    </button>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-4">
+                    {agents.map((agent) => (
+                      <div key={agent.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mr-3">
+                              <span className="text-xl">🤖</span>
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-gray-900">{agent.name}</h4>
+                              <p className="text-sm text-gray-600">{agent.type}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center">
+                            <div className={`w-2 h-2 rounded-full mr-2 ${getStatusColor(agent.status)}`}></div>
+                            <span className={`text-sm font-medium ${getStatusTextColor(agent.status)} capitalize`}>
+                              {agent.status}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Task Statistics */}
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <div className="text-lg font-semibold text-green-600">{agent.tasks.completed}</div>
+                            <div className="text-xs text-gray-600">Completed</div>
+                          </div>
+                          <div>
+                            <div className="text-lg font-semibold text-blue-600">{agent.tasks.running}</div>
+                            <div className="text-xs text-gray-600">Running</div>
+                          </div>
+                          <div>
+                            <div className="text-lg font-semibold text-gray-600">{agent.tasks.pending}</div>
+                            <div className="text-xs text-gray-600">Pending</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Recent Activity */}
-          <div style={{backgroundColor: 'white', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
-            <div style={{padding: '1.5rem 1.5rem 0 1.5rem', borderBottom: '1px solid #e5e7eb'}}>
-              <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem'}}>Recent Activity</h3>
-            </div>
-            <div style={{padding: '1.5rem'}}>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-                <div style={{display: 'flex', alignItems: 'flex-start'}}>
-                  <div style={{
-                    width: '0.5rem',
-                    height: '0.5rem',
-                    borderRadius: '50%',
-                    backgroundColor: '#22c55e',
-                    marginTop: '0.5rem',
-                    marginRight: '0.75rem'
-                  }}></div>
-                  <div>
-                    <p style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', margin: 0}}>IzzyAI CEO</p>
-                    <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Completed strategic planning task</p>
-                    <p style={{fontSize: '0.75rem', color: '#9ca3af', margin: '0.25rem 0 0 0'}}>2 minutes ago</p>
+          {/* Recent Activity Section */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+              </div>
+              
+              <div className="p-6">
+                <div className="space-y-4">
+                  {/* Sample activity items - in real app, these would come from API */}
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <p className="font-medium text-gray-900">IzzyAI CEO</p>
+                      <p className="text-sm text-gray-600">Completed strategic planning task</p>
+                      <p className="text-xs text-gray-500 mt-1">2 minutes ago</p>
+                    </div>
                   </div>
-                </div>
-                <div style={{display: 'flex', alignItems: 'flex-start'}}>
-                  <div style={{
-                    width: '0.5rem',
-                    height: '0.5rem',
-                    borderRadius: '50%',
-                    backgroundColor: '#3b82f6',
-                    marginTop: '0.5rem',
-                    marginRight: '0.75rem'
-                  }}></div>
-                  <div>
-                    <p style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', margin: 0}}>System</p>
-                    <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>New React Developer agent deployed</p>
-                    <p style={{fontSize: '0.75rem', color: '#9ca3af', margin: '0.25rem 0 0 0'}}>15 minutes ago</p>
+                  
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <p className="font-medium text-gray-900">System</p>
+                      <p className="text-sm text-gray-600">New React Developer agent deployed</p>
+                      <p className="text-xs text-gray-500 mt-1">15 minutes ago</p>
+                    </div>
                   </div>
-                </div>
-                <div style={{display: 'flex', alignItems: 'flex-start'}}>
-                  <div style={{
-                    width: '0.5rem',
-                    height: '0.5rem',
-                    borderRadius: '50%',
-                    backgroundColor: '#ef4444',
-                    marginTop: '0.5rem',
-                    marginRight: '0.75rem'
-                  }}></div>
-                  <div>
-                    <p style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', margin: 0}}>Backend Dev 2</p>
-                    <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Database migration task failed</p>
-                    <p style={{fontSize: '0.75rem', color: '#9ca3af', margin: '0.25rem 0 0 0'}}>1 hour ago</p>
+                  
+                  <div className="flex items-start">
+                    <div className="w-2 h-2 bg-red-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div>
+                      <p className="font-medium text-gray-900">Backend Dev 2</p>
+                      <p className="text-sm text-gray-600">Database migration task failed</p>
+                      <p className="text-xs text-gray-500 mt-1">1 hour ago</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -389,102 +517,53 @@ export function FixedDashboard() {
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div style={{marginTop: '2rem'}}>
-          <div style={{backgroundColor: 'white', borderRadius: '0.5rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
-            <div style={{padding: '1.5rem 1.5rem 0 1.5rem', borderBottom: '1px solid #e5e7eb'}}>
-              <h3 style={{fontSize: '1.125rem', fontWeight: '600', color: '#111827', marginBottom: '1.5rem'}}>Quick Actions</h3>
-            </div>
-            <div style={{padding: '1.5rem'}}>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem'}}>
-                <button 
-                  onClick={() => navigate('/agents/create')}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '2rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s'
-                  }}
-                >
-                  <span style={{fontSize: '2rem', marginBottom: '0.5rem'}}>➕</span>
-                  <span style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827'}}>Deploy New Agent</span>
-                </button>
-                <button 
-                  onClick={() => navigate('/teams/create')}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '2rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s'
-                  }}
-                >
-                  <span style={{fontSize: '2rem', marginBottom: '0.5rem'}}>👥</span>
-                  <span style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827'}}>Create Team</span>
-                </button>
-                <Link to="/organization-chart" style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '2rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.5rem',
-                  backgroundColor: 'transparent',
-                  textDecoration: 'none',
-                  transition: 'background-color 0.2s'
-                }}>
-                  <span style={{fontSize: '2rem', marginBottom: '0.5rem'}}>📊</span>
-                  <span style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827'}}>View Organization Chart</span>
-                </Link>
-                <button 
-                  onClick={() => navigate('/organization/profile')}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '2rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s'
-                  }}
-                >
-                  <span style={{fontSize: '2rem', marginBottom: '0.5rem'}}>🏢</span>
-                  <span style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827'}}>Organization Profile</span>
-                </button>
-                <button 
-                  onClick={() => navigate('/goals')}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '2rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.5rem',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s'
-                  }}
-                >
-                  <span style={{fontSize: '2rem', marginBottom: '0.5rem'}}>🎯</span>
-                  <span style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827'}}>Manage Goals</span>
-                </button>
-              </div>
+        {/* Quick Actions Section */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+          </div>
+          
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <button 
+                onClick={handleCreateAgent}
+                className="flex flex-col items-center justify-center p-6 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-3xl mb-2">➕</span>
+                <span className="font-medium text-gray-900">Deploy New Agent</span>
+              </button>
+              
+              <button 
+                onClick={handleCreateTeam}
+                className="flex flex-col items-center justify-center p-6 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-3xl mb-2">👥</span>
+                <span className="font-medium text-gray-900">Create Team</span>
+              </button>
+              
+              <button 
+                onClick={handleViewOrganization}
+                className="flex flex-col items-center justify-center p-6 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-3xl mb-2">🏢</span>
+                <span className="font-medium text-gray-900">Organization Profile</span>
+              </button>
+              
+              <button 
+                onClick={handleViewGoals}
+                className="flex flex-col items-center justify-center p-6 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-3xl mb-2">🎯</span>
+                <span className="font-medium text-gray-900">Manage Goals</span>
+              </button>
+              
+              <button 
+                onClick={() => navigate('/playground')}
+                className="flex flex-col items-center justify-center p-6 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-3xl mb-2">🔧</span>
+                <span className="font-medium text-gray-900">API Playground</span>
+              </button>
             </div>
           </div>
         </div>
