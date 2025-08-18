@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, HTTPException, Query, Path, Body, UploadFile, File, Form
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Path, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
@@ -7,6 +7,7 @@ import asyncio
 import os
 import logging
 from datetime import datetime, date
+import json
 from decimal import Decimal
 from contextlib import asynccontextmanager
 from .agent_manager import AgentManager
@@ -19,7 +20,7 @@ from .knowledge_manager import knowledge_manager, DocumentMetadata
 from .container_manager import container_manager, ContainerStatus, ContainerConfig
 from .rag_integration import rag_system, RAGContext
 from .websocket_manager import websocket_manager, WebSocketUpdate, UpdateType, notify_agent_status_change, notify_task_progress, notify_container_status_change, notify_knowledge_update
-from hierarchy_endpoints import router as hierarchy_router
+from .hierarchy_endpoints import router as hierarchy_router
 
 logger = logging.getLogger(__name__)
 
