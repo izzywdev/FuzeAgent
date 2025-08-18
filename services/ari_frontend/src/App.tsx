@@ -24,7 +24,7 @@ function App() {
       setIsLoading(true)
       setError(null)
       
-      const response = await fetch('http://localhost:8000/organizations')
+      const response = await fetch('http://localhost:8006/organizations')
       if (response.ok) {
         const data = await response.json()
         setOrganizations(data)
@@ -71,7 +71,7 @@ function App() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/organizations', {
+      const response = await fetch('http://localhost:8006/organizations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
