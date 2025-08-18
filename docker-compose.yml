@@ -115,6 +115,18 @@ services:
     networks:
       - ai-team-network
 
+  # Ari's Simple Frontend (Organizations)
+  ari_frontend:
+    build: ./services/ari_frontend
+    ports:
+      - "3032:3001"
+    environment:
+      VITE_API_URL: http://localhost:8006
+    depends_on:
+      - orchestrator
+    networks:
+      - ai-team-network
+
   # MCP Server for Claude Code Integration (SSE Mode)
   mcp-server:
     build: ./mcp-servers/fuzeagent-server
