@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine as dependencies
+FROM node:20-bullseye as dependencies
 
 WORKDIR /app
 
