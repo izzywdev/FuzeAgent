@@ -107,7 +107,7 @@ curl -X POST "http://localhost:8000/agents" \
       "default_branch": "main"
     },
     "sandbox_settings": {
-      "base_image": "fuzeagent/dev-frontend:latest",
+      "base_image": "fuzeagent/dev-ui:latest",
       "resource_limits": {
         "memory": "2Gi",
         "cpu": "1.0"
