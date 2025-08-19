@@ -112,6 +112,7 @@ services:
       VITE_API_URL: http://localhost:8006
     depends_on:
       - hierarchy-api
+      - orchestrator
     networks:
       - ai-team-network
 
