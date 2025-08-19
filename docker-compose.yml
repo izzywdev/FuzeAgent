@@ -107,7 +107,7 @@ services:
   ui:
     build: ./services/ui-react
     ports:
-      - "3031:3000"
+      - "3031:80"
     environment:
       VITE_API_URL: http://localhost:8006
     depends_on:
