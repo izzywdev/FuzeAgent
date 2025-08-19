@@ -103,27 +103,15 @@ services:
     networks:
       - ai-team-network
 
-  # Management UI (React)
-  frontend:
-    build: ./services/frontend
+  # UI (React)
+  ui:
+    build: ./services/ui-react
     ports:
-      - "3031:3000"  # Changed from 3030 to 3031 to avoid any potential conflicts
+      - "3031:3000"
     environment:
       VITE_API_URL: http://localhost:8006
     depends_on:
-      - orchestrator
-    networks:
-      - ai-team-network
-
-  # Ari's Simple Frontend (Organizations)
-  ari_frontend:
-    build: ./services/ari_frontend
-    ports:
-      - "3032:3001"
-    environment:
-      VITE_API_URL: http://localhost:8006
-    depends_on:
-      - orchestrator
+      - hierarchy-api
     networks:
       - ai-team-network
 
