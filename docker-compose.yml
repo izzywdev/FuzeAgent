@@ -108,11 +108,7 @@ services:
     build: ./services/ui-react
     ports:
       - "3031:80"
-    environment:
-      VITE_API_URL: http://localhost:8006
-    depends_on:
-      - hierarchy-api
-      - orchestrator
+    # UI now uses a built-in mock API and does not depend on backend services at runtime
     networks:
       - ai-team-network
 
