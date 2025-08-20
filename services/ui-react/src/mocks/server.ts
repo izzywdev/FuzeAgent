@@ -5,7 +5,7 @@ import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonRespon
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
-function match(url: string, method: HttpMethod) {
+function match(url: string, _method: HttpMethod) {
 	const u = new URL(url, window.location.origin)
 	const path = u.pathname
 	return { path, url: u }
