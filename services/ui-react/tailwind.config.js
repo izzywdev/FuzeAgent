@@ -1,6 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
+  safelist: [
+    // Dynamic classes used via helper functions
+    'bg-green-500','bg-yellow-500','bg-red-500','bg-gray-500',
+    'text-green-700','text-yellow-700','text-red-700','text-gray-700',
+    // Dashboard cards
+    'bg-green-50','bg-blue-50','bg-gray-50','text-blue-600','text-gray-600','text-green-600',
+  ],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
