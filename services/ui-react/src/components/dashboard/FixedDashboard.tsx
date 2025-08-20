@@ -129,7 +129,7 @@ export function FixedDashboard(): JSX.Element {
       setMetrics({
         totalAgents: agentsData.length,
         activeAgents: agentsData.filter(agent => agent.status === 'active').length,
-        tasksCompleted: agentsData.reduce((total, agent) => total + agent.tasks.completed, 0),
+        tasksCompleted: agentsData.reduce((total, agent) => total + (agent?.tasks?.completed ?? 0), 0),
         teamsCount: Array.isArray(teamsData) ? teamsData.length : 0
       })
       
@@ -444,15 +444,15 @@ export function FixedDashboard(): JSX.Element {
                         {/* Task Statistics */}
                         <div className="grid grid-cols-3 gap-4 text-center">
                           <div>
-                            <div className="text-lg font-semibold text-green-600">{agent.tasks.completed}</div>
+                            <div className="text-lg font-semibold text-green-600">{agent?.tasks?.completed ?? 0}</div>
                             <div className="text-xs text-gray-600">Completed</div>
                           </div>
                           <div>
-                            <div className="text-lg font-semibold text-blue-600">{agent.tasks.running}</div>
+                            <div className="text-lg font-semibold text-blue-600">{agent?.tasks?.running ?? 0}</div>
                             <div className="text-xs text-gray-600">Running</div>
                           </div>
                           <div>
-                            <div className="text-lg font-semibold text-gray-600">{agent.tasks.pending}</div>
+                            <div className="text-lg font-semibold text-gray-600">{agent?.tasks?.pending ?? 0}</div>
                             <div className="text-xs text-gray-600">Pending</div>
                           </div>
                         </div>

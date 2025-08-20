@@ -191,15 +191,15 @@ export function AgentCard({
       {/* Task Statistics */}
       <div className="grid grid-cols-3 gap-2 text-center mb-3">
         <div className="bg-green-50 rounded p-2">
-          <div className="text-sm font-semibold text-green-600">{agent.tasks.completed}</div>
+          <div className="text-sm font-semibold text-green-600">{agent?.tasks?.completed ?? 0}</div>
           <div className="text-xs text-green-600">Completed</div>
         </div>
         <div className="bg-blue-50 rounded p-2">
-          <div className="text-sm font-semibold text-blue-600">{agent.tasks.running}</div>
+          <div className="text-sm font-semibold text-blue-600">{agent?.tasks?.running ?? 0}</div>
           <div className="text-xs text-blue-600">Running</div>
         </div>
         <div className="bg-gray-50 rounded p-2">
-          <div className="text-sm font-semibold text-gray-600">{agent.tasks.pending}</div>
+          <div className="text-sm font-semibold text-gray-600">{agent?.tasks?.pending ?? 0}</div>
           <div className="text-xs text-gray-600">Pending</div>
         </div>
       </div>
