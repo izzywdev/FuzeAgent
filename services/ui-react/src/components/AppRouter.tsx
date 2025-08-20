@@ -30,6 +30,7 @@ import { TeamDetailsPage } from './pages/TeamDetailsPage'
 // Organization and goals pages
 import { OrganizationProfilePage } from './pages/OrganizationProfilePage'
 import { GoalsPage } from './pages/GoalsPage'
+import { FixedOrgChartPage } from './pages/FixedOrgChartPage'
 
 // Documentation and tools
 import DocsPage from '../pages/DocsPage'
@@ -70,6 +71,7 @@ export default function AppRouter() {
         <Route path="/goals" element={<GoalsPage />} />
         <Route path="/goals/:goalId" element={<GoalsPage />} />
         <Route path="/organization/profile" element={<OrganizationProfilePage />} />
+        <Route path="/organization-chart" element={<FixedOrgChartPage />} />
         
         {/* Analytics and Monitoring Routes */}
         <Route 

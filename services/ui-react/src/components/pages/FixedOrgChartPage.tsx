@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 
 const orgData = {
   organization: 'WCG - World Class Group',
@@ -70,7 +71,67 @@ const orgData = {
   ]
 }
 
+type Org = { id: string; name: string }
+type Team = { id: string; organization_id: string; name: string; description?: string }
+type Agent = { id: string; team_id?: string; name: string; type?: string }
+
 export function FixedOrgChartPage() {
+  const [org, setOrg] = useState<Org | null>(null)
+  const [teams, setTeams] = useState<Team[]>([])
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [orgsRes, teamsRes, agentsRes] = await Promise.all([
+          fetch('/organizations'),
+          fetch('/teams'),
+          fetch('/agents'),
+        ])
+        const orgs: Org[] = await orgsRes.json()
+        setOrg(orgs[0] || null)
+        setTeams(await teamsRes.json())
+        setAgents(await agentsRes.json())
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const orgChart = useMemo(() => {
+    if (!org) return orgData
+    const grouped: Record<string, Agent[]> = {}
+    for (const ag of agents) {
+      const key = ag.team_id || 'unassigned'
+      grouped[key] = grouped[key] || []
+      grouped[key].push(ag)
+    }
+    return {
+      organization: org.name,
+      ceo: 'Organization',
+      departments: [
+        {
+          name: 'Teams',
+          head: 'Team Leads',
+          color: '#2563eb',
+          teams: teams.map(t => ({
+            name: t.name,
+            lead: 'Lead',
+            members: (grouped[t.id] || []).map(a => a.name || 'Agent')
+          }))
+        }
+      ]
+    }
+  }, [org, teams, agents])
+
+  const view = org ? orgChart : orgData
+
+  if (loading) {
+    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading organization chart…</div>
+  }
+
   return (
     <div style={{minHeight: '100vh', backgroundColor: '#f9fafb'}}>
       {/* Navigation */}
@@ -121,7 +182,7 @@ export function FixedOrgChartPage() {
       <main style={{maxWidth: '80rem', margin: '0 auto', padding: '1.5rem 1rem'}}>
         {/* Header */}
         <div style={{textAlign: 'center', marginBottom: '2rem'}}>
-          <h2 style={{fontSize: '2rem', fontWeight: 'bold', color: '#111827'}}>{orgData.organization}</h2>
+          <h2 style={{fontSize: '2rem', fontWeight: 'bold', color: '#111827'}}>{view.organization}</h2>
           <p style={{marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280'}}>
             AI Team Organizational Structure
           </p>
@@ -149,14 +210,14 @@ export function FixedOrgChartPage() {
             }}>
               <span style={{fontSize: '2rem'}}>👑</span>
             </div>
-            <h3 style={{fontSize: '1.125rem', fontWeight: 'bold', color: '#111827', margin: 0}}>{orgData.ceo}</h3>
+            <h3 style={{fontSize: '1.125rem', fontWeight: 'bold', color: '#111827', margin: 0}}>{view.ceo}</h3>
             <p style={{fontSize: '0.875rem', color: '#6b7280', margin: '0.25rem 0 0 0'}}>Chief Executive Officer</p>
           </div>
         </div>
 
         {/* Departments */}
         <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem'}}>
-          {orgData.departments.map((dept, deptIndex) => (
+          {view.departments.map((dept, deptIndex) => (
             <div key={deptIndex} style={{
               backgroundColor: 'white',
               borderRadius: '1rem',
@@ -246,14 +307,14 @@ export function FixedOrgChartPage() {
             <div style={{textAlign: 'center'}}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>👥</div>
               <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827'}}>
-                {orgData.departments.reduce((acc, dept) => acc + dept.teams.length, 0)}
+                {view.departments.reduce((acc, dept) => acc + dept.teams.length, 0)}
               </div>
               <div style={{fontSize: '0.875rem', color: '#6b7280'}}>Teams</div>
             </div>
             <div style={{textAlign: 'center'}}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>🤖</div>
               <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827'}}>
-                {orgData.departments.reduce((acc, dept) => 
+                {view.departments.reduce((acc, dept) => 
                   acc + dept.teams.reduce((teamAcc, team) => teamAcc + team.members.length, 0), 0
                 )}
               </div>
