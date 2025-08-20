@@ -7,17 +7,14 @@ const getAPIEndpoints = () => {
   
   // Development vs Production configuration
   const isDevelopment = import.meta.env.NODE_ENV === 'development' || hostname === 'localhost'
+  const sameOriginWs = `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}${window.location.port ? `:${window.location.port}` : ''}`
   
   if (isDevelopment) {
+    // Use same-origin relative paths in dev; a mock layer intercepts these
     return {
-      // Core orchestrator API (for agent management, tasks, etc.)
-      ORCHESTRATOR_API_BASE: `${protocol}//${hostname}:8000`,
-      
-      // Hierarchy API (for organizations, teams, agents structure)
-      HIERARCHY_API_BASE: `${protocol}//${hostname}:8006`,
-      
-      // WebSocket endpoints
-      WEBSOCKET_BASE: `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}:8000`
+      ORCHESTRATOR_API_BASE: '',
+      HIERARCHY_API_BASE: '',
+      WEBSOCKET_BASE: sameOriginWs
     }
   } else {
     // Production endpoints (through nginx proxy)
