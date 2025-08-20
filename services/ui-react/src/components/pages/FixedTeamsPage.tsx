@@ -83,7 +83,7 @@ function FixedTeamsPageCore() {
         setError(null)
         
         console.log('Fetching teams from API...')
-        const response = await fetch('http://localhost:8006/teams')
+        const response = await fetch('/teams')
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)

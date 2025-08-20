@@ -186,7 +186,7 @@ export default function ApiPlayground() {
       await new Promise(resolve => setTimeout(resolve, 1000))
       
       // Make actual API request
-      const response = await fetch(`http://localhost:8006${currentEndpoint.path}`, {
+      const response = await fetch(`${currentEndpoint.path}`, {
         method: currentEndpoint.method,
         headers: {
           'Content-Type': 'application/json'

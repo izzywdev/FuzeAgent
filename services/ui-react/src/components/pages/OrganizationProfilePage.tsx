@@ -72,7 +72,7 @@ export function OrganizationProfilePage() {
   const loadFirstOrganization = async () => {
     try {
       // First, get all organizations to find the first one
-      const orgsResponse = await fetch('http://localhost:8006/organizations')
+      const orgsResponse = await fetch('/organizations')
       if (orgsResponse.ok) {
         const organizations = await orgsResponse.json()
         if (organizations && organizations.length > 0) {
@@ -93,7 +93,7 @@ export function OrganizationProfilePage() {
   const loadOrganizationData = async (orgId?: string) => {
     const targetId = orgId || orgInfo.id
     try {
-      const response = await fetch(`http://localhost:8006/organizations/${targetId}`)
+      const response = await fetch(`/organizations/${targetId}`)
       if (response.ok) {
         const data = await response.json()
         const loadedOrgInfo: OrganizationInfo = {
@@ -149,7 +149,7 @@ export function OrganizationProfilePage() {
     setSaveMessage(null)
     
     try {
-      const response = await fetch(`http://localhost:8006/organizations/${orgInfo.id}`, {
+      const response = await fetch(`/organizations/${orgInfo.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'

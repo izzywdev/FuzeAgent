@@ -57,8 +57,8 @@ const DEFAULT_ORG_NAME = 'WCG - World Class Group'
  * API endpoints for data fetching
  */
 const API_ENDPOINTS = {
-  agents: 'http://localhost:8000/agents',
-  teams: 'http://localhost:8000/teams'
+  agents: '/agents',
+  teams: '/teams'
 } as const
 
 // ============================================================================

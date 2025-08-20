@@ -95,7 +95,7 @@ export function TeamDetailsPage() {
     // Load team data from API
     const loadTeamData = async () => {
       try {
-        const response = await fetch(`http://localhost:8006/teams/${teamId}`)
+        const response = await fetch(`/teams/${teamId}`)
         if (response.ok) {
           const teamData = await response.json()
           setTeam(teamData)
@@ -120,7 +120,7 @@ export function TeamDetailsPage() {
     if (!teamId) return
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/teams/${teamId}/documents`)
+      const response = await fetch(`/knowledge/teams/${teamId}/documents`)
       if (response.ok) {
         const documents = await response.json()
         setKnowledgeDocs(documents)
@@ -144,7 +144,7 @@ export function TeamDetailsPage() {
         formData.append('file', file)
         formData.append('title', file.name)
         
-        const response = await fetch(`http://localhost:8000/knowledge/teams/${teamId}/documents`, {
+        const response = await fetch(`/knowledge/teams/${teamId}/documents`, {
           method: 'POST',
           body: formData
         })
@@ -176,7 +176,7 @@ export function TeamDetailsPage() {
     setUploading(true)
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/teams/${teamId}/url`, {
+      const response = await fetch(`/knowledge/teams/${teamId}/url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -204,7 +204,7 @@ export function TeamDetailsPage() {
     setSelectedDocument(doc)
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/teams/${teamId}/documents/${doc.id}/content`)
+      const response = await fetch(`/knowledge/teams/${teamId}/documents/${doc.id}/content`)
       if (response.ok) {
         const data = await response.json()
         setDocumentContent(data.content)
@@ -221,7 +221,7 @@ export function TeamDetailsPage() {
     if (!teamId || !confirm('Are you sure you want to delete this document?')) return
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/teams/${teamId}/documents/${docId}`, {
+      const response = await fetch(`/knowledge/teams/${teamId}/documents/${docId}`, {
         method: 'DELETE'
       })
       

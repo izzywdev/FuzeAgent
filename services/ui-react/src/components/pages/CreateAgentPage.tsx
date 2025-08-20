@@ -44,7 +44,7 @@ export function CreateAgentPage() {
 
   useEffect(() => {
     // Load teams
-    fetch('http://localhost:8000/teams')
+    fetch('/teams')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -72,7 +72,7 @@ export function CreateAgentPage() {
       })
 
     // Load agent templates
-    fetch('http://localhost:8000/agent-templates')
+    fetch('/agent-templates')
       .then(res => res.json())
       .then(data => {
         if (data && data.templates && Array.isArray(data.templates)) {
@@ -126,7 +126,7 @@ export function CreateAgentPage() {
     setCreating(true)
 
     try {
-      const response = await fetch('http://localhost:8000/agents', {
+      const response = await fetch('/agents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -41,7 +41,7 @@ export function DashboardPage() {
   const fetchDashboardData = async () => {
     try {
       // Fetch agents
-      const agentsResponse = await fetch('http://localhost:8000/agents')
+      const agentsResponse = await fetch('/agents')
       if (agentsResponse.ok) {
         const agentsData = await agentsResponse.json()
         setAgents(agentsData)
@@ -62,7 +62,7 @@ export function DashboardPage() {
 
   const fetchKnowledgeStats = async () => {
     try {
-      const response = await fetch('/api/knowledge/stats')
+      const response = await fetch('/knowledge/stats')
       if (response.ok) {
         const data = await response.json()
         setKnowledgeStats(data)

@@ -29,7 +29,7 @@ export function GoalsPage() {
 
   useEffect(() => {
     // Try to fetch goals from API
-    fetch('http://localhost:8000/organizations/1/goals')
+    fetch('/organizations/1/goals')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -529,7 +529,7 @@ export function GoalsPage() {
         {showCreateForm && <CreateGoalModal onClose={() => setShowCreateForm(false)} onSuccess={() => {
           setShowCreateForm(false)
           // Reload goals
-          fetch('http://localhost:8000/organizations/1/goals')
+          fetch('/organizations/1/goals')
             .then(res => res.json())
             .then(data => {
               if (Array.isArray(data)) {
@@ -567,7 +567,7 @@ function CreateGoalModal({ onClose, onSuccess }: CreateGoalModalProps) {
     setError('')
 
     try {
-      const response = await fetch('http://localhost:8000/organizations/1/goals', {
+      const response = await fetch('/organizations/1/goals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

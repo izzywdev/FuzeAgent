@@ -38,7 +38,7 @@ export function FixedAgentsPage() {
   }, [agents, searchTerm, typeFilter])
 
   useEffect(() => {
-    fetch('http://localhost:8000/agents')
+    fetch('/agents')
       .then(res => res.json())
       .then(data => {
         const agentData = Array.isArray(data) ? data : []
