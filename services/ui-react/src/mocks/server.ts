@@ -56,19 +56,18 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 export function enableMockApi() {
 	if ((window as any).__mockApiEnabled) return
 	const origFetch = window.fetch.bind(window)
+	const apiPrefixes = ['/agents', '/teams', '/organizations', '/agent-templates', '/knowledge', '/rag']
 	window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-		const url = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
-		// Intercept only app API calls
-		if (
-			url.startsWith('http://localhost:8000') ||
-			url.startsWith('http://localhost:8006') ||
-			url.startsWith('/api')
-		) {
-			// Map real endpoints to mock paths
-			const mapped = url
-				.replace('http://localhost:8000', '')
-				.replace('http://localhost:8006', '')
-				.replace(/^\/api/, '')
+		const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
+		const u = new URL(raw, window.location.origin)
+		const path = u.pathname
+		const shouldIntercept =
+			raw.startsWith('http://localhost:8000') ||
+			raw.startsWith('http://localhost:8006') ||
+			raw.startsWith('/api') ||
+			apiPrefixes.some(p => path.startsWith(p))
+		if (shouldIntercept) {
+			const mapped = path + (u.search || '')
 			return handleRequest(mapped, init)
 		}
 		return origFetch(input as any, init)
