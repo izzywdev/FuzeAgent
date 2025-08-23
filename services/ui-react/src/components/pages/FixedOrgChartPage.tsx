@@ -1,70 +1,20 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
-const orgData = {
-  organization: 'WCG - World Class Group',
-  ceo: 'IzzyAI CEO',
+// Default fallback structure when no API data is available
+const defaultOrgStructure = {
+  organization: 'No Organization',
+  ceo: 'No CEO',
   departments: [
     {
-      name: 'Executive Leadership',
-      head: 'IzzyAI CEO',
-      color: '#7c3aed',
+      name: 'No Departments',
+      head: 'No Head',
+      color: '#6b7280',
       teams: [
         {
-          name: 'C-Suite',
-          lead: 'IzzyAI CEO',
-          members: ['IzzyAI CEO', 'Alex CTO', 'Sarah CPO']
-        }
-      ]
-    },
-    {
-      name: 'Engineering',
-      head: 'Alex CTO',
-      color: '#2563eb',
-      teams: [
-        {
-          name: 'Frontend Development',
-          lead: 'React Developer',
-          members: ['React Developer', 'TypeScript Developer']
-        },
-        {
-          name: 'Backend Development', 
-          lead: 'Python Developer',
-          members: ['Python Developer']
-        },
-        {
-          name: 'DevOps',
-          lead: 'DevOps Engineer',
-          members: ['DevOps Engineer']
-        }
-      ]
-    },
-    {
-      name: 'Product & Quality',
-      head: 'Sarah CPO',
-      color: '#16a34a',
-      teams: [
-        {
-          name: 'Quality Assurance',
-          lead: 'QA Engineer',
-          members: ['QA Engineer']
-        }
-      ]
-    },
-    {
-      name: 'Business Operations',
-      head: 'IzzyAI CEO',
-      color: '#dc2626',
-      teams: [
-        {
-          name: 'Marketing',
-          lead: 'Marketing Agent',
-          members: ['Marketing Agent']
-        },
-        {
-          name: 'Sales',
-          lead: 'Sales Agent', 
-          members: ['Sales Agent']
+          name: 'No Teams',
+          lead: 'No Lead',
+          members: ['No members found']
         }
       ]
     }
@@ -72,7 +22,7 @@ const orgData = {
 }
 
 type Org = { id: string; name: string }
-type Team = { id: string; organization_id: string; name: string; description?: string }
+type Team = { id: string; organization_id: string; name: string; description?: string; team_type?: string }
 type Agent = { id: string; team_id?: string; name: string; type?: string }
 
 export function FixedOrgChartPage() {
@@ -101,32 +51,52 @@ export function FixedOrgChartPage() {
   }, [])
 
   const orgChart = useMemo(() => {
-    if (!org) return orgData
+    if (!org) return defaultOrgStructure
     const grouped: Record<string, Agent[]> = {}
     for (const ag of agents) {
       const key = ag.team_id || 'unassigned'
       grouped[key] = grouped[key] || []
       grouped[key].push(ag)
     }
+    
+    // Create departments based on team types
+    const departmentMap: Record<string, {name: string, color: string, teams: any[]}> = {
+      'development': { name: 'Engineering', color: '#2563eb', teams: [] },
+      'qa': { name: 'Quality Assurance', color: '#16a34a', teams: [] },
+      'devops': { name: 'DevOps', color: '#7c3aed', teams: [] },
+      'business': { name: 'Business Operations', color: '#dc2626', teams: [] },
+      'design': { name: 'Design', color: '#f59e0b', teams: [] },
+      'executive': { name: 'Executive Leadership', color: '#8b5cf6', teams: [] }
+    }
+    
+    // Group teams by type
+    for (const team of teams) {
+      const dept = departmentMap[team.team_type || 'development'] || departmentMap['development']
+      dept.teams.push({
+        name: team.name,
+        lead: 'Team Lead',
+        members: (grouped[team.id] || []).map(a => a.name || 'Agent')
+      })
+    }
+    
+    // Convert to array and filter out empty departments
+    const departments = Object.values(departmentMap)
+      .filter(dept => dept.teams.length > 0)
+      .map(dept => ({
+        name: dept.name,
+        head: 'Department Head',
+        color: dept.color,
+        teams: dept.teams
+      }))
+    
     return {
       organization: org.name,
-      ceo: 'Organization',
-      departments: [
-        {
-          name: 'Teams',
-          head: 'Team Leads',
-          color: '#2563eb',
-          teams: teams.map(t => ({
-            name: t.name,
-            lead: 'Lead',
-            members: (grouped[t.id] || []).map(a => a.name || 'Agent')
-          }))
-        }
-      ]
+      ceo: 'Organization Leader',
+      departments: departments.length > 0 ? departments : defaultOrgStructure.departments
     }
   }, [org, teams, agents])
 
-  const view = org ? orgChart : orgData
+  const view = orgChart
 
   if (loading) {
     return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading organization chart…</div>
@@ -273,7 +243,7 @@ export function FixedOrgChartPage() {
                     
                     {/* Team Members */}
                     <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem'}}>
-                      {team.members.map((member, memberIndex) => (
+                      {team.members.map((member: any, memberIndex: number) => (
                         <span key={memberIndex} style={{
                           fontSize: '0.75rem',
                           padding: '0.25rem 0.5rem',
@@ -282,7 +252,7 @@ export function FixedOrgChartPage() {
                           border: `1px solid ${dept.color}40`,
                           color: dept.color
                         }}>
-                          {member}
+                          {typeof member === 'string' ? member : member.name || 'Unknown'}
                         </span>
                       ))}
                     </div>
@@ -301,7 +271,7 @@ export function FixedOrgChartPage() {
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem'}}>
             <div style={{textAlign: 'center'}}>
               <div style={{fontSize: '2rem', marginBottom: '0.5rem'}}>🏢</div>
-              <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827'}}>{orgData.departments.length}</div>
+              <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827'}}>{view.departments.length}</div>
               <div style={{fontSize: '0.875rem', color: '#6b7280'}}>Departments</div>
             </div>
             <div style={{textAlign: 'center'}}>

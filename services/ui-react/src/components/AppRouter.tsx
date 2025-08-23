@@ -63,6 +63,7 @@ export default function AppRouter() {
         {/* Team Management Routes */}
         <Route path="/teams" element={<FixedTeamsPage />} />
         <Route path="/teams/create" element={<CreateTeamPage />} />
+        <Route path="/teams/:teamId" element={<TeamDetailsPage />} />
         <Route path="/teams/:teamId/details" element={<TeamDetailsPage />} />
         <Route path="/teams/:teamId/manage" element={<TeamDetailsPage />} />
         <Route path="/teams/:teamId/settings" element={<TeamDetailsPage />} />

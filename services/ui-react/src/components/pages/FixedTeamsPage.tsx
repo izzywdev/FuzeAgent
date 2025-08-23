@@ -2,11 +2,25 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../ErrorBoundary'
 
+interface TeamMember {
+  id: string
+  name: string
+  role: string
+  type: string
+  status: string
+  joinedDate: string
+  performance: {
+    tasksCompleted: number
+    tasksActive: number
+    efficiency: string
+  }
+}
+
 interface Team {
   id: string
   name: string
   description: string
-  members: string[]
+  members: TeamMember[]
   status: string
   color: string
   team_type?: string
@@ -430,7 +444,7 @@ function FixedTeamsPageCore() {
                         color: team.color || '#6b7280',
                         border: `1px solid ${(team.color || '#6b7280')}30`
                       }}>
-                        {member || 'Unknown Member'}
+                        {typeof member === 'string' ? member : member.name || 'Unknown Member'}
                       </span>
                     ))
                   ) : (

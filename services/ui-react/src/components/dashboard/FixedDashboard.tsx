@@ -49,9 +49,9 @@ interface DashboardMetrics {
 // ============================================================================
 
 /**
- * Default organization name
+ * Default organization name - will be loaded from API
  */
-const DEFAULT_ORG_NAME = 'WCG - World Class Group'
+const DEFAULT_ORG_NAME = 'Loading...'
 
 /**
  * API endpoints for data fetching
@@ -82,7 +82,7 @@ export function FixedDashboard(): JSX.Element {
     tasksCompleted: 0,
     teamsCount: 0
   })
-  const [orgName] = useState<string>(DEFAULT_ORG_NAME)
+  const [orgName, setOrgName] = useState<string>(DEFAULT_ORG_NAME)
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -107,10 +107,11 @@ export function FixedDashboard(): JSX.Element {
       setIsLoading(true)
       setError(null)
       
-      // Fetch agents and teams data in parallel
-      const [agentsResponse, teamsResponse] = await Promise.all([
+      // Fetch agents, teams, and organizations data in parallel
+      const [agentsResponse, teamsResponse, orgsResponse] = await Promise.all([
         fetch(API_ENDPOINTS.agents),
-        fetch(API_ENDPOINTS.teams)
+        fetch(API_ENDPOINTS.teams),
+        fetch('/organizations')
       ])
 
       if (!agentsResponse.ok) {
@@ -121,8 +122,13 @@ export function FixedDashboard(): JSX.Element {
         throw new Error(`Failed to fetch teams: ${teamsResponse.status}`)
       }
 
+      if (!orgsResponse.ok) {
+        throw new Error(`Failed to fetch organizations: ${orgsResponse.status}`)
+      }
+
       const agentsData: Agent[] = await agentsResponse.json()
       const teamsData = await teamsResponse.json()
+      const orgsData = await orgsResponse.json()
 
       // Update state with fetched data
       setAgents(agentsData)
@@ -132,6 +138,13 @@ export function FixedDashboard(): JSX.Element {
         tasksCompleted: agentsData.reduce((total, agent) => total + (agent?.tasks?.completed ?? 0), 0),
         teamsCount: Array.isArray(teamsData) ? teamsData.length : 0
       })
+      
+      // Set organization name from API data
+      if (Array.isArray(orgsData) && orgsData.length > 0) {
+        setOrgName(orgsData[0].name || DEFAULT_ORG_NAME)
+      } else {
+        setOrgName('No Organization Found')
+      }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
@@ -473,33 +486,34 @@ export function FixedDashboard(): JSX.Element {
               
               <div className="p-6">
                 <div className="space-y-4">
-                  {/* Sample activity items - in real app, these would come from API */}
-                  <div className="flex items-start">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <div>
-                      <p className="font-medium text-gray-900">IzzyAI CEO</p>
-                      <p className="text-sm text-gray-600">Completed strategic planning task</p>
-                      <p className="text-xs text-gray-500 mt-1">2 minutes ago</p>
+                  {/* Dynamic activity items based on agents */}
+                  {agents.slice(0, 3).map((agent) => (
+                    <div key={agent.id} className="flex items-start">
+                      <div className={`w-2 h-2 rounded-full mt-2 mr-3 flex-shrink-0 ${
+                        agent.status === 'active' ? 'bg-green-500' : 
+                        agent.status === 'idle' ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}></div>
+                      <div>
+                        <p className="font-medium text-gray-900">{agent.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {agent.status === 'active' ? 'Currently processing tasks' :
+                           agent.status === 'idle' ? 'Standing by for new tasks' :
+                           'Requires attention'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {agent.lastActivity ? 
+                            new Date(agent.lastActivity).toLocaleString() : 
+                            'Recently updated'
+                          }
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-start">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <div>
-                      <p className="font-medium text-gray-900">System</p>
-                      <p className="text-sm text-gray-600">New React Developer agent deployed</p>
-                      <p className="text-xs text-gray-500 mt-1">15 minutes ago</p>
+                  ))}
+                  {agents.length === 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      <p>No recent activity</p>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-start">
-                    <div className="w-2 h-2 bg-red-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                    <div>
-                      <p className="font-medium text-gray-900">Backend Dev 2</p>
-                      <p className="text-sm text-gray-600">Database migration task failed</p>
-                      <p className="text-xs text-gray-500 mt-1">1 hour ago</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

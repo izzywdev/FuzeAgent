@@ -1,26 +1,23 @@
-# Development Dockerfile with hot reloading
+# Development Dockerfile - runs source code with npm dev server
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies globally for faster subsequent builds
-RUN npm install -g nodemon
-
-# Copy package files
+# Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies with development optimizations
-RUN npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+# Install dependencies
+RUN npm install --legacy-peer-deps
 
-# Copy source code
+# Copy all source code
 COPY . .
 
-# Expose port
+# Expose port for Vite dev server
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+# Health check for development server
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
 
-# Start development server with hot reload
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Start Vite development server with source code (unminified, hot reload)
+CMD ["npm", "start"]

@@ -143,16 +143,19 @@ export function FixedAgentsPage() {
               <option value="specialized">Specialized</option>
             </select>
           </div>
-          <button style={{
-            backgroundColor: '#2563eb',
-            color: 'white',
-            padding: '0.5rem 1rem',
-            borderRadius: '0.375rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            border: 'none',
-            cursor: 'pointer'
-          }}>
+          <button 
+            onClick={() => navigate('/agents/create')}
+            style={{
+              backgroundColor: '#2563eb',
+              color: 'white',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
             + Create Agent
           </button>
         </div>

@@ -63,6 +63,7 @@ export function TeamDetailsPage() {
   const [showDocumentViewer, setShowDocumentViewer] = useState(false)
   const [documentContent, setDocumentContent] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
 
   // Display error if there is one
   if (error) {
@@ -91,6 +92,16 @@ export function TeamDetailsPage() {
 
   useEffect(() => {
     if (!teamId) return
+
+    // Check if this is a newly created team
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('created') === 'true') {
+      setShowSuccessMessage(true)
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => setShowSuccessMessage(false), 5000)
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
 
     // Load team data from API
     const loadTeamData = async () => {
@@ -269,6 +280,43 @@ export function TeamDetailsPage() {
 
   return (
     <div style={{minHeight: '100vh', backgroundColor: '#f9fafb'}}>
+      {/* Success Message */}
+      {showSuccessMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '1rem',
+          right: '1rem',
+          zIndex: 1000,
+          backgroundColor: '#dcfce7',
+          border: '1px solid #16a34a',
+          borderRadius: '0.5rem',
+          padding: '1rem 1.5rem',
+          color: '#15803d',
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          <span>✅</span>
+          <span>Team created successfully!</span>
+          <button 
+            onClick={() => setShowSuccessMessage(false)}
+            style={{
+              marginLeft: '0.5rem',
+              background: 'none',
+              border: 'none',
+              color: '#15803d',
+              cursor: 'pointer',
+              fontSize: '1rem'
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav style={{backgroundColor: 'white', borderBottom: '1px solid #e5e7eb', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}}>
         <div style={{maxWidth: '80rem', margin: '0 auto', padding: '0 1rem'}}>

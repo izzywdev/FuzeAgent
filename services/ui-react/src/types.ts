@@ -59,7 +59,7 @@ export interface Agent {
   role: string
   type: string
   template_id?: string
-  status: 'active' | 'inactive' | 'busy' | 'error'
+  status: 'active' | 'inactive' | 'busy' | 'error' | 'idle'
   config: {
     goal?: string
     backstory?: string
@@ -74,6 +74,18 @@ export interface Agent {
   team_name?: string
   organization_id?: string
   organization_name?: string
+  tasks?: {
+    completed: number
+    running: number
+    pending: number
+  }
+  lastActivity?: string
+  performance?: {
+    tasksCompleted: number
+    tasksActive: number
+    efficiency: string
+  }
+  joinedDate?: string
 }
 
 export interface Task {

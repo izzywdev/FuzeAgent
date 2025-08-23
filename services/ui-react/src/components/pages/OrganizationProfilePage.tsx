@@ -55,6 +55,11 @@ export function OrganizationProfilePage() {
   const [ragResults, setRagResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{type: 'success' | 'error', text: string} | null>(null)
+  const [stats, setStats] = useState({
+    totalAgents: 0,
+    activeTeams: 0,
+    tasksCompleted: 0
+  })
 
   // Load organization data and knowledge documents on component mount
   useEffect(() => {
@@ -79,6 +84,7 @@ export function OrganizationProfilePage() {
           const firstOrg = organizations[0]
           await loadOrganizationData(firstOrg.id)
           await loadKnowledgeDocuments(firstOrg.id)
+          await loadStats()
         } else {
           console.error('No organizations found')
         }
@@ -127,6 +133,30 @@ export function OrganizationProfilePage() {
       }
     } catch (error) {
       console.error('Error loading documents:', error)
+    }
+  }
+
+  const loadStats = async () => {
+    try {
+      // Load agents and teams to calculate stats
+      const [agentsResponse, teamsResponse] = await Promise.all([
+        fetch('/agents'),
+        fetch('/teams')
+      ])
+
+      if (agentsResponse.ok && teamsResponse.ok) {
+        const agents = await agentsResponse.json()
+        const teams = await teamsResponse.json()
+
+        setStats({
+          totalAgents: Array.isArray(agents) ? agents.length : 0,
+          activeTeams: Array.isArray(teams) ? teams.filter(t => t.status === 'active').length : 0,
+          tasksCompleted: Array.isArray(agents) ? 
+            agents.reduce((total, agent) => total + (agent?.tasks?.completed || 0), 0) : 0
+        })
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error)
     }
   }
 
@@ -612,15 +642,15 @@ export function OrganizationProfilePage() {
               <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem'}}>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
                   <span style={{color: '#6b7280'}}>Total Agents:</span>
-                  <span style={{fontWeight: '500'}}>10</span>
+                  <span style={{fontWeight: '500'}}>{stats.totalAgents}</span>
                 </div>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
                   <span style={{color: '#6b7280'}}>Active Teams:</span>
-                  <span style={{fontWeight: '500'}}>5</span>
+                  <span style={{fontWeight: '500'}}>{stats.activeTeams}</span>
                 </div>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
                   <span style={{color: '#6b7280'}}>Tasks Completed:</span>
-                  <span style={{fontWeight: '500'}}>145</span>
+                  <span style={{fontWeight: '500'}}>{stats.tasksCompleted}</span>
                 </div>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
                   <span style={{color: '#6b7280'}}>Knowledge Docs:</span>
@@ -634,16 +664,16 @@ export function OrganizationProfilePage() {
               <h4 style={{fontSize: '1rem', fontWeight: '600', marginBottom: '1rem'}}>Recent Activity</h4>
               <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
                 <div style={{fontSize: '0.875rem'}}>
-                  <div style={{fontWeight: '500', color: '#111827'}}>Profile Updated</div>
-                  <div style={{color: '#6b7280', fontSize: '0.75rem'}}>2 hours ago</div>
+                  <div style={{fontWeight: '500', color: '#111827'}}>Organization Profile</div>
+                  <div style={{color: '#6b7280', fontSize: '0.75rem'}}>Loaded from API</div>
                 </div>
                 <div style={{fontSize: '0.875rem'}}>
-                  <div style={{fontWeight: '500', color: '#111827'}}>New agent deployed</div>
-                  <div style={{color: '#6b7280', fontSize: '0.75rem'}}>1 day ago</div>
+                  <div style={{fontWeight: '500', color: '#111827'}}>Teams: {stats.activeTeams} active</div>
+                  <div style={{color: '#6b7280', fontSize: '0.75rem'}}>Updated from API</div>
                 </div>
                 <div style={{fontSize: '0.875rem'}}>
-                  <div style={{fontWeight: '500', color: '#111827'}}>Knowledge base updated</div>
-                  <div style={{color: '#6b7280', fontSize: '0.75rem'}}>3 days ago</div>
+                  <div style={{fontWeight: '500', color: '#111827'}}>Knowledge: {knowledgeDocs.length} docs</div>
+                  <div style={{color: '#6b7280', fontSize: '0.75rem'}}>Synced from API</div>
                 </div>
               </div>
             </div>

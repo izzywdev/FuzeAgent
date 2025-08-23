@@ -30,6 +30,40 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		return jsonResponse({ ...organizations.find(o => o.id === id), ...body })
 	}
 	if (method === 'GET' && path === '/teams') return jsonResponse(teams)
+	if (method === 'POST' && path === '/teams') {
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const newTeam = {
+			id: crypto.randomUUID(),
+			organization_id: body.organization_id,
+			name: body.name,
+			description: body.description,
+			team_type: body.team_type,
+			color: body.settings?.color || '#2563eb',
+			status: 'active',
+			created: new Date().toISOString(),
+			settings: body.settings || {},
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+			members: [],
+			stats: {
+				totalTasks: 0,
+				completedTasks: 0,
+				activeTasks: 0,
+				avgResponseTime: '0s'
+			},
+			knowledgeBase: []
+		}
+		teams.push(newTeam)
+		return jsonResponse(newTeam, { status: 201 })
+	}
+	if (method === 'GET' && path.startsWith('/teams/')) {
+		const id = path.split('/')[2]
+		const team = teams.find(t => t.id === id)
+		if (team) {
+			return jsonResponse(team)
+		}
+		return jsonResponse({ message: 'Team not found' }, { status: 404 })
+	}
 
 	// Orchestrator-like endpoints
 	if (method === 'GET' && path === '/agents') return jsonResponse(agents)

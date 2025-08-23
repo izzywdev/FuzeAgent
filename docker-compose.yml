@@ -105,9 +105,25 @@ services:
 
   # UI (React)
   ui:
-    build: ./services/ui-react
+    image: fuzeagent-ui:latest
     ports:
-      - "3031:80"
+      - "3031:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for live development and hot reload
+      - ./services/ui-react/src:/app/src
+      - ./services/ui-react/public:/app/public
+      - ./services/ui-react/index.html:/app/index.html
+      - ./services/ui-react/vite.config.ts:/app/vite.config.ts
+      - ./services/ui-react/package.json:/app/package.json
+      - ./services/ui-react/tailwind.config.js:/app/tailwind.config.js
+      - ./services/ui-react/postcss.config.js:/app/postcss.config.js
+      - ./services/ui-react/tsconfig.json:/app/tsconfig.json
+      - ./services/ui-react/tsconfig.app.json:/app/tsconfig.app.json
+      - ./services/ui-react/eslint.config.js:/app/eslint.config.js
+    working_dir: /app
+    command: ["npm", "start"]
     # UI now uses a built-in mock API and does not depend on backend services at runtime
     networks:
       - ai-team-network

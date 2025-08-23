@@ -25,10 +25,48 @@ export const teams = [
 		organization_id: organizations[0].id,
 		name: 'Engineering',
 		description: 'Core engineering team',
-		team_type: 'technical',
+		team_type: 'development',
+		color: '#2563eb',
+		status: 'active',
+		created: new Date().toISOString(),
 		settings: {},
 		created_at: new Date().toISOString(),
 		updated_at: new Date().toISOString(),
+		members: [
+			{
+				id: 'a1111111-2222-3333-4444-555555555555',
+				name: 'React Developer 1',
+				role: 'Frontend Developer',
+				type: 'developer',
+				status: 'active',
+				joinedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(),
+				performance: {
+					tasksCompleted: 12,
+					tasksActive: 1,
+					efficiency: '92%'
+				}
+			},
+			{
+				id: 'b1111111-2222-3333-4444-555555555555',
+				name: 'Backend Dev 1',
+				role: 'Backend Developer',
+				type: 'developer',
+				status: 'idle',
+				joinedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+				performance: {
+					tasksCompleted: 8,
+					tasksActive: 0,
+					efficiency: '88%'
+				}
+			}
+		],
+		stats: {
+			totalTasks: 15,
+			completedTasks: 20,
+			activeTasks: 1,
+			avgResponseTime: '2.3s'
+		},
+		knowledgeBase: []
 	},
 ]
 
@@ -46,6 +84,12 @@ export const agents = [
 		updated_at: new Date().toISOString(),
 		tasks: { completed: 12, running: 1, pending: 2 },
 		lastActivity: new Date().toISOString(),
+		performance: {
+			tasksCompleted: 12,
+			tasksActive: 1,
+			efficiency: '92%'
+		},
+		joinedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(),
 	},
 	{
 		id: 'b1111111-2222-3333-4444-555555555555',
@@ -60,6 +104,12 @@ export const agents = [
 		updated_at: new Date().toISOString(),
 		tasks: { completed: 8, running: 0, pending: 1 },
 		lastActivity: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+		performance: {
+			tasksCompleted: 8,
+			tasksActive: 0,
+			efficiency: '88%'
+		},
+		joinedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
 	},
 ]
 
