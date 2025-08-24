@@ -1,5 +1,5 @@
 # Development Dockerfile - runs source code with npm dev server
-FROM node:20-alpine
+FROM node:20
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps --no-audit --fund=false
 
 # Copy all source code
 COPY . .

@@ -1,7 +1,7 @@
 // Very small mock fetch layer that intercepts calls the app makes and returns realistic data
 // Disable by not importing this module in main.tsx
 
-import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse } from './data'
+import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB } from './data'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
@@ -15,6 +15,9 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 	const href = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
 	const method = ((init?.method || (typeof input !== 'string' && !(input instanceof URL) ? (input as Request).method : 'GET')) as HttpMethod) || 'GET'
 	const { path } = match(href, method)
+
+	// Ensure latest data loaded
+	loadMockDB()
 
 	// Hierarchy API
 	if (method === 'GET' && path === '/organizations') return jsonResponse(organizations)
@@ -54,6 +57,7 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 			knowledgeBase: []
 		}
 		teams.push(newTeam)
+		saveMockDB()
 		return jsonResponse(newTeam, { status: 201 })
 	}
 	if (method === 'GET' && path.startsWith('/teams/')) {
@@ -69,19 +73,66 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 	if (method === 'GET' && path === '/agents') return jsonResponse(agents)
 	if (method === 'POST' && path === '/agents') {
 		const body = init?.body ? JSON.parse(init.body as string) : {}
-		return jsonResponse({ agent_id: 'new-agent-id', ...body }, { status: 201 })
+		const id = crypto.randomUUID()
+		const now = new Date().toISOString()
+		const cfg = body.config || {
+			model: 'claude-sonnet-4-20250514',
+			temperature: 0.7,
+			tools: [],
+			goal: '',
+			backstory: ''
+		}
+		const newAgent = {
+			id,
+			team_id: body.team_id || (teams[0]?.id || ''),
+			name: body.name || 'New Agent',
+			role: body.role || 'Agent',
+			type: body.type || 'developer',
+			status: 'active',
+			config: cfg,
+			template_id: body.template_id || undefined,
+			created_at: now,
+			updated_at: now,
+			tasks: { completed: 0, running: 0, pending: 0 },
+			lastActivity: now,
+			performance: {
+				tasksCompleted: 0,
+				tasksActive: 0,
+				efficiency: '0%'
+			},
+			joinedDate: now
+		}
+		agents.push(newAgent)
+		saveMockDB()
+		return jsonResponse({ agent_id: id, status: 'created', agent: newAgent }, { status: 201 })
 	}
 	if (method === 'GET' && path.startsWith('/agents/') && path.endsWith('/tasks')) return jsonResponse([])
 	if (method === 'GET' && path.startsWith('/agents/')) {
 		const id = path.split('/')[2]
 		return jsonResponse(agents.find(a => a.id === id) || agents[0])
 	}
+	if (method === 'PUT' && path.startsWith('/agents/')) {
+		const id = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const idx = agents.findIndex(a => a.id === id)
+		if (idx === -1) return jsonResponse({ message: 'Agent not found' }, { status: 404 })
+		const existing = agents[idx]
+		const updated = {
+			...existing,
+			...body,
+			config: { ...existing.config, ...(body.config || {}) },
+			updated_at: new Date().toISOString(),
+		}
+		agents[idx] = updated as any
+		saveMockDB()
+		return jsonResponse(updated)
+	}
 	if (method === 'GET' && path === '/agent-templates') return jsonResponse(agentTemplates)
 
 	// Knowledge endpoints
 	if (method === 'GET' && path.includes('/knowledge/')) return jsonResponse(knowledgeDocs)
-	if (method === 'POST' && path.includes('/knowledge/')) return jsonResponse({ ok: true }, { status: 201 })
-	if (method === 'DELETE' && path.includes('/knowledge/')) return jsonResponse({ ok: true })
+	if (method === 'POST' && path.includes('/knowledge/')) { const res = jsonResponse({ ok: true }, { status: 201 }); saveMockDB(); return res }
+	if (method === 'DELETE' && path.includes('/knowledge/')) { const res = jsonResponse({ ok: true }); saveMockDB(); return res }
 
 	// Default fallthrough
 	return jsonResponse({ message: 'Mock endpoint not implemented', path, method }, { status: 404 })

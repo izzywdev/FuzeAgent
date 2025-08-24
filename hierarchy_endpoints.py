@@ -216,6 +216,14 @@ async def get_teams(organization_id: Optional[str] = None):
         
         return teams
 
+Agents: List[Agent] = []
+
+@app.get("/agents", response_model=List[Agent])
+async def get_agents():
+    async with db_pool.acquire() as conn:
+        
+        
+        return agents
 @app.post("/teams", response_model=Team)
 async def create_team(team_data: TeamCreate):
     async with db_pool.acquire() as conn:

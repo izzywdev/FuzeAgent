@@ -1,6 +1,6 @@
 // Mock data that approximates the real API schema used by the UI
 
-export const organizations = [
+export let organizations = [
 	{
 		id: '9953005b-1395-4577-b01d-323c2e547681',
 		name: 'Acme Corp',
@@ -19,7 +19,7 @@ export const organizations = [
 	},
 ]
 
-export const teams = [
+export let teams = [
 	{
 		id: '4d0b5f8a-08b0-4d2a-9c6e-18f0f0d0a111',
 		organization_id: organizations[0].id,
@@ -70,7 +70,7 @@ export const teams = [
 	},
 ]
 
-export const agents = [
+export let agents = [
 	{
 		id: 'a1111111-2222-3333-4444-555555555555',
 		team_id: teams[0].id,
@@ -78,7 +78,13 @@ export const agents = [
 		role: 'Frontend Developer',
 		type: 'developer',
 		status: 'active',
-		config: {},
+		config: {
+			model: 'claude-sonnet-4-20250514',
+			temperature: 0.7,
+			tools: ['code_generation', 'code_review'],
+			goal: 'Build high-quality React apps',
+			backstory: 'Experienced frontend engineer'
+		},
 		template_id: 'react-dev',
 		created_at: new Date().toISOString(),
 		updated_at: new Date().toISOString(),
@@ -98,7 +104,13 @@ export const agents = [
 		role: 'Backend Developer',
 		type: 'developer',
 		status: 'idle',
-		config: {},
+		config: {
+			model: 'claude-sonnet-4-20250514',
+			temperature: 0.7,
+			tools: ['api_development'],
+			goal: 'Build robust APIs',
+			backstory: 'Backend specialist'
+		},
 		template_id: 'backend-dev',
 		created_at: new Date().toISOString(),
 		updated_at: new Date().toISOString(),
@@ -113,7 +125,7 @@ export const agents = [
 	},
 ]
 
-export const agentTemplates = [
+export let agentTemplates = [
 	{
 		id: 'react-dev',
 		name: 'React Developer',
@@ -128,7 +140,7 @@ export const agentTemplates = [
 	},
 ]
 
-export const knowledgeDocs = [
+export let knowledgeDocs = [
 	{
 		id: 'doc-1',
 		title: 'Engineering Handbook',
@@ -144,4 +156,56 @@ export function jsonResponse(body: unknown, init: ResponseInit = { status: 200 }
 	})
 }
 
+// LocalStorage-backed persistence for mock data
+const STORAGE_KEY = 'fuzeagent_mock_db_v1'
 
+type MockDB = {
+	organizations: typeof organizations
+	teams: typeof teams
+	agents: typeof agents
+	agentTemplates: typeof agentTemplates
+	knowledgeDocs: typeof knowledgeDocs
+}
+
+function canUseLocalStorage(): boolean {
+	try {
+		return typeof localStorage !== 'undefined'
+	} catch {
+		return false
+	}
+}
+
+export function saveMockDB() {
+	if (!canUseLocalStorage()) return
+	const state: MockDB = {
+		organizations,
+		teams,
+		agents,
+		agentTemplates,
+		knowledgeDocs,
+	}
+	localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+}
+
+export function loadMockDB() {
+	if (!canUseLocalStorage()) return
+	const raw = localStorage.getItem(STORAGE_KEY)
+	if (!raw) {
+		saveMockDB()
+		return
+	}
+	try {
+		const parsed = JSON.parse(raw) as Partial<MockDB>
+		if (parsed.organizations && Array.isArray(parsed.organizations)) organizations = parsed.organizations as any
+		if (parsed.teams && Array.isArray(parsed.teams)) teams = parsed.teams as any
+		if (parsed.agents && Array.isArray(parsed.agents)) agents = parsed.agents as any
+		if (parsed.agentTemplates && Array.isArray(parsed.agentTemplates)) agentTemplates = parsed.agentTemplates as any
+		if (parsed.knowledgeDocs && Array.isArray(parsed.knowledgeDocs)) knowledgeDocs = parsed.knowledgeDocs as any
+	} catch {
+		// On parse error, re-save defaults
+		saveMockDB()
+	}
+}
+
+// Hydrate immediately on module load
+loadMockDB()

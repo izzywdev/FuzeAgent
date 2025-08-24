@@ -92,7 +92,22 @@ export function CreateAgentPage() {
           }))
           setTemplates(transformedTemplates)
         } else if (Array.isArray(data)) {
-          setTemplates(data)
+          // Some backends (including our mock API) return a flat array of templates
+          // Normalize it to the shape expected by the UI
+          const normalizedTemplates = data.map((template: any) => ({
+            id: template.id || template.template_id,
+            name: template.name,
+            description: template.description || '',
+            type: template.type || template.category || 'developer',
+            defaultConfig: {
+              model: template.default_model || template.model || 'claude-sonnet-4-20250514',
+              temperature: template.default_temperature ?? 0.7,
+              tools: Array.isArray(template.tools) ? template.tools : [],
+              goal: template.default_goal || '',
+              backstory: template.default_backstory || ''
+            }
+          }))
+          setTemplates(normalizedTemplates)
         } else {
           // No templates available
           setTemplates([])
@@ -359,7 +374,7 @@ export function CreateAgentPage() {
                       {template.description}
                     </div>
                     <div style={{fontSize: '0.75rem', color: '#9ca3af'}}>
-                      Model: {template.defaultConfig.model}
+                      Model: {template.defaultConfig?.model || 'claude-sonnet-4-20250514'}
                     </div>
                   </div>
                 ))}

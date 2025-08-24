@@ -4,17 +4,25 @@ version: '3.9'
 services:
   # Use development UI build with hot reload
   ui:
-    build:
-      context: ./services/ui-react
-      dockerfile: Dockerfile.dev
+    image: node:20
     volumes:
       - ./services/ui-react/src:/app/src:ro
       - ./services/ui-react/public:/app/public:ro
+      - ./services/ui-react/index.html:/app/index.html:ro
+      - ./services/ui-react/vite.config.ts:/app/vite.config.ts:ro
+      - ./services/ui-react/package.json:/app/package.json:ro
+      - ./services/ui-react/tailwind.config.js:/app/tailwind.config.js:ro
+      - ./services/ui-react/postcss.config.js:/app/postcss.config.js:ro
+      - ./services/ui-react/tsconfig.json:/app/tsconfig.json:ro
+      - ./services/ui-react/tsconfig.app.json:/app/tsconfig.app.json:ro
+      - ./services/ui-react/eslint.config.js:/app/eslint.config.js:ro
       - /app/node_modules  # Anonymous volume to preserve node_modules
+    working_dir: /app
     environment:
       - VITE_API_URL=http://localhost:8006
       - VITE_HMR_PORT=3000
       - CHOKIDAR_USEPOLLING=true  # For WSL/Windows file watching
+    command: sh -c "npm install --legacy-peer-deps --no-audit --fund=false && npm start"
     
   # Orchestrator with source code mounted for development
   orchestrator:

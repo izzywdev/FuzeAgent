@@ -117,6 +117,7 @@ export function AgentDetailsPage() {
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [chatWebSocket, setChatWebSocket] = useState<WebSocket | null>(null)
   const [isAgentTyping, setIsAgentTyping] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!agentId) return
@@ -950,7 +951,7 @@ export function AgentDetailsPage() {
               <div style={{display: 'flex', gap: '1rem', fontSize: '0.875rem', color: '#6b7280'}}>
                 <span>Type: <strong>{agent.type}</strong></span>
                 <span>Team: <strong>{agent.team_name || 'Unassigned'}</strong></span>
-                <span>Model: <strong>{agent.config.model}</strong></span>
+                <span>Model: <strong>{agent.config?.model || 'claude-sonnet-4-20250514'}</strong></span>
               </div>
             </div>
           </div>
@@ -1059,11 +1060,11 @@ export function AgentDetailsPage() {
                   </div>
                   <div style={{display: 'flex', justifyContent: 'space-between'}}>
                     <span style={{color: '#6b7280'}}>Temperature:</span>
-                    <span>{agent.config.temperature}</span>
+                    <span>{agent.config?.temperature ?? 0.7}</span>
                   </div>
                   <div style={{display: 'flex', justifyContent: 'space-between'}}>
                     <span style={{color: '#6b7280'}}>Tools:</span>
-                    <span>{agent.config.tools.length}</span>
+                    <span>{agent.config?.tools?.length ?? 0}</span>
                   </div>
                 </div>
               </div>
@@ -1198,6 +1199,7 @@ export function AgentDetailsPage() {
                   <input
                     type="text"
                     value={agent.name}
+                    readOnly
                     style={{
                       width: '100%',
                       padding: '0.75rem',
@@ -1215,6 +1217,7 @@ export function AgentDetailsPage() {
                   <input
                     type="text"
                     value={agent.role}
+                    readOnly
                     style={{
                       width: '100%',
                       padding: '0.75rem',
@@ -1231,6 +1234,7 @@ export function AgentDetailsPage() {
                   </label>
                   <textarea
                     value={agent.config.goal || ''}
+                    readOnly
                     rows={3}
                     style={{
                       width: '100%',
@@ -1249,6 +1253,7 @@ export function AgentDetailsPage() {
                   </label>
                   <textarea
                     value={agent.config.backstory || ''}
+                    readOnly
                     rows={3}
                     style={{
                       width: '100%',
@@ -1273,7 +1278,7 @@ export function AgentDetailsPage() {
                       borderRadius: '0.375rem',
                       fontSize: '0.875rem'
                     }}>
-                      <option value={agent.config.model}>{agent.config.model}</option>
+                      <option value={agent.config?.model || 'claude-sonnet-4-20250514'}>{agent.config?.model || 'claude-sonnet-4-20250514'}</option>
                       <option value="claude-3-opus-20240229">claude-3-opus-20240229</option>
                       <option value="gpt-4">gpt-4</option>
                     </select>
@@ -1285,7 +1290,8 @@ export function AgentDetailsPage() {
                     </label>
                     <input
                       type="number"
-                      value={agent.config.temperature}
+                      value={agent.config?.temperature ?? 0.7}
+                      readOnly
                       min="0"
                       max="2"
                       step="0.1"
@@ -1304,33 +1310,80 @@ export function AgentDetailsPage() {
                   <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Available Tools
                   </label>
-                  <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem'}}>
-                    {agent.config.tools.map(tool => (
-                      <span key={tool} style={{
-                        padding: '0.25rem 0.5rem',
-                        backgroundColor: '#dbeafe',
-                        color: '#1d4ed8',
-                        borderRadius: '0.25rem',
-                        fontSize: '0.75rem'
-                      }}>
-                        {tool}
-                      </span>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '0.5rem',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '0.375rem',
+                    padding: '1rem'
+                  }}>
+                    {[
+                      'code_generation','code_review','debugging','testing','api_development',
+                      'database_design','infrastructure_management','deployment','monitoring',
+                      'security','performance_testing','test_automation','bug_reporting',
+                      'quality_analysis','strategic_planning','team_management','resource_allocation'
+                    ].map(tool => (
+                      <label key={tool} style={{display: 'flex', alignItems: 'center', fontSize: '0.875rem'}}>
+                        <input
+                          type="checkbox"
+                          checked={(agent.config?.tools || []).includes(tool)}
+                          onChange={(e) => {
+                            const current = agent.config?.tools || []
+                            const updated = e.target.checked
+                              ? [...current, tool]
+                              : current.filter(t => t !== tool)
+                            setAgent(prev => prev ? ({ ...prev, config: { ...prev.config, tools: updated } }) : prev)
+                          }}
+                          style={{marginRight: '0.5rem'}}
+                        />
+                        {tool.replace(/_/g, ' ')}
+                      </label>
                     ))}
                   </div>
                 </div>
 
                 <div style={{display: 'flex', gap: '0.5rem', paddingTop: '1rem'}}>
-                  <button style={{
+                  <button disabled={saving} onClick={async () => {
+                    if (!agent) return
+                    setSaving(true)
+                    try {
+                      const res = await fetch(`/agents/${agent.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: agent.name,
+                          role: agent.role,
+                          type: agent.type,
+                          team_id: agent.team_id,
+                          config: agent.config,
+                        })
+                      })
+                      if (res.ok) {
+                        const updated = await res.json()
+                        setAgent(updated)
+                        alert('Agent settings saved')
+                      } else {
+                        alert('Failed to save settings')
+                      }
+                    } catch {
+                      alert('Network error saving settings')
+                    } finally {
+                      setSaving(false)
+                    }
+                  }} style={{
                     padding: '0.75rem 1.5rem',
-                    backgroundColor: '#2563eb',
+                    backgroundColor: saving ? '#9ca3af' : '#2563eb',
                     color: 'white',
                     border: 'none',
                     borderRadius: '0.375rem',
                     fontSize: '0.875rem',
                     fontWeight: '500',
-                    cursor: 'pointer'
+                    cursor: saving ? 'not-allowed' : 'pointer'
                   }}>
-                    Save Changes
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                   <button style={{
                     padding: '0.75rem 1.5rem',
@@ -1452,7 +1505,7 @@ export function AgentDetailsPage() {
                 gap: '1rem'
               }}
             >
-              {chatMessages.length === 0 ? (
+              {(chatMessages?.length || 0) === 0 ? (
                 <div style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -1682,7 +1735,7 @@ export function AgentDetailsPage() {
                       <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
                         {doc.size && `${formatFileSize(doc.size)} • `}
                         Added {new Date(doc.upload_date).toLocaleDateString()}
-                        {doc.tags.length > 0 && (
+                        {(doc.tags && doc.tags.length > 0) && (
                           <span style={{marginLeft: '0.5rem'}}>
                             {doc.tags.map(tag => (
                               <span key={tag} style={{
@@ -2109,7 +2162,7 @@ export function AgentDetailsPage() {
                 position: 'relative'
               }}
             >
-              {containerLogs.length > 0 ? (
+              {(containerLogs?.length || 0) > 0 ? (
                 containerLogs.map((log, index) => (
                   <div key={index} style={{marginBottom: '0.25rem', whiteSpace: 'pre-wrap'}}>
                     {log}
@@ -2122,7 +2175,7 @@ export function AgentDetailsPage() {
               )}
               
               {/* Log count indicator */}
-              {containerLogs.length > 0 && (
+              {(containerLogs?.length || 0) > 0 && (
                 <div style={{
                   position: 'sticky',
                   bottom: 0,
@@ -2138,7 +2191,7 @@ export function AgentDetailsPage() {
                     borderRadius: '0.25rem',
                     fontSize: '0.75rem'
                   }}>
-                    {containerLogs.length} lines
+                    {(containerLogs?.length || 0)} lines
                   </div>
                 </div>
               )}
@@ -2238,15 +2291,15 @@ export function AgentDetailsPage() {
                   document.body.removeChild(a)
                   URL.revokeObjectURL(url)
                 }}
-                disabled={containerLogs.length === 0}
+                disabled={(containerLogs?.length || 0) === 0}
                 style={{
                   padding: '0.5rem 1rem',
                   border: '1px solid #d1d5db',
-                  backgroundColor: containerLogs.length === 0 ? '#f9fafb' : 'white',
+                  backgroundColor: (containerLogs?.length || 0) === 0 ? '#f9fafb' : 'white',
                   borderRadius: '0.375rem',
                   fontSize: '0.875rem',
-                  cursor: containerLogs.length === 0 ? 'not-allowed' : 'pointer',
-                  color: containerLogs.length === 0 ? '#9ca3af' : 'inherit'
+                  cursor: (containerLogs?.length || 0) === 0 ? 'not-allowed' : 'pointer',
+                  color: (containerLogs?.length || 0) === 0 ? '#9ca3af' : 'inherit'
                 }}
               >
                 Download Logs
