@@ -60,6 +60,54 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		saveMockDB()
 		return jsonResponse(newTeam, { status: 201 })
 	}
+	// Team members: attach an existing agent to a team (enforce one team per agent)
+	if (method === 'POST' && path.startsWith('/teams/') && path.endsWith('/members')) {
+		const teamId = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const teamIdx = teams.findIndex(t => t.id === teamId)
+		if (teamIdx === -1) return jsonResponse({ message: 'Team not found' }, { status: 404 })
+		const agentId = body.agent_id as string | undefined
+		if (!agentId) return jsonResponse({ message: 'agent_id is required' }, { status: 400 })
+		const agentIdx = agents.findIndex(a => a.id === agentId)
+		if (agentIdx === -1) return jsonResponse({ message: 'Agent not found' }, { status: 404 })
+		const now = new Date().toISOString()
+		const agent = agents[agentIdx] as any
+		// If agent already in this team and member exists, return existing
+		const alreadyInTeam = agent.team_id === teamId
+		const existingMemberIdx = teams[teamIdx].members.findIndex(m => m.id === agentId)
+		if (alreadyInTeam && existingMemberIdx !== -1) {
+			return jsonResponse({ member: teams[teamIdx].members[existingMemberIdx], agent_id: agentId, team_id: teamId })
+		}
+		// Remove from previous team's members if present
+		if (agent.team_id) {
+			const prevIdx = teams.findIndex(t => t.id === agent.team_id)
+			if (prevIdx !== -1) {
+				const memberIdx = teams[prevIdx].members.findIndex(m => m.id === agentId)
+				if (memberIdx !== -1) teams[prevIdx].members.splice(memberIdx, 1)
+			}
+		}
+		// Update agent's team assignment
+		agent.team_id = teamId
+		agent.updated_at = now
+		agents[agentIdx] = agent
+		// Create or update member record for target team
+		const member = {
+			id: agent.id,
+			name: agent.name,
+			role: agent.role,
+			type: agent.type,
+			status: agent.status || 'active',
+			joinedDate: agent.joinedDate || now,
+			performance: agent.performance || { tasksCompleted: 0, tasksActive: 0, efficiency: '0%' }
+		}
+		if (existingMemberIdx === -1) {
+			teams[teamIdx].members.push(member as any)
+		} else {
+			teams[teamIdx].members[existingMemberIdx] = member as any
+		}
+		saveMockDB()
+		return jsonResponse({ member, agent_id: agentId, team_id: teamId }, { status: 201 })
+	}
 	if (method === 'GET' && path.startsWith('/teams/')) {
 		const id = path.split('/')[2]
 		const team = teams.find(t => t.id === id)

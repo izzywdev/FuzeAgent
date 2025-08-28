@@ -64,6 +64,11 @@ export function TeamDetailsPage() {
   const [documentContent, setDocumentContent] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [addingMember, setAddingMember] = useState(false)
+  const [addMemberError, setAddMemberError] = useState<string | null>(null)
+  const [agentsList, setAgentsList] = useState<any[]>([])
+  const [selectedAgentId, setSelectedAgentId] = useState('')
 
   // Display error if there is one
   if (error) {
@@ -125,6 +130,21 @@ export function TeamDetailsPage() {
 
     loadTeamData()
   }, [teamId])
+
+  // Load agents list for add-member modal
+  useEffect(() => {
+    if (!showAddMember) return
+    const loadAgents = async () => {
+      try {
+        const res = await fetch('/agents')
+        if (res.ok) {
+          const data = await res.json()
+          setAgentsList(Array.isArray(data) ? data : [])
+        }
+      } catch {}
+    }
+    loadAgents()
+  }, [showAddMember])
 
   // Load knowledge documents for the team
   const loadKnowledgeDocuments = async () => {
@@ -207,6 +227,36 @@ export function TeamDetailsPage() {
     
     setUploading(false)
     setShowUpload(false)
+  }
+
+  const handleAddMember = async () => {
+    if (!teamId) return
+    if (!selectedAgentId) {
+      setAddMemberError('Please select an agent')
+      return
+    }
+    setAddingMember(true)
+    setAddMemberError(null)
+    try {
+      const response = await fetch(`/teams/${teamId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: selectedAgentId })
+      })
+      if (response.ok) {
+        const data = await response.json()
+        const added = data.member as TeamMember
+        setTeam(prev => prev ? { ...prev, members: [...prev.members.filter(m => m.id !== added.id), added] } : prev)
+        setShowAddMember(false)
+        setSelectedAgentId('')
+      } else {
+        setAddMemberError('Failed to add member')
+      }
+    } catch (e) {
+      setAddMemberError('Error adding member')
+    } finally {
+      setAddingMember(false)
+    }
   }
 
   const handleDocumentClick = async (doc: KnowledgeDocument) => {
@@ -357,7 +407,7 @@ export function TeamDetailsPage() {
               }}>
                 Edit Team
               </button>
-              <button style={{
+              <button onClick={() => setShowAddMember(true)} style={{
                 padding: '0.5rem 1rem',
                 backgroundColor: '#2563eb',
                 color: 'white',
@@ -563,7 +613,7 @@ export function TeamDetailsPage() {
           <div>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
               <h3 style={{fontSize: '1.25rem', fontWeight: '600'}}>Team Members ({team.members.length})</h3>
-              <button style={{
+              <button onClick={() => setShowAddMember(true)} style={{
                 padding: '0.5rem 1rem',
                 backgroundColor: '#2563eb',
                 color: 'white',
@@ -930,6 +980,88 @@ export function TeamDetailsPage() {
               {selectedDocument.tags.length > 0 && (
                 <p><strong>Tags:</strong> {selectedDocument.tags.join(', ')}</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {showAddMember && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            width: '32rem',
+            maxWidth: '95vw',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+              <h3 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>Add Team Member</h3>
+              <button onClick={() => setShowAddMember(false)} style={{
+                padding: '0.25rem 0.5rem',
+                border: 'none',
+                borderRadius: '0.375rem',
+                backgroundColor: '#f3f4f6',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}>✕</button>
+            </div>
+            {addMemberError && (
+              <div style={{
+                marginBottom: '0.75rem',
+                padding: '0.5rem 0.75rem',
+                backgroundColor: '#fee2e2',
+                border: '1px solid #ef4444',
+                color: '#b91c1c',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem'
+              }}>{addMemberError}</div>
+            )}
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+              <div>
+                <label style={{display: 'block', fontSize: '0.875rem', color: '#374151', marginBottom: '0.25rem'}}>Select Agent</label>
+                <select value={selectedAgentId} onChange={(e) => setSelectedAgentId(e.target.value)}
+                  style={{width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}}>
+                  <option value="">-- Choose an available agent --</option>
+                  {agentsList.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} {a.team_id ? `(currently in team)` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p style={{fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem'}}>Agent can belong to only one team; selecting will reassign if needed.</p>
+              </div>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem'}}>
+              <button onClick={() => setShowAddMember(false)} style={{
+                padding: '0.5rem 1rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}>Cancel</button>
+              <button onClick={handleAddMember} disabled={addingMember} style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: addingMember ? '#93c5fd' : '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                cursor: addingMember ? 'not-allowed' : 'pointer'
+              }}>{addingMember ? 'Adding...' : 'Add Member'}</button>
             </div>
           </div>
         </div>
