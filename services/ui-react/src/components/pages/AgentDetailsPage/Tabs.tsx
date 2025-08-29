@@ -14,7 +14,7 @@ export function Tabs({ activeTab, setActiveTab }: TabsProps): JSX.Element {
             { id: 'overview', label: 'Overview' },
             { id: 'settings', label: 'Settings' },
             { id: 'tasks', label: 'Tasks' },
-            { id: 'conversations', label: 'Conversations' },
+            { id: 'conversations', label: 'Conversation' },
             { id: 'knowledge', label: 'Knowledge' },
             { id: 'container', label: 'Container' }
           ].map(tab => (

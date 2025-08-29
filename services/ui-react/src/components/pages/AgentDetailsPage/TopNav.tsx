@@ -1,10 +1,9 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import type { Agent } from './types'
+// Avoid runtime imports of type-only modules in dev
+type AgentLite = { name: string; status: string }
 
-interface TopNavProps {
-  agent: Agent
-}
+interface TopNavProps { agent: AgentLite }
 
 export function TopNav({ agent }: TopNavProps): JSX.Element {
   return (

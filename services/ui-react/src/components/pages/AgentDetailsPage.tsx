@@ -981,16 +981,12 @@ export function AgentDetailsPage(): React.ReactElement {
             conversations={conversationsList}
             selectedConversation={selectedConversation}
             loading={loadingConversations}
-            creating={creatingConversation}
-            updatingStatusId={updatingStatusId}
             chatWebSocket={chatWebSocket}
             chatMessages={chatMessages}
             isAgentTyping={isAgentTyping}
             newMessage={newMessage}
             isSendingMessage={isSendingMessage}
-            onNewConversation={handleNewConversation}
-            onSelectConversation={handleSelectConversation}
-            onConversationStatus={handleConversationStatus}
+            
             onNewMessageChange={setNewMessage}
             onSendMessage={sendMessage}
           />

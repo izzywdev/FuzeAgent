@@ -256,7 +256,10 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		const agentId = path.split('/')[2]
 		const body = init?.body ? JSON.parse(init.body as string) : {}
 		const now = new Date().toISOString()
-		const convo = { id: crypto.randomUUID(), agent_id: agentId, title: body.title || 'New Conversation', created_at: now, updated_at: now, status: 'running' as const }
+		// Reuse existing conversation if present to enforce single-conversation mode
+		const existing = conversations.find(c => c.agent_id === agentId)
+		if (existing) return jsonResponse(existing)
+		const convo = { id: crypto.randomUUID(), agent_id: agentId, title: body.title || 'Conversation', created_at: now, updated_at: now, status: 'running' as const }
 		conversations.push(convo)
 		saveMockDB()
 		return jsonResponse(convo, { status: 201 })
