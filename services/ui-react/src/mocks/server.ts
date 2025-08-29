@@ -1,7 +1,8 @@
 // Very small mock fetch layer that intercepts calls the app makes and returns realistic data
 // Disable by not importing this module in main.tsx
 
-import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB } from './data'
+import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB, tasks, conversations, messages } from './data'
+import type { ChatMessage } from './data'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
@@ -108,13 +109,56 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		saveMockDB()
 		return jsonResponse({ member, agent_id: agentId, team_id: teamId }, { status: 201 })
 	}
-	if (method === 'GET' && path.startsWith('/teams/')) {
+	if (method === 'GET' && path.startsWith('/teams/') && !path.endsWith('/tasks')) {
 		const id = path.split('/')[2]
 		const team = teams.find(t => t.id === id)
 		if (team) {
 			return jsonResponse(team)
 		}
 		return jsonResponse({ message: 'Team not found' }, { status: 404 })
+	}
+
+	// Team tasks
+	if (method === 'GET' && path.startsWith('/teams/') && path.endsWith('/tasks')) {
+		const teamId = path.split('/')[2]
+		return jsonResponse(tasks.filter(t => t.team_id === teamId))
+	}
+	if (method === 'POST' && path.startsWith('/teams/') && path.endsWith('/tasks')) {
+		const teamId = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const now = new Date().toISOString()
+		const newTask = {
+			id: crypto.randomUUID(),
+			title: body.title || 'New Task',
+			description: body.description || '',
+			status: (body.status || 'pending') as any,
+			priority: (body.priority || 'medium') as any,
+			created_at: now,
+			team_id: teamId,
+			agent_id: body.agent_id || undefined,
+		}
+		tasks.push(newTask as any)
+		saveMockDB()
+		return jsonResponse(newTask, { status: 201 })
+	}
+
+	// Assign existing task to agent
+	if (method === 'PUT' && path.startsWith('/tasks/') && path.endsWith('/assign')) {
+		const taskId = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const agentId = body.agent_id as string | undefined
+		const idx = tasks.findIndex(t => t.id === taskId)
+		if (idx === -1) return jsonResponse({ message: 'Task not found' }, { status: 404 })
+		if (!agentId) return jsonResponse({ message: 'agent_id is required' }, { status: 400 })
+		const agent = agents.find(a => a.id === agentId)
+		if (!agent) return jsonResponse({ message: 'Agent not found' }, { status: 404 })
+		// Optional: ensure team matches
+		if (tasks[idx].team_id && agent.team_id && tasks[idx].team_id !== agent.team_id) {
+			return jsonResponse({ message: 'Task belongs to another team' }, { status: 400 })
+		}
+		tasks[idx] = { ...tasks[idx], agent_id: agentId }
+		saveMockDB()
+		return jsonResponse(tasks[idx])
 	}
 
 	// Orchestrator-like endpoints
@@ -154,7 +198,28 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		saveMockDB()
 		return jsonResponse({ agent_id: id, status: 'created', agent: newAgent }, { status: 201 })
 	}
-	if (method === 'GET' && path.startsWith('/agents/') && path.endsWith('/tasks')) return jsonResponse([])
+	if (method === 'GET' && path.startsWith('/agents/') && path.endsWith('/tasks')) {
+		const id = path.split('/')[2]
+		return jsonResponse(tasks.filter(t => t.agent_id === id))
+	}
+	if (method === 'POST' && path.startsWith('/agents/') && path.endsWith('/tasks')) {
+		const id = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const now = new Date().toISOString()
+		const newTask = {
+			id: crypto.randomUUID(),
+			title: body.title || 'New Task',
+			description: body.description || '',
+			status: (body.status || 'pending') as any,
+			priority: (body.priority || 'medium') as any,
+			created_at: now,
+			agent_id: id,
+			team_id: body.team_id || agents.find(a => a.id === id)?.team_id,
+		}
+		tasks.push(newTask as any)
+		saveMockDB()
+		return jsonResponse(newTask, { status: 201 })
+	}
 	if (method === 'GET' && path.startsWith('/agents/')) {
 		const id = path.split('/')[2]
 		return jsonResponse(agents.find(a => a.id === id) || agents[0])
@@ -182,6 +247,57 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 	if (method === 'POST' && path.includes('/knowledge/')) { const res = jsonResponse({ ok: true }, { status: 201 }); saveMockDB(); return res }
 	if (method === 'DELETE' && path.includes('/knowledge/')) { const res = jsonResponse({ ok: true }); saveMockDB(); return res }
 
+	// Conversations endpoints
+	if (method === 'GET' && path.startsWith('/agents/') && path.endsWith('/conversations')) {
+		const agentId = path.split('/')[2]
+		return jsonResponse(conversations.filter(c => c.agent_id === agentId))
+	}
+	if (method === 'POST' && path.startsWith('/agents/') && path.endsWith('/conversations')) {
+		const agentId = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const now = new Date().toISOString()
+		const convo = { id: crypto.randomUUID(), agent_id: agentId, title: body.title || 'New Conversation', created_at: now, updated_at: now, status: 'running' as const }
+		conversations.push(convo)
+		saveMockDB()
+		return jsonResponse(convo, { status: 201 })
+	}
+	if (method === 'GET' && path.includes('/conversations/') && path.endsWith('/messages')) {
+		const parts = path.split('/')
+		const conversationId = parts[4]
+		return jsonResponse(messages.filter(m => m.conversation_id === conversationId))
+	}
+	if (method === 'POST' && path.includes('/conversations/') && path.endsWith('/messages')) {
+		const parts = path.split('/')
+		const agentId = parts[2]
+		const conversationId = parts[4]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const now = new Date().toISOString()
+		const userMsg: ChatMessage = { id: crypto.randomUUID(), conversation_id: conversationId, role: 'user', content: body.content || body.message || '', timestamp: now, status: 'sent' }
+		messages.push(userMsg)
+		// Update convo timestamp
+		const cIdx = conversations.findIndex(c => c.id === conversationId)
+		if (cIdx !== -1) conversations[cIdx].updated_at = now
+		saveMockDB()
+		// Broadcast to WS clients
+		broadcastConversation(conversationId, { type: 'new_message', message: userMsg })
+		// Simulate agent reply
+		simulateAgentReply(agentId, conversationId)
+		return jsonResponse(userMsg, { status: 201 })
+	}
+
+	// Conversation status update
+	if (method === 'PUT' && path.startsWith('/conversations/') && path.endsWith('/status')) {
+		const conversationId = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const status = body.status as 'running' | 'paused' | 'stopped' | undefined
+		const idx = conversations.findIndex(c => c.id === conversationId)
+		if (idx === -1) return jsonResponse({ message: 'Conversation not found' }, { status: 404 })
+		if (!status || !['running','paused','stopped'].includes(status)) return jsonResponse({ message: 'Invalid status' }, { status: 400 })
+		conversations[idx] = { ...conversations[idx], status, updated_at: new Date().toISOString() }
+		saveMockDB()
+		return jsonResponse(conversations[idx])
+	}
+
 	// Default fallthrough
 	return jsonResponse({ message: 'Mock endpoint not implemented', path, method }, { status: 404 })
 }
@@ -189,7 +305,7 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 export function enableMockApi() {
 	if ((window as any).__mockApiEnabled) return
 	const origFetch = window.fetch.bind(window)
-	const apiPrefixes = ['/agents', '/teams', '/organizations', '/agent-templates', '/knowledge', '/rag']
+	const apiPrefixes = ['/agents', '/teams', '/organizations', '/agent-templates', '/knowledge', '/rag', '/tasks']
 	window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
 		const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
 		const u = new URL(raw, window.location.origin)
@@ -209,4 +325,115 @@ export function enableMockApi() {
 	console.info('[MockAPI] Enabled')
 }
 
+// --- Mock WebSocket for conversations ---
+type WSHandler = ((event: { data: string }) => void) | null
+class MockWebSocket {
+	url: string
+	readyState: number
+	onopen: (() => void) | null = null
+	onmessage: WSHandler = null
+	onerror: ((err: unknown) => void) | null = null
+	onclose: (() => void) | null = null
+	private conversationId: string
+	constructor(url: string) {
+		this.url = url
+		this.readyState = 0
+		// Parse conversation id: /ws/agents/{agentId}/conversations/{conversationId}
+		try {
+			const u = new URL(url, window.location.origin)
+			const parts = u.pathname.split('/')
+			this.conversationId = parts[5]
+		} catch {
+			this.conversationId = ''
+		}
+		setTimeout(() => {
+			this.readyState = 1
+			registerWsClient(this.conversationId, this)
+			this.onopen && this.onopen()
+			// optional: send initial pong to confirm
+		}, 10)
+	}
+	send(data: string) {
+		try {
+			const parsed = JSON.parse(data)
+			if (parsed.type === 'ping') {
+				this.onmessage && this.onmessage({ data: JSON.stringify({ type: 'pong' }) })
+				return
+			}
+			if (parsed.type === 'message') {
+				// Treat as user message via WS
+				const now = new Date().toISOString()
+				const msg: ChatMessage = { id: crypto.randomUUID(), conversation_id: this.conversationId, role: 'user', content: parsed.content || '', timestamp: now, status: 'sent', metadata: parsed.metadata }
+				messages.push(msg)
+				saveMockDB()
+				broadcastConversation(this.conversationId, { type: 'new_message', message: msg })
+				// Simulate reply
+				// Find agentId from conversation
+				const convo = conversations.find(c => c.id === this.conversationId)
+				const agentId = convo?.agent_id || ''
+				simulateAgentReply(agentId, this.conversationId)
+			}
+		} catch (e) {
+			this.onerror && this.onerror(e)
+		}
+	}
+	close() {
+		this.readyState = 3
+		unregisterWsClient(this.conversationId, this)
+		this.onclose && this.onclose()
+	}
+}
 
+const wsClientsByConversation: Record<string, Set<MockWebSocket>> = {}
+function registerWsClient(conversationId: string, ws: MockWebSocket) {
+	if (!conversationId) return
+	if (!wsClientsByConversation[conversationId]) wsClientsByConversation[conversationId] = new Set()
+	wsClientsByConversation[conversationId].add(ws)
+}
+function unregisterWsClient(conversationId: string, ws: MockWebSocket) {
+	wsClientsByConversation[conversationId]?.delete(ws)
+}
+function broadcastConversation(conversationId: string, payload: unknown) {
+	const json = JSON.stringify(payload)
+	wsClientsByConversation[conversationId]?.forEach(client => {
+		client.onmessage && client.onmessage({ data: json })
+	})
+}
+function randomReply(): string {
+	const len = Math.floor(Math.random() * 40) + 10
+	const letters = 'abcdefghijklmnopqrstuvwxyz'
+	let s = ''
+	for (let i = 0; i < len; i++) s += letters[Math.floor(Math.random() * letters.length)]
+	return s
+}
+function simulateAgentReply(_agentId: string, conversationId: string) {
+	const delay = Math.floor(Math.random() * 7000)
+	// typing on only if running
+	if (isConversationRunning(conversationId)) {
+		broadcastConversation(conversationId, { type: 'typing', typing: true })
+	}
+	setTimeout(() => {
+		if (!isConversationRunning(conversationId)) {
+			broadcastConversation(conversationId, { type: 'typing', typing: false })
+			return
+		}
+		const now = new Date().toISOString()
+		const assistant: ChatMessage = { id: crypto.randomUUID(), conversation_id: conversationId, role: 'assistant', content: randomReply(), timestamp: now, status: 'sent' }
+		messages.push(assistant)
+		saveMockDB()
+		broadcastConversation(conversationId, { type: 'new_message', message: assistant })
+		broadcastConversation(conversationId, { type: 'typing', typing: false })
+	}, delay)
+}
+
+function isConversationRunning(conversationId: string): boolean {
+	const c = conversations.find(c => c.id === conversationId)
+	return (c as any)?.status === 'running'
+}
+
+export function enableMockWs() {
+	if ((window as any).__mockWsEnabled) return
+	;(window as any).WebSocket = MockWebSocket as any
+	;(window as any).__mockWsEnabled = true
+	console.info('[MockWS] Enabled')
+}

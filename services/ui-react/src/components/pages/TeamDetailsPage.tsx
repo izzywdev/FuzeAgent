@@ -69,6 +69,14 @@ export function TeamDetailsPage() {
   const [addMemberError, setAddMemberError] = useState<string | null>(null)
   const [agentsList, setAgentsList] = useState<any[]>([])
   const [selectedAgentId, setSelectedAgentId] = useState('')
+  const [showCreateTask, setShowCreateTask] = useState(false)
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDescription, setTaskDescription] = useState('')
+  const [taskPriority, setTaskPriority] = useState('medium')
+  const [taskAssigneeId, setTaskAssigneeId] = useState('')
+  const [creatingTask, setCreatingTask] = useState(false)
+  const [createTaskError, setCreateTaskError] = useState<string | null>(null)
+  const [teamTasks, setTeamTasks] = useState<any[]>([])
 
   // Display error if there is one
   if (error) {
@@ -145,6 +153,59 @@ export function TeamDetailsPage() {
     }
     loadAgents()
   }, [showAddMember])
+
+  // Load team tasks when tasks tab active or on open
+  useEffect(() => {
+    if (!teamId) return
+    if (activeTab !== 'tasks') return
+    const loadTasks = async () => {
+      try {
+        const res = await fetch(`/teams/${teamId}/tasks`)
+        if (res.ok) {
+          const data = await res.json()
+          setTeamTasks(Array.isArray(data) ? data : [])
+        }
+      } catch {}
+    }
+    loadTasks()
+  }, [teamId, activeTab])
+
+  const handleCreateTask = async () => {
+    if (!teamId) return
+    if (!taskTitle.trim()) {
+      setCreateTaskError('Please enter a task title')
+      return
+    }
+    setCreatingTask(true)
+    setCreateTaskError(null)
+    try {
+      const res = await fetch(`/teams/${teamId}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: taskTitle.trim(),
+          description: taskDescription.trim(),
+          priority: taskPriority,
+          agent_id: taskAssigneeId || undefined,
+        })
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setTeamTasks(prev => [created, ...prev])
+        setShowCreateTask(false)
+        setTaskTitle('')
+        setTaskDescription('')
+        setTaskPriority('medium')
+        setTaskAssigneeId('')
+      } else {
+        setCreateTaskError('Failed to create task')
+      }
+    } catch {
+      setCreateTaskError('Error creating task')
+    } finally {
+      setCreatingTask(false)
+    }
+  }
 
   // Load knowledge documents for the team
   const loadKnowledgeDocuments = async () => {
@@ -712,23 +773,52 @@ export function TeamDetailsPage() {
         )}
 
         {activeTab === 'tasks' && (
-          <div style={{textAlign: 'center', padding: '3rem'}}>
-            <div style={{fontSize: '3rem', marginBottom: '1rem'}}>📋</div>
-            <h3 style={{fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem'}}>Task Management</h3>
-            <p style={{color: '#6b7280', marginBottom: '1.5rem'}}>
-              Team task management interface coming soon...
-            </p>
-            <button style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              fontSize: '0.875rem',
-              cursor: 'pointer'
-            }}>
-              Create Task
-            </button>
+          <div>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+              <h3 style={{fontSize: '1.25rem', fontWeight: '600'}}>Team Tasks ({teamTasks.length})</h3>
+              <button onClick={() => setShowCreateTask(true)} style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}>
+                + Create Task
+              </button>
+            </div>
+
+            {teamTasks.length === 0 ? (
+              <div style={{textAlign: 'center', padding: '3rem', color: '#6b7280'}}>No tasks yet</div>
+            ) : (
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem'}}>
+                {teamTasks.map(task => (
+                  <div key={task.id} style={{
+                    backgroundColor: 'white',
+                    padding: '1.25rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem'}}>
+                      <h4 style={{fontSize: '1rem', fontWeight: 600, margin: 0, color: '#111827'}}>{task.title}</h4>
+                      <span style={{
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        fontSize: '0.75rem',
+                        backgroundColor: task.status === 'completed' ? '#dcfce7' : task.status === 'in_progress' ? '#dbeafe' : '#f3f4f6',
+                        color: task.status === 'completed' ? '#15803d' : task.status === 'in_progress' ? '#1d4ed8' : '#374151'
+                      }}>{task.status}</span>
+                    </div>
+                    <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>{task.description}</p>
+                    <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', fontSize: '0.75rem', color: '#9ca3af'}}>
+                      <span>Priority: {task.priority}</span>
+                      <span>{new Date(task.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1062,6 +1152,61 @@ export function TeamDetailsPage() {
                 fontSize: '0.875rem',
                 cursor: addingMember ? 'not-allowed' : 'pointer'
               }}>{addingMember ? 'Adding...' : 'Add Member'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Task Modal */}
+      {showCreateTask && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '0.75rem', padding: '1.5rem', width: '36rem', maxWidth: '95vw' }}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+              <h3 style={{fontSize: '1.125rem', fontWeight: 600, margin: 0}}>Create Task</h3>
+              <button onClick={() => setShowCreateTask(false)} style={{ padding: '0.25rem 0.5rem', border: 'none', borderRadius: '0.375rem', backgroundColor: '#f3f4f6', cursor: 'pointer' }}>✕</button>
+            </div>
+            {createTaskError && (
+              <div style={{ marginBottom: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#fee2e2', border: '1px solid #ef4444', color: '#b91c1c', borderRadius: '0.375rem', fontSize: '0.875rem' }}>{createTaskError}</div>
+            )}
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
+              <div>
+                <label style={{display: 'block', fontSize: '0.875rem', color: '#374151', marginBottom: '0.25rem'}}>Title</label>
+                <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Task title"
+                  style={{width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}} />
+              </div>
+              <div>
+                <label style={{display: 'block', fontSize: '0.875rem', color: '#374151', marginBottom: '0.25rem'}}>Description</label>
+                <textarea value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} rows={3}
+                  style={{width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem', resize: 'vertical'}} />
+              </div>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem'}}>
+                <div>
+                  <label style={{display: 'block', fontSize: '0.875rem', color: '#374151', marginBottom: '0.25rem'}}>Priority</label>
+                  <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)}
+                    style={{width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}}>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{display: 'block', fontSize: '0.875rem', color: '#374151', marginBottom: '0.25rem'}}>Assign to</label>
+                  <select value={taskAssigneeId} onChange={(e) => setTaskAssigneeId(e.target.value)}
+                    style={{width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}}>
+                    <option value="">Unassigned</option>
+                    {team.members.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem'}}>
+              <button onClick={() => setShowCreateTask(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', backgroundColor: 'white', cursor: 'pointer', fontSize: '0.875rem' }}>Cancel</button>
+              <button onClick={handleCreateTask} disabled={creatingTask} style={{ padding: '0.5rem 1rem', backgroundColor: creatingTask ? '#93c5fd' : '#2563eb', color: 'white', border: 'none', borderRadius: '0.375rem', fontSize: '0.875rem', cursor: creatingTask ? 'not-allowed' : 'pointer' }}>{creatingTask ? 'Creating...' : 'Create Task'}</button>
             </div>
           </div>
         </div>

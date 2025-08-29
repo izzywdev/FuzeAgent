@@ -149,6 +149,41 @@ export let knowledgeDocs = [
 	},
 ]
 
+// Simple task store
+export let tasks: Array<{
+  id: string
+  title: string
+  description: string
+  status: 'pending' | 'in_progress' | 'completed'
+  priority: 'low' | 'medium' | 'high'
+  created_at: string
+  completed_at?: string
+  team_id?: string
+  agent_id?: string
+}> = []
+
+// Conversations and messages store
+export type ChatMessage = {
+  id: string
+  conversation_id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+  status?: 'sending' | 'sent'
+  metadata?: Record<string, unknown>
+}
+
+export let conversations: Array<{
+  id: string
+  agent_id: string
+  title: string
+  created_at: string
+  updated_at: string
+  status: 'running' | 'paused' | 'stopped'
+}> = []
+
+export let messages: ChatMessage[] = []
+
 export function jsonResponse(body: unknown, init: ResponseInit = { status: 200 }) {
 	return new Response(JSON.stringify(body), {
 		...init,
@@ -165,6 +200,9 @@ type MockDB = {
 	agents: typeof agents
 	agentTemplates: typeof agentTemplates
 	knowledgeDocs: typeof knowledgeDocs
+	tasks: typeof tasks
+	conversations: typeof conversations
+	messages: typeof messages
 }
 
 function canUseLocalStorage(): boolean {
@@ -183,6 +221,9 @@ export function saveMockDB() {
 		agents,
 		agentTemplates,
 		knowledgeDocs,
+		tasks,
+		conversations,
+		messages,
 	}
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
@@ -201,6 +242,9 @@ export function loadMockDB() {
 		if (parsed.agents && Array.isArray(parsed.agents)) agents = parsed.agents as any
 		if (parsed.agentTemplates && Array.isArray(parsed.agentTemplates)) agentTemplates = parsed.agentTemplates as any
 		if (parsed.knowledgeDocs && Array.isArray(parsed.knowledgeDocs)) knowledgeDocs = parsed.knowledgeDocs as any
+		if (parsed.tasks && Array.isArray(parsed.tasks)) tasks = parsed.tasks as any
+		if (parsed.conversations && Array.isArray(parsed.conversations)) conversations = parsed.conversations as any
+		if (parsed.messages && Array.isArray(parsed.messages)) messages = parsed.messages as any
 	} catch {
 		// On parse error, re-save defaults
 		saveMockDB()
