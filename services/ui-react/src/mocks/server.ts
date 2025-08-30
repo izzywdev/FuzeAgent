@@ -1,7 +1,7 @@
 // Very small mock fetch layer that intercepts calls the app makes and returns realistic data
 // Disable by not importing this module in main.tsx
 
-import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB, tasks, conversations, messages } from './data'
+import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB, tasks } from './data'
 import type { ChatMessage } from './data'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -192,7 +192,8 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 				tasksActive: 0,
 				efficiency: '0%'
 			},
-			joinedDate: now
+			joinedDate: now,
+			conversations: []
 		}
 		agents.push(newAgent)
 		saveMockDB()
@@ -220,7 +221,7 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		saveMockDB()
 		return jsonResponse(newTask, { status: 201 })
 	}
-	if (method === 'GET' && path.startsWith('/agents/')) {
+	if (method === 'GET' && path.startsWith('/agents/') && !path.includes('/tasks') && !path.includes('/conversations')) {
 		const id = path.split('/')[2]
 		return jsonResponse(agents.find(a => a.id === id) || agents[0])
 	}
@@ -247,27 +248,43 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 	if (method === 'POST' && path.includes('/knowledge/')) { const res = jsonResponse({ ok: true }, { status: 201 }); saveMockDB(); return res }
 	if (method === 'DELETE' && path.includes('/knowledge/')) { const res = jsonResponse({ ok: true }); saveMockDB(); return res }
 
-	// Conversations endpoints
+	// Conversations endpoints (now nested under agent objects)
 	if (method === 'GET' && path.startsWith('/agents/') && path.endsWith('/conversations')) {
 		const agentId = path.split('/')[2]
-		return jsonResponse(conversations.filter(c => c.agent_id === agentId))
+		const aIdx = agents.findIndex(a => (a as any).id === agentId)
+		if (aIdx === -1) return jsonResponse([], { status: 200 })
+		const list = ((agents as any)[aIdx].conversations || [])
+		if (list.length === 0) {
+			const now = new Date().toISOString()
+			const convo = { id: crypto.randomUUID(), agent_id: agentId, title: 'Conversation', created_at: now, updated_at: now, status: 'running' as const, messages: [] }
+			;(agents as any)[aIdx].conversations = [convo]
+			saveMockDB()
+			return jsonResponse([convo])
+		}
+		return jsonResponse(list)
 	}
 	if (method === 'POST' && path.startsWith('/agents/') && path.endsWith('/conversations')) {
 		const agentId = path.split('/')[2]
 		const body = init?.body ? JSON.parse(init.body as string) : {}
 		const now = new Date().toISOString()
-		// Reuse existing conversation if present to enforce single-conversation mode
-		const existing = conversations.find(c => c.agent_id === agentId)
+		const aIdx = agents.findIndex(a => (a as any).id === agentId)
+		if (aIdx === -1) return jsonResponse({ message: 'Agent not found' }, { status: 404 })
+		const existing = ((agents as any)[aIdx].conversations || [])[0]
 		if (existing) return jsonResponse(existing)
-		const convo = { id: crypto.randomUUID(), agent_id: agentId, title: body.title || 'Conversation', created_at: now, updated_at: now, status: 'running' as const }
-		conversations.push(convo)
+		const convo = { id: crypto.randomUUID(), agent_id: agentId, title: body.title || 'Conversation', created_at: now, updated_at: now, status: 'running' as const, messages: [] }
+		;(agents as any)[aIdx].conversations = [convo]
 		saveMockDB()
 		return jsonResponse(convo, { status: 201 })
 	}
 	if (method === 'GET' && path.includes('/conversations/') && path.endsWith('/messages')) {
 		const parts = path.split('/')
 		const conversationId = parts[4]
-		return jsonResponse(messages.filter(m => m.conversation_id === conversationId))
+		// Load from nested agent store
+		for (const a of agents as any[]) {
+			const c = a.conversations?.find((x: any) => x.id === conversationId)
+			if (c) return jsonResponse(c.messages || [])
+		}
+		return jsonResponse([])
 	}
 	if (method === 'POST' && path.includes('/conversations/') && path.endsWith('/messages')) {
 		const parts = path.split('/')
@@ -276,14 +293,17 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		const body = init?.body ? JSON.parse(init.body as string) : {}
 		const now = new Date().toISOString()
 		const userMsg: ChatMessage = { id: crypto.randomUUID(), conversation_id: conversationId, role: 'user', content: body.content || body.message || '', timestamp: now, status: 'sent' }
-		messages.push(userMsg)
-		// Update convo timestamp
-		const cIdx = conversations.findIndex(c => c.id === conversationId)
-		if (cIdx !== -1) conversations[cIdx].updated_at = now
+		for (const a of agents as any[]) {
+			const ci = a.conversations?.findIndex((c: any) => c.id === conversationId) ?? -1
+			if (ci !== -1) {
+				a.conversations[ci].updated_at = now
+				a.conversations[ci].messages = Array.isArray(a.conversations[ci].messages) ? a.conversations[ci].messages : []
+				a.conversations[ci].messages.push(userMsg)
+				break
+			}
+		}
 		saveMockDB()
-		// Broadcast to WS clients
-		broadcastConversation(conversationId, { type: 'new_message', message: userMsg })
-		// Simulate agent reply
+		// Do not broadcast the user's message to avoid client duplication; only simulate agent reply
 		simulateAgentReply(agentId, conversationId)
 		return jsonResponse(userMsg, { status: 201 })
 	}
@@ -293,12 +313,19 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		const conversationId = path.split('/')[2]
 		const body = init?.body ? JSON.parse(init.body as string) : {}
 		const status = body.status as 'running' | 'paused' | 'stopped' | undefined
-		const idx = conversations.findIndex(c => c.id === conversationId)
-		if (idx === -1) return jsonResponse({ message: 'Conversation not found' }, { status: 404 })
-		if (!status || !['running','paused','stopped'].includes(status)) return jsonResponse({ message: 'Invalid status' }, { status: 400 })
-		conversations[idx] = { ...conversations[idx], status, updated_at: new Date().toISOString() }
+		let updated: any = null
+		for (const a of agents as any[]) {
+			const ci = a.conversations?.findIndex((c: any) => c.id === conversationId) ?? -1
+			if (ci !== -1) {
+				if (!status || !['running','paused','stopped'].includes(status)) return jsonResponse({ message: 'Invalid status' }, { status: 400 })
+				a.conversations[ci] = { ...a.conversations[ci], status, updated_at: new Date().toISOString() }
+				updated = a.conversations[ci]
+				break
+			}
+		}
+		if (!updated) return jsonResponse({ message: 'Conversation not found' }, { status: 404 })
 		saveMockDB()
-		return jsonResponse(conversations[idx])
+		return jsonResponse(updated)
 	}
 
 	// Default fallthrough
@@ -367,13 +394,24 @@ class MockWebSocket {
 				// Treat as user message via WS
 				const now = new Date().toISOString()
 				const msg: ChatMessage = { id: crypto.randomUUID(), conversation_id: this.conversationId, role: 'user', content: parsed.content || '', timestamp: now, status: 'sent', metadata: parsed.metadata }
-				messages.push(msg)
+				// Push into nested agent conversation
+				for (const a of agents as any[]) {
+					const ci = a.conversations?.findIndex((c: any) => c.id === this.conversationId) ?? -1
+					if (ci !== -1) {
+						a.conversations[ci].messages = Array.isArray(a.conversations[ci].messages) ? a.conversations[ci].messages : []
+						a.conversations[ci].messages.push(msg)
+						break
+					}
+				}
 				saveMockDB()
 				broadcastConversation(this.conversationId, { type: 'new_message', message: msg })
 				// Simulate reply
 				// Find agentId from conversation
-				const convo = conversations.find(c => c.id === this.conversationId)
-				const agentId = convo?.agent_id || ''
+				let agentId = ''
+				for (const a of agents as any[]) {
+					const c = a.conversations?.find((x: any) => x.id === this.conversationId)
+					if (c) { agentId = a.id; break }
+				}
 				simulateAgentReply(agentId, this.conversationId)
 			}
 		} catch (e) {
@@ -411,28 +449,28 @@ function randomReply(): string {
 }
 function simulateAgentReply(_agentId: string, conversationId: string) {
 	const delay = Math.floor(Math.random() * 7000)
-	// typing on only if running
-	if (isConversationRunning(conversationId)) {
-		broadcastConversation(conversationId, { type: 'typing', typing: true })
-	}
+	// Always show typing
+	broadcastConversation(conversationId, { type: 'typing', typing: true })
 	setTimeout(() => {
-		if (!isConversationRunning(conversationId)) {
-			broadcastConversation(conversationId, { type: 'typing', typing: false })
-			return
-		}
 		const now = new Date().toISOString()
 		const assistant: ChatMessage = { id: crypto.randomUUID(), conversation_id: conversationId, role: 'assistant', content: randomReply(), timestamp: now, status: 'sent' }
-		messages.push(assistant)
+		// Push into nested agent store
+		for (const a of agents as any[]) {
+			const ci = a.conversations?.findIndex((c: any) => c.id === conversationId) ?? -1
+			if (ci !== -1) {
+				a.conversations[ci].messages = Array.isArray(a.conversations[ci].messages) ? a.conversations[ci].messages : []
+				a.conversations[ci].updated_at = now
+				a.conversations[ci].messages.push(assistant)
+				break
+			}
+		}
 		saveMockDB()
 		broadcastConversation(conversationId, { type: 'new_message', message: assistant })
 		broadcastConversation(conversationId, { type: 'typing', typing: false })
 	}, delay)
 }
 
-function isConversationRunning(conversationId: string): boolean {
-	const c = conversations.find(c => c.id === conversationId)
-	return (c as any)?.status === 'running'
-}
+// no-op helper removed
 
 export function enableMockWs() {
 	if ((window as any).__mockWsEnabled) return

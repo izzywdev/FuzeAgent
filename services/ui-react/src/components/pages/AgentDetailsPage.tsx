@@ -1,5 +1,5 @@
 /* @jsxImportSource react */
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import type { Agent, Task, Conversation, ChatMessage, ContainerInfo, KnowledgeDocument } from './AgentDetailsPage/types'
 import { TopNav } from './AgentDetailsPage/TopNav'
@@ -53,8 +53,14 @@ export function AgentDetailsPage(): React.ReactElement {
   const [assigningTask, setAssigningTask] = useState(false)
   const [assignTaskError, setAssignTaskError] = useState<string | null>(null)
 
+  const hasInitializedRef = useRef(false)
+  const wsConnectingRef = useRef(false)
+  const creatingConversationRef = useRef(false)
+
   useEffect(() => {
     if (!agentId) return
+    if (hasInitializedRef.current) return
+    hasInitializedRef.current = true
 
     // Load agent details
     fetch(`/agents/${agentId}`)
@@ -201,7 +207,14 @@ export function AgentDetailsPage(): React.ReactElement {
           startChatWebSocket(primaryConversation.id)
         } else {
           // No conversations exist yet - will be created when user sends first message
-          console.log('No conversations found for agent')
+          // Create a default conversation immediately to persist state
+          const created = await fetch(`/agents/${agentId}/conversations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `Conversation with ${agent?.name || 'Agent'}` }) })
+          if (created.ok) {
+            const c = await created.json()
+            setSelectedConversation(c)
+            await loadConversationMessages(c.id)
+            startChatWebSocket(c.id)
+          }
         }
       } else {
         console.error('Failed to load agent conversations')
@@ -214,6 +227,8 @@ export function AgentDetailsPage(): React.ReactElement {
   // Create primary conversation for agent
   const createPrimaryConversation = async () => {
     if (!agentId) return
+    if (creatingConversationRef.current) return
+    creatingConversationRef.current = true
     
     try {
       const response = await fetch(`/agents/${agentId}/conversations`, {
@@ -235,13 +250,14 @@ export function AgentDetailsPage(): React.ReactElement {
         // Start WebSocket connection
         startChatWebSocket(conversation.id)
         
-        console.log('Created primary conversation')
+        // created
       } else {
         console.error('Failed to create primary conversation')
       }
     } catch (error) {
       console.error('Error creating primary conversation:', error)
     }
+    creatingConversationRef.current = false
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -567,7 +583,9 @@ export function AgentDetailsPage(): React.ReactElement {
   }
 
   const startChatWebSocket = (conversationId: string) => {
-    if (!agentId || chatWebSocket) return
+    if (!agentId) return
+    if (chatWebSocket || wsConnectingRef.current) return
+    wsConnectingRef.current = true
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/ws/agents/${agentId}/conversations/${conversationId}`
@@ -575,10 +593,11 @@ export function AgentDetailsPage(): React.ReactElement {
     const ws = new WebSocket(wsUrl)
     
     ws.onopen = () => {
-      console.log('Chat WebSocket connected')
+      // connected
       setChatWebSocket(ws)
       // Send ping to keep connection alive
       ws.send(JSON.stringify({ type: 'ping' }))
+      wsConnectingRef.current = false
     }
     
     ws.onmessage = (event) => {
@@ -595,13 +614,12 @@ export function AgentDetailsPage(): React.ReactElement {
             status: data.message.status || 'sent',
             metadata: data.message.metadata
           }
-          setChatMessages((prev: ChatMessage[]) => [...prev, newMessage])
+          setChatMessages((prev: ChatMessage[]) => prev.some((m: ChatMessage) => m.id === newMessage.id) ? prev : [...prev, newMessage])
           setIsAgentTyping(false)
         } else if (data.type === 'typing') {
           setIsAgentTyping(data.typing)
         } else if (data.type === 'pong') {
-          // Keep alive response
-          console.log('WebSocket pong received')
+          // keep-alive
         } else if (data.type === 'error') {
           console.error('Chat error:', data.message)
           setIsAgentTyping(false)
@@ -616,9 +634,9 @@ export function AgentDetailsPage(): React.ReactElement {
     }
     
     ws.onclose = () => {
-      console.log('Chat WebSocket disconnected')
       setChatWebSocket(null)
       setIsAgentTyping(false)
+      wsConnectingRef.current = false
     }
   }
 
@@ -634,6 +652,10 @@ export function AgentDetailsPage(): React.ReactElement {
         if (!selectedConversation && Array.isArray(list) && list.length > 0) {
           const first = list[0]
           setSelectedConversation(first)
+          // Optimistically load any nested messages if the server returned them
+          if ((first as any)?.messages && Array.isArray((first as any).messages)) {
+            setChatMessages((first as any).messages)
+          }
           await loadConversationMessages(first.id)
           startChatWebSocket(first.id)
         }
@@ -684,7 +706,12 @@ export function AgentDetailsPage(): React.ReactElement {
       setChatWebSocket(null)
     }
     setSelectedConversation(convo)
-    setChatMessages([])
+    // Seed from nested messages if present, then refresh from server
+    if ((convo as any)?.messages && Array.isArray((convo as any).messages)) {
+      setChatMessages((convo as any).messages)
+    } else {
+      setChatMessages([])
+    }
     await loadConversationMessages(convo.id)
     startChatWebSocket(convo.id)
   }
@@ -733,7 +760,7 @@ export function AgentDetailsPage(): React.ReactElement {
       status: 'sending'
     }
     
-    setChatMessages((prev: ChatMessage[]) => [...prev, userMessage])
+    setChatMessages((prev: any) => (Array.isArray(prev) ? [...prev, userMessage] : [userMessage]))
     const messageToSend = newMessage
     setNewMessage('')
     setIsAgentTyping(true)
@@ -779,13 +806,10 @@ export function AgentDetailsPage(): React.ReactElement {
         }))
         
         // Update message status to sent
-        setChatMessages((prev: ChatMessage[]) => 
-          prev.map((msg: ChatMessage) => 
-            msg.id === userMessage.id 
-              ? { ...msg, status: 'sent' as const }
-              : msg
-          )
-        );
+        setChatMessages((prev: any) => {
+          const base: ChatMessage[] = Array.isArray(prev) ? prev : []
+          return base.map((msg) => msg.id === userMessage.id ? { ...msg, status: 'sent' as const } : msg)
+        })
       } else {
         // WebSocket not connected, fall back to HTTP POST
         const response = await fetch(`/agents/${agentId}/conversations/${selectedConversation.id}/messages`, {

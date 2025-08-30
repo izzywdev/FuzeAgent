@@ -96,6 +96,7 @@ export let agents = [
 			efficiency: '92%'
 		},
 		joinedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(),
+		conversations: [],
 	},
 	{
 		id: 'b1111111-2222-3333-4444-555555555555',
@@ -122,6 +123,7 @@ export let agents = [
 			efficiency: '88%'
 		},
 		joinedDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString(),
+		conversations: [],
 	},
 ]
 
@@ -162,7 +164,7 @@ export let tasks: Array<{
   agent_id?: string
 }> = []
 
-// Conversations and messages store
+// Conversations and messages types (nested under agents)
 export type ChatMessage = {
   id: string
   conversation_id: string
@@ -172,17 +174,15 @@ export type ChatMessage = {
   status?: 'sending' | 'sent'
   metadata?: Record<string, unknown>
 }
-
-export let conversations: Array<{
+export type Conversation = {
   id: string
   agent_id: string
   title: string
   created_at: string
   updated_at: string
   status: 'running' | 'paused' | 'stopped'
-}> = []
-
-export let messages: ChatMessage[] = []
+  messages: ChatMessage[]
+}
 
 export function jsonResponse(body: unknown, init: ResponseInit = { status: 200 }) {
 	return new Response(JSON.stringify(body), {
@@ -201,8 +201,6 @@ type MockDB = {
 	agentTemplates: typeof agentTemplates
 	knowledgeDocs: typeof knowledgeDocs
 	tasks: typeof tasks
-	conversations: typeof conversations
-	messages: typeof messages
 }
 
 function canUseLocalStorage(): boolean {
@@ -222,8 +220,6 @@ export function saveMockDB() {
 		agentTemplates,
 		knowledgeDocs,
 		tasks,
-		conversations,
-		messages,
 	}
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
@@ -232,19 +228,50 @@ export function loadMockDB() {
 	if (!canUseLocalStorage()) return
 	const raw = localStorage.getItem(STORAGE_KEY)
 	if (!raw) {
+		// Seed with defaults but persist immediately for consistency across reloads
 		saveMockDB()
 		return
 	}
 	try {
-		const parsed = JSON.parse(raw) as Partial<MockDB>
+		const parsed = JSON.parse(raw) as Partial<MockDB & { conversations?: any[]; messages?: ChatMessage[] }>
 		if (parsed.organizations && Array.isArray(parsed.organizations)) organizations = parsed.organizations as any
 		if (parsed.teams && Array.isArray(parsed.teams)) teams = parsed.teams as any
 		if (parsed.agents && Array.isArray(parsed.agents)) agents = parsed.agents as any
 		if (parsed.agentTemplates && Array.isArray(parsed.agentTemplates)) agentTemplates = parsed.agentTemplates as any
 		if (parsed.knowledgeDocs && Array.isArray(parsed.knowledgeDocs)) knowledgeDocs = parsed.knowledgeDocs as any
 		if (parsed.tasks && Array.isArray(parsed.tasks)) tasks = parsed.tasks as any
-		if (parsed.conversations && Array.isArray(parsed.conversations)) conversations = parsed.conversations as any
-		if (parsed.messages && Array.isArray(parsed.messages)) messages = parsed.messages as any
+		// Migration: move top-level conversations/messages into agents
+		const topConversations = (parsed as any).conversations as any[] | undefined
+		const topMessages = (parsed as any).messages as ChatMessage[] | undefined
+		if (Array.isArray(topConversations) || Array.isArray(topMessages)) {
+			// Ensure conversations array on all agents
+			agents = (agents as any[]).map(a => ({ ...a, conversations: Array.isArray(a.conversations) ? a.conversations : [] })) as any
+			if (Array.isArray(topConversations)) {
+				for (const c of topConversations) {
+					const idx = (agents as any[]).findIndex(a => a.id === c.agent_id)
+					if (idx !== -1) {
+						const exists = (agents as any[])[idx].conversations.find((x: any) => x.id === c.id)
+						if (!exists) {
+							(agents as any[])[idx].conversations.push({ ...c, messages: [] })
+						}
+					}
+				}
+			}
+			if (Array.isArray(topMessages)) {
+				for (const m of topMessages) {
+					for (const a of agents as any[]) {
+						const ci = a.conversations?.findIndex((c: any) => c.id === m.conversation_id) ?? -1
+						if (ci !== -1) {
+							a.conversations[ci].messages = Array.isArray(a.conversations[ci].messages) ? a.conversations[ci].messages : []
+							a.conversations[ci].messages.push(m)
+							break
+						}
+					}
+				}
+			}
+			// After migration, re-save without legacy keys
+			saveMockDB()
+		}
 	} catch {
 		// On parse error, re-save defaults
 		saveMockDB()
