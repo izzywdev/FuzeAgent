@@ -164,6 +164,29 @@ export let tasks: Array<{
   agent_id?: string
 }> = []
 
+// Organizational goals
+export type Goal = {
+  id: string
+  organization_id: string
+  title: string
+  description: string
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  status: 'planning' | 'active' | 'completed' | 'on_hold'
+  target_completion_date: string
+  progress_percentage: number
+  assigned_teams: string[]
+  milestones: {
+    id: string
+    title: string
+    status: string
+    due_date: string
+  }[]
+  created_at: string
+  updated_at: string
+}
+
+export let goals: Goal[] = []
+
 // Conversations and messages types (nested under agents)
 export type ChatMessage = {
   id: string
@@ -201,6 +224,7 @@ type MockDB = {
 	agentTemplates: typeof agentTemplates
 	knowledgeDocs: typeof knowledgeDocs
 	tasks: typeof tasks
+	goals: typeof goals
 }
 
 function canUseLocalStorage(): boolean {
@@ -220,6 +244,7 @@ export function saveMockDB() {
 		agentTemplates,
 		knowledgeDocs,
 		tasks,
+		goals,
 	}
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
@@ -240,6 +265,7 @@ export function loadMockDB() {
 		if (parsed.agentTemplates && Array.isArray(parsed.agentTemplates)) agentTemplates = parsed.agentTemplates as any
 		if (parsed.knowledgeDocs && Array.isArray(parsed.knowledgeDocs)) knowledgeDocs = parsed.knowledgeDocs as any
 		if (parsed.tasks && Array.isArray(parsed.tasks)) tasks = parsed.tasks as any
+		if ((parsed as any).goals && Array.isArray((parsed as any).goals)) goals = (parsed as any).goals as any
 		// Migration: move top-level conversations/messages into agents
 		const topConversations = (parsed as any).conversations as any[] | undefined
 		const topMessages = (parsed as any).messages as ChatMessage[] | undefined

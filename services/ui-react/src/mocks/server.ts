@@ -1,7 +1,7 @@
 // Very small mock fetch layer that intercepts calls the app makes and returns realistic data
 // Disable by not importing this module in main.tsx
 
-import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB, tasks } from './data'
+import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB, tasks, goals } from './data'
 import type { ChatMessage } from './data'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -22,6 +22,50 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 
 	// Hierarchy API
 	if (method === 'GET' && path === '/organizations') return jsonResponse(organizations)
+	// Goals endpoints (scoped to organization)
+	if (method === 'GET' && path.startsWith('/organizations/') && path.endsWith('/goals')) {
+		const orgId = path.split('/')[2]
+		return jsonResponse((goals as any[]).filter(g => g.organization_id === orgId))
+	}
+	if (method === 'POST' && path.startsWith('/organizations/') && path.endsWith('/goals')) {
+		const orgId = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const now = new Date().toISOString()
+		const goal = {
+			id: crypto.randomUUID(),
+			organization_id: orgId,
+			title: body.title || 'Untitled Goal',
+			description: body.description || '',
+			priority: (body.priority || 'medium') as any,
+			status: 'active' as const,
+			target_completion_date: body.target_completion_date || now,
+			progress_percentage: 0,
+			assigned_teams: Array.isArray(body.assigned_teams) ? body.assigned_teams : [],
+			milestones: [],
+			created_at: now,
+			updated_at: now,
+		}
+		;(goals as any[]).push(goal)
+		saveMockDB()
+		return jsonResponse(goal, { status: 201 })
+	}
+	if (method === 'PUT' && path.startsWith('/goals/')) {
+		const goalId = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const idx = (goals as any[]).findIndex(g => g.id === goalId)
+		if (idx === -1) return jsonResponse({ message: 'Goal not found' }, { status: 404 })
+		(goals as any[])[idx] = { ...(goals as any[])[idx], ...body, updated_at: new Date().toISOString() }
+		saveMockDB()
+		return jsonResponse((goals as any[])[idx])
+	}
+	if (method === 'DELETE' && path.startsWith('/goals/')) {
+		const goalId = path.split('/')[2]
+		const idx = (goals as any[]).findIndex(g => g.id === goalId)
+		if (idx === -1) return jsonResponse({ message: 'Goal not found' }, { status: 404 })
+		;(goals as any[]).splice(idx, 1)
+		saveMockDB()
+		return jsonResponse({ ok: true })
+	}
 	if (method === 'GET' && path.startsWith('/organizations/')) {
 		const id = path.split('/')[2]
 		const org = organizations.find(o => o.id === id) || organizations[0]
@@ -60,6 +104,24 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 		teams.push(newTeam)
 		saveMockDB()
 		return jsonResponse(newTeam, { status: 201 })
+	}
+	// Update team details
+	if (method === 'PUT' && path.startsWith('/teams/')) {
+		const teamId = path.split('/')[2]
+		const idx = teams.findIndex(t => t.id === teamId)
+		if (idx === -1) return jsonResponse({ message: 'Team not found' }, { status: 404 })
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const existing = teams[idx]
+		teams[idx] = {
+			...existing,
+			name: body.name ?? existing.name,
+			description: body.description ?? existing.description,
+			team_type: body.team_type ?? existing.team_type,
+			color: body.color ?? existing.color,
+			updated_at: new Date().toISOString(),
+		}
+		saveMockDB()
+		return jsonResponse(teams[idx])
 	}
 	// Team members: attach an existing agent to a team (enforce one team per agent)
 	if (method === 'POST' && path.startsWith('/teams/') && path.endsWith('/members')) {
@@ -335,7 +397,7 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 export function enableMockApi() {
 	if ((window as any).__mockApiEnabled) return
 	const origFetch = window.fetch.bind(window)
-	const apiPrefixes = ['/agents', '/teams', '/organizations', '/agent-templates', '/knowledge', '/rag', '/tasks']
+	const apiPrefixes = ['/agents', '/teams', '/organizations', '/agent-templates', '/knowledge', '/rag', '/tasks', '/goals']
 	window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
 		const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
 		const u = new URL(raw, window.location.origin)

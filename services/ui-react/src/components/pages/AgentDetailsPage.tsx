@@ -1041,7 +1041,7 @@ export function AgentDetailsPage(): React.ReactElement {
             onViewLogs={async () => { await handleLoadContainerLogs(true) }}
           />
         )}
-      </div>
+                  </div>
       <DocumentViewer
         open={showDocumentViewer}
         document={selectedDocument}

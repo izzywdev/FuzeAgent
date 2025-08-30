@@ -24,6 +24,8 @@ export function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [goalToEdit, setGoalToEdit] = useState<Goal | null>(null)
   const navigate = useNavigate()
   const { goalId } = useParams()
 
@@ -165,6 +167,47 @@ export function GoalsPage() {
                   {goal.progress_percentage}%
                 </div>
                 <div style={{fontSize: '0.875rem', color: '#6b7280'}}>Overall Progress</div>
+                <div style={{marginTop: '0.75rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end'}}>
+                  <button
+                    onClick={() => { setGoalToEdit(goal); setShowEditForm(true) }}
+                    style={{
+                      padding: '0.375rem 0.75rem',
+                      backgroundColor: 'white',
+                      color: '#2563eb',
+                      border: '1px solid #93c5fd',
+                      borderRadius: '0.375rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm('Delete this goal? This action cannot be undone.')) return
+                      try {
+                        await fetch(`/goals/${goal.id}`, { method: 'DELETE' })
+                        // After delete, navigate back to list and reload
+                        navigate('/goals')
+                        fetch('/organizations/1/goals')
+                          .then(res => res.json())
+                          .then(data => { if (Array.isArray(data)) setGoals(data) })
+                          .catch(() => {})
+                      } catch {}
+                    }}
+                    style={{
+                      padding: '0.375rem 0.75rem',
+                      backgroundColor: 'white',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                      borderRadius: '0.375rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -235,6 +278,21 @@ export function GoalsPage() {
             </div>
           </div>
         </main>
+
+        {showEditForm && goalToEdit && (
+          <EditGoalModal
+            goal={goalToEdit}
+            onClose={() => { setShowEditForm(false); setGoalToEdit(null) }}
+            onSuccess={() => {
+              setShowEditForm(false); setGoalToEdit(null)
+              // Reload goals so details page reflects updates
+              fetch('/organizations/1/goals')
+                .then(res => res.json())
+                .then(data => { if (Array.isArray(data)) setGoals(data) })
+                .catch(() => {})
+            }}
+          />
+        )}
       </div>
     )
   }
@@ -540,6 +598,21 @@ export function GoalsPage() {
               // Keep existing goals on error
             })
         }} />}
+
+        {showEditForm && goalToEdit && (
+          <EditGoalModal
+            goal={goalToEdit}
+            onClose={() => { setShowEditForm(false); setGoalToEdit(null) }}
+            onSuccess={() => {
+              setShowEditForm(false); setGoalToEdit(null)
+              // Reload goals
+              fetch('/organizations/1/goals')
+                .then(res => res.json())
+                .then(data => { if (Array.isArray(data)) setGoals(data) })
+                .catch(() => {})
+            }}
+          />
+        )}
       </main>
     </div>
   )
@@ -560,6 +633,16 @@ function CreateGoalModal({ onClose, onSuccess }: CreateGoalModalProps) {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [availableTeams, setAvailableTeams] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    fetch('/teams')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setAvailableTeams(data.map((t: any) => ({ id: t.id, name: t.name })))
+      })
+      .catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -609,7 +692,7 @@ function CreateGoalModal({ onClose, onSuccess }: CreateGoalModalProps) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: 9999
     }}>
       <div style={{
         backgroundColor: 'white',
@@ -723,23 +806,12 @@ function CreateGoalModal({ onClose, onSuccess }: CreateGoalModalProps) {
 
           <div style={{marginBottom: '2rem'}}>
             <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
-              Assigned Teams (comma-separated)
+              Assigned Teams
             </label>
-            <input
-              type="text"
-              value={formData.assigned_teams.join(', ')}
-              onChange={(e) => setFormData(prev => ({
-                ...prev, 
-                assigned_teams: e.target.value.split(',').map(t => t.trim()).filter(t => t)
-              }))}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem'
-              }}
-              placeholder="Development Team, Marketing Team, Executive Team"
+            <TeamsMultiSelect
+              options={availableTeams}
+              value={formData.assigned_teams}
+              onChange={(next) => setFormData(prev => ({ ...prev, assigned_teams: next }))}
             />
           </div>
 
@@ -779,6 +851,170 @@ function CreateGoalModal({ onClose, onSuccess }: CreateGoalModalProps) {
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+interface EditGoalModalProps {
+  goal: Goal
+  onClose: () => void
+  onSuccess: () => void
+}
+
+function EditGoalModal({ goal, onClose, onSuccess }: EditGoalModalProps) {
+  const [formData, setFormData] = useState({
+    title: goal.title,
+    description: goal.description,
+    priority: goal.priority,
+    target_completion_date: goal.target_completion_date,
+    assigned_teams: goal.assigned_teams as string[],
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [availableTeams, setAvailableTeams] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    fetch('/teams')
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setAvailableTeams(data.map((t: any) => ({ id: t.id, name: t.name }))) })
+      .catch(() => {})
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError('')
+    try {
+      const res = await fetch(`/goals/${goal.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData })
+      })
+      if (res.ok) {
+        onSuccess()
+      } else {
+        onSuccess()
+      }
+    } catch (err) {
+      setError('Failed to update goal. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+      <div style={{ backgroundColor: 'white', borderRadius: '0.5rem', padding: '2rem', maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem'}}>Edit Goal</h3>
+        {error && (
+          <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '0.75rem', borderRadius: '0.375rem', marginBottom: '1rem' }}>{error}</div>
+        )}
+        <form onSubmit={handleSubmit}>
+          <div style={{marginBottom: '1rem'}}>
+            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Goal Title *</label>
+            <input type="text" required value={formData.title} onChange={(e) => setFormData(prev => ({...prev, title: e.target.value}))} style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem' }} />
+          </div>
+          <div style={{marginBottom: '1rem'}}>
+            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Description *</label>
+            <textarea required value={formData.description} onChange={(e) => setFormData(prev => ({...prev, description: e.target.value}))} rows={4} style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem', resize: 'vertical' }} />
+          </div>
+          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem'}}>
+            <div>
+              <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Priority *</label>
+              <select value={formData.priority} onChange={(e) => setFormData(prev => ({...prev, priority: e.target.value as any}))} style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem' }}>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <div>
+              <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Target Date *</label>
+              <input type="date" required value={formData.target_completion_date} onChange={(e) => setFormData(prev => ({...prev, target_completion_date: e.target.value}))} min={new Date().toISOString().split('T')[0]} style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem' }} />
+            </div>
+          </div>
+          <div style={{marginBottom: '2rem'}}>
+            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Assigned Teams</label>
+            <TeamsMultiSelect
+              options={availableTeams}
+              value={formData.assigned_teams}
+              onChange={(next) => setFormData(prev => ({ ...prev, assigned_teams: next }))}
+            />
+          </div>
+          <div style={{display: 'flex', gap: '0.75rem', justifyContent: 'end'}}>
+            <button type="button" onClick={onClose} disabled={isSubmitting} style={{ padding: '0.75rem 1.5rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', backgroundColor: 'white', color: '#374151', fontWeight: '500', cursor: isSubmitting ? 'not-allowed' : 'pointer', opacity: isSubmitting ? 0.5 : 1 }}>Cancel</button>
+            <button type="submit" disabled={isSubmitting} style={{ padding: '0.75rem 1.5rem', backgroundColor: isSubmitting ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', borderRadius: '0.375rem', fontWeight: '500', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>{isSubmitting ? 'Saving...' : 'Save Changes'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Lightweight multiselect dropdown with checkboxes
+function TeamsMultiSelect({ options, value, onChange }: { options: { id: string; name: string }[]; value: string[]; onChange: (v: string[]) => void }) {
+  const [open, setOpen] = useState(false)
+  const selected = Array.isArray(value) ? value : []
+  const toggle = (name: string) => {
+    const set = new Set(selected)
+    if (set.has(name)) set.delete(name); else set.add(name)
+    onChange(Array.from(set))
+  }
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%',
+          textAlign: 'left',
+          padding: '0.625rem 0.75rem',
+          border: '1px solid #d1d5db',
+          borderRadius: '0.375rem',
+          backgroundColor: 'white',
+          fontSize: '0.875rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer'
+        }}
+      >
+        <span style={{ color: selected.length ? '#111827' : '#6b7280' }}>
+          {selected.length ? selected.join(', ') : 'Select teams'}
+        </span>
+        <span style={{ color: '#9ca3af' }}>▾</span>
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            backgroundColor: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: '0.375rem',
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)',
+            zIndex: 10000,
+            maxHeight: '14rem',
+            overflow: 'auto'
+          }}
+        >
+          {options.map(opt => {
+            const checked = selected.includes(opt.name)
+            return (
+              <label key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(opt.name)}
+                />
+                <span style={{ fontSize: '0.875rem', color: '#111827' }}>{opt.name}</span>
+              </label>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

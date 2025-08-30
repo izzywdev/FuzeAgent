@@ -897,7 +897,7 @@ export function OrganizationProfilePage() {
           )}
 
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
-            {knowledgeDocs.map((doc) => (
+            {(Array.isArray(knowledgeDocs) ? knowledgeDocs : []).map((doc) => (
               <div key={doc.id} style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -934,7 +934,7 @@ export function OrganizationProfilePage() {
                     <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
                       {doc.size && `${formatFileSize(doc.size)} • `}
                       Added {new Date(doc.upload_date).toLocaleDateString()}
-                      {doc.tags.length > 0 && (
+                      {Array.isArray(doc.tags) && doc.tags.length > 0 && (
                         <span style={{marginLeft: '0.5rem'}}>
                           {doc.tags.map(tag => (
                             <span key={tag} style={{
@@ -1065,7 +1065,7 @@ export function OrganizationProfilePage() {
                 {selectedDocument.word_count && (
                   <p><strong>Word Count:</strong> {selectedDocument.word_count.toLocaleString()}</p>
                 )}
-                {selectedDocument.tags.length > 0 && (
+                {Array.isArray(selectedDocument.tags) && selectedDocument.tags.length > 0 && (
                   <p><strong>Tags:</strong> {selectedDocument.tags.join(', ')}</p>
                 )}
               </div>
