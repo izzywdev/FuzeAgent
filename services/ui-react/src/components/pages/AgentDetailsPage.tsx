@@ -954,6 +954,7 @@ export function AgentDetailsPage(): React.ReactElement {
                           role: agent.role,
                           type: agent.type,
                           team_id: agent.team_id,
+                          container_image: agent.container_image || null,
                           config: agent.config,
                         })
                       })

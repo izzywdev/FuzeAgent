@@ -4,6 +4,8 @@ export interface Agent {
   role: string
   type: string
   status: string
+  // Docker image to use for this agent's container. Defaults from template but can be overridden.
+  container_image?: string
   config: {
     model: string
     temperature: number

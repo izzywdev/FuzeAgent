@@ -45,6 +45,22 @@ export function SettingsTab({ agent, saving, setAgent, onSave }: SettingsTabProp
             </div>
           </div>
           <div>
+            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Docker Image</label>
+            <select
+              value={agent.container_image || 'node:20-bullseye'}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                const value = e.target.value
+                setAgent(prev => ({ ...prev, container_image: value }))
+              }}
+              style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}}
+            >
+              <option value="node:20-bullseye">node:20-bullseye</option>
+              <option value="node:20-alpine">node:20-alpine</option>
+              <option value="python:3.11-slim">python:3.11-slim</option>
+              <option value="python:3.11-alpine">python:3.11-alpine</option>
+            </select>
+          </div>
+          <div>
             <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Available Tools</label>
             <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '0.375rem', padding: '1rem'}}>
               {[

@@ -18,6 +18,7 @@ interface AgentTemplate {
     goal: string
     backstory: string
   }
+  defaultDockerImage?: string
 }
 
 export function CreateAgentPage() {
@@ -33,6 +34,7 @@ export function CreateAgentPage() {
     type: 'developer',
     team_id: '',
     template_id: '',
+    container_image: 'node:20-bullseye',
     config: {
       model: 'claude-sonnet-4-20250514',
       temperature: 0.7,
@@ -88,7 +90,8 @@ export function CreateAgentPage() {
               tools: template.tools || [],
               goal: template.default_goal || '',
               backstory: template.default_backstory || ''
-            }
+            },
+            defaultDockerImage: template.default_docker_image || template.default_container_image || template.docker_image || template.container_image || ''
           }))
           setTemplates(transformedTemplates)
         } else if (Array.isArray(data)) {
@@ -105,7 +108,8 @@ export function CreateAgentPage() {
               tools: Array.isArray(template.tools) ? template.tools : [],
               goal: template.default_goal || '',
               backstory: template.default_backstory || ''
-            }
+            },
+            defaultDockerImage: template.default_docker_image || template.default_container_image || template.docker_image || template.container_image || ''
           }))
           setTemplates(normalizedTemplates)
         } else {
@@ -129,6 +133,7 @@ export function CreateAgentPage() {
       type: template.type,
       template_id: template.id,
       role: template.name,
+      container_image: template.defaultDockerImage || formData.container_image || 'node:20-bullseye',
       config: {
         ...template.defaultConfig,
         tools: [...template.defaultConfig.tools]
@@ -151,6 +156,7 @@ export function CreateAgentPage() {
           role: formData.role,
           type: formData.type,
           team_id: formData.team_id,
+          container_image: formData.container_image,
           config: formData.config
         })
       })
@@ -373,8 +379,11 @@ export function CreateAgentPage() {
                     <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem'}}>
                       {template.description}
                     </div>
-                    <div style={{fontSize: '0.75rem', color: '#9ca3af'}}>
-                      Model: {template.defaultConfig?.model || 'claude-sonnet-4-20250514'}
+                    <div style={{display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#9ca3af'}}>
+                      <span>Model: {template.defaultConfig?.model || 'claude-sonnet-4-20250514'}</span>
+                      {template.defaultDockerImage && (
+                        <span>Image: {template.defaultDockerImage}</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -494,6 +503,28 @@ export function CreateAgentPage() {
                 ))}
               </div>
             </div>
+          </div>
+
+          <div style={{marginTop: '1.5rem'}}>
+            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+              Docker Image
+            </label>
+            <select
+              value={formData.container_image}
+              onChange={(e) => setFormData({...formData, container_image: e.target.value})}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem'
+              }}
+            >
+              <option value="node:20-bullseye">node:20-bullseye</option>
+              <option value="node:20-alpine">node:20-alpine</option>
+              <option value="python:3.11-slim">python:3.11-slim</option>
+              <option value="python:3.11-alpine">python:3.11-alpine</option>
+            </select>
           </div>
 
           {/* Submit Button */}
