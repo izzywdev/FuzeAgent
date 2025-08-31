@@ -23,7 +23,7 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 
 # Storage configuration
-KNOWLEDGE_STORAGE_PATH = os.environ.get("KNOWLEDGE_STORAGE_PATH", "/app/knowledge_storage")
+KNOWLEDGE_STORAGE_PATH = os.environ.get("KNOWLEDGE_STORAGE_PATH", "./knowledge_storage")
 MAX_FILE_SIZE = int(os.environ.get("MAX_FILE_SIZE", "50000000"))  # 50MB default
 SUPPORTED_TYPES = ['.pdf', '.docx', '.doc', '.txt', '.md', '.html', '.json']
 

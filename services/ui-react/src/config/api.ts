@@ -5,26 +5,31 @@ const getAPIEndpoints = () => {
   const protocol = window.location.protocol
   const hostname = window.location.hostname
   
+  // Allow explicit overrides via env vars
+  const envHierarchy = (import.meta as any).env?.VITE_HIERARCHY_API_BASE as string | undefined
+  const envOrchestrator = (import.meta as any).env?.VITE_ORCHESTRATOR_API_BASE as string | undefined
+  const envWebSocket = (import.meta as any).env?.VITE_WEBSOCKET_BASE as string | undefined
+  
   // Development vs Production configuration
-  const isDevelopment = import.meta.env.NODE_ENV === 'development' || hostname === 'localhost'
+  const isDevelopment = (import.meta as any).env?.NODE_ENV === 'development' || hostname === 'localhost'
   
   if (isDevelopment) {
     return {
       // Core orchestrator API (for agent management, tasks, etc.)
-      ORCHESTRATOR_API_BASE: `${protocol}//${hostname}:8000`,
+      ORCHESTRATOR_API_BASE: envOrchestrator || `${protocol}//${hostname}:8000`,
       
       // Hierarchy API (for organizations, teams, agents structure)
-      HIERARCHY_API_BASE: `${protocol}//${hostname}:8006`,
+      HIERARCHY_API_BASE: envHierarchy || `${protocol}//${hostname}:8006`,
       
       // WebSocket endpoints
-      WEBSOCKET_BASE: `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}:8000`
+      WEBSOCKET_BASE: envWebSocket || `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}:8000`
     }
   } else {
-    // Production endpoints (through nginx proxy)
+    // Production endpoints (through nginx proxy) with optional overrides
     return {
-      ORCHESTRATOR_API_BASE: `${protocol}//${hostname}/api`,
-      HIERARCHY_API_BASE: `${protocol}//${hostname}/api`,
-      WEBSOCKET_BASE: `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}/api`
+      ORCHESTRATOR_API_BASE: envOrchestrator || `${protocol}//${hostname}/api`,
+      HIERARCHY_API_BASE: envHierarchy || `${protocol}//${hostname}/api`,
+      WEBSOCKET_BASE: envWebSocket || `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}/api`
     }
   }
 }

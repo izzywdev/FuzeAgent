@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { API_URL } from '../../config/env'
 import ErrorBoundary from '../ErrorBoundary'
 
 interface Team {
@@ -131,7 +132,7 @@ function FixedTeamsPageCore() {
         setError(null)
         
         console.log('Fetching teams from API...')
-        const response = await fetch('http://localhost:8006/teams')
+        const response = await fetch(`${API_URL}/teams`)
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)

@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  database:
+    build:
+      context: ../database_service
+    container_name: fuzeagent-db
+    environment:
+      POSTGRES_DB: ai_context
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_context"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    networks:
+      - fuzeagent-network
+
+  # Redis for caching and messaging
+  redis:
+    image: redis:7-alpine
+    container_name: fuzeagent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - fuzeagent-network
+
+  # RabbitMQ for task queue
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: fuzeagent-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - fuzeagent-network
+
+  # Orchestrator service
+  orchestrator:
+    build:
+      context: .
+    container_name: fuzeagent-orchestrator
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password@database:5432/ai_context
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - fuzeagent-network
+
+volumes:
+  db_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  fuzeagent-network:
+    driver: bridge

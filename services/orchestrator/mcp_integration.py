@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass, asdict
 
-from .database import DatabaseManager
+from database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

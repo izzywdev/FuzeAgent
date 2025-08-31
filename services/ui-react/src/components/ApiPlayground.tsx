@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FiPlay, FiCopy, FiChevronDown, FiChevronRight } from 'react-icons/fi'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
 import CodeBlock from './CodeBlock'
+import { API_URL } from '../config/env'
 
 interface ApiEndpoint {
   id: string
@@ -204,7 +205,7 @@ export default function ApiPlayground() {
   }
 
   const generateCurlCommand = () => {
-    const baseUrl = 'http://localhost:8006'
+    const baseUrl = API_URL
     let curl = `curl -X ${currentEndpoint.method} "${baseUrl}${currentEndpoint.path}"`
     
     if (currentEndpoint.method !== 'GET' && currentEndpoint.requestBody) {

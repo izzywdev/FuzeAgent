@@ -23,7 +23,7 @@ from cryptography.fernet import Fernet
 import os
 import base64
 
-from .database import DatabaseManager
+from database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

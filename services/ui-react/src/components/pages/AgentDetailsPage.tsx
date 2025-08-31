@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL, WS_URL_BASE } from '../../config/env'
 import { Link, useParams } from 'react-router-dom'
 
 interface Agent {
@@ -117,22 +118,62 @@ export function AgentDetailsPage() {
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [chatWebSocket, setChatWebSocket] = useState<WebSocket | null>(null)
   const [isAgentTyping, setIsAgentTyping] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedAgent, setEditedAgent] = useState<Agent | null>(null)
+
+  const handleStartEdit = () => {
+    setIsEditing(true)
+    setEditedAgent(agent ? {...agent} : null)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditedAgent(agent ? {...agent} : null)
+  }
+
+  const handleSaveEdit = () => {
+    if (editedAgent) {
+      setAgent(editedAgent)
+      setIsEditing(false)
+    }
+  }
+
+  const handleFieldChange = (field: string, value: any) => {
+    if (editedAgent) {
+      if (field.includes('.')) {
+        const [parent, child] = field.split('.')
+        setEditedAgent({
+          ...editedAgent,
+          [parent]: {
+            ...editedAgent[parent as keyof Agent],
+            [child]: value
+          }
+        })
+      } else {
+        setEditedAgent({
+          ...editedAgent,
+          [field]: value
+        })
+      }
+    }
+  }
 
   useEffect(() => {
     if (!agentId) return
 
     // Load agent details
-    fetch(`http://localhost:8000/agents/${agentId}`)
+    fetch(`${API_URL}/agents/${agentId}`)
       .then(res => res.json())
       .then(data => {
         setAgent(data)
+        setEditedAgent(data)
         setLoading(false)
       })
       .catch(err => {
         console.error('Failed to load agent:', err)
         setLoading(false)
         // Mock data for demo
-        setAgent({
+        const mockAgent = {
           id: agentId,
           name: 'IzzyAI CEO',
           role: 'Digital CEO',
@@ -149,11 +190,13 @@ export function AgentDetailsPage() {
           updated_at: '2025-08-06T11:16:04.060598',
           team_id: '1',
           team_name: 'Executive Team'
-        })
+        }
+        setAgent(mockAgent)
+        setEditedAgent(mockAgent)
       })
 
     // Load agent tasks
-    fetch(`http://localhost:8000/agents/${agentId}/tasks`)
+    fetch(`${API_URL}/agents/${agentId}/tasks`)
       .then(res => res.json())
       .then(data => setTasks(Array.isArray(data) ? data : []))
       .catch(() => {
@@ -204,7 +247,7 @@ export function AgentDetailsPage() {
     if (!agentId) return
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/agents/${agentId}/documents`)
+      const response = await fetch(`${API_URL}/knowledge/agents/${agentId}/documents`)
       if (response.ok) {
         const documents = await response.json()
         setKnowledgeDocs(documents)
@@ -221,7 +264,7 @@ export function AgentDetailsPage() {
     if (!agentId) return
     
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations`)
+      const response = await fetch(`${API_URL}/agents/${agentId}/conversations`)
       if (response.ok) {
         const conversations = await response.json()
         
@@ -252,7 +295,7 @@ export function AgentDetailsPage() {
     if (!agentId) return
     
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations`, {
+      const response = await fetch(`${API_URL}/agents/${agentId}/conversations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -292,7 +335,7 @@ export function AgentDetailsPage() {
         formData.append('file', file)
         formData.append('title', file.name)
         
-        const response = await fetch(`http://localhost:8000/knowledge/agents/${agentId}/documents`, {
+        const response = await fetch(`${API_URL}/knowledge/agents/${agentId}/documents`, {
           method: 'POST',
           body: formData
         })
@@ -324,7 +367,7 @@ export function AgentDetailsPage() {
     setUploading(true)
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/agents/${agentId}/url`, {
+      const response = await fetch(`${API_URL}/knowledge/agents/${agentId}/url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -352,7 +395,7 @@ export function AgentDetailsPage() {
     setSelectedDocument(doc)
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/agents/${agentId}/documents/${doc.id}/content`)
+      const response = await fetch(`${API_URL}/knowledge/agents/${agentId}/documents/${doc.id}/content`)
       if (response.ok) {
         const data = await response.json()
         setDocumentContent(data.content)
@@ -369,7 +412,7 @@ export function AgentDetailsPage() {
     if (!agentId || !confirm('Are you sure you want to delete this document?')) return
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/agents/${agentId}/documents/${docId}`, {
+      const response = await fetch(`${API_URL}/knowledge/agents/${agentId}/documents/${docId}`, {
         method: 'DELETE'
       })
       
@@ -395,7 +438,7 @@ export function AgentDetailsPage() {
     if (!agentId) return
     
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/container/status`)
+      const response = await fetch(`${API_URL}/agents/${agentId}/container/status`)
       if (response.ok) {
         const data = await response.json()
         setContainerInfo(data)
@@ -414,7 +457,7 @@ export function AgentDetailsPage() {
     
     setContainerLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/container/create`, {
+      const response = await fetch(`${API_URL}/agents/${agentId}/container/create`, {
         method: 'POST'
       })
       
@@ -435,7 +478,7 @@ export function AgentDetailsPage() {
     
     setContainerLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/container/start`, {
+      const response = await fetch(`${API_URL}/agents/${agentId}/container/start`, {
         method: 'POST'
       })
       
@@ -456,7 +499,7 @@ export function AgentDetailsPage() {
     
     setContainerLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/container/stop`, {
+      const response = await fetch(`${API_URL}/agents/${agentId}/container/stop`, {
         method: 'POST'
       })
       
@@ -477,7 +520,7 @@ export function AgentDetailsPage() {
     
     setContainerLoading(true)
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/container/restart`, {
+      const response = await fetch(`${API_URL}/agents/${agentId}/container/restart`, {
         method: 'POST'
       })
       
@@ -497,7 +540,7 @@ export function AgentDetailsPage() {
     if (!agentId) return
     
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/container/logs`)
+      const response = await fetch(`${API_URL}/agents/${agentId}/container/logs`)
       if (response.ok) {
         const data = await response.json()
         setContainerLogs(data.logs || [])
@@ -519,8 +562,7 @@ export function AgentDetailsPage() {
     if (!agentId || isLiveLogsActive) return
 
     // Create WebSocket connection for live logs
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/agents/${agentId}/container/logs/stream`
+    const wsUrl = `${WS_URL_BASE}/agents/${agentId}/container/logs/stream`
     
     const ws = new WebSocket(wsUrl)
     
@@ -590,7 +632,7 @@ export function AgentDetailsPage() {
     if (!agentId) return
 
     try {
-      const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations/${conversationId}/messages`)
+      const response = await fetch(`${API_URL}/agents/${agentId}/conversations/${conversationId}/messages`)
       if (response.ok) {
         const messages = await response.json()
         setChatMessages(messages)
@@ -605,8 +647,7 @@ export function AgentDetailsPage() {
   const startChatWebSocket = (conversationId: string) => {
     if (!agentId || chatWebSocket) return
 
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/ws/agents/${agentId}/conversations/${conversationId}`
+    const wsUrl = `${WS_URL_BASE}/ws/agents/${agentId}/conversations/${conversationId}`
     
     const ws = new WebSocket(wsUrl)
     
@@ -691,7 +732,7 @@ export function AgentDetailsPage() {
       // First, enhance the prompt with RAG context
       let enhancedMessage = messageToSend
       try {
-        const ragResponse = await fetch('http://localhost:8000/rag/enhance-prompt', {
+        const ragResponse = await fetch(`${API_URL}/rag/enhance-prompt`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -737,7 +778,7 @@ export function AgentDetailsPage() {
         )
       } else {
         // WebSocket not connected, fall back to HTTP POST
-        const response = await fetch(`http://localhost:8000/agents/${agentId}/conversations/${selectedConversation.id}/messages`, {
+        const response = await fetch(`${API_URL}/agents/${agentId}/conversations/${selectedConversation.id}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -1188,7 +1229,58 @@ export function AgentDetailsPage() {
         {activeTab === 'settings' && (
           <div style={{maxWidth: '50rem'}}>
             <div style={{backgroundColor: 'white', padding: '2rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
-              <h3 style={{fontSize: '1.25rem', fontWeight: '600', marginBottom: '1.5rem'}}>Agent Configuration</h3>
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+                <h3 style={{fontSize: '1.25rem', fontWeight: '600', margin: 0}}>Agent Configuration</h3>
+                <div style={{display: 'flex', gap: '0.5rem'}}>
+                  {!isEditing ? (
+                    <button
+                      onClick={handleStartEdit}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        backgroundColor: '#2563eb',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleCancelEdit}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          backgroundColor: '#6b7280',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.375rem',
+                          fontSize: '0.875rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveEdit}
+                        style={{
+                          padding: '0.5rem 1rem',
+                          backgroundColor: '#16a34a',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '0.375rem',
+                          fontSize: '0.875rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Save
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
               
               <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
                 <div>
@@ -1197,13 +1289,17 @@ export function AgentDetailsPage() {
                   </label>
                   <input
                     type="text"
-                    value={agent.name}
+                    value={isEditing ? (editedAgent?.name || '') : (agent?.name || '')}
+                    onChange={(e) => isEditing && handleFieldChange('name', e.target.value)}
+                    readOnly={!isEditing}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
                       border: '1px solid #d1d5db',
                       borderRadius: '0.375rem',
-                      fontSize: '0.875rem'
+                      fontSize: '0.875rem',
+                      backgroundColor: isEditing ? 'white' : '#f9fafb',
+                      cursor: isEditing ? 'text' : 'default'
                     }}
                   />
                 </div>
@@ -1214,13 +1310,17 @@ export function AgentDetailsPage() {
                   </label>
                   <input
                     type="text"
-                    value={agent.role}
+                    value={isEditing ? (editedAgent?.role || '') : (agent?.role || '')}
+                    onChange={(e) => isEditing && handleFieldChange('role', e.target.value)}
+                    readOnly={!isEditing}
                     style={{
                       width: '100%',
                       padding: '0.75rem',
                       border: '1px solid #d1d5db',
                       borderRadius: '0.375rem',
-                      fontSize: '0.875rem'
+                      fontSize: '0.875rem',
+                      backgroundColor: isEditing ? 'white' : '#f9fafb',
+                      cursor: isEditing ? 'text' : 'default'
                     }}
                   />
                 </div>
@@ -1230,7 +1330,9 @@ export function AgentDetailsPage() {
                     Goal
                   </label>
                   <textarea
-                    value={agent.config.goal || ''}
+                    value={isEditing ? (editedAgent?.config?.goal || '') : (agent?.config?.goal || '')}
+                    onChange={(e) => isEditing && handleFieldChange('config.goal', e.target.value)}
+                    readOnly={!isEditing}
                     rows={3}
                     style={{
                       width: '100%',
@@ -1238,7 +1340,9 @@ export function AgentDetailsPage() {
                       border: '1px solid #d1d5db',
                       borderRadius: '0.375rem',
                       fontSize: '0.875rem',
-                      resize: 'vertical'
+                      resize: 'vertical',
+                      backgroundColor: isEditing ? 'white' : '#f9fafb',
+                      cursor: isEditing ? 'text' : 'default'
                     }}
                   />
                 </div>
@@ -1248,7 +1352,9 @@ export function AgentDetailsPage() {
                     Backstory
                   </label>
                   <textarea
-                    value={agent.config.backstory || ''}
+                    value={isEditing ? (editedAgent?.config?.backstory || '') : (agent?.config?.backstory || '')}
+                    onChange={(e) => isEditing && handleFieldChange('config.backstory', e.target.value)}
+                    readOnly={!isEditing}
                     rows={3}
                     style={{
                       width: '100%',
@@ -1256,7 +1362,9 @@ export function AgentDetailsPage() {
                       border: '1px solid #d1d5db',
                       borderRadius: '0.375rem',
                       fontSize: '0.875rem',
-                      resize: 'vertical'
+                      resize: 'vertical',
+                      backgroundColor: isEditing ? 'white' : '#f9fafb',
+                      cursor: isEditing ? 'text' : 'default'
                     }}
                   />
                 </div>
@@ -1266,16 +1374,23 @@ export function AgentDetailsPage() {
                     <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                       Model
                     </label>
-                    <select style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.875rem'
-                    }}>
-                      <option value={agent.config.model}>{agent.config.model}</option>
+                    <select 
+                      value={isEditing ? (editedAgent?.config?.model || '') : (agent?.config?.model || '')}
+                      onChange={(e) => isEditing && handleFieldChange('config.model', e.target.value)}
+                      disabled={!isEditing}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.875rem',
+                        backgroundColor: isEditing ? 'white' : '#f9fafb',
+                        cursor: isEditing ? 'pointer' : 'default'
+                      }}>
                       <option value="claude-3-opus-20240229">claude-3-opus-20240229</option>
+                      <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
                       <option value="gpt-4">gpt-4</option>
+                      <option value="gpt-4-turbo">gpt-4-turbo</option>
                     </select>
                   </div>
 
@@ -1285,7 +1400,9 @@ export function AgentDetailsPage() {
                     </label>
                     <input
                       type="number"
-                      value={agent.config.temperature}
+                      value={isEditing ? (editedAgent?.config?.temperature || 0) : (agent?.config?.temperature || 0)}
+                      onChange={(e) => isEditing && handleFieldChange('config.temperature', parseFloat(e.target.value))}
+                      readOnly={!isEditing}
                       min="0"
                       max="2"
                       step="0.1"
@@ -1294,7 +1411,9 @@ export function AgentDetailsPage() {
                         padding: '0.75rem',
                         border: '1px solid #d1d5db',
                         borderRadius: '0.375rem',
-                        fontSize: '0.875rem'
+                        fontSize: '0.875rem',
+                        backgroundColor: isEditing ? 'white' : '#f9fafb',
+                        cursor: isEditing ? 'text' : 'default'
                       }}
                     />
                   </div>
@@ -1879,7 +1998,7 @@ export function AgentDetailsPage() {
                   </div>
 
                   {/* Port Mappings */}
-                  {Object.keys(containerInfo.ports).length > 0 && (
+                  {containerInfo.ports && Object.keys(containerInfo.ports).length > 0 && (
                     <div style={{marginTop: '1.5rem'}}>
                       <h5 style={{fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem'}}>Port Mappings</h5>
                       <div style={{fontSize: '0.75rem', fontFamily: 'monospace', color: '#6b7280'}}>

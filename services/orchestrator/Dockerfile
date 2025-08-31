@@ -12,7 +12,6 @@ RUN apt-get update && apt-get install -y \
     wget \
     openssh-client \
     gnupg \
-    software-properties-common \
     build-essential \
     libffi-dev \
     libssl-dev \
@@ -41,14 +40,13 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy source code
 COPY . .
 
-# Copy entrypoint script and set permissions before switching user
+# Copy entrypoint script and set permissions
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Create non-root user and set ownership
-RUN useradd -m -u 1000 orchestrator && \
-    chown -R orchestrator:orchestrator /app
-USER orchestrator
+# Run as root to avoid permission issues with installed packages
+# Note: In production, consider using a non-root user with proper permissions
+USER root
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

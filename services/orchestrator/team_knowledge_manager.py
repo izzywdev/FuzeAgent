@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
-from .organization_rag_manager import (
+from organization_rag_manager import (
     OrganizationRAGManager, KnowledgeCategory, ContentType, 
     SourceType, VisibilityLevel, KnowledgeSearchResult
 )

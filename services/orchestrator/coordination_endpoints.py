@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 import logging
 import asyncpg
-from .database import get_db_connection
+from database import get_db_connection
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/coordination", tags=["Cross-Product Coordination"])

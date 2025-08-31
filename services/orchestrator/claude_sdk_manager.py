@@ -17,8 +17,8 @@ from enum import Enum
 from typing import Dict, List, Optional, Any, Callable, AsyncGenerator
 from dataclasses import dataclass
 
-from .file_operations_engine import FileOperationsEngine, OperationBatch
-from .conversation_manager import ConversationManager, MessageType
+from file_operations_engine import FileOperationsEngine, OperationBatch
+from conversation_manager import ConversationManager, MessageType
 
 logger = logging.getLogger(__name__)
 

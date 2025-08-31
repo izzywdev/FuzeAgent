@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from '../../config/env'
 import { Link } from 'react-router-dom'
 
 interface OrganizationInfo {
@@ -72,7 +73,7 @@ export function OrganizationProfilePage() {
   const loadFirstOrganization = async () => {
     try {
       // First, get all organizations to find the first one
-      const orgsResponse = await fetch('http://localhost:8006/organizations')
+      const orgsResponse = await fetch(`${API_URL}/organizations`)
       if (orgsResponse.ok) {
         const organizations = await orgsResponse.json()
         if (organizations && organizations.length > 0) {
@@ -93,7 +94,7 @@ export function OrganizationProfilePage() {
   const loadOrganizationData = async (orgId?: string) => {
     const targetId = orgId || orgInfo.id
     try {
-      const response = await fetch(`http://localhost:8006/organizations/${targetId}`)
+      const response = await fetch(`${API_URL}/organizations/${targetId}`)
       if (response.ok) {
         const data = await response.json()
         const loadedOrgInfo: OrganizationInfo = {
@@ -118,7 +119,7 @@ export function OrganizationProfilePage() {
   const loadKnowledgeDocuments = async (orgId?: string) => {
     const targetId = orgId || orgInfo.id
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${targetId}/documents`)
+      const response = await fetch(`${API_URL}/knowledge/organizations/${targetId}/documents`)
       if (response.ok) {
         const documents = await response.json()
         setKnowledgeDocs(documents)
@@ -149,7 +150,7 @@ export function OrganizationProfilePage() {
     setSaveMessage(null)
     
     try {
-      const response = await fetch(`http://localhost:8006/organizations/${orgInfo.id}`, {
+      const response = await fetch(`${API_URL}/organizations/${orgInfo.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -202,7 +203,7 @@ export function OrganizationProfilePage() {
         formData.append('file', file)
         formData.append('title', file.name)
         
-        const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/documents`, {
+        const response = await fetch(`${API_URL}/knowledge/organizations/${orgInfo.id}/documents`, {
           method: 'POST',
           body: formData
         })
@@ -232,7 +233,7 @@ export function OrganizationProfilePage() {
     setUploading(true)
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/url`, {
+      const response = await fetch(`${API_URL}/knowledge/organizations/${orgInfo.id}/url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -258,7 +259,7 @@ export function OrganizationProfilePage() {
     setSelectedDocument(doc)
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/documents/${doc.id}/content`)
+      const response = await fetch(`${API_URL}/knowledge/organizations/${orgInfo.id}/documents/${doc.id}/content`)
       if (response.ok) {
         const data = await response.json()
         setDocumentContent(data.content)
@@ -275,7 +276,7 @@ export function OrganizationProfilePage() {
     if (!confirm('Are you sure you want to delete this document?')) return
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/documents/${docId}`, {
+      const response = await fetch(`${API_URL}/knowledge/organizations/${orgInfo.id}/documents/${docId}`, {
         method: 'DELETE'
       })
       
@@ -295,7 +296,7 @@ export function OrganizationProfilePage() {
     setIsSearching(true)
     
     try {
-      const response = await fetch('http://localhost:8000/rag/search', {
+      const response = await fetch(`${API_URL}/rag/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

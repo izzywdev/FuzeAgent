@@ -37,7 +37,7 @@ describe('Agent Workflow Integration Tests', () => {
       }
 
       // Simulate form submission
-      const createResponse = await fetch('http://localhost:8000/agents', {
+      const createResponse = await fetch(expect.stringMatching(/\/agents$/), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(agentData)
@@ -52,7 +52,7 @@ describe('Agent Workflow Integration Tests', () => {
       expect(createdAgent.agent.name).toBe('New Agent')
 
       // Verify agent details fetch
-      const detailsResponse = await fetch(`http://localhost:8000/agents/${createdAgent.agent_id}`)
+      const detailsResponse = await fetch(expect.stringMatching(/\/agents\/.+/))
       const agentDetails = await detailsResponse.json()
 
       expect(detailsResponse.ok).toBe(true)
@@ -64,7 +64,7 @@ describe('Agent Workflow Integration Tests', () => {
       // Mock template selection workflow
       mockFetch.success(mockApiResponses.templates)
 
-      const templatesResponse = await fetch('http://localhost:8000/agent-templates')
+      const templatesResponse = await fetch(expect.stringMatching(/\/agent-templates$/))
       const templatesData = await templatesResponse.json()
 
       expect(templatesData.templates).toHaveLength(1)
@@ -90,7 +90,7 @@ describe('Agent Workflow Integration Tests', () => {
         }
       })
 
-      const createResponse = await fetch('http://localhost:8000/agents', {
+      const createResponse = await fetch(expect.stringMatching(/\/agents$/), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(agentFromTemplate)
@@ -111,7 +111,7 @@ describe('Agent Workflow Integration Tests', () => {
         config: {}
       }
 
-      const response = await fetch('http://localhost:8000/agents', {
+      const response = await fetch(expect.stringMatching(/\/agents$/), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invalidAgentData)
@@ -189,7 +189,7 @@ describe('Agent Workflow Integration Tests', () => {
       // Mock agent details
       mockFetch.success(mockApiResponses.agents[0])
       
-      const agentResponse = await fetch(`http://localhost:8000/agents/${agentId}`)
+      const agentResponse = await fetch(expect.stringMatching(/\/agents\/.+/))
       const agent = await agentResponse.json()
 
       expect(agent.id).toBe(agentId)
@@ -206,7 +206,7 @@ describe('Agent Workflow Integration Tests', () => {
         }
       ])
 
-      const tasksResponse = await fetch(`http://localhost:8000/agents/${agentId}/tasks`)
+      const tasksResponse = await fetch(expect.stringMatching(/\/agents\/.+\/tasks$/))
       const tasks = await tasksResponse.json()
 
       expect(tasks).toHaveLength(1)
@@ -223,7 +223,7 @@ describe('Agent Workflow Integration Tests', () => {
         }
       ])
 
-      const conversationsResponse = await fetch(`http://localhost:8000/agents/${agentId}/conversations`)
+      const conversationsResponse = await fetch(expect.stringMatching(/\/agents\/.+\/conversations$/))
       const conversations = await conversationsResponse.json()
 
       expect(conversations).toHaveLength(1)
@@ -233,7 +233,7 @@ describe('Agent Workflow Integration Tests', () => {
     it('should handle agent not found', async () => {
       mockFetch.error(404, 'Agent not found')
 
-      const response = await fetch('http://localhost:8000/agents/non-existent-id')
+      const response = await fetch(expect.stringMatching(/\/agents\/non-existent-id$/))
       expect(response.ok).toBe(false)
       expect(response.status).toBe(404)
 
@@ -246,7 +246,7 @@ describe('Agent Workflow Integration Tests', () => {
     it('should load teams for agent assignment', async () => {
       mockFetch.success(mockApiResponses.teams)
 
-      const response = await fetch('http://localhost:8000/teams')
+      const response = await fetch(expect.stringMatching(/\/teams$/))
       const teams = await response.json()
 
       expect(teams).toHaveLength(1)
@@ -259,7 +259,7 @@ describe('Agent Workflow Integration Tests', () => {
       // Load available teams
       mockFetch.success(mockApiResponses.teams)
       
-      const teamsResponse = await fetch('http://localhost:8000/teams')
+      const teamsResponse = await fetch(expect.stringMatching(/\/teams$/))
       const teams = await teamsResponse.json()
 
       // Create agent with team assignment
@@ -279,7 +279,7 @@ describe('Agent Workflow Integration Tests', () => {
         }
       })
 
-      const createResponse = await fetch('http://localhost:8000/agents', {
+      const createResponse = await fetch(expect.stringMatching(/\/agents$/), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(agentData)
@@ -302,7 +302,7 @@ describe('Agent Workflow Integration Tests', () => {
       )
 
       try {
-        await fetch('http://localhost:8000/agents')
+        await fetch(expect.stringMatching(/\/agents$/))
       } catch (error) {
         expect(error).toBeInstanceOf(Error)
         expect((error as Error).message).toBe('Network timeout')
@@ -312,7 +312,7 @@ describe('Agent Workflow Integration Tests', () => {
     it('should handle rate limiting', async () => {
       mockFetch.error(429, 'Too Many Requests')
 
-      const response = await fetch('http://localhost:8000/agents')
+      const response = await fetch(expect.stringMatching(/\/agents$/))
       expect(response.status).toBe(429)
       
       const error = await response.json()
@@ -322,7 +322,7 @@ describe('Agent Workflow Integration Tests', () => {
     it('should handle server errors during operations', async () => {
       mockFetch.error(500, 'Internal Server Error')
 
-      const response = await fetch('http://localhost:8000/agents', {
+      const response = await fetch(expect.stringMatching(/\/agents$/), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -344,7 +344,7 @@ describe('Agent Workflow Integration Tests', () => {
       // Create agent
       mockFetch.success(mockApiResponses.createAgent)
 
-      const createResponse = await fetch('http://localhost:8000/agents', {
+      const createResponse = await fetch(expect.stringMatching(/\/agents$/), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

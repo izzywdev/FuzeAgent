@@ -3,7 +3,7 @@ import json
 from typing import Dict, List, Optional
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from .database import get_db_connection
+from database import get_db_connection
 
 class ContextService:
     def __init__(self):

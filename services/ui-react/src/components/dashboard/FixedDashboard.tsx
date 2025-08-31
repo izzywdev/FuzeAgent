@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from '../../config/env'
 import { Link, useNavigate } from 'react-router-dom'
 
 interface Agent {
@@ -49,7 +50,7 @@ export function FixedDashboard() {
 
   useEffect(() => {
     // Load teams count
-    fetch('http://localhost:8000/teams')
+    fetch(`${API_URL}/teams`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {

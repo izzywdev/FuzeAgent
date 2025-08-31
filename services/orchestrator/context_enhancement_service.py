@@ -15,10 +15,10 @@ from dataclasses import dataclass
 
 import asyncpg
 
-from .organization_rag_manager import (
+from organization_rag_manager import (
     OrganizationRAGManager, KnowledgeCategory, ContentType, KnowledgeSearchResult
 )
-from .team_knowledge_manager import TeamKnowledgeManager, TeamKnowledgeSearchResult
+from team_knowledge_manager import TeamKnowledgeManager, TeamKnowledgeSearchResult
 
 logger = logging.getLogger(__name__)
 

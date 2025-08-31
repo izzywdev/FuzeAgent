@@ -42,22 +42,22 @@ function App() {
     try {
       setLoading(true)
       
-      // Load organizations from hierarchy API and templates from orchestrator API
-      const [newOrganizations, newTemplates] = await Promise.all([
+      // Load organizations from hierarchy API and templates from orchestrator API (optional)
+      const results = await Promise.allSettled([
         api.hierarchy.get('/organizations'),
-        api.orchestrator.get('/templates').then(res => res.templates)
+        api.orchestrator.get('/templates').then((res) => res.templates)
       ])
 
-      // Update organizations and templates
+      const newOrganizations = results[0].status === 'fulfilled' ? results[0].value : []
+      const newTemplates = results[1].status === 'fulfilled' ? results[1].value : []
+
       if (forceRefresh || !arraysEqual(organizations, newOrganizations)) {
         setOrganizations(newOrganizations)
-        
-        // Set current organization if not set and we have organizations
         if (!currentOrganization && newOrganizations.length > 0) {
           setCurrentOrganization(newOrganizations[0])
         }
       }
-      
+
       if (forceRefresh || !arraysEqual(templates, newTemplates)) {
         setTemplates(newTemplates)
       }
@@ -65,23 +65,22 @@ function App() {
       // Load teams for current organization
       if (currentOrganization) {
         const newTeams = await api.hierarchy.get(`/teams?organization_id=${currentOrganization.id}`)
-        
         if (forceRefresh || !arraysEqual(teams, newTeams)) {
           setTeams(newTeams)
-          
-          // Set current team if not set and we have teams
           if (!currentTeam && newTeams.length > 0) {
             setCurrentTeam(newTeams[0])
           }
         }
       }
 
-      // Load agents and tasks for current team
+      // Load agents and tasks for current team (tasks optional)
       if (currentTeam) {
-        const [newAgents, newTasks] = await Promise.all([
+        const pair = await Promise.allSettled([
           api.hierarchy.get(`/agents?team_id=${currentTeam.id}`),
           api.orchestrator.get('/tasks')
         ])
+        const newAgents = pair[0].status === 'fulfilled' ? pair[0].value : []
+        const newTasks = pair[1].status === 'fulfilled' ? pair[1].value : []
 
         if (forceRefresh || !arraysEqual(agents, newAgents)) {
           setAgents(newAgents)
@@ -101,9 +100,15 @@ function App() {
     loadData(true) // Force refresh on initial load
   }, [])
 
-  // WebSocket for real-time updates
+  // WebSocket for real-time updates (optional; may fail if orchestrator is down)
   useEffect(() => {
-    const ws = new WebSocket(`${API_ENDPOINTS.WEBSOCKET_BASE}/ws`)
+    let ws: WebSocket | null = null
+    try {
+      ws = new WebSocket(`${API_ENDPOINTS.WEBSOCKET_BASE}/ws`)
+    } catch (e) {
+      console.warn('WebSocket unavailable, continuing without realtime updates')
+      return
+    }
     
     ws.onopen = () => {
       console.log('WebSocket connected')
@@ -159,19 +164,19 @@ function App() {
     }
     
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
+      console.warn('WebSocket error (ignored):', error)
     }
     
     // Keep connection alive with ping
     const pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send('ping')
       }
     }, 30000)
     
     return () => {
       clearInterval(pingInterval)
-      ws.close()
+      ws && ws.close()
     }
   }, [])
 
@@ -229,7 +234,7 @@ function App() {
     }
   }, [loadData])
 
-  // Agent management (updated)
+  // Agent management (uses orchestrator; leave behavior as-is)
   const handleCreateAgent = useCallback(async (agentData: any) => {
     if (!currentTeam) {
       throw new Error('Please select a team first')

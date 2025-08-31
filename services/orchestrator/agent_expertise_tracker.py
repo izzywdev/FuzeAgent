@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
-from .database import get_db_connection
+from database import get_db_connection
 
 logger = logging.getLogger(__name__)
 

@@ -18,10 +18,10 @@ from enum import Enum
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
-from .organization_rag_manager import (
+from organization_rag_manager import (
     OrganizationRAGManager, KnowledgeCategory, ContentType, SourceType, VisibilityLevel
 )
-from .team_knowledge_manager import TeamKnowledgeManager
+from team_knowledge_manager import TeamKnowledgeManager
 
 logger = logging.getLogger(__name__)
 

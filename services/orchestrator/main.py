@@ -9,16 +9,16 @@ import logging
 from datetime import datetime, date
 from decimal import Decimal
 from contextlib import asynccontextmanager
-from .agent_manager import AgentManager
-from .task_queue import TaskQueue
-from .context_service import ContextService
-from .sandbox_manager import AgentSandboxManager
-from .task_execution_engine import TaskExecutionEngine
-from .database import get_db_connection
-from .knowledge_manager import knowledge_manager, DocumentMetadata
-from .container_manager import container_manager, ContainerStatus, ContainerConfig
-from .rag_integration import rag_system, RAGContext
-from .websocket_manager import websocket_manager, WebSocketUpdate, UpdateType, notify_agent_status_change, notify_task_progress, notify_container_status_change, notify_knowledge_update
+from agent_manager import AgentManager
+from task_queue import TaskQueue
+from context_service import ContextService
+from sandbox_manager import AgentSandboxManager
+from task_execution_engine import TaskExecutionEngine
+from database import get_db_connection
+from knowledge_manager import knowledge_manager, DocumentMetadata
+from container_manager import container_manager, ContainerStatus, ContainerConfig
+from rag_integration import rag_system, RAGContext
+from websocket_manager import websocket_manager, WebSocketUpdate, UpdateType, notify_agent_status_change, notify_task_progress, notify_container_status_change, notify_knowledge_update
 from hierarchy_endpoints import router as hierarchy_router
 
 logger = logging.getLogger(__name__)
@@ -209,18 +209,18 @@ async def lifespan(app: FastAPI):
     await app.state.task_execution_engine.start()
     
     # Initialize multi-agent coordinator
-    from .multi_agent_coordinator import integrate_multi_agent_coordination
+    from multi_agent_coordinator import integrate_multi_agent_coordination
     app.state.multi_agent_coordinator = integrate_multi_agent_coordination(app.state.task_execution_engine)
     await app.state.multi_agent_coordinator.start()
     
     # Initialize knowledge management system
     try:
-        from .organization_rag_manager import OrganizationRAGManager
-        from .team_knowledge_manager import TeamKnowledgeManager
-        from .knowledge_propagation_engine import KnowledgePropagationEngine
-        from .knowledge_notification_service import KnowledgeNotificationService
-        from .task_knowledge_extractor import TaskKnowledgeExtractor
-        from .context_enhancement_service import ContextEnhancementService
+        from organization_rag_manager import OrganizationRAGManager
+        from team_knowledge_manager import TeamKnowledgeManager
+        from knowledge_propagation_engine import KnowledgePropagationEngine
+        from knowledge_notification_service import KnowledgeNotificationService
+        from task_knowledge_extractor import TaskKnowledgeExtractor
+        from context_enhancement_service import ContextEnhancementService
         
         app.state.org_rag_manager = OrganizationRAGManager(database_url)
         await app.state.org_rag_manager.initialize()
@@ -247,7 +247,7 @@ async def lifespan(app: FastAPI):
         await app.state.context_enhancement_service.initialize()
         
         # Initialize knowledge analytics service
-        from .knowledge_analytics_service import KnowledgeAnalyticsService
+        from knowledge_analytics_service import KnowledgeAnalyticsService
         app.state.knowledge_analytics_service = KnowledgeAnalyticsService(database_url)
         await app.state.knowledge_analytics_service.initialize()
         
@@ -258,10 +258,10 @@ async def lifespan(app: FastAPI):
     
     # Initialize goals management system
     try:
-        from .goals_management_service import GoalsManagementService
-        from .milestone_task_engine import MilestoneTaskEngine
-        from .goal_conversation_service import GoalConversationService
-        from .goal_tracking_service import GoalTrackingService
+        from goals_management_service import GoalsManagementService
+        from milestone_task_engine import MilestoneTaskEngine
+        from goal_conversation_service import GoalConversationService
+        from goal_tracking_service import GoalTrackingService
         
         app.state.goals_service = GoalsManagementService(database_url)
         await app.state.goals_service.initialize()
@@ -1162,7 +1162,7 @@ async def get_task_messages(task_id: str):
 async def list_sandboxes(agent_id: str = None, status: str = None):
     """List active sandboxes"""
     try:
-        from .sandbox_manager import SandboxStatus
+        from sandbox_manager import SandboxStatus
         
         sandbox_status = None
         if status:
@@ -1510,7 +1510,7 @@ async def send_claude_session_input(task_id: str, input_data: dict):
 async def get_mcp_tools():
     """Get available MCP tools"""
     try:
-        from .mcp_integration import FuzeAgentMCPServer
+        from mcp_integration import FuzeAgentMCPServer
         
         mcp_server = FuzeAgentMCPServer()
         tools = [
@@ -1534,7 +1534,7 @@ async def get_mcp_tools():
 async def call_mcp_tool(tool_request: MCPToolRequest = Body(...)):
     """Call an MCP tool"""
     try:
-        from .mcp_integration import FuzeAgentMCPServer
+        from mcp_integration import FuzeAgentMCPServer
         
         tool_name = tool_request.get("tool_name")
         arguments = tool_request.get("arguments", {})
@@ -1554,7 +1554,7 @@ async def call_mcp_tool(tool_request: MCPToolRequest = Body(...)):
 async def get_mcp_resources():
     """Get available MCP resources"""
     try:
-        from .mcp_integration import FuzeAgentMCPServer
+        from mcp_integration import FuzeAgentMCPServer
         
         mcp_server = FuzeAgentMCPServer()
         resources = [
@@ -1576,7 +1576,7 @@ async def get_mcp_resources():
 async def get_mcp_resource(uri: str):
     """Get an MCP resource by URI"""
     try:
-        from .mcp_integration import FuzeAgentMCPServer
+        from mcp_integration import FuzeAgentMCPServer
         
         if not uri:
             raise HTTPException(status_code=400, detail="uri parameter is required")
@@ -1593,7 +1593,7 @@ async def get_mcp_resource(uri: str):
 async def get_task_mcp_context(task_id: str):
     """Get MCP context for a task"""
     try:
-        from .mcp_integration import FuzeAgentMCPServer, MCPClaudeIntegration
+        from mcp_integration import FuzeAgentMCPServer, MCPClaudeIntegration
         
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution:
@@ -1622,7 +1622,7 @@ async def setup_agent_mcp(agent_id: str = Path(..., description="Agent ID"),
                            setup_data: AgentMCPSetupRequest = Body(...)):
     """Set up MCP integration for an agent"""
     try:
-        from .mcp_integration import FuzeAgentMCPServer, MCPClaudeIntegration
+        from mcp_integration import FuzeAgentMCPServer, MCPClaudeIntegration
         
         task_id = setup_data.get("task_id")
         session_id = setup_data.get("session_id")
@@ -1660,7 +1660,7 @@ async def initiate_task_coordination(task_id: str = Path(..., description="Task 
                                       coordination_request: CoordinationRequest = Body(...)):
     """Initiate multi-agent coordination for a complex task"""
     try:
-        from .multi_agent_coordinator import CoordinationMode
+        from multi_agent_coordinator import CoordinationMode
         
         coordination_mode = coordination_request.get("coordination_mode", "collaborative")
         required_agents = coordination_request.get("required_agents")
@@ -1864,7 +1864,7 @@ async def store_provider_credentials(
 ):
     """Store encrypted API credentials for a model provider at organization level"""
     try:
-        from .model_configuration import model_config_manager, ModelProvider
+        from model_configuration import model_config_manager, ModelProvider
         
         # Validate provider
         try:
@@ -1904,7 +1904,7 @@ async def get_available_models(
 ):
     """Get available AI models with provider credential validation"""
     try:
-        from .model_configuration import model_config_manager, ModelProvider, ModelCapability
+        from model_configuration import model_config_manager, ModelProvider, ModelCapability
         
         provider_filter = None
         if provider:
@@ -1945,7 +1945,7 @@ async def configure_agent_model(
 ):
     """Configure model settings for an AI agent"""
     try:
-        from .model_configuration import model_config_manager, AgentModelConfig
+        from model_configuration import model_config_manager, AgentModelConfig
         
         agent_config = AgentModelConfig(
             agent_id=agent_id,
@@ -1984,7 +1984,7 @@ async def configure_agent_model(
 async def get_agent_model_configuration(agent_id: str = Path(..., description="Agent ID")):
     """Get model configuration for an AI agent"""
     try:
-        from .model_configuration import model_config_manager
+        from model_configuration import model_config_manager
         
         config = await model_config_manager.get_agent_model_config(agent_id)
         
@@ -2023,7 +2023,7 @@ async def estimate_task_cost(
 ):
     """Estimate cost for task execution based on agent's model configuration"""
     try:
-        from .model_configuration import model_config_manager
+        from model_configuration import model_config_manager
         
         estimate = await model_config_manager.estimate_task_cost(
             agent_id=agent_id,
@@ -2046,7 +2046,7 @@ async def get_organization_model_usage(
 ):
     """Get model usage statistics and costs for an organization"""
     try:
-        from .model_configuration import model_config_manager
+        from model_configuration import model_config_manager
         
         usage = await model_config_manager.get_organization_model_usage(
             organization_id=organization_id,
@@ -2069,7 +2069,7 @@ async def get_model_recommendations(
 ):
     """Get model recommendations based on task capabilities and cost constraints"""
     try:
-        from .model_configuration import model_config_manager, ModelCapability
+        from model_configuration import model_config_manager, ModelCapability
         
         # Parse capabilities
         try:
@@ -2115,7 +2115,7 @@ async def get_knowledge_notifications(
 ):
     """Get knowledge notifications for a recipient"""
     try:
-        from .knowledge_notification_service import KnowledgeNotificationService, NotificationStatus, NotificationType
+        from knowledge_notification_service import KnowledgeNotificationService, NotificationStatus, NotificationType
         
         # Initialize notification service if not already done
         if not hasattr(app.state, 'notification_service'):
@@ -2181,7 +2181,7 @@ async def update_notification_status(
 ):
     """Update notification status and optional action taken"""
     try:
-        from .knowledge_notification_service import NotificationStatus
+        from knowledge_notification_service import NotificationStatus
         
         # Validate status
         try:
@@ -2244,7 +2244,7 @@ async def add_organizational_knowledge(
 ):
     """Add knowledge to organization-level knowledge base"""
     try:
-        from .organization_rag_manager import ContentType, KnowledgeCategory, SourceType
+        from organization_rag_manager import ContentType, KnowledgeCategory, SourceType
         
         # Initialize services if not already done
         if not hasattr(app.state, 'org_rag_manager'):
@@ -2295,7 +2295,7 @@ async def search_organizational_knowledge(
 ):
     """Search organization-level knowledge base"""
     try:
-        from .organization_rag_manager import KnowledgeCategory
+        from organization_rag_manager import KnowledgeCategory
         
         # Parse categories
         category_filters = None
@@ -2352,7 +2352,7 @@ async def get_enhanced_context_for_agent(
 ):
     """Get enhanced context with relevant knowledge for agent task execution"""
     try:
-        from .context_enhancement_service import ContextEnhancementService
+        from context_enhancement_service import ContextEnhancementService
         
         # Initialize context enhancement service if needed
         if not hasattr(app.state, 'context_enhancement_service'):
@@ -2890,7 +2890,7 @@ async def create_goal(
 ):
     """Create a new organizational goal"""
     try:
-        from .goals_management_service import GoalType
+        from goals_management_service import GoalType
         
         goal_id = await app.state.goals_service.create_goal(
             organization_id=organization_id,
@@ -2928,7 +2928,7 @@ async def list_organization_goals(
 ):
     """List goals for an organization"""
     try:
-        from .goals_management_service import GoalStatus, GoalType
+        from goals_management_service import GoalStatus, GoalType
         
         status_filter = [GoalStatus(s) for s in status] if status else None
         type_filter = [GoalType(gt) for gt in goal_type] if goal_type else None
@@ -3245,7 +3245,7 @@ async def create_goal_conversation(
 ):
     """Create goal conversation"""
     try:
-        from .goal_conversation_service import ConversationType
+        from goal_conversation_service import ConversationType
         
         conversation_id = await app.state.goal_conversation_service.create_goal_conversation(
             goal_id=goal_id,
@@ -3295,7 +3295,7 @@ async def add_message_to_conversation(
 ):
     """Add message to conversation"""
     try:
-        from .goal_conversation_service import MessageType
+        from goal_conversation_service import MessageType
         
         message_id = await app.state.goal_conversation_service.add_message_to_conversation(
             conversation_id=conversation_id,
@@ -3398,7 +3398,7 @@ async def get_goal_conversations(
 ):
     """Get conversations for a goal"""
     try:
-        from .goal_conversation_service import ConversationType, ConversationStatus
+        from goal_conversation_service import ConversationType, ConversationStatus
         
         conv_type = ConversationType(conversation_type) if conversation_type else None
         conv_status = ConversationStatus(status) if status else None

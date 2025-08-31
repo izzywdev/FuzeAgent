@@ -1,23 +1,49 @@
 # FuzeAgent - AI Team Orchestration Platform
+## Version 0.0.1.0
 
 FuzeAgent is a comprehensive AI team orchestration platform that creates and manages autonomous AI agents using Claude Code SDK and CrewAI. The system implements a distributed microservices architecture where multiple AI agents collaborate to complete complex software development tasks, coordinated by a digital CEO (IzzyAI).
 
-## 🏗️ Architecture
+## 🎉 What's New in Version 0.0.1.0
+
+### ✨ Major Features
+- **Full UI Implementation**: Complete React-based management interface now fully functional
+- **Direct Database Integration**: UI now communicates directly with the Hierarchy API service
+- **Separated Database Service**: Database management moved to dedicated microservice for better scalability
+- **API-First Architecture**: All UI functionality now backed by comprehensive REST API endpoints
+
+### 🔄 Architecture Changes
+- **New Hierarchy API Service**: Dedicated FastAPI service handling all UI-database communication
+- **Database Service Separation**: PostgreSQL management now runs as independent microservice
+- **Direct API Integration**: UI bypasses orchestrator for immediate database operations
+- **Streamlined Data Flow**: Simplified architecture for better performance and reliability
+
+## 🏗️ Updated Architecture (v0.0.1.0)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Management UI                            │
-│                    (React + WebSocket + D3.js)                  │
+│                    Management UI (React)                        │ 
+│                  + WebSocket + D3.js                           │
 └─────────────────────────┬───────────────────────────────────────┘
-                          │
-┌─────────────────────────┴───────────────────────────────────────┐
-│                 Orchestration Service (FastAPI)                  │
-│                        + CrewAI Core                             │
+                          │ Direct API Communication
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Hierarchy API Service                         │
+│                     (FastAPI + AsyncPG)                        │
 └─────────────────────────┬───────────────────────────────────────┘
-                          │
-┌─────────────────────────┴───────────────────────────────────────┐
-│                      Message Queue (RabbitMQ)                    │
-└─────────────────────────┬───────────────────────────────────────┘
+                          │ Direct Database Access
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Database Service                              │
+│                    (PostgreSQL + pgvector)                     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│                   Orchestration Layer                          │
+│  ┌───────────────────┐  ┌─────────────────┐  ┌───────────────┐ │
+│  │ Orchestrator API  │  │  Message Queue  │  │  Agent Mgmt   │ │
+│  │   (FastAPI)       │  │   (RabbitMQ)    │  │   (CrewAI)    │ │
+│  └───────────────────┘  └─────────────────┘  └───────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
                           │
 ┌─────────────────────────┴───────────────────────────────────────┐
 │                        Agent Containers                          │
@@ -28,15 +54,13 @@ FuzeAgent is a comprehensive AI team orchestration platform that creates and man
 │  │Frontend Dev1│  │Frontend Dev2│  │Backend Dev1 │  ...       │
 │  └─────────────┘  └─────────────┘  └─────────────┘            │
 └──────────────────────────────────────────────────────────────────┘
-                          │
-┌─────────────────────────┴───────────────────────────────────────┐
-│                     Shared Services                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐       │
-│  │Context Store │  │  MCP Servers │  │  Code Storage  │       │
-│  │  (Postgres)  │  │   (Node.js)  │  │   (GitLab)    │       │
-│  └──────────────┘  └──────────────┘  └────────────────┘       │
-└──────────────────────────────────────────────────────────────────┘
 ```
+
+### Key Architectural Improvements
+- **Direct UI-Database Communication**: Management UI now connects directly to Hierarchy API service
+- **Separated Concerns**: Database operations isolated from agent orchestration
+- **Better Performance**: Eliminated unnecessary proxy layers for UI operations
+- **Independent Scaling**: Database and orchestration services can scale independently
 
 ## 🚀 Quick Start
 
@@ -74,13 +98,15 @@ FuzeAgent is a comprehensive AI team orchestration platform that creates and man
 ## 🎛️ Services
 
 ### Core Infrastructure
-- **PostgreSQL** (port 5432): Primary database with pgvector for embeddings
-- **RabbitMQ** (port 5672, management 15672): Message queue for agent communication
-- **Redis** (port 6379): Caching and session storage
+- **PostgreSQL** (port 5434): Primary database with pgvector for embeddings
+- **RabbitMQ** (port 5672, management 15673): Message queue for agent communication  
+- **Redis** (port 6380): Caching and session storage
 
-### Application Services
+### Application Services (New in v0.0.1.0)
+- **Management UI** (port 3001): React-based dashboard - **Now Fully Functional** ✅
+- **Hierarchy API** (port 8006): FastAPI service handling UI-database operations - **New** ✨
+- **Database Service** (port 5434): Dedicated PostgreSQL management service - **New** ✨
 - **Orchestrator** (port 8000): FastAPI service managing agents and tasks
-- **Management UI** (port 3000): React-based dashboard (coming soon)
 
 ## 🎯 Goals Management System
 
@@ -235,11 +261,14 @@ GET /health
 
 ## 🛠️ Development
 
-### Project Structure
+### Project Structure (Updated v0.0.1.0)
 ```
 FuzeAgent/
 ├── services/
-│   └── orchestrator/          # FastAPI orchestration service
+│   ├── orchestrator/          # FastAPI orchestration service
+│   ├── ui-react/              # React Management UI - NEW ✨
+│   ├── hierarchy_API/         # Hierarchy API service - NEW ✨
+│   └── database_service/      # Database management service - NEW ✨
 ├── containers/
 │   ├── base-agent/           # Base agent container
 │   ├── developer-agent/      # Developer-specific agent
@@ -250,26 +279,44 @@ FuzeAgent/
 └── setup.sh                 # Quick setup script
 ```
 
-### Common Commands
+### New Service Details
+- **ui-react/**: Complete React frontend with agent management, team hierarchies, goals tracking, and real-time monitoring
+- **hierarchy_API/**: FastAPI service providing REST endpoints for UI operations with direct database access
+- **database_service/**: Dedicated PostgreSQL service with optimized connection pooling and health monitoring
+
+### Common Commands (Updated for v0.0.1.0)
 
 ```bash
-# View logs
-docker-compose logs -f [service_name]
+# Access the Management UI (NEW!)
+open http://localhost:3001
+
+# View service logs
+docker-compose logs -f ui-react          # React UI logs
+docker-compose logs -f hierarchy_API     # Hierarchy API logs
+docker-compose logs -f database_service  # Database service logs
+docker-compose logs -f orchestrator      # Orchestrator logs
 
 # Restart services
 docker-compose restart
+docker-compose restart ui-react          # Restart just the UI
+docker-compose restart hierarchy_API     # Restart just the API
 
 # Stop all services
 docker-compose down
 
-# Build and restart
+# Build and restart (recommended after code changes)
 docker-compose build && docker-compose up -d
 
-# Database access
-docker-compose exec postgres psql -U postgres -d ai_context
+# Database access (via dedicated service)
+docker-compose exec database_service psql -U postgres -d ai_context
+
+# API Health Checks
+curl http://localhost:8006/health         # Hierarchy API
+curl http://localhost:8000/health         # Orchestrator
+curl http://localhost:3001                # UI (should show React app)
 
 # RabbitMQ management
-open http://localhost:15672  # admin/[password from .env]
+open http://localhost:15673  # admin/[password from .env]
 ```
 
 ### Adding New Agent Types
@@ -318,12 +365,19 @@ The system uses both global and project-specific Claude Code configurations:
 
 ## 📊 Monitoring
 
-### Health Checks
+### Health Checks (Updated for v0.0.1.0)
+- **Management UI**: `http://localhost:3001` - **Now Available** ✅
+- **Hierarchy API**: `http://localhost:8006/health` - **New** ✨
+- **Database Service**: `docker-compose exec database_service pg_isready` - **Updated** ✨
 - **Orchestrator**: `http://localhost:8000/health`
-- **Database**: `docker-compose exec postgres pg_isready`
-- **RabbitMQ**: `http://localhost:15672`
+- **RabbitMQ**: `http://localhost:15673`
 
-### Observability
+### Observability (Enhanced in v0.0.1.0)
+- **Full UI Dashboard**: Real-time agent monitoring, task tracking, and system metrics ✅
+- **Interactive Agent Management**: Create, configure, and monitor agents through web interface ✅
+- **Knowledge Management**: Upload documents and manage agent knowledge bases through UI ✅
+- **Team Hierarchies**: Visual organization charts and team management ✅
+- **Goal Tracking**: Complete goals management with progress visualization ✅
 - Structured logging with correlation IDs
 - Real-time WebSocket updates
 - Task completion metrics
@@ -356,31 +410,63 @@ The system uses both global and project-specific Claude Code configurations:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🆘 Troubleshooting
+## 🆘 Troubleshooting (Updated for v0.0.1.0)
 
 ### Common Issues
 
+**UI Not Loading**
+- Verify React service is running: `docker-compose ps ui-react`
+- Check UI logs: `docker-compose logs ui-react`
+- Ensure port 3001 is available: `curl http://localhost:3001`
+
+**API Endpoints Not Working**
+- Verify Hierarchy API is running: `curl http://localhost:8006/health`
+- Check API logs: `docker-compose logs hierarchy_API`
+- Ensure database service is connected: `docker-compose ps database_service`
+
 **Agent Creation Fails**
 - Verify `ANTHROPIC_API_KEY` is set correctly
-- Check database connectivity: `docker-compose ps postgres`
+- Check database connectivity: `docker-compose ps database_service`
 - Ensure RabbitMQ is running: `docker-compose ps rabbitmq`
+- Try creating agent through UI at `http://localhost:3001/agents`
 
 **Tasks Not Processing**
 - Check agent container status: `docker-compose ps`
 - View orchestrator logs: `docker-compose logs orchestrator`
-- Verify message queue: http://localhost:15672
+- Verify message queue: http://localhost:15673
 
 **Database Connection Issues**
-- Restart PostgreSQL: `docker-compose restart postgres`
-- Check database logs: `docker-compose logs postgres`
+- Restart database service: `docker-compose restart database_service`
+- Check database logs: `docker-compose logs database_service`
 - Verify connection string in `.env`
+- Test connection: `docker-compose exec database_service pg_isready`
 
 ### Getting Help
 
-- Check the logs: `docker-compose logs -f`
-- Verify service health: `curl http://localhost:8000/health`
-- Review agent status: `curl http://localhost:8000/agents`
-- Consult `CLAUDE.md` for detailed guidance
+- **Check the Management UI**: http://localhost:3001 for visual system status
+- **API Health Checks**: 
+  - UI: http://localhost:3001
+  - Hierarchy API: http://localhost:8006/health  
+  - Orchestrator: http://localhost:8000/health
+- **Service Logs**: `docker-compose logs -f [service_name]`
+- **Database Status**: Use UI or `curl http://localhost:8006/agents`
+- **Consult Documentation**: `CLAUDE.md` for detailed guidance
+
+---
+
+## 🎯 Version 0.0.1.0 Summary
+
+This major release transforms FuzeAgent from a backend-only system to a **fully functional web application**:
+
+✅ **Complete React UI** - Beautiful, responsive management interface  
+✅ **Direct Database Integration** - Fast, reliable data operations  
+✅ **Microservice Architecture** - Scalable, maintainable service separation  
+✅ **Real-time Monitoring** - Live system status and agent management  
+✅ **Knowledge Management** - Document upload and URL integration  
+✅ **Team Hierarchies** - Visual organization management  
+✅ **Goal Tracking** - Comprehensive goal and milestone management  
+
+**Ready to use at: http://localhost:3001** 🚀
 
 ---
 

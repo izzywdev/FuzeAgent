@@ -18,11 +18,11 @@ from dataclasses import dataclass
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
-from .organization_rag_manager import (
+from organization_rag_manager import (
     OrganizationRAGManager, KnowledgeCategory, ContentType, SourceType
 )
-from .team_knowledge_manager import TeamKnowledgeManager
-from .knowledge_propagation_engine import KnowledgePropagationEngine, PropagationTrigger
+from team_knowledge_manager import TeamKnowledgeManager
+from knowledge_propagation_engine import KnowledgePropagationEngine, PropagationTrigger
 
 logger = logging.getLogger(__name__)
 

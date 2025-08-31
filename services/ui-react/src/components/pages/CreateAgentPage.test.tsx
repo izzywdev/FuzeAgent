@@ -44,8 +44,8 @@ describe('CreateAgentPage', () => {
         expect(screen.getByText('Create New Agent')).toBeInTheDocument()
       })
 
-      expect(fetch).toHaveBeenCalledWith('http://localhost:8000/teams')
-      expect(fetch).toHaveBeenCalledWith('http://localhost:8000/agent-templates')
+      expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/teams$/))
+      expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/agent-templates$/))
     })
   })
 
@@ -202,7 +202,7 @@ describe('CreateAgentPage', () => {
 
       // Should call API with correct data
       await waitFor(() => {
-        expect(fetch).toHaveBeenCalledWith('http://localhost:8000/agents', {
+        expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/agents$/), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

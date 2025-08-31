@@ -3,7 +3,7 @@ import aio_pika
 import json
 import os
 from typing import Dict, List, Optional, Any
-from .database import DatabaseManager
+from database import DatabaseManager
 
 class TaskQueue:
     def __init__(self):

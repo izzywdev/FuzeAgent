@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from '../../config/env'
 import { Link, useNavigate } from 'react-router-dom'
 
 interface Agent {
@@ -38,7 +39,7 @@ export function FixedAgentsPage() {
   }, [agents, searchTerm, typeFilter])
 
   useEffect(() => {
-    fetch('http://localhost:8000/agents')
+    fetch(`${API_URL}/agents`)
       .then(res => res.json())
       .then(data => {
         const agentData = Array.isArray(data) ? data : []

@@ -4,11 +4,11 @@ import asyncio
 import docker
 import os
 import uuid
-from .claude_code_wrapper import ClaudeCodeWrapper
-from .database import get_db_connection, DatabaseManager
-from .sandbox_manager import AgentSandboxManager
-from .git_workflow_manager import GitWorkflowManager
-from .agent_expertise_tracker import AgentExpertiseTracker
+from claude_code_wrapper import ClaudeCodeWrapper
+from database import get_db_connection, DatabaseManager
+from sandbox_manager import AgentSandboxManager
+from git_workflow_manager import GitWorkflowManager
+from agent_expertise_tracker import AgentExpertiseTracker
 
 class AgentManager:
     def __init__(self, database_url: str):

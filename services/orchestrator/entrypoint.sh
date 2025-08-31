@@ -27,7 +27,7 @@ wait_for_service() {
 }
 
 # Wait for database
-wait_for_service postgres 5432 "PostgreSQL"
+wait_for_service database 5432 "PostgreSQL"
 
 # Wait for Redis
 wait_for_service redis 6379 "Redis"

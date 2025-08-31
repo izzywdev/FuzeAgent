@@ -14,7 +14,7 @@ import anthropic
 from anthropic import Anthropic
 
 # Import conversation manager for full chat tracking
-from .conversation_manager import ConversationManager, MessageType
+from conversation_manager import ConversationManager, MessageType
 
 class ClaudeCodeInput(BaseModel):
     """Input schema for Claude Code tool"""
