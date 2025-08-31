@@ -955,6 +955,7 @@ export function AgentDetailsPage(): React.ReactElement {
                           type: agent.type,
                           team_id: agent.team_id,
                           container_image: agent.container_image || null,
+                          container_env: agent.container_env || {},
                           config: agent.config,
                         })
                       })

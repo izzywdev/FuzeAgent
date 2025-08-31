@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import { TeamToolsSection } from './TeamToolsSection'
 
 interface TeamMember {
   id: string
@@ -542,6 +543,7 @@ export function TeamDetailsPage() {
               { id: 'members', label: 'Members' },
               { id: 'tasks', label: 'Tasks' },
               { id: 'knowledge', label: 'Knowledge Base' },
+              { id: 'tools', label: 'Tools' },
               { id: 'performance', label: 'Performance' }
             ].map(tab => (
               <button
@@ -820,6 +822,13 @@ export function TeamDetailsPage() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'tools' && (
+          <TeamToolsSection 
+            teamId={teamId || ''}
+            onToolsChange={() => {}}
+          />
         )}
 
         {activeTab === 'knowledge' && (

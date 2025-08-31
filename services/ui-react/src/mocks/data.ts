@@ -127,6 +127,75 @@ export let agents = [
 	},
 ]
 
+// ---------------- Organization tools and settings (mock) ----------------
+export type OrgTool = {
+  id: string
+  org_id: string
+  key: string
+  name: string
+  description?: string
+  default_config: Record<string, any>
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+export let orgTools: OrgTool[] = [
+  {
+    id: crypto.randomUUID(),
+    org_id: organizations[0].id,
+    key: 'code_generation',
+    name: 'Code Generation',
+    description: 'LLM-based code generation',
+    default_config: { model: 'claude-sonnet-4-20250514', temperature: 0.4 },
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: crypto.randomUUID(),
+    org_id: organizations[0].id,
+    key: 'code_review',
+    name: 'Code Review',
+    description: 'Automated code review',
+    default_config: { model: 'claude-sonnet-4-20250514', temperature: 0.2 },
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: crypto.randomUUID(),
+    org_id: organizations[0].id,
+    key: 'api_development',
+    name: 'API Development',
+    description: 'API scaffolding and contract testing',
+    default_config: { language: 'python', framework: 'fastapi' },
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+]
+
+export type TeamToolSetting = {
+  team_id: string
+  tool_id: string
+  enabled: boolean
+  config_override?: Record<string, any>
+  updated_at: string
+}
+export let teamToolSettings: TeamToolSetting[] = [
+  { team_id: teams[0].id, tool_id: orgTools[0].id, enabled: true, updated_at: new Date().toISOString() },
+  { team_id: teams[0].id, tool_id: orgTools[1].id, enabled: true, updated_at: new Date().toISOString() },
+]
+
+export type AgentToolSetting = {
+  agent_id: string
+  tool_id: string
+  enabled: boolean
+  config_override?: Record<string, any>
+  updated_at: string
+}
+export let agentToolSettings: AgentToolSetting[] = []
+
 export let agentTemplates = [
 	{
 		id: 'react-dev',
@@ -225,6 +294,9 @@ type MockDB = {
 	knowledgeDocs: typeof knowledgeDocs
 	tasks: typeof tasks
 	goals: typeof goals
+	orgTools: typeof orgTools
+	teamToolSettings: typeof teamToolSettings
+	agentToolSettings: typeof agentToolSettings
 }
 
 function canUseLocalStorage(): boolean {
@@ -245,6 +317,9 @@ export function saveMockDB() {
 		knowledgeDocs,
 		tasks,
 		goals,
+		orgTools,
+		teamToolSettings,
+		agentToolSettings,
 	}
 	localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
@@ -266,6 +341,9 @@ export function loadMockDB() {
 		if (parsed.knowledgeDocs && Array.isArray(parsed.knowledgeDocs)) knowledgeDocs = parsed.knowledgeDocs as any
 		if (parsed.tasks && Array.isArray(parsed.tasks)) tasks = parsed.tasks as any
 		if ((parsed as any).goals && Array.isArray((parsed as any).goals)) goals = (parsed as any).goals as any
+		if ((parsed as any).orgTools && Array.isArray((parsed as any).orgTools)) orgTools = (parsed as any).orgTools as any
+		if ((parsed as any).teamToolSettings && Array.isArray((parsed as any).teamToolSettings)) teamToolSettings = (parsed as any).teamToolSettings as any
+		if ((parsed as any).agentToolSettings && Array.isArray((parsed as any).agentToolSettings)) agentToolSettings = (parsed as any).agentToolSettings as any
 		// Migration: move top-level conversations/messages into agents
 		const topConversations = (parsed as any).conversations as any[] | undefined
 		const topMessages = (parsed as any).messages as ChatMessage[] | undefined

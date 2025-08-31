@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { EnvEditor } from '../common/EnvEditor'
 
 interface Team {
   id: string
@@ -35,6 +36,7 @@ export function CreateAgentPage() {
     team_id: '',
     template_id: '',
     container_image: 'node:20-bullseye',
+    container_env: {} as Record<string, string>,
     config: {
       model: 'claude-sonnet-4-20250514',
       temperature: 0.7,
@@ -134,6 +136,7 @@ export function CreateAgentPage() {
       template_id: template.id,
       role: template.name,
       container_image: template.defaultDockerImage || formData.container_image || 'node:20-bullseye',
+      container_env: {},
       config: {
         ...template.defaultConfig,
         tools: [...template.defaultConfig.tools]
@@ -157,6 +160,7 @@ export function CreateAgentPage() {
           type: formData.type,
           team_id: formData.team_id,
           container_image: formData.container_image,
+          container_env: formData.container_env,
           config: formData.config
         })
       })
@@ -182,12 +186,15 @@ export function CreateAgentPage() {
     }
   }
 
-  const availableTools = [
-    'code_generation', 'code_review', 'debugging', 'testing', 'api_development',
-    'database_design', 'infrastructure_management', 'deployment', 'monitoring',
-    'security', 'performance_testing', 'test_automation', 'bug_reporting',
-    'quality_analysis', 'strategic_planning', 'team_management', 'resource_allocation'
-  ]
+  const [teamTools, setTeamTools] = useState<Array<{ tool: { id: string, key: string, name: string }, setting: { enabled: boolean, config_override?: Record<string, any> } }>>([])
+
+  useEffect(() => {
+    const tid = formData.team_id
+    if (!tid) { setTeamTools([]); return }
+    fetch(`/teams/${tid}/tools`).then(r => r.json()).then((list) => {
+      if (Array.isArray(list)) setTeamTools(list)
+    }).catch(() => setTeamTools([]))
+  }, [formData.team_id])
 
   if (loading) {
     return (
@@ -481,24 +488,25 @@ export function CreateAgentPage() {
 
             <div style={{marginTop: '1.5rem'}}>
               <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
-                Available Tools
+                Available Tools (from Team Settings)
               </label>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '0.375rem', padding: '1rem'}}>
-                {availableTools.map(tool => (
-                  <label key={tool} style={{display: 'flex', alignItems: 'center', fontSize: '0.875rem'}}>
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '0.375rem', padding: '1rem'}}>
+                {teamTools.map(({ tool, setting }) => (
+                  <label key={tool.id} style={{display: 'flex', alignItems: 'center', fontSize: '0.875rem'}}>
                     <input
                       type="checkbox"
-                      checked={formData.config.tools.includes(tool)}
+                      checked={formData.config.tools.includes(tool.key)}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setFormData({...formData, config: {...formData.config, tools: [...formData.config.tools, tool]}})
+                          setFormData({...formData, config: {...formData.config, tools: [...formData.config.tools, tool.key]}})
                         } else {
-                          setFormData({...formData, config: {...formData.config, tools: formData.config.tools.filter(t => t !== tool)}})
+                          setFormData({...formData, config: {...formData.config, tools: formData.config.tools.filter(t => t !== tool.key)}})
                         }
                       }}
                       style={{marginRight: '0.5rem'}}
                     />
-                    {tool.replace(/_/g, ' ')}
+                    <span title={tool.key}>{tool.name || tool.key}</span>
+                    {!setting.enabled && <span style={{marginLeft: '0.5rem', fontSize: '0.75rem', color: '#9ca3af'}}>(team disabled)</span>}
                   </label>
                 ))}
               </div>
@@ -525,6 +533,16 @@ export function CreateAgentPage() {
               <option value="python:3.11-slim">python:3.11-slim</option>
               <option value="python:3.11-alpine">python:3.11-alpine</option>
             </select>
+          </div>
+
+          <div style={{marginTop: '1.5rem'}}>
+            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+              Environment Variables
+            </label>
+            <EnvEditor
+              value={formData.container_env}
+              onChange={(env) => setFormData({...formData, container_env: env})}
+            />
           </div>
 
           {/* Submit Button */}

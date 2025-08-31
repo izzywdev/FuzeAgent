@@ -1,7 +1,7 @@
 // Very small mock fetch layer that intercepts calls the app makes and returns realistic data
 // Disable by not importing this module in main.tsx
 
-import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB, tasks, goals } from './data'
+import { agents, teams, organizations, agentTemplates, knowledgeDocs, jsonResponse, saveMockDB, loadMockDB, tasks, goals, orgTools, teamToolSettings, agentToolSettings } from './data'
 import type { ChatMessage } from './data'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -22,6 +22,124 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit) {
 
 	// Hierarchy API
 	if (method === 'GET' && path === '/organizations') return jsonResponse(organizations)
+
+	// ---------------- Organization Tools ----------------
+	if (method === 'GET' && path.startsWith('/organizations/') && path.endsWith('/tools')) {
+		const orgId = path.split('/')[2]
+		return jsonResponse(orgTools.filter(t => t.org_id === orgId))
+	}
+	if (method === 'POST' && path.startsWith('/organizations/') && path.endsWith('/tools')) {
+		const orgId = path.split('/')[2]
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const now = new Date().toISOString()
+		const t = {
+			id: crypto.randomUUID(),
+			org_id: orgId,
+			key: body.key || `tool_${Math.random().toString(36).slice(2,8)}`,
+			name: body.name || 'Tool',
+			description: body.description || '',
+			default_config: body.default_config || {},
+			is_active: true,
+			created_at: now,
+			updated_at: now,
+		}
+		;(orgTools as any[]).push(t)
+		saveMockDB()
+		return jsonResponse(t, { status: 201 })
+	}
+	if (method === 'PUT' && /^\/organizations\/[^/]+\/tools\/[^/]+$/.test(path)) {
+		const [, , orgId, , toolId] = path.split('/')
+		const idx = (orgTools as any[]).findIndex(t => t.id === toolId && t.org_id === orgId)
+		if (idx === -1) return jsonResponse({ message: 'Tool not found' }, { status: 404 })
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		;(orgTools as any[])[idx] = { ...(orgTools as any[])[idx], ...body, updated_at: new Date().toISOString() }
+		saveMockDB()
+		return jsonResponse((orgTools as any[])[idx])
+	}
+	if (method === 'DELETE' && /^\/organizations\/[^/]+\/tools\/[^/]+$/.test(path)) {
+		const [, , orgId, , toolId] = path.split('/')
+		const idx = (orgTools as any[]).findIndex(t => t.id === toolId && t.org_id === orgId)
+		if (idx === -1) return jsonResponse({ message: 'Tool not found' }, { status: 404 })
+		;(orgTools as any[])[idx].is_active = false
+		;(orgTools as any[])[idx].updated_at = new Date().toISOString()
+		saveMockDB()
+		return jsonResponse((orgTools as any[])[idx])
+	}
+
+	// ---------------- Team Tool Settings ----------------
+	function findOrgIdByTeam(teamId: string): string | undefined {
+		return teams.find(t => t.id === teamId)?.organization_id
+	}
+	if (method === 'GET' && /^\/teams\/[^/]+\/tools$/.test(path)) {
+		const teamId = path.split('/')[2]
+		const orgId = findOrgIdByTeam(teamId)
+		const base = orgTools.filter(t => t.org_id === orgId && t.is_active)
+		const withSettings = base.map(tool => {
+			const set = teamToolSettings.find(s => s.team_id === teamId && s.tool_id === tool.id)
+			return { tool, setting: set || { enabled: false, config_override: undefined } }
+		})
+		return jsonResponse(withSettings)
+	}
+	if (method === 'PUT' && /^\/teams\/[^/]+\/tools\/[^/]+$/.test(path)) {
+		const [, , teamId, , toolId] = path.split('/')
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const idx = teamToolSettings.findIndex(s => s.team_id === teamId && s.tool_id === toolId)
+		const now = new Date().toISOString()
+		if (idx === -1) {
+			teamToolSettings.push({ team_id: teamId, tool_id: toolId, enabled: !!body.enabled, config_override: body.config_override, updated_at: now })
+		} else {
+			teamToolSettings[idx] = { ...teamToolSettings[idx], ...body, updated_at: now }
+		}
+		saveMockDB()
+		return jsonResponse(teamToolSettings.find(s => s.team_id === teamId && s.tool_id === toolId))
+	}
+
+	// ---------------- Agent Tool Settings & Effective ----------------
+	function deepMerge(a: any, b: any) {
+		if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) return b ?? a
+		const out: any = Array.isArray(a) ? [...a] : { ...a }
+		for (const k of Object.keys(b)) out[k] = deepMerge(out[k], b[k])
+		return out
+	}
+	function findOrgIdByAgent(agentId: string): { orgId?: string, teamId?: string } {
+		const a = (agents as any[]).find(x => x.id === agentId)
+		const teamId = a?.team_id
+		const orgId = teamId ? findOrgIdByTeam(teamId) : undefined
+		return { orgId, teamId }
+	}
+	function computeEffectiveTools(agentId: string) {
+		const { orgId, teamId } = findOrgIdByAgent(agentId)
+		if (!orgId) return []
+		const base = orgTools.filter(t => t.org_id === orgId && t.is_active)
+		return base.map(tool => {
+			const team = teamId ? teamToolSettings.find(s => s.team_id === teamId && s.tool_id === tool.id) : undefined
+			const agent = agentToolSettings.find(s => s.agent_id === agentId && s.tool_id === tool.id)
+			const enabled = (agent?.enabled ?? team?.enabled) ?? false
+			const config = deepMerge(tool.default_config, deepMerge(team?.config_override || {}, agent?.config_override || {}))
+			return { tool_id: tool.id, key: tool.key, name: tool.name, enabled, config }
+		})
+	}
+	if (method === 'GET' && /^\/agents\/[^/]+\/tools$/.test(path)) {
+		const agentId = path.split('/')[2]
+		return jsonResponse(computeEffectiveTools(agentId))
+	}
+	if (method === 'GET' && /^\/agents\/[^/]+\/tools\/effective$/.test(path)) {
+		const agentId = path.split('/')[2]
+		return jsonResponse(computeEffectiveTools(agentId))
+	}
+	if (method === 'PUT' && /^\/agents\/[^/]+\/tools\/[^/]+$/.test(path)) {
+		const [, , agentId, , toolId] = path.split('/')
+		const body = init?.body ? JSON.parse(init.body as string) : {}
+		const idx = agentToolSettings.findIndex(s => s.agent_id === agentId && s.tool_id === toolId)
+		const now = new Date().toISOString()
+		if (idx === -1) {
+			agentToolSettings.push({ agent_id: agentId, tool_id: toolId, enabled: !!body.enabled, config_override: body.config_override, updated_at: now })
+		} else {
+			agentToolSettings[idx] = { ...agentToolSettings[idx], ...body, updated_at: now }
+		}
+		saveMockDB()
+		return jsonResponse(agentToolSettings.find(s => s.agent_id === agentId && s.tool_id === toolId))
+	}
 	// Goals endpoints (scoped to organization)
 	if (method === 'GET' && path.startsWith('/organizations/') && path.endsWith('/goals')) {
 		const orgId = path.split('/')[2]

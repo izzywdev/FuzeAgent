@@ -6,6 +6,8 @@ export interface Agent {
   status: string
   // Docker image to use for this agent's container. Defaults from template but can be overridden.
   container_image?: string
+  // Environment variables to inject into the agent container
+  container_env?: Record<string, string>
   config: {
     model: string
     temperature: number

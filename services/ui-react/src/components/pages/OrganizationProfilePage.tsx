@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { OrganizationToolsSection } from './OrganizationToolsSection'
 
 interface OrganizationInfo {
   id: string
@@ -61,10 +62,20 @@ export function OrganizationProfilePage() {
     tasksCompleted: 0
   })
 
+  // Organization tools state
+  const [orgTools, setOrgTools] = useState<any[]>([])
+
   // Load organization data and knowledge documents on component mount
   useEffect(() => {
     loadFirstOrganization()
   }, [])
+
+  // Load organization tools
+  useEffect(() => {
+    if (orgInfo.id) {
+      loadOrganizationTools()
+    }
+  }, [orgInfo.id])
 
   // Clear save message after 3 seconds
   useEffect(() => {
@@ -157,6 +168,18 @@ export function OrganizationProfilePage() {
       }
     } catch (error) {
       console.error('Error loading stats:', error)
+    }
+  }
+
+  const loadOrganizationTools = async () => {
+    try {
+      const response = await fetch(`/organizations/${orgInfo.id}/tools`)
+      if (response.ok) {
+        const tools = await response.json()
+        setOrgTools(tools)
+      }
+    } catch (error) {
+      console.error('Error loading organization tools:', error)
     }
   }
 
@@ -997,6 +1020,13 @@ export function OrganizationProfilePage() {
             ))}
           </div>
         </div>
+
+        {/* Organization Tools Section */}
+        <OrganizationToolsSection 
+          orgId={orgInfo.id}
+          tools={orgTools}
+          onToolsChange={loadOrganizationTools}
+        />
 
         {/* Document Viewer Modal */}
         {showDocumentViewer && selectedDocument && (

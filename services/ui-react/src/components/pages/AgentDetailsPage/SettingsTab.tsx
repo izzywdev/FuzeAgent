@@ -1,4 +1,6 @@
 import React from 'react'
+import { EnvEditor } from '../../common/EnvEditor'
+import { AgentToolsSection } from './AgentToolsSection'
 import type { Agent } from './types'
 
 interface SettingsTabProps {
@@ -61,30 +63,15 @@ export function SettingsTab({ agent, saving, setAgent, onSave }: SettingsTabProp
             </select>
           </div>
           <div>
-            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Available Tools</label>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '0.375rem', padding: '1rem'}}>
-              {[
-                'code_generation','code_review','debugging','testing','api_development',
-                'database_design','infrastructure_management','deployment','monitoring',
-                'security','performance_testing','test_automation','bug_reporting',
-                'quality_analysis','strategic_planning','team_management','resource_allocation'
-              ].map(tool => (
-                <label key={tool} style={{display: 'flex', alignItems: 'center', fontSize: '0.875rem'}}>
-                  <input
-                    type="checkbox"
-                    checked={(agent.config?.tools || []).includes(tool)}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const current = agent.config?.tools || []
-                      const updated = e.target.checked ? [...current, tool] : current.filter((t: string) => t !== tool)
-                      setAgent(prev => ({ ...prev, config: { ...prev.config, tools: updated } }))
-                    }}
-                    style={{marginRight: '0.5rem'}}
-                  />
-                  {tool.replace(/_/g, ' ')}
-                </label>
-              ))}
-            </div>
+            <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Environment Variables</label>
+            <EnvEditor
+              value={agent.container_env || {}}
+              onChange={(env: Record<string, string>) => {
+                setAgent(prev => ({ ...prev, container_env: env }))
+              }}
+            />
           </div>
+          <AgentToolsSection agent={agent} setAgent={setAgent} />
           <div style={{display: 'flex', gap: '0.5rem', paddingTop: '1rem'}}>
             <button disabled={saving} onClick={onSave} style={{padding: '0.75rem 1.5rem', backgroundColor: saving ? '#9ca3af' : '#2563eb', color: 'white', border: 'none', borderRadius: '0.375rem', fontSize: '0.875rem', fontWeight: '500', cursor: saving ? 'not-allowed' : 'pointer'}}>
               {saving ? 'Saving...' : 'Save Changes'}
