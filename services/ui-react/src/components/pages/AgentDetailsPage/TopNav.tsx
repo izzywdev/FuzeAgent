@@ -32,7 +32,18 @@ export function TopNav({ agent }: TopNavProps): JSX.Element {
               <span style={{color: '#111827'}}>{agent.name}</span>
             </div>
           </div>
-          <div style={{display: 'flex', gap: '0.5rem'}}>
+          <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+            <Link to="/organization-chart" style={{
+              padding: '0.5rem 1rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              textDecoration: 'none',
+              color: '#111827'
+            }}>
+              Organization Chart
+            </Link>
             <button style={{
               padding: '0.5rem 1rem',
               border: '1px solid #d1d5db',
