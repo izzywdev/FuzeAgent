@@ -1435,6 +1435,254 @@
           }
         },
         "required": ["goals", "total", "page", "page_size", "total_pages"]
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the task"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the task"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the task"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Priority level of the task"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed"],
+            "description": "Current status of the task"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the assigned team"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the assigned agent"
+          },
+          "milestone_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the related milestone"
+          },
+          "result": {
+            "type": "string",
+            "description": "Result of task execution"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Completion timestamp"
+          },
+          "team_name": {
+            "type": "string",
+            "description": "Name of the assigned team"
+          },
+          "agent_name": {
+            "type": "string",
+            "description": "Name of the assigned agent"
+          },
+          "milestone_title": {
+            "type": "string",
+            "description": "Title of the related milestone"
+          }
+        },
+        "required": ["id", "title", "priority", "status", "created_at", "updated_at", "team_name", "agent_name", "milestone_title"]
+      },
+      "TaskCreate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the task"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the task"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Priority level (defaults to medium)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed"],
+            "description": "Status (defaults to pending)"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of assigned team"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of assigned agent"
+          },
+          "milestone_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of related milestone"
+          }
+        },
+        "required": ["title"]
+      },
+      "TaskUpdate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Updated title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated description"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Updated priority"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed"],
+            "description": "Updated status"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Updated team assignment"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Updated agent assignment"
+          },
+          "milestone_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Updated milestone relationship"
+          },
+          "result": {
+            "type": "string",
+            "description": "Task execution result"
+          }
+        }
+      },
+      "TaskFilters": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["pending", "in_progress", "completed", "failed"]
+            },
+            "description": "Filter by status"
+          },
+          "priority": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["low", "medium", "high", "critical"]
+            },
+            "description": "Filter by priority"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Filter by team"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Filter by agent"
+          },
+          "milestone_id": {
+            "type": "string",
+            "description": "Filter by milestone"
+          },
+          "date_range": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "to": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "description": "Filter by date range"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search in title and description"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": ["created_at", "updated_at", "priority", "status", "title"],
+            "description": "Sort field"
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": ["asc", "desc"],
+            "description": "Sort order"
+          }
+        }
+      },
+      "PaginatedTasksResponse": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of tasks"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Items per page"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/TaskFilters"
+          }
+        },
+        "required": ["tasks", "total", "page", "page_size", "total_pages"]
       }
     }
   },
@@ -2152,6 +2400,575 @@
           },
           "404": {
             "description": "Goal not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/tasks": {
+      "post": {
+        "summary": "Create task",
+        "description": "Create a new task for an organization",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Task created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization, team, agent, or milestone not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List tasks",
+        "description": "List tasks for an organization with filtering, search, and pagination",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["pending", "in_progress", "completed", "failed"]
+              }
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              }
+            },
+            "description": "Filter by priority"
+          },
+          {
+            "name": "team_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by team"
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by agent"
+          },
+          {
+            "name": "milestone_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by milestone"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Filter by creation date from"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Filter by creation date to"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search in title and description"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["created_at", "updated_at", "priority", "status", "title"],
+              "default": "created_at"
+            },
+            "description": "Sort field"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "desc"
+            },
+            "description": "Sort order"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTasksResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/tasks/{task_id}": {
+      "get": {
+        "summary": "Get task",
+        "description": "Get a specific task by ID",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update task",
+        "description": "Update an existing task",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Task ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Task"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete task",
+        "description": "Delete an existing task",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Task deleted"
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/tasks/{task_id}/execute": {
+      "post": {
+        "summary": "Execute task",
+        "description": "Execute a task and update its status",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Task ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task execution started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "task_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/tasks/teams/{team_id}": {
+      "get": {
+        "summary": "Get team tasks",
+        "description": "Get all tasks for a specific team",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Team ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of team tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Team not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/tasks/agents/{agent_id}": {
+      "get": {
+        "summary": "Get agent tasks",
+        "description": "Get all tasks assigned to a specific agent",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of agent tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/tasks/milestones/{milestone_id}": {
+      "get": {
+        "summary": "Get milestone tasks",
+        "description": "Get all tasks for a specific milestone",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "milestone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Milestone ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of milestone tasks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Task"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Milestone not found",
             "content": {
               "application/json": {
                 "schema": {
