@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { TeamToolsSection } from './TeamToolsSection'
+import { useApiService } from '../../hooks/useApiService'
 
 interface TeamMember {
   id: string
@@ -54,6 +55,7 @@ interface Team {
 export function TeamDetailsPage() {
   const { teamId } = useParams<{ teamId: string }>()
   const navigate = useNavigate()
+  const apiService = useApiService()
   const [team, setTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -120,12 +122,11 @@ export function TeamDetailsPage() {
     // Load team data from API
     const loadTeamData = async () => {
       try {
-        const response = await fetch(`/teams/${teamId}`)
+        const response = await apiService.getTeam(teamId)
         if (response.ok) {
-          const teamData = await response.json()
-          setTeam(teamData)
+          setTeam(response.data)
         } else {
-          setError('Failed to load team data')
+          setError(`Failed to load team data: HTTP ${response.status}`)
         }
       } catch (err) {
         setError('Error loading team data')
@@ -145,10 +146,9 @@ export function TeamDetailsPage() {
     if (!showAddMember) return
     const loadAgents = async () => {
       try {
-        const res = await fetch('/agents')
+        const res = await apiService.getAgents()
         if (res.ok) {
-          const data = await res.json()
-          setAgentsList(Array.isArray(data) ? data : [])
+          setAgentsList(Array.isArray(res.data) ? res.data : [])
         }
       } catch {}
     }
@@ -159,15 +159,16 @@ export function TeamDetailsPage() {
   useEffect(() => {
     if (!teamId) return
     if (activeTab !== 'tasks') return
-    const loadTasks = async () => {
-      try {
-        const res = await fetch(`/teams/${teamId}/tasks`)
-        if (res.ok) {
-          const data = await res.json()
-          setTeamTasks(Array.isArray(data) ? data : [])
-        }
-      } catch {}
+      const loadTasks = async () => {
+    try {
+      const response = await apiService.getTeamTasks(teamId)
+      if (response.ok) {
+        setTeamTasks(Array.isArray(response.data) ? response.data : [])
+      }
+    } catch (error) {
+      console.error('Failed to load team tasks:', error)
     }
+  }
     loadTasks()
   }, [teamId, activeTab])
 
@@ -180,26 +181,21 @@ export function TeamDetailsPage() {
     setCreatingTask(true)
     setCreateTaskError(null)
     try {
-      const res = await fetch(`/teams/${teamId}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: taskTitle.trim(),
-          description: taskDescription.trim(),
-          priority: taskPriority,
-          agent_id: taskAssigneeId || undefined,
-        })
+      const res = await apiService.createTeamTask(teamId, {
+        title: taskTitle.trim(),
+        description: taskDescription.trim(),
+        priority: taskPriority
       })
+      
       if (res.ok) {
-        const created = await res.json()
-        setTeamTasks(prev => [created, ...prev])
+        setTeamTasks(prev => [res.data, ...prev])
         setShowCreateTask(false)
         setTaskTitle('')
         setTaskDescription('')
         setTaskPriority('medium')
         setTaskAssigneeId('')
       } else {
-        setCreateTaskError('Failed to create task')
+        setCreateTaskError(`Failed to create task: HTTP ${res.status}`)
       }
     } catch {
       setCreateTaskError('Error creating task')
@@ -213,12 +209,11 @@ export function TeamDetailsPage() {
     if (!teamId) return
     
     try {
-      const response = await fetch(`/knowledge/teams/${teamId}/documents`)
+      const response = await apiService.getTeamKnowledge(teamId)
       if (response.ok) {
-        const documents = await response.json()
-        setKnowledgeDocs(documents)
+        setKnowledgeDocs(response.data)
       } else {
-        console.error('Failed to load team documents')
+        console.error('Failed to load team documents:', response.status)
       }
     } catch (error) {
       console.error('Error loading team documents:', error)
@@ -233,19 +228,12 @@ export function TeamDetailsPage() {
     
     for (const file of Array.from(files)) {
       try {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('title', file.name)
-        
-        const response = await fetch(`/knowledge/teams/${teamId}/documents`, {
-          method: 'POST',
-          body: formData
-        })
+        const response = await apiService.uploadTeamDocument(teamId, file, file.name)
         
         if (response.ok) {
           console.log(`Uploaded ${file.name} successfully`)
         } else {
-          console.error(`Failed to upload ${file.name}`)
+          console.error(`Failed to upload ${file.name}: HTTP ${response.status}`)
         }
       } catch (error) {
         console.error(`Error uploading ${file.name}:`, error)
@@ -269,19 +257,13 @@ export function TeamDetailsPage() {
     setUploading(true)
     
     try {
-      const response = await fetch(`/knowledge/teams/${teamId}/url`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ url })
-      })
+      const response = await apiService.addTeamUrl(teamId, url)
       
       if (response.ok) {
         console.log('URL added successfully')
         await loadKnowledgeDocuments()
       } else {
-        console.error('Failed to add URL')
+        console.error('Failed to add URL:', response.status)
       }
     } catch (error) {
       console.error('Error adding URL:', error)
@@ -300,19 +282,14 @@ export function TeamDetailsPage() {
     setAddingMember(true)
     setAddMemberError(null)
     try {
-      const response = await fetch(`/teams/${teamId}/members`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: selectedAgentId })
-      })
+      const response = await apiService.addTeamMember(teamId, selectedAgentId)
       if (response.ok) {
-        const data = await response.json()
-        const added = data.member as TeamMember
+        const added = response.data.member as TeamMember
         setTeam(prev => prev ? { ...prev, members: [...prev.members.filter(m => m.id !== added.id), added] } : prev)
         setShowAddMember(false)
         setSelectedAgentId('')
       } else {
-        setAddMemberError('Failed to add member')
+        setAddMemberError(`Failed to add member: HTTP ${response.status}`)
       }
     } catch (e) {
       setAddMemberError('Error adding member')
@@ -327,13 +304,12 @@ export function TeamDetailsPage() {
     setSelectedDocument(doc)
     
     try {
-      const response = await fetch(`/knowledge/teams/${teamId}/documents/${doc.id}/content`)
+      const response = await apiService.getTeamKnowledgeContent(teamId, doc.id)
       if (response.ok) {
-        const data = await response.json()
-        setDocumentContent(data.content)
+        setDocumentContent(response.data.content)
         setShowDocumentViewer(true)
       } else {
-        console.error('Failed to load document content')
+        console.error('Failed to load document content:', response.status)
       }
     } catch (error) {
       console.error('Error loading document content:', error)
@@ -344,14 +320,12 @@ export function TeamDetailsPage() {
     if (!teamId || !confirm('Are you sure you want to delete this document?')) return
     
     try {
-      const response = await fetch(`/knowledge/teams/${teamId}/documents/${docId}`, {
-        method: 'DELETE'
-      })
+      const response = await apiService.deleteTeamDocument(teamId, docId)
       
       if (response.ok) {
         await loadKnowledgeDocuments()
       } else {
-        console.error('Failed to delete document')
+        console.error('Failed to delete document:', response.status)
       }
     } catch (error) {
       console.error('Error deleting document:', error)

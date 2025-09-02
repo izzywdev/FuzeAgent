@@ -103,6 +103,25 @@ services:
     networks:
       - ai-team-network
 
+  # Mock API Server (Python with SQLite)
+  mock-server:
+    build: ./services/mock-server
+    ports:
+      - "8001:8000"
+    volumes:
+      - mock_data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/mock_data.db
+    networks:
+      - ai-team-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # UI (React)
   ui:
     image: fuzeagent-ui:latest
@@ -110,6 +129,7 @@ services:
       - "3031:3000"
     environment:
       - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:8001
     volumes:
       # Mount source code for live development and hot reload
       - ./services/ui-react/src:/app/src
@@ -124,7 +144,8 @@ services:
       - ./services/ui-react/eslint.config.js:/app/eslint.config.js
     working_dir: /app
     command: ["npm", "start"]
-    # UI now uses a built-in mock API and does not depend on backend services at runtime
+    depends_on:
+      - mock-server
     networks:
       - ai-team-network
 
@@ -160,3 +181,4 @@ volumes:
   rabbitmq_data:
   orchestrator_workspaces:
   orchestrator_backups:
+  mock_data:

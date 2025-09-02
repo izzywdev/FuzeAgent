@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useApiService } from '../../hooks/useApiService'
 
 interface Goal {
   id: string
@@ -29,24 +30,38 @@ export function GoalsPage() {
   const navigate = useNavigate()
   const { goalId } = useParams()
 
+  // Helper function to reload goals
+  const reloadGoals = async () => {
+    try {
+      const response = await apiService.getGoals('1') // Using organization ID 1
+      if (response.ok && Array.isArray(response.data)) {
+        setGoals(response.data)
+      }
+    } catch (error) {
+      console.error('Error reloading goals:', error)
+    }
+  }
+
   useEffect(() => {
-    // Try to fetch goals from API
-    fetch('/organizations/1/goals')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setGoals(data)
+    const loadGoals = async () => {
+      try {
+        // Try to fetch goals from API
+        const response = await apiService.getGoals('1') // Using organization ID 1
+        if (response.ok && Array.isArray(response.data)) {
+          setGoals(response.data)
         } else {
-          // No goals available
+          console.error('Failed to load goals:', response.status)
           setGoals([])
         }
-        setLoading(false)
-      })
-      .catch(() => {
-        // Use mock data on error
+      } catch (error) {
+        console.error('Error loading goals:', error)
         setGoals([])
+      } finally {
         setLoading(false)
-      })
+      }
+    }
+    
+    loadGoals()
   }, [])
 
   // Goals will be fetched from API
@@ -186,13 +201,10 @@ export function GoalsPage() {
                     onClick={async () => {
                       if (!window.confirm('Delete this goal? This action cannot be undone.')) return
                       try {
-                        await fetch(`/goals/${goal.id}`, { method: 'DELETE' })
+                        await apiService.deleteGoal(goal.id)
                         // After delete, navigate back to list and reload
                         navigate('/goals')
-                        fetch('/organizations/1/goals')
-                          .then(res => res.json())
-                          .then(data => { if (Array.isArray(data)) setGoals(data) })
-                          .catch(() => {})
+                        await reloadGoals()
                       } catch {}
                     }}
                     style={{
@@ -283,13 +295,10 @@ export function GoalsPage() {
           <EditGoalModal
             goal={goalToEdit}
             onClose={() => { setShowEditForm(false); setGoalToEdit(null) }}
-            onSuccess={() => {
+            onSuccess={async () => {
               setShowEditForm(false); setGoalToEdit(null)
               // Reload goals so details page reflects updates
-              fetch('/organizations/1/goals')
-                .then(res => res.json())
-                .then(data => { if (Array.isArray(data)) setGoals(data) })
-                .catch(() => {})
+              await reloadGoals()
             }}
           />
         )}
@@ -603,13 +612,10 @@ export function GoalsPage() {
           <EditGoalModal
             goal={goalToEdit}
             onClose={() => { setShowEditForm(false); setGoalToEdit(null) }}
-            onSuccess={() => {
+            onSuccess={async () => {
               setShowEditForm(false); setGoalToEdit(null)
               // Reload goals
-              fetch('/organizations/1/goals')
-                .then(res => res.json())
-                .then(data => { if (Array.isArray(data)) setGoals(data) })
-                .catch(() => {})
+              await reloadGoals()
             }}
           />
         )}
@@ -885,11 +891,7 @@ function EditGoalModal({ goal, onClose, onSuccess }: EditGoalModalProps) {
     setIsSubmitting(true)
     setError('')
     try {
-      const res = await fetch(`/goals/${goal.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData })
-      })
+      const res = await apiService.updateGoal(goal.id, formData)
       if (res.ok) {
         onSuccess()
       } else {

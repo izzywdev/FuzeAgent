@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useApiService } from '../hooks/useApiService'
 import { FiPlay, FiCopy, FiChevronDown, FiChevronRight } from 'react-icons/fi'
 import { CopyToClipboard } from 'react-copy-to-clipboard'
 import CodeBlock from './CodeBlock'

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useApiService } from '../../hooks/useApiService'
 
 interface Agent {
   id: string
@@ -12,6 +13,7 @@ interface Agent {
 }
 
 export function FixedAgentsPage() {
+  const apiService = useApiService()
   const [agents, setAgents] = useState<Agent[]>([])
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,21 +40,29 @@ export function FixedAgentsPage() {
   }, [agents, searchTerm, typeFilter])
 
   useEffect(() => {
-    fetch('/agents')
-      .then(res => res.json())
-      .then(data => {
-        const agentData = Array.isArray(data) ? data : []
-        setAgents(agentData)
-        setFilteredAgents(agentData)
-        setLoading(false)
-      })
-      .catch(err => {
+    const loadAgents = async () => {
+      try {
+        const response = await apiService.getAgents()
+        
+        if (response.ok) {
+          const agentData = Array.isArray(response.data) ? response.data : []
+          setAgents(agentData)
+          setFilteredAgents(agentData)
+        } else {
+          console.error('Failed to load agents:', response.status)
+          setAgents([])
+          setFilteredAgents([])
+        }
+      } catch (err) {
         console.error('Failed to load agents:', err)
-        setLoading(false)
-        // No fallback data - show empty state
         setAgents([])
         setFilteredAgents([])
-      })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadAgents()
   }, [])
 
   return (

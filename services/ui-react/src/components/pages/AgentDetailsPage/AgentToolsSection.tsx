@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import type { Agent } from './types'
+import { useApiService } from '../../../hooks/useApiService'
 
 interface Props {
   agent: Agent
@@ -15,29 +16,47 @@ type EffectiveTool = {
 }
 
 export function AgentToolsSection({ agent, setAgent }: Props): JSX.Element {
+  const apiService = useApiService()
   const [tools, setTools] = useState<EffectiveTool[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!agent?.id) return
-    setLoading(true)
-    fetch(`/agents/${agent.id}/tools`).then(r => r.json()).then((list) => {
-      if (Array.isArray(list)) setTools(list)
-    }).finally(() => setLoading(false))
-  }, [agent?.id])
+    const loadTools = async () => {
+      setLoading(true)
+      try {
+        const response = await apiService.getAgentTools(agent.id)
+        if (response.ok && Array.isArray(response.data)) {
+          setTools(response.data)
+        } else {
+          console.error('Failed to load agent tools:', response.status)
+        }
+      } catch (error) {
+        console.error('Error loading agent tools:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadTools()
+  }, [agent?.id, apiService])
 
   const toggle = async (tool: EffectiveTool, next: boolean) => {
-    await fetch(`/agents/${agent.id}/tools/${tool.tool_id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: next })
-    })
-    setTools(prev => prev.map(t => t.tool_id === tool.tool_id ? { ...t, enabled: next } : t))
-    // keep agent.config.tools in sync for legacy code paths
-    setAgent(prev => {
-      const current = prev.config?.tools || []
-      const updated = next ? Array.from(new Set([...current, tool.key])) : current.filter((k: string) => k !== tool.key)
-      return { ...prev, config: { ...prev.config, tools: updated } }
-    })
+    try {
+      const response = await apiService.updateAgentTool(agent.id, tool.tool_id, { enabled: next })
+      if (response.ok) {
+        setTools(prev => prev.map(t => t.tool_id === tool.tool_id ? { ...t, enabled: next } : t))
+        // keep agent.config.tools in sync for legacy code paths
+        setAgent(prev => {
+          const current = prev.config?.tools || []
+          const updated = next ? Array.from(new Set([...current, tool.key])) : current.filter((k: string) => k !== tool.key)
+          return { ...prev, config: { ...prev.config, tools: updated } }
+        })
+      } else {
+        console.error('Error updating agent tool:', response.status)
+      }
+    } catch (error) {
+      console.error('Error updating agent tool:', error)
+    }
   }
 
   return (

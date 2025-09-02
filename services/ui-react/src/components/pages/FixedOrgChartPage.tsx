@@ -1,5 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react'
+import { useOrganization } from '../../contexts/OrganizationContext'
+import { useApiService } from '../../hooks/useApiService'
 
 // Lazy-load GoJS from CDN to avoid bundler dependency issues
 async function loadGoJs(): Promise<any> {
@@ -48,6 +50,8 @@ type Agent = { id: string; team_id?: string; name: string; type?: string }
 
 export function FixedOrgChartPage() {
   const navigate = useNavigate()
+  const { currentOrganization } = useOrganization()
+  const apiService = useApiService()
   const [org, setOrg] = useState<Org | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
@@ -57,21 +61,28 @@ export function FixedOrgChartPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [orgsRes, teamsRes, agentsRes] = await Promise.all([
-          fetch('/organizations'),
-          fetch('/teams'),
-          fetch('/agents'),
+        if (!currentOrganization) {
+          setOrg(null)
+          setTeams([])
+          setAgents([])
+          setLoading(false)
+          return
+        }
+
+        const [teamsRes, agentsRes] = await Promise.all([
+          apiService.getTeams(),
+          apiService.getAgents(),
         ])
-        const orgs: Org[] = await orgsRes.json()
-        setOrg(orgs[0] || null)
-        setTeams(await teamsRes.json())
-        setAgents(await agentsRes.json())
+        
+        setOrg(currentOrganization)
+        setTeams(teamsRes.ok ? teamsRes.data : [])
+        setAgents(agentsRes.ok ? agentsRes.data : [])
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [])
+  }, [currentOrganization, apiService])
 
   const orgChart = useMemo(() => {
     if (!org) return defaultOrgStructure
@@ -389,14 +400,14 @@ function QuickEditModal({ type, id, org, teams, agents, onClose, onSaved, onOpen
     setSaving(true); setError('')
     try {
       if (type === 'org' && org) {
-        const res = await fetch(`/organizations/${org.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, description: form.description }) })
-        if (res.ok) onSaved({ kind: 'org', item: await res.json() }); else onSaved({ kind: 'org', item: { ...org, name: form.name, description: form.description } })
+        const res = await apiService.updateOrganization(org.id, { name: form.name, description: form.description })
+        if (res.ok) onSaved({ kind: 'org', item: res.data }); else onSaved({ kind: 'org', item: { ...org, name: form.name, description: form.description } })
       } else if (type === 'team' && id) {
-        const res = await fetch(`/teams/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, description: form.description, team_type: form.team_type, color: form.color }) })
-        if (res.ok) onSaved({ kind: 'team', item: await res.json() })
+        const res = await apiService.updateTeam(id, { name: form.name, description: form.description, team_type: form.team_type as any })
+        if (res.ok) onSaved({ kind: 'team', item: res.data })
       } else if (type === 'agent' && id) {
-        const res = await fetch(`/agents/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name }) })
-        if (res.ok) onSaved({ kind: 'agent', item: await res.json() })
+        const res = await apiService.updateAgent(id, { name: form.name })
+        if (res.ok) onSaved({ kind: 'agent', item: res.data })
       }
     } catch (e) {
       setError('Failed to save changes')

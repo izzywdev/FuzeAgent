@@ -13,6 +13,8 @@
 
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useOrganization } from '../../contexts/OrganizationContext'
+import { useApiService } from '../../hooks/useApiService'
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -75,6 +77,8 @@ export function FixedDashboard(): JSX.Element {
   // STATE MANAGEMENT
   // ============================================================================
   
+  const { currentOrganization } = useOrganization()
+  const apiService = useApiService()
   const [agents, setAgents] = useState<Agent[]>([])
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalAgents: 0,
@@ -99,6 +103,15 @@ export function FixedDashboard(): JSX.Element {
     fetchDashboardData()
   }, [])
 
+  // Update organization name when current organization changes
+  useEffect(() => {
+    if (currentOrganization) {
+      setOrgName(currentOrganization.name)
+    } else {
+      setOrgName('No Organization Selected')
+    }
+  }, [currentOrganization])
+
   /**
    * Fetch all required data for the dashboard
    */
@@ -107,28 +120,8 @@ export function FixedDashboard(): JSX.Element {
       setIsLoading(true)
       setError(null)
       
-      // Fetch agents, teams, and organizations data in parallel
-      const [agentsResponse, teamsResponse, orgsResponse] = await Promise.all([
-        fetch(API_ENDPOINTS.agents),
-        fetch(API_ENDPOINTS.teams),
-        fetch('/organizations')
-      ])
-
-      if (!agentsResponse.ok) {
-        throw new Error(`Failed to fetch agents: ${agentsResponse.status}`)
-      }
-      
-      if (!teamsResponse.ok) {
-        throw new Error(`Failed to fetch teams: ${teamsResponse.status}`)
-      }
-
-      if (!orgsResponse.ok) {
-        throw new Error(`Failed to fetch organizations: ${orgsResponse.status}`)
-      }
-
-      const agentsData: Agent[] = await agentsResponse.json()
-      const teamsData = await teamsResponse.json()
-      const orgsData = await orgsResponse.json()
+      // Fetch all dashboard data using the API service
+      const { agents: agentsData, teams: teamsData, organizations: orgsData } = await apiService.getDashboardData()
 
       // Update state with fetched data
       setAgents(agentsData)
@@ -139,11 +132,11 @@ export function FixedDashboard(): JSX.Element {
         teamsCount: Array.isArray(teamsData) ? teamsData.length : 0
       })
       
-      // Set organization name from API data
-      if (Array.isArray(orgsData) && orgsData.length > 0) {
-        setOrgName(orgsData[0].name || DEFAULT_ORG_NAME)
+      // Set organization name from current organization context
+      if (currentOrganization) {
+        setOrgName(currentOrganization.name)
       } else {
-        setOrgName('No Organization Found')
+        setOrgName('No Organization Selected')
       }
       
     } catch (err) {

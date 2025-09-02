@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../../config/api'
+import { useOrganization } from '../../contexts/OrganizationContext'
+import { useApiService } from '../../hooks/useApiService'
 
 export function CreateTeamPage() {
   const navigate = useNavigate()
+  const { currentOrganization } = useOrganization()
+  const apiService = useApiService()
   const [creating, setCreating] = useState(false)
-  const [organizations, setOrganizations] = useState<any[]>([])
-  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
   const [error, setError] = useState<string>('')
   
   const [formData, setFormData] = useState({
@@ -16,23 +18,7 @@ export function CreateTeamPage() {
     color: '#2563eb'
   })
 
-  useEffect(() => {
-    loadOrganizations()
-  }, [])
-
-  const loadOrganizations = async () => {
-    try {
-      const orgs = await api.hierarchy.get('/organizations')
-      setOrganizations(orgs)
-      // Auto-select first organization if available
-      if (orgs.length > 0) {
-        setSelectedOrgId(orgs[0].id)
-      }
-    } catch (error) {
-      console.error('Error loading organizations:', error)
-      setError('Failed to load organizations')
-    }
-  }
+  // No need to load organizations - we use the current organization automatically
 
   const teamTypes = [
     { id: 'executive', name: 'Executive', description: 'Leadership and strategic planning' },
@@ -54,8 +40,8 @@ export function CreateTeamPage() {
     setCreating(true)
     setError('')
 
-    if (!selectedOrgId) {
-      setError('Please select an organization')
+    if (!currentOrganization) {
+      setError('No organization selected. Please select an organization first.')
       setCreating(false)
       return
     }
@@ -63,7 +49,6 @@ export function CreateTeamPage() {
     try {
       // Create team data matching the backend API expectations
       const teamData = {
-        organization_id: selectedOrgId,
         name: formData.name,
         description: formData.description,
         team_type: formData.type,
@@ -79,10 +64,14 @@ export function CreateTeamPage() {
         }
       }
 
-      const newTeam = await api.hierarchy.post('/teams', teamData)
+      const response = await apiService.createTeam(teamData)
+
+      if (!response.ok) {
+        throw new Error('Failed to create team')
+      }
       
       // Navigate to team details page with success message
-      navigate(`/teams/${newTeam.id}?created=true`)
+      navigate(`/teams/${response.data.id}?created=true`)
       
     } catch (error) {
       console.error('Error creating team:', error)
@@ -170,32 +159,17 @@ export function CreateTeamPage() {
             )}
             
             <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-              {/* Organization Selector */}
-              <div>
-                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
-                  Organization *
-                </label>
-                <select
-                  required
-                  value={selectedOrgId}
-                  onChange={(e) => setSelectedOrgId(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white'
-                  }}
-                >
-                  <option value="">Select an organization</option>
-                  {organizations.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Current Organization Display */}
+              {currentOrganization && (
+                <div style={{padding: '1rem', backgroundColor: '#f3f4f6', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
+                  <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.25rem'}}>
+                    Creating team for:
+                  </div>
+                  <div style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>
+                    {currentOrganization.name}
+                  </div>
+                </div>
+              )}
               <div>
                 <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                   Team Name *
@@ -375,16 +349,16 @@ export function CreateTeamPage() {
               </Link>
               <button
                 type="submit"
-                disabled={creating || !formData.name || !formData.description || !selectedOrgId}
+                disabled={creating || !formData.name || !formData.description || !currentOrganization}
                 style={{
                   padding: '0.75rem 1.5rem',
-                  backgroundColor: creating || !formData.name || !formData.description || !selectedOrgId ? '#9ca3af' : '#2563eb',
+                  backgroundColor: creating || !formData.name || !formData.description || !currentOrganization ? '#9ca3af' : '#2563eb',
                   color: 'white',
                   border: 'none',
                   borderRadius: '0.375rem',
                   fontSize: '0.875rem',
                   fontWeight: '500',
-                  cursor: creating || !formData.name || !formData.description || !selectedOrgId ? 'not-allowed' : 'pointer',
+                  cursor: creating || !formData.name || !formData.description || !currentOrganization ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem'

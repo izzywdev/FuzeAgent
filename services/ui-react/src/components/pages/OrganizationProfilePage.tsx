@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { OrganizationToolsSection } from './OrganizationToolsSection'
+import { useApiService } from '../../hooks/useApiService'
 
 interface OrganizationInfo {
   id: string
@@ -32,6 +33,7 @@ interface KnowledgeDocument {
 }
 
 export function OrganizationProfilePage() {
+  const apiService = useApiService()
   const [orgInfo, setOrgInfo] = useState<OrganizationInfo>({
     id: '1',
     name: 'WCG - World Class Group',
@@ -88,9 +90,9 @@ export function OrganizationProfilePage() {
   const loadFirstOrganization = async () => {
     try {
       // First, get all organizations to find the first one
-      const orgsResponse = await fetch('/organizations')
+      const orgsResponse = await apiService.getOrganizations()
       if (orgsResponse.ok) {
-        const organizations = await orgsResponse.json()
+        const organizations = orgsResponse.data
         if (organizations && organizations.length > 0) {
           const firstOrg = organizations[0]
           await loadOrganizationData(firstOrg.id)
@@ -100,7 +102,7 @@ export function OrganizationProfilePage() {
           console.error('No organizations found')
         }
       } else {
-        console.error('Failed to load organizations')
+        console.error('Failed to load organizations:', orgsResponse.status)
       }
     } catch (error) {
       console.error('Error loading organizations:', error)
@@ -110,9 +112,9 @@ export function OrganizationProfilePage() {
   const loadOrganizationData = async (orgId?: string) => {
     const targetId = orgId || orgInfo.id
     try {
-      const response = await fetch(`/organizations/${targetId}`)
+      const response = await apiService.getOrganization(targetId)
       if (response.ok) {
-        const data = await response.json()
+        const data = response.data
         const loadedOrgInfo: OrganizationInfo = {
           id: data.id,
           name: data.name,
@@ -125,7 +127,7 @@ export function OrganizationProfilePage() {
         setOrgInfo(loadedOrgInfo)
         setOriginalOrgInfo({...loadedOrgInfo})
       } else {
-        console.error('Failed to load organization data')
+        console.error('Failed to load organization data:', response.status)
       }
     } catch (error) {
       console.error('Error loading organization data:', error)
@@ -135,12 +137,11 @@ export function OrganizationProfilePage() {
   const loadKnowledgeDocuments = async (orgId?: string) => {
     const targetId = orgId || orgInfo.id
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${targetId}/documents`)
+      const response = await apiService.getOrganizationKnowledge(targetId)
       if (response.ok) {
-        const documents = await response.json()
-        setKnowledgeDocs(documents)
+        setKnowledgeDocs(response.data)
       } else {
-        console.error('Failed to load documents')
+        console.error('Failed to load documents:', response.status)
       }
     } catch (error) {
       console.error('Error loading documents:', error)
@@ -151,13 +152,13 @@ export function OrganizationProfilePage() {
     try {
       // Load agents and teams to calculate stats
       const [agentsResponse, teamsResponse] = await Promise.all([
-        fetch('/agents'),
-        fetch('/teams')
+        apiService.getAgents(),
+        apiService.getTeams()
       ])
 
       if (agentsResponse.ok && teamsResponse.ok) {
-        const agents = await agentsResponse.json()
-        const teams = await teamsResponse.json()
+        const agents = agentsResponse.data
+        const teams = teamsResponse.data
 
         setStats({
           totalAgents: Array.isArray(agents) ? agents.length : 0,
@@ -173,10 +174,11 @@ export function OrganizationProfilePage() {
 
   const loadOrganizationTools = async () => {
     try {
-      const response = await fetch(`/organizations/${orgInfo.id}/tools`)
+      const response = await apiService.getOrganizationTools(orgInfo.id)
       if (response.ok) {
-        const tools = await response.json()
-        setOrgTools(tools)
+        setOrgTools(response.data)
+      } else {
+        console.error('Error loading organization tools:', response.status)
       }
     } catch (error) {
       console.error('Error loading organization tools:', error)
@@ -202,23 +204,18 @@ export function OrganizationProfilePage() {
     setSaveMessage(null)
     
     try {
-      const response = await fetch(`/organizations/${orgInfo.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: orgInfo.name,
-          description: orgInfo.description,
+      const response = await apiService.updateOrganization(orgInfo.id, {
+        name: orgInfo.name,
+        description: orgInfo.description,
+        settings: {
           industry: orgInfo.industry,
           size: orgInfo.size,
           founded: orgInfo.founded,
           website: orgInfo.website
-        })
+        }
       })
       
       if (response.ok) {
-        await response.json()
         setOriginalOrgInfo({...orgInfo})
         setIsEditing(false)
         setSaveMessage({type: 'success', text: 'Organization profile updated successfully!'})
@@ -226,10 +223,9 @@ export function OrganizationProfilePage() {
         // Reload the data to ensure consistency
         await loadOrganizationData()
       } else {
-        const errorData = await response.json().catch(() => ({}))
         setSaveMessage({
           type: 'error', 
-          text: errorData.detail || 'Failed to update organization profile'
+          text: `Failed to update organization profile: HTTP ${response.status}`
         })
       }
     } catch (error) {
@@ -251,19 +247,12 @@ export function OrganizationProfilePage() {
     
     for (const file of Array.from(files)) {
       try {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('title', file.name)
-        
-        const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/documents`, {
-          method: 'POST',
-          body: formData
-        })
+        const response = await apiService.uploadOrganizationDocument(orgInfo.id, file, file.name)
         
         if (response.ok) {
           console.log(`Uploaded ${file.name} successfully`)
         } else {
-          console.error(`Failed to upload ${file.name}`)
+          console.error(`Failed to upload ${file.name}: HTTP ${response.status}`)
         }
       } catch (error) {
         console.error(`Error uploading ${file.name}:`, error)
@@ -285,19 +274,13 @@ export function OrganizationProfilePage() {
     setUploading(true)
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/url`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ url })
-      })
+      const response = await apiService.addOrganizationUrl(orgInfo.id, url)
       
       if (response.ok) {
         console.log('URL added successfully')
         await loadKnowledgeDocuments()
       } else {
-        console.error('Failed to add URL')
+        console.error('Failed to add URL:', response.status)
       }
     } catch (error) {
       console.error('Error adding URL:', error)
@@ -311,13 +294,12 @@ export function OrganizationProfilePage() {
     setSelectedDocument(doc)
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/documents/${doc.id}/content`)
+      const response = await apiService.getOrganizationKnowledgeContent(orgInfo.id, doc.id)
       if (response.ok) {
-        const data = await response.json()
-        setDocumentContent(data.content)
+        setDocumentContent(response.data.content)
         setShowDocumentViewer(true)
       } else {
-        console.error('Failed to load document content')
+        console.error('Failed to load document content:', response.status)
       }
     } catch (error) {
       console.error('Error loading document content:', error)
@@ -328,14 +310,12 @@ export function OrganizationProfilePage() {
     if (!confirm('Are you sure you want to delete this document?')) return
     
     try {
-      const response = await fetch(`http://localhost:8000/knowledge/organizations/${orgInfo.id}/documents/${docId}`, {
-        method: 'DELETE'
-      })
+      const response = await apiService.deleteOrganizationDocument(orgInfo.id, docId)
       
       if (response.ok) {
         await loadKnowledgeDocuments()
       } else {
-        console.error('Failed to delete document')
+        console.error('Failed to delete document:', response.status)
       }
     } catch (error) {
       console.error('Error deleting document:', error)
@@ -348,24 +328,12 @@ export function OrganizationProfilePage() {
     setIsSearching(true)
     
     try {
-      const response = await fetch('http://localhost:8000/rag/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          query: ragQuery,
-          organization_id: orgInfo.id,
-          max_results: 10,
-          similarity_threshold: 0.6
-        })
-      })
+      const response = await apiService.ragSearch(ragQuery, orgInfo.id)
       
       if (response.ok) {
-        const data = await response.json()
-        setRagResults(data.relevant_chunks || [])
+        setRagResults(response.data.relevant_chunks || [])
       } else {
-        console.error('RAG search failed')
+        console.error('RAG search failed:', response.status)
         setRagResults([])
       }
     } catch (error) {

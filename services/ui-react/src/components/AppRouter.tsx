@@ -10,8 +10,15 @@
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 
+// Context providers
+import { OrganizationProvider } from '../contexts/OrganizationContext'
+import { OrganizationWrapper } from './OrganizationWrapper'
+
 // Core layout component
 import { Layout } from './layout/Layout'
+
+// Landing page
+import { LandingPage } from './pages/LandingPage'
 
 // Dashboard components
 import { FixedDashboard } from './dashboard/FixedDashboard'
@@ -40,6 +47,7 @@ import ApiPlayground from './ApiPlayground'
  * Main application router component
  * 
  * Provides routing for all major application features including:
+ * - Landing page for organization selection
  * - Dashboard and analytics
  * - Agent and team management
  * - Organization settings
@@ -50,10 +58,15 @@ import ApiPlayground from './ApiPlayground'
 export default function AppRouter() {
   return (
     <Router>
-      <Routes>
-        {/* Main Dashboard Routes */}
-        <Route path="/" element={<FixedDashboard />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
+      <OrganizationProvider>
+        <OrganizationWrapper />
+        <Routes>
+          {/* Landing Page Route */}
+          <Route path="/landing" element={<LandingPage />} />
+          
+          {/* Main Dashboard Routes */}
+          <Route path="/" element={<FixedDashboard />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
         
         {/* Agent Management Routes */}
         <Route path="/agents" element={<FixedAgentsPage />} />
@@ -132,6 +145,7 @@ export default function AppRouter() {
           } 
         />
       </Routes>
+      </OrganizationProvider>
     </Router>
   )
 }

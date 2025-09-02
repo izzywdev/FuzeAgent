@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { OrganizationSwitcher } from './OrganizationSwitcher'
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -195,6 +196,11 @@ export function Sidebar({ className }: SidebarProps): JSX.Element {
             <p className="text-xs text-muted-foreground">{APP_BRAND.tagline}</p>
           </div>
         </div>
+      </div>
+
+      {/* Organization Switcher */}
+      <div className="px-4 py-3 border-b border-border">
+        <OrganizationSwitcher />
       </div>
 
       {/* Navigation Menu */}

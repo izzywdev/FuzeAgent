@@ -1,7 +1,6 @@
 import { expect, afterEach, vi, beforeEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import * as matchers from '@testing-library/jest-dom/matchers'
-import { enableMockApi } from '../mocks/server'
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers)
@@ -67,4 +66,4 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 }))
 
-enableMockApi()
+// Mock API calls will be handled by the external mock server

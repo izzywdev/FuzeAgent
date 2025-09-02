@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useApiService } from '../../hooks/useApiService'
 
 interface Props {
   orgId: string
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function OrganizationToolsSection({ orgId, tools, onToolsChange }: Props): JSX.Element {
+  const apiService = useApiService()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingTool, setEditingTool] = useState<any>(null)
   const [formData, setFormData] = useState({
@@ -25,20 +27,18 @@ export function OrganizationToolsSection({ orgId, tools, onToolsChange }: Props)
 
   const handleCreate = async () => {
     try {
-      const response = await fetch(`/organizations/${orgId}/tools`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: formData.key,
-          name: formData.name,
-          description: formData.description,
-          default_config: JSON.parse(formData.default_config)
-        })
+      const response = await apiService.createOrganizationTool(orgId, {
+        key: formData.key,
+        name: formData.name,
+        description: formData.description,
+        default_config: JSON.parse(formData.default_config)
       })
       if (response.ok) {
         setShowCreateForm(false)
         setFormData({ key: '', name: '', description: '', default_config: '{}' })
         onToolsChange()
+      } else {
+        console.error('Error creating tool:', response.status)
       }
     } catch (error) {
       console.error('Error creating tool:', error)
@@ -48,20 +48,18 @@ export function OrganizationToolsSection({ orgId, tools, onToolsChange }: Props)
   const handleUpdate = async () => {
     if (!editingTool) return
     try {
-      const response = await fetch(`/organizations/${orgId}/tools/${editingTool.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: formData.key,
-          name: formData.name,
-          description: formData.description,
-          default_config: JSON.parse(formData.default_config)
-        })
+      const response = await apiService.updateOrganizationTool(orgId, editingTool.id, {
+        key: formData.key,
+        name: formData.name,
+        description: formData.description,
+        default_config: JSON.parse(formData.default_config)
       })
       if (response.ok) {
         setEditingTool(null)
         setFormData({ key: '', name: '', description: '', default_config: '{}' })
         onToolsChange()
+      } else {
+        console.error('Error updating tool:', response.status)
       }
     } catch (error) {
       console.error('Error updating tool:', error)
@@ -71,11 +69,11 @@ export function OrganizationToolsSection({ orgId, tools, onToolsChange }: Props)
   const handleDelete = async (toolId: string) => {
     if (!confirm('Are you sure you want to delete this tool?')) return
     try {
-      const response = await fetch(`/organizations/${orgId}/tools/${toolId}`, {
-        method: 'DELETE'
-      })
+      const response = await apiService.deleteOrganizationTool(orgId, toolId)
       if (response.ok) {
         onToolsChange()
+      } else {
+        console.error('Error deleting tool:', response.status)
       }
     } catch (error) {
       console.error('Error deleting tool:', error)

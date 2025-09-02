@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useApiService } from '../../hooks/useApiService'
 
 interface Props {
   teamId: string
@@ -20,6 +21,7 @@ type TeamTool = {
 }
 
 export function TeamToolsSection({ teamId, onToolsChange }: Props): JSX.Element {
+  const apiService = useApiService()
   const [tools, setTools] = useState<TeamTool[]>([])
   const [loading, setLoading] = useState(false)
   const [editingTool, setEditingTool] = useState<TeamTool | null>(null)
@@ -34,10 +36,11 @@ export function TeamToolsSection({ teamId, onToolsChange }: Props): JSX.Element 
   const loadTeamTools = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/teams/${teamId}/tools`)
+      const response = await apiService.getTeamTools(teamId)
       if (response.ok) {
-        const data = await response.json()
-        setTools(data)
+        setTools(response.data)
+      } else {
+        console.error('Error loading team tools:', response.status)
       }
     } catch (error) {
       console.error('Error loading team tools:', error)
@@ -48,17 +51,15 @@ export function TeamToolsSection({ teamId, onToolsChange }: Props): JSX.Element 
 
   const toggleTool = async (tool: TeamTool, enabled: boolean) => {
     try {
-      const response = await fetch(`/teams/${teamId}/tools/${tool.tool.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          enabled,
-          config_override: tool.setting.config_override
-        })
+      const response = await apiService.updateTeamTool(teamId, tool.tool.id, { 
+        enabled,
+        config_override: tool.setting.config_override
       })
       if (response.ok) {
         await loadTeamTools()
         onToolsChange()
+      } else {
+        console.error('Error updating tool setting:', response.status)
       }
     } catch (error) {
       console.error('Error updating tool setting:', error)
@@ -69,19 +70,17 @@ export function TeamToolsSection({ teamId, onToolsChange }: Props): JSX.Element 
     if (!editingTool) return
     try {
       const parsedConfig = JSON.parse(configOverride)
-      const response = await fetch(`/teams/${teamId}/tools/${tool.tool.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          enabled: tool.setting.enabled,
-          config_override: parsedConfig
-        })
+      const response = await apiService.updateTeamTool(teamId, tool.tool.id, { 
+        enabled: tool.setting.enabled,
+        config_override: parsedConfig
       })
       if (response.ok) {
         setEditingTool(null)
         setConfigOverride('{}')
         await loadTeamTools()
         onToolsChange()
+      } else {
+        console.error('Error updating tool config:', response.status)
       }
     } catch (error) {
       console.error('Error updating tool config:', error)

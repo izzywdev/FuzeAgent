@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import ErrorBoundary from '../ErrorBoundary'
+import { useOrganization } from '../../contexts/OrganizationContext'
+import { useApiService } from '../../hooks/useApiService'
 
 interface TeamMember {
   id: string
@@ -57,6 +59,8 @@ const normalizeTeam = (team: any): Team => {
 
 
 function FixedTeamsPageCore() {
+  const { currentOrganization } = useOrganization()
+  const apiService = useApiService()
   const [teams, setTeams] = useState<Team[]>([])
   const [filteredTeams, setFilteredTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
@@ -96,33 +100,39 @@ function FixedTeamsPageCore() {
         setLoading(true)
         setError(null)
         
-        console.log('Fetching teams from API...')
-        const response = await fetch('/teams')
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        if (!currentOrganization) {
+          setTeams([])
+          setFilteredTeams([])
+          setLoading(false)
+          return
         }
         
-        const data = await response.json()
-        console.log('API response:', data)
+        console.log('Fetching teams from API...')
+        const response = await apiService.getTeams()
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+        
+        console.log('API response:', response.data)
         
         // Handle different response structures
         let teamData: Team[]
         
-        if (Array.isArray(data)) {
+        if (Array.isArray(response.data)) {
           // Direct array response
-          teamData = data
-        } else if (data && Array.isArray(data.teams)) {
+          teamData = response.data
+        } else if (response.data && Array.isArray(response.data.teams)) {
           // Object with teams property
-          teamData = data.teams
-        } else if (data && typeof data === 'object') {
+          teamData = response.data.teams
+        } else if (response.data && typeof response.data === 'object') {
           // Single team object or other structure
-          teamData = Object.values(data).filter(item => 
+          teamData = Object.values(response.data).filter(item => 
             item && typeof item === 'object' && 'id' in item
           ) as Team[]
         } else {
           // Unexpected format
-          console.warn('Unexpected API response format:', data)
+          console.warn('Unexpected API response format:', response.data)
           teamData = []
         }
         
@@ -162,7 +172,7 @@ function FixedTeamsPageCore() {
     return () => {
       setLoading(false)
     }
-  }, [])
+  }, [currentOrganization, apiService])
 
   const handleCreateTeam = () => {
     navigate('/teams/create')

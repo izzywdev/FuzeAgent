@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { EnvEditor } from '../common/EnvEditor'
+import { useOrganization } from '../../contexts/OrganizationContext'
+import { useApiService } from '../../hooks/useApiService'
 
 interface Team {
   id: string
@@ -24,6 +26,8 @@ interface AgentTemplate {
 
 export function CreateAgentPage() {
   const navigate = useNavigate()
+  const { currentOrganization } = useOrganization()
+  const apiService = useApiService()
   const [teams, setTeams] = useState<Team[]>([])
   const [templates, setTemplates] = useState<AgentTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,85 +51,78 @@ export function CreateAgentPage() {
   })
 
   useEffect(() => {
-    // Load teams
-    fetch('/teams')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setTeams(data)
+    const loadData = async () => {
+      try {
+        // Load teams for the current organization
+        if (currentOrganization) {
+          const teamsResponse = await apiService.getTeams()
+          if (teamsResponse.ok && Array.isArray(teamsResponse.data)) {
+            setTeams(teamsResponse.data)
+          } else {
+            setTeams([])
+          }
         } else {
-          // Mock teams data
-          setTeams([
-            { id: '1', name: 'Executive Team' },
-            { id: '2', name: 'Development Team' },
-            { id: '3', name: 'Quality Assurance' },
-            { id: '4', name: 'DevOps Team' },
-            { id: '5', name: 'Business Team' }
-          ])
+          setTeams([])
         }
-      })
-      .catch(() => {
-        // Mock teams data on error
-        setTeams([
-          { id: '1', name: 'Executive Team' },
-          { id: '2', name: 'Development Team' },
-          { id: '3', name: 'Quality Assurance' },
-          { id: '4', name: 'DevOps Team' },
-          { id: '5', name: 'Business Team' }
-        ])
-      })
 
-    // Load agent templates
-    fetch('/agent-templates')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.templates && Array.isArray(data.templates)) {
-          // Transform API response to match UI interface
-          const transformedTemplates = data.templates.map((template: any) => ({
-            id: template.template_id,
-            name: template.name,
-            description: template.description,
-            type: template.category || 'developer',
-            defaultConfig: {
-              model: template.default_model || 'claude-sonnet-4-20250514',
-              temperature: template.default_temperature || 0.7,
-              tools: template.tools || [],
-              goal: template.default_goal || '',
-              backstory: template.default_backstory || ''
-            },
-            defaultDockerImage: template.default_docker_image || template.default_container_image || template.docker_image || template.container_image || ''
-          }))
-          setTemplates(transformedTemplates)
-        } else if (Array.isArray(data)) {
-          // Some backends (including our mock API) return a flat array of templates
-          // Normalize it to the shape expected by the UI
-          const normalizedTemplates = data.map((template: any) => ({
-            id: template.id || template.template_id,
-            name: template.name,
-            description: template.description || '',
-            type: template.type || template.category || 'developer',
-            defaultConfig: {
-              model: template.default_model || template.model || 'claude-sonnet-4-20250514',
-              temperature: template.default_temperature ?? 0.7,
-              tools: Array.isArray(template.tools) ? template.tools : [],
-              goal: template.default_goal || '',
-              backstory: template.default_backstory || ''
-            },
-            defaultDockerImage: template.default_docker_image || template.default_container_image || template.docker_image || template.container_image || ''
-          }))
-          setTemplates(normalizedTemplates)
+        // Load agent templates
+        const templatesResponse = await apiService.getAgentTemplates()
+        if (templatesResponse.ok) {
+          const data = templatesResponse.data
+          if (data && data.templates && Array.isArray(data.templates)) {
+            // Transform API response to match UI interface
+            const transformedTemplates = data.templates.map((template: any) => ({
+              id: template.template_id,
+              name: template.name,
+              description: template.description,
+              type: template.category || 'developer',
+              defaultConfig: {
+                model: template.default_model || 'claude-sonnet-4-20250514',
+                temperature: template.default_temperature || 0.7,
+                tools: template.tools || [],
+                goal: template.default_goal || '',
+                backstory: template.default_backstory || ''
+              },
+              defaultDockerImage: template.default_docker_image || template.default_container_image || template.docker_image || template.container_image || ''
+            }))
+            setTemplates(transformedTemplates)
+          } else if (Array.isArray(data)) {
+            // Some backends (including our mock API) return a flat array of templates
+            // Normalize it to the shape expected by the UI
+            const normalizedTemplates = data.map((template: any) => ({
+              id: template.id || template.template_id,
+              name: template.name,
+              description: template.description || '',
+              type: template.type || template.category || 'developer',
+              defaultConfig: {
+                model: template.default_model || template.model || 'claude-sonnet-4-20250514',
+                temperature: template.default_temperature ?? 0.7,
+                tools: Array.isArray(template.tools) ? template.tools : [],
+                goal: template.default_goal || '',
+                backstory: template.default_backstory || ''
+              },
+              defaultDockerImage: template.default_docker_image || template.default_container_image || template.docker_image || template.container_image || ''
+            }))
+            setTemplates(normalizedTemplates)
+          } else {
+            // No templates available
+            setTemplates([])
+          }
         } else {
-          // No templates available
+          console.error('Failed to load templates:', templatesResponse.status)
           setTemplates([])
         }
-        setLoading(false)
-      })
-      .catch(() => {
-        // No templates on error
+      } catch (err) {
+        console.error('Failed to load data:', err)
+        setTeams([])
         setTemplates([])
+      } finally {
         setLoading(false)
-      })
-  }, [])
+      }
+    }
+
+    loadData()
+  }, [currentOrganization, apiService])
 
   // Templates will be fetched from API
 
@@ -148,25 +145,25 @@ export function CreateAgentPage() {
     e.preventDefault()
     setCreating(true)
 
+    if (!currentOrganization) {
+      alert('No organization selected. Please select an organization first.')
+      setCreating(false)
+      return
+    }
+
     try {
-      const response = await fetch('/agents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          role: formData.role,
-          type: formData.type,
-          team_id: formData.team_id,
-          container_image: formData.container_image,
-          container_env: formData.container_env,
-          config: formData.config
-        })
+      const response = await apiService.createAgent({
+        name: formData.name,
+        role: formData.role,
+        type: formData.type,
+        team_id: formData.team_id,
+        container_image: formData.container_image,
+        container_env: formData.container_env,
+        config: formData.config
       })
 
       if (response.ok) {
-        const newAgent = await response.json()
+        const newAgent = response.data
         // Handle different possible response structures
         const agentId = newAgent.agent_id || newAgent.agent?.id || newAgent.id
         if (agentId) {
@@ -176,7 +173,7 @@ export function CreateAgentPage() {
           alert('Agent created but unable to navigate. Please check the agents list.')
         }
       } else {
-        alert('Failed to create agent. Please try again.')
+        alert(`Failed to create agent: HTTP ${response.status}`)
       }
     } catch (error) {
       console.error('Error creating agent:', error)
@@ -190,11 +187,27 @@ export function CreateAgentPage() {
 
   useEffect(() => {
     const tid = formData.team_id
-    if (!tid) { setTeamTools([]); return }
-    fetch(`/teams/${tid}/tools`).then(r => r.json()).then((list) => {
-      if (Array.isArray(list)) setTeamTools(list)
-    }).catch(() => setTeamTools([]))
-  }, [formData.team_id])
+    if (!tid) { 
+      setTeamTools([])
+      return 
+    }
+    
+    const loadTeamTools = async () => {
+      try {
+        const response = await apiService.getTeamTools(tid)
+        if (response.ok && Array.isArray(response.data)) {
+          setTeamTools(response.data)
+        } else {
+          setTeamTools([])
+        }
+      } catch (error) {
+        console.error('Failed to load team tools:', error)
+        setTeamTools([])
+      }
+    }
+    
+    loadTeamTools()
+  }, [formData.team_id, apiService])
 
   if (loading) {
     return (
@@ -272,6 +285,17 @@ export function CreateAgentPage() {
               <h3 style={{fontSize: '1.25rem', fontWeight: '600', marginBottom: '1.5rem'}}>Agent Details</h3>
               
               <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
+                {/* Current Organization Display */}
+                {currentOrganization && (
+                  <div style={{padding: '1rem', backgroundColor: '#f3f4f6', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
+                    <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.25rem'}}>
+                      Creating agent for:
+                    </div>
+                    <div style={{fontSize: '1rem', fontWeight: '600', color: '#111827'}}>
+                      {currentOrganization.name}
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Agent Name *

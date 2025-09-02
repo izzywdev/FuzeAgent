@@ -14,11 +14,13 @@ import { ContainerTab } from './AgentDetailsPage/ContainerTab'
 import { AssignTaskModal } from './AgentDetailsPage/AssignTaskModal'
 import { DocumentViewer } from './AgentDetailsPage/DocumentViewer'
 import { InlineCss } from './AgentDetailsPage/InlineCss'
+import { useApiService } from '../../hooks/useApiService'
 
 
 
 export function AgentDetailsPage(): React.ReactElement {
   const { agentId } = useParams<{ agentId: string }>()
+  const apiService = useApiService()
   const [agent, setAgent] = useState<Agent | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [containerInfo, setContainerInfo] = useState<ContainerInfo | null>(null)
@@ -63,16 +65,36 @@ export function AgentDetailsPage(): React.ReactElement {
     hasInitializedRef.current = true
 
     // Load agent details
-    fetch(`/agents/${agentId}`)
-      .then(res => res.json())
-      .then(data => {
-        setAgent(data)
-        setLoading(false)
-      })
-      .catch(err => {
+    const loadAgent = async () => {
+      try {
+        const response = await apiService.getAgent(agentId)
+        if (response.ok) {
+          setAgent(response.data)
+        } else {
+          console.error('Failed to load agent:', response.status)
+          // Mock data for demo
+          setAgent({
+            id: agentId,
+            name: 'IzzyAI CEO',
+            role: 'Digital CEO',
+            type: 'executive',
+            status: 'active',
+            config: {
+              model: 'claude-sonnet-4-20250514',
+              temperature: 0.7,
+              tools: ['strategic_planning', 'resource_allocation', 'team_management'],
+              goal: 'Lead the organization with strategic vision and effective decision-making',
+              backstory: 'Executive AI with extensive experience in strategic planning, team leadership, and organizational management'
+            },
+            created_at: '2025-08-06T11:16:04.060569',
+            updated_at: '2025-08-06T11:16:04.060598',
+            team_id: '1',
+            team_name: 'Executive Team'
+          })
+        }
+      } catch (err) {
         console.error('Failed to load agent:', err)
-        setLoading(false)
-        // Mock data for demo
+        // Mock data for demo (same as above)
         setAgent({
           id: agentId,
           name: 'IzzyAI CEO',
@@ -91,14 +113,53 @@ export function AgentDetailsPage(): React.ReactElement {
           team_id: '1',
           team_name: 'Executive Team'
         })
-      })
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadAgent()
 
     // Load agent tasks
-    fetch(`/agents/${agentId}/tasks`)
-      .then(res => res.json())
-      .then(data => setTasks(Array.isArray(data) ? data : []))
-      .catch(() => {
-        // Mock tasks data
+    const loadAgentTasks = async () => {
+      try {
+        const response = await apiService.getAgentTasks(agentId)
+        if (response.ok) {
+          setTasks(Array.isArray(response.data) ? response.data : [])
+        } else {
+          console.error('Failed to load agent tasks:', response.status)
+          // Mock tasks data
+          setTasks([
+            {
+              id: '1',
+              title: 'Strategic Planning Q4 2025',
+              description: 'Develop comprehensive strategic plan for Q4 2025 expansion',
+              status: 'completed',
+              priority: 'high',
+              created_at: '2025-08-05T09:00:00Z',
+              completed_at: '2025-08-05T17:30:00Z'
+            },
+            {
+              id: '2',
+              title: 'Team Performance Review',
+              description: 'Conduct quarterly performance review for all team leads',
+              status: 'in_progress',
+              priority: 'medium',
+              created_at: '2025-08-06T08:00:00Z'
+            },
+            {
+              id: '3',
+              title: 'Budget Allocation Planning',
+              description: 'Plan budget allocation for next quarter initiatives',
+              status: 'pending',
+              priority: 'high',
+              created_at: '2025-08-06T10:00:00Z'
+            }
+          ])
+        }
+      } catch (error) {
+        console.error('Failed to load agent tasks:', error)
+        // Same mock data as above
         setTasks([
           {
             id: '1',
@@ -126,7 +187,10 @@ export function AgentDetailsPage(): React.ReactElement {
             created_at: '2025-08-06T10:00:00Z'
           }
         ])
-      })
+      }
+    }
+    
+    loadAgentTasks()
 
     // Load agent's primary conversation from API
     if (agentId) {
@@ -149,18 +213,13 @@ export function AgentDetailsPage(): React.ReactElement {
     setAssigningTask(true)
     setAssignTaskError(null)
     try {
-      const res = await fetch(`/tasks/${selectedTeamTaskId}/assign`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: agentId })
-      })
+      const res = await apiService.assignTask(selectedTeamTaskId, agentId)
       if (res.ok) {
-        const updated = await res.json()
-        setTasks((prev: Task[]) => [updated, ...prev.filter((t: Task) => t.id !== updated.id)])
+        setTasks((prev: Task[]) => [res.data, ...prev.filter((t: Task) => t.id !== res.data.id)])
         setShowAssignTask(false)
         setSelectedTeamTaskId('')
       } else {
-        setAssignTaskError('Failed to assign task')
+        setAssignTaskError(`Failed to assign task: HTTP ${res.status}`)
       }
     } catch {
       setAssignTaskError('Error assigning task')
@@ -174,12 +233,11 @@ export function AgentDetailsPage(): React.ReactElement {
     if (!agentId) return
     
     try {
-      const response = await fetch(`/knowledge/agents/${agentId}/documents`)
+      const response = await apiService.getAgentKnowledge(agentId)
       if (response.ok) {
-        const documents = await response.json()
-        setKnowledgeDocs(documents)
+        setKnowledgeDocs(response.data)
       } else {
-        console.error('Failed to load agent documents')
+        console.error('Failed to load agent documents:', response.status)
       }
     } catch (error) {
       console.error('Error loading agent documents:', error)
@@ -980,7 +1038,13 @@ export function AgentDetailsPage(): React.ReactElement {
             tasks={tasks}
             onOpenAssign={() => {
                 if (agent?.team_id) {
-                  fetch(`/teams/${agent.team_id}/tasks`).then(r => r.json()).then(d => setTeamTasks(Array.isArray(d) ? d : []))
+                  apiService.getTeamTasks(agent.team_id).then(response => {
+                    if (response.ok) {
+                      setTeamTasks(Array.isArray(response.data) ? response.data : [])
+                    } else {
+                      setTeamTasks([])
+                    }
+                  }).catch(() => setTeamTasks([]))
                 } else {
                   setTeamTasks([])
                 }
