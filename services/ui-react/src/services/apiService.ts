@@ -1,13 +1,14 @@
 
-import type { 
-  Organization, 
-  OrganizationCreate, 
+import type {
+  Organization,
+  OrganizationCreate,
   OrganizationUpdate,
-  Team, 
-  TeamCreate, 
+  Team,
+  TeamCreate,
   TeamUpdate,
-  Agent, 
+  Agent,
   Task,
+  Milestone,
   AgentTemplate,
   CreateCustomAgent
 } from '../types'
@@ -642,6 +643,180 @@ class ApiService {
         limit: 5
       })
     })
+  }
+
+  // ============================================================================
+  // MILESTONES
+  // ============================================================================
+
+  /**
+   * Create a new milestone for a goal
+   */
+  async createMilestone(data: {
+    goal_id: string
+    title: string
+    description: string
+    priority?: 'low' | 'medium' | 'high' | 'critical'
+    target_date: string
+  }): Promise<ApiResponse<Milestone>> {
+    return this.request<Milestone>('/milestones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+  }
+
+  /**
+   * Get a specific milestone by ID
+   */
+  async getMilestone(milestoneId: string): Promise<ApiResponse<Milestone>> {
+    return this.request<Milestone>(`/milestones/${milestoneId}`)
+  }
+
+  /**
+   * Update an existing milestone
+   */
+  async updateMilestone(
+    milestoneId: string,
+    data: {
+      title?: string
+      description?: string
+      status?: 'not_started' | 'in_progress' | 'completed' | 'blocked' | 'cancelled'
+      priority?: 'low' | 'medium' | 'high' | 'critical'
+      progress_percentage?: number
+      target_date?: string
+    }
+  ): Promise<ApiResponse<Milestone>> {
+    return this.request<Milestone>(`/milestones/${milestoneId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+  }
+
+  /**
+   * Delete a milestone
+   */
+  async deleteMilestone(milestoneId: string): Promise<ApiResponse<void>> {
+    return this.request<void>(`/milestones/${milestoneId}`, {
+      method: 'DELETE'
+    })
+  }
+
+  /**
+   * List milestones with filtering, search, and pagination
+   */
+  async getMilestones(options: {
+    page?: number
+    page_size?: number
+    goal_id?: string
+    status?: ('not_started' | 'in_progress' | 'completed' | 'blocked' | 'cancelled')[]
+    priority?: ('low' | 'medium' | 'high' | 'critical')[]
+    search?: string
+    sort_by?: 'created_at' | 'target_date' | 'priority' | 'progress_percentage' | 'title'
+    sort_order?: 'asc' | 'desc'
+  } = {}): Promise<ApiResponse<{
+    milestones: Milestone[]
+    total: number
+    page: number
+    page_size: number
+    total_pages: number
+    filters?: any
+  }>> {
+    const params = new URLSearchParams()
+
+    if (options.page) params.append('page', options.page.toString())
+    if (options.page_size) params.append('page_size', options.page_size.toString())
+    if (options.goal_id) params.append('goal_id', options.goal_id)
+    if (options.status?.length) {
+      options.status.forEach(s => params.append('status', s))
+    }
+    if (options.priority?.length) {
+      options.priority.forEach(p => params.append('priority', p))
+    }
+    if (options.search) params.append('search', options.search)
+    if (options.sort_by) params.append('sort_by', options.sort_by)
+    if (options.sort_order) params.append('sort_order', options.sort_order)
+
+    const url = `/milestones${params.toString() ? '?' + params.toString() : ''}`
+
+    return this.request<{
+      milestones: Milestone[]
+      total: number
+      page: number
+      page_size: number
+      total_pages: number
+      filters?: any
+    }>(url)
+  }
+
+  /**
+   * Get all tasks associated with a milestone
+   */
+  async getMilestoneTasks(
+    milestoneId: string,
+    options: {
+      page?: number
+      page_size?: number
+      status?: ('pending' | 'in_progress' | 'completed' | 'failed')[]
+    } = {}
+  ): Promise<ApiResponse<{
+    tasks: Task[]
+    total: number
+    page: number
+    page_size: number
+    total_pages: number
+  }>> {
+    const params = new URLSearchParams()
+
+    if (options.page) params.append('page', options.page.toString())
+    if (options.page_size) params.append('page_size', options.page_size.toString())
+    if (options.status?.length) {
+      options.status.forEach(s => params.append('status', s))
+    }
+
+    const url = `/milestones/${milestoneId}/tasks${params.toString() ? '?' + params.toString() : ''}`
+
+    return this.request<{
+      tasks: Task[]
+      total: number
+      page: number
+      page_size: number
+      total_pages: number
+    }>(url)
+  }
+
+  /**
+   * Assign a task to a milestone
+   */
+  async assignTaskToMilestone(milestoneId: string, taskId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/milestones/${milestoneId}/tasks/${taskId}`, {
+      method: 'POST'
+    })
+  }
+
+  /**
+   * Remove a task from a milestone
+   */
+  async removeTaskFromMilestone(milestoneId: string, taskId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/milestones/${milestoneId}/tasks/${taskId}`, {
+      method: 'DELETE'
+    })
+  }
+
+  /**
+   * Get milestones for a specific goal
+   */
+  async getGoalMilestones(goalId: string): Promise<ApiResponse<Milestone[]>> {
+    const response = await this.getMilestones({ goal_id: goalId })
+    if (response.ok) {
+      return {
+        data: response.data.milestones,
+        status: response.status,
+        ok: response.ok
+      }
+    }
+    return response as any
   }
 
   // ============================================================================
