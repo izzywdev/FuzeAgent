@@ -57,7 +57,12 @@ import ApiPlayground from './ApiPlayground'
  */
 export default function AppRouter() {
   return (
-    <Router>
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
       <OrganizationProvider>
         <OrganizationWrapper />
         <Routes>

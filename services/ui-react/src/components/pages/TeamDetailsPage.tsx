@@ -80,31 +80,7 @@ export function TeamDetailsPage() {
   const [creatingTask, setCreatingTask] = useState(false)
   const [createTaskError, setCreateTaskError] = useState<string | null>(null)
   const [teamTasks, setTeamTasks] = useState<any[]>([])
-
-  // Display error if there is one
-  if (error) {
-    return (
-      <div style={{minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-        <div style={{textAlign: 'center'}}>
-          <div style={{fontSize: '2rem', marginBottom: '1rem'}}>⚠️</div>
-          <p style={{color: '#dc2626', marginBottom: '1rem'}}>{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              cursor: 'pointer'
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const [showErrorPage, setShowErrorPage] = useState(false)
 
   useEffect(() => {
     if (!teamId) return
@@ -127,6 +103,7 @@ export function TeamDetailsPage() {
           setTeam(response.data)
         } else {
           setError(`Failed to load team data: HTTP ${response.status}`)
+          setShowErrorPage(true)
         }
       } catch (err) {
         setError('Error loading team data')
@@ -140,6 +117,31 @@ export function TeamDetailsPage() {
 
     loadTeamData()
   }, [teamId])
+
+  // Show error page if there's an error and we're not loading
+  if (showErrorPage && !loading) {
+    return (
+      <div style={{minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <div style={{textAlign: 'center'}}>
+          <div style={{fontSize: '2rem', marginBottom: '1rem'}}>⚠️</div>
+          <p style={{color: '#dc2626', marginBottom: '1rem'}}>{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              cursor: 'pointer'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // Load agents list for add-member modal
   useEffect(() => {

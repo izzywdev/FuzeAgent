@@ -267,11 +267,11 @@ class ApiService {
   }
 
   async getTeamKnowledge(id: string): Promise<ApiResponse<KnowledgeDocument[]>> {
-    return this.directRequest<KnowledgeDocument[]>(`/knowledge/teams/${id}/documents`)
+    return this.request<KnowledgeDocument[]>(`/teams/${id}/knowledge`)
   }
 
   async getTeamKnowledgeContent(teamId: string, docId: string): Promise<ApiResponse<DocumentContent>> {
-    return this.directRequest<DocumentContent>(`/knowledge/teams/${teamId}/documents/${docId}/content`)
+    return this.request<DocumentContent>(`/teams/${teamId}/knowledge/${docId}/content`)
   }
 
   // ============================================================================

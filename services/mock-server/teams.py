@@ -19,13 +19,12 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 
 @router.get("/", response_model=List[TeamResponse])
 def get_teams(
-    org_id: str = Depends(get_organization_id_from_bearer_token),
     db: Session = Depends(get_db)
 ):
-    """Get all teams for the authenticated organization."""
-    logger.info(f"GET /teams - Organization: {org_id}")
-    
-    teams = db.query(Team).filter(Team.organization_id == org_id).all()
+    """Get all teams (no authentication required for listing)."""
+    logger.info("GET /teams - Listing all teams")
+
+    teams = db.query(Team).all()
     
     # Convert to response format with additional fields
     team_responses = []
@@ -119,17 +118,13 @@ def create_team(
 @router.get("/{team_id}", response_model=TeamResponse)
 def get_team(
     team_id: str,
-    org_id: str = Depends(get_organization_id_from_bearer_token),
     db: Session = Depends(get_db)
 ):
-    """Get a specific team by ID (must belong to authenticated organization)."""
-    logger.info(f"GET /teams/{team_id} - Organization: {org_id}")
-    
-    team = db.query(Team).filter(
-        Team.id == team_id,
-        Team.organization_id == org_id
-    ).first()
-    
+    """Get a specific team by ID."""
+    logger.info(f"GET /teams/{team_id}")
+
+    team = db.query(Team).filter(Team.id == team_id).first()
+
     if not team:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -159,6 +154,77 @@ def get_team(
     }
     
     return team_response
+
+# Knowledge/Document endpoints for teams
+@router.get("/{team_id}/knowledge", response_model=List[dict])
+def get_team_knowledge(team_id: str, db: Session = Depends(get_db)):
+    """Get knowledge documents for a team."""
+    logger.info(f"GET /teams/{team_id}/knowledge")
+
+    # For now, return mock data since we don't have a knowledge table
+    mock_docs = [
+        {
+            "id": "doc1",
+            "title": "Team Guidelines",
+            "filename": "guidelines.pdf",
+            "type": "document",
+            "mime_type": "application/pdf",
+            "size": 1024000,
+            "status": "active",
+            "upload_date": "2024-01-15T10:00:00Z",
+            "last_modified": "2024-01-15T10:00:00Z",
+            "content_preview": "This document contains team guidelines...",
+            "tags": ["guidelines", "team"],
+            "team_id": team_id,
+            "word_count": 1200,
+            "extracted_text": "This document contains team guidelines and best practices..."
+        },
+        {
+            "id": "doc2",
+            "title": "Project Documentation",
+            "filename": "project-docs.md",
+            "type": "document",
+            "mime_type": "text/markdown",
+            "size": 512000,
+            "status": "active",
+            "upload_date": "2024-01-20T14:30:00Z",
+            "last_modified": "2024-01-20T14:30:00Z",
+            "content_preview": "# Project Documentation\n\nThis is the main project documentation...",
+            "tags": ["documentation", "project"],
+            "team_id": team_id,
+            "word_count": 800,
+            "extracted_text": "# Project Documentation\n\nThis is the main project documentation..."
+        }
+    ]
+
+    return mock_docs
+
+@router.get("/{team_id}/knowledge/{doc_id}/content", response_model=dict)
+def get_team_knowledge_content(team_id: str, doc_id: str, db: Session = Depends(get_db)):
+    """Get content of a specific knowledge document."""
+    logger.info(f"GET /teams/{team_id}/knowledge/{doc_id}/content")
+
+    # Mock content based on document ID
+    mock_content = {
+        "doc1": {
+            "content": "This document contains team guidelines and best practices for working together effectively. Please review these guidelines regularly to ensure smooth collaboration.",
+            "type": "document",
+            "filename": "guidelines.pdf"
+        },
+        "doc2": {
+            "content": "# Project Documentation\n\nThis is the main project documentation for the team. It contains all the important information about the project structure, requirements, and procedures.",
+            "type": "document",
+            "filename": "project-docs.md"
+        }
+    }
+
+    if doc_id not in mock_content:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+
+    return mock_content[doc_id]
 
 @router.put("/{team_id}", response_model=TeamResponse)
 def update_team(
