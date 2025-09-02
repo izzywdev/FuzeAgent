@@ -120,20 +120,26 @@ class AgentToolSetting(Base):
 
 class Task(Base):
     __tablename__ = "tasks"
-    
+
     id = Column(String, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(Text)
-    status = Column(String, default="pending")  # pending, in_progress, completed
-    priority = Column(String, default="medium")  # low, medium, high
+    status = Column(String, default="pending")  # pending, in_progress, completed, failed
+    priority = Column(String, default="medium")  # low, medium, high, critical
     team_id = Column(String, ForeignKey("teams.id"))
     agent_id = Column(String, ForeignKey("agents.id"))
+    milestone_id = Column(String, ForeignKey("milestones.id"))
+    result = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime)
+
+    # Relationships
+    milestone = relationship("Milestone", back_populates="tasks")
 
 class Goal(Base):
     __tablename__ = "goals"
-    
+
     id = Column(String, primary_key=True, index=True)
     organization_id = Column(String, ForeignKey("organizations.id"), nullable=False)
     title = Column(String, nullable=False)
@@ -143,6 +149,28 @@ class Goal(Base):
     target_date = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    milestones = relationship("Milestone", back_populates="goal", cascade="all, delete-orphan")
+
+class Milestone(Base):
+    __tablename__ = "milestones"
+
+    id = Column(String, primary_key=True, index=True)
+    goal_id = Column(String, ForeignKey("goals.id"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text)
+    status = Column(String, default="not_started")  # not_started, in_progress, completed, blocked, cancelled
+    priority = Column(String, default="medium")  # low, medium, high, critical
+    progress_percentage = Column(Integer, default=0)
+    target_date = Column(DateTime, nullable=False)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    goal = relationship("Goal", back_populates="milestones")
+    tasks = relationship("Task", back_populates="milestone", cascade="all, delete-orphan")
 
 # Create all tables
 def create_tables():
