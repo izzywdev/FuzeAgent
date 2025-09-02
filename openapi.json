@@ -1436,6 +1436,221 @@
         },
         "required": ["goals", "total", "page", "page_size", "total_pages"]
       },
+      "Agent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the agent"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the team this agent belongs to"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the agent"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role of the agent"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["developer", "analyst", "manager", "specialist"],
+            "description": "Type of agent"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive", "maintenance", "error"],
+            "description": "Current status of the agent"
+          },
+          "config": {
+            "type": "object",
+            "description": "Agent configuration"
+          },
+          "template_id": {
+            "type": "string",
+            "description": "Template ID used to create this agent"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp"
+          },
+          "team_name": {
+            "type": "string",
+            "description": "Name of the assigned team"
+          },
+          "task_count": {
+            "type": "integer",
+            "description": "Total number of tasks assigned"
+          },
+          "completed_task_count": {
+            "type": "integer",
+            "description": "Number of completed tasks"
+          },
+          "active_task_count": {
+            "type": "integer",
+            "description": "Number of active tasks"
+          },
+          "efficiency_rate": {
+            "type": "number",
+            "description": "Efficiency rate (0-100)"
+          },
+          "last_activity": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last activity timestamp"
+          }
+        },
+        "required": ["id", "team_id", "name", "role", "type", "status", "created_at", "updated_at", "team_name", "task_count", "completed_task_count", "active_task_count", "efficiency_rate"]
+      },
+      "AgentCreate": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the team this agent belongs to"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the agent"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role of the agent"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["developer", "analyst", "manager", "specialist"],
+            "description": "Type of agent (defaults to developer)"
+          },
+          "template_id": {
+            "type": "string",
+            "description": "Template ID used to create this agent"
+          },
+          "config": {
+            "type": "object",
+            "description": "Agent configuration"
+          }
+        },
+        "required": ["team_id", "name"]
+      },
+      "AgentUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Updated name"
+          },
+          "role": {
+            "type": "string",
+            "description": "Updated role"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["developer", "analyst", "manager", "specialist"],
+            "description": "Updated type"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive", "maintenance", "error"],
+            "description": "Updated status"
+          },
+          "config": {
+            "type": "object",
+            "description": "Updated configuration"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Updated team assignment"
+          }
+        }
+      },
+      "AgentFilters": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["active", "inactive", "maintenance", "error"]
+            },
+            "description": "Filter by status"
+          },
+          "type": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["developer", "analyst", "manager", "specialist"]
+            },
+            "description": "Filter by type"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Filter by team"
+          },
+          "template_id": {
+            "type": "string",
+            "description": "Filter by template"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search in name and role"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": ["created_at", "updated_at", "name", "type", "status"],
+            "description": "Sort field"
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": ["asc", "desc"],
+            "description": "Sort order"
+          }
+        }
+      },
+      "PaginatedAgentsResponse": {
+        "type": "object",
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Agent"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of agents"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Items per page"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/AgentFilters"
+          }
+        },
+        "required": ["agents", "total", "page", "page_size", "total_pages"]
+      },
       "Task": {
         "type": "object",
         "properties": {
@@ -2197,8 +2412,8 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Goal"
-                }
+                    "$ref": "#/components/schemas/Goal"
+                  }
               }
             }
           },
@@ -2404,6 +2619,551 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/agents": {
+      "post": {
+        "summary": "Create agent",
+        "description": "Create a new agent for an organization",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Agent created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agent"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization or team not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List agents",
+        "description": "List agents for an organization with filtering, search, and pagination",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["active", "inactive", "maintenance", "error"]
+              }
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["developer", "analyst", "manager", "specialist"]
+              }
+            },
+            "description": "Filter by type"
+          },
+          {
+            "name": "team_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by team"
+          },
+          {
+            "name": "template_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by template"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search in name and role"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["created_at", "updated_at", "name", "type", "status"],
+              "default": "created_at"
+            },
+            "description": "Sort field"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "desc"
+            },
+            "description": "Sort order"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedAgentsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/agents/{agent_id}": {
+      "get": {
+        "summary": "Get agent",
+        "description": "Get a specific agent by ID",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agent"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update agent",
+        "description": "Update an existing agent",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agent"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete agent",
+        "description": "Delete an existing agent",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Agent deleted"
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/agents/{agent_id}/start": {
+      "post": {
+        "summary": "Start agent",
+        "description": "Start an agent and update its status",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "agent_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/agents/{agent_id}/stop": {
+      "post": {
+        "summary": "Stop agent",
+        "description": "Stop an agent and update its status",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Agent ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent stopped successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "agent_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Agent not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/agents/teams/{team_id}": {
+      "get": {
+        "summary": "Get team agents",
+        "description": "Get all agents for a specific team",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Team ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of team agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Agent"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Team not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/agents/templates": {
+      "get": {
+        "summary": "Get agent templates",
+        "description": "Get available agent templates",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of agent templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "category": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "config": {
+                        "type": "object"
+                      }
+                    }
+                  }
                 }
               }
             }

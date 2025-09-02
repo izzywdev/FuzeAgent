@@ -40,7 +40,7 @@ app.add_middleware(
 # Include routers
 app.include_router(organizations_router)
 app.include_router(teams_router)
-app.include_router(agents_router)
+app.include_router(agents_router, prefix="/organizations/{org_id}")
 app.include_router(goals_router)
 app.include_router(tasks_router)
 app.include_router(milestones_router)
