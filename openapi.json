@@ -40,65 +40,231 @@
         },
         "required": ["id", "name", "description", "settings", "created_at", "updated_at"]
       },
-      "Team": {
+      "TeamResponse": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Unique identifier for the team"
           },
           "organization_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "ID of the organization this team belongs to"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Name of the team"
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "description": "Description of the team"
           },
           "team_type": {
-            "type": "string"
+            "type": "string",
+            "enum": ["development", "operations", "management", "research"],
+            "description": "Type of team",
+            "default": "development"
           },
           "color": {
-            "type": "string"
+            "type": "string",
+            "description": "Color for team UI representation",
+            "default": "#2563eb"
           },
           "status": {
             "type": "string",
-            "enum": ["active", "inactive"]
-          },
-          "created": {
-            "type": "string",
-            "format": "date-time"
+            "enum": ["active", "inactive"],
+            "description": "Current status of the team"
           },
           "settings": {
-            "type": "object"
+            "type": "object",
+            "description": "Team settings and configuration"
           },
           "created_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When the team was created"
           },
           "updated_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When the team was last updated"
           },
-          "members": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TeamMember"
-            }
+          "member_count": {
+            "type": "integer",
+            "description": "Number of agents in the team",
+            "default": 0
           },
-          "stats": {
-            "$ref": "#/components/schemas/TeamStats"
+          "agent_count": {
+            "type": "integer",
+            "description": "Alias for member_count",
+            "default": 0
           },
-          "knowledgeBase": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/KnowledgeDocument"
-            }
+          "task_count": {
+            "type": "integer",
+            "description": "Total number of tasks assigned to the team",
+            "default": 0
+          },
+          "completed_task_count": {
+            "type": "integer",
+            "description": "Number of completed tasks",
+            "default": 0
+          },
+          "active_task_count": {
+            "type": "integer",
+            "description": "Number of active tasks",
+            "default": 0
+          },
+          "goal_count": {
+            "type": "integer",
+            "description": "Number of goals associated with the team",
+            "default": 0
+          },
+          "milestone_count": {
+            "type": "integer",
+            "description": "Number of milestones associated with the team",
+            "default": 0
+          },
+          "efficiency_rate": {
+            "type": "number",
+            "format": "float",
+            "description": "Team efficiency rate as percentage",
+            "default": 0.0
+          },
+          "avg_response_time": {
+            "type": "string",
+            "description": "Average response time for team tasks",
+            "default": "0s"
           }
         },
-        "required": ["id", "organization_id", "name", "description", "team_type", "color", "status", "created", "settings", "created_at", "updated_at", "members", "stats", "knowledgeBase"]
+        "required": ["id", "organization_id", "name", "description", "team_type", "color", "status", "settings", "created_at", "updated_at", "member_count", "agent_count", "task_count", "completed_task_count", "active_task_count", "goal_count", "milestone_count", "efficiency_rate", "avg_response_time"]
+      },
+      "TeamCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the team"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the team"
+          },
+          "team_type": {
+            "type": "string",
+            "enum": ["development", "operations", "management", "research"],
+            "description": "Type of team",
+            "default": "development"
+          },
+          "color": {
+            "type": "string",
+            "description": "Color for team UI representation",
+            "default": "#2563eb"
+          },
+          "settings": {
+            "type": "object",
+            "description": "Team settings and configuration"
+          }
+        },
+        "required": ["name"]
+      },
+      "TeamUpdate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Updated name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated description"
+          },
+          "team_type": {
+            "type": "string",
+            "enum": ["development", "operations", "management", "research"],
+            "description": "Updated team type"
+          },
+          "color": {
+            "type": "string",
+            "description": "Updated color"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive"],
+            "description": "Updated status"
+          },
+          "settings": {
+            "type": "object",
+            "description": "Updated settings"
+          }
+        }
+      },
+      "TeamFilters": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by status"
+          },
+          "team_type": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by team type"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search in name and description"
+          },
+          "sort_by": {
+            "type": "string",
+            "description": "Sort field",
+            "default": "created_at"
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": ["asc", "desc"],
+            "description": "Sort order",
+            "default": "desc"
+          }
+        }
+      },
+      "PaginatedTeamsResponse": {
+        "type": "object",
+        "properties": {
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamResponse"
+            },
+            "description": "List of teams"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of teams"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Number of items per page"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/TeamFilters"
+          }
+        },
+        "required": ["teams", "total", "page", "page_size", "total_pages"]
       },
       "TeamMember": {
         "type": "object",
@@ -3740,20 +3906,109 @@
         }
       }
     },
-    "/teams": {
+    "/organizations/{org_id}/teams": {
       "get": {
-        "summary": "List all teams",
-        "description": "Retrieve a list of all teams",
+        "summary": "List teams for organization",
+        "description": "Retrieve a paginated list of teams for an organization with filtering, search, and sorting",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "team_type",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Filter by team type"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search in name and description"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "created_at"
+            },
+            "description": "Sort field"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "desc"
+            },
+            "description": "Sort order"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "List of teams",
+            "description": "Paginated list of teams",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Team"
-                  }
+                  "$ref": "#/components/schemas/PaginatedTeamsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3762,24 +4017,46 @@
       },
       "post": {
         "summary": "Create team",
-        "description": "Create a new team",
+        "description": "Create a new team for an organization",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateTeamRequest"
+                "$ref": "#/components/schemas/TeamCreate"
               }
             }
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": "Created team",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Team"
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3787,11 +4064,21 @@
         }
       }
     },
-    "/teams/{team_id}": {
+    "/organizations/{org_id}/teams/{team_id}": {
       "get": {
         "summary": "Get team by ID",
-        "description": "Retrieve a specific team by its ID",
+        "description": "Retrieve a specific team by its ID with full details and statistics",
         "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
           {
             "name": "team_id",
             "in": "path",
@@ -3799,7 +4086,8 @@
             "schema": {
               "type": "string",
               "format": "uuid"
-            }
+            },
+            "description": "Team ID"
           }
         ],
         "responses": {
@@ -3808,13 +4096,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Team"
+                  "$ref": "#/components/schemas/TeamResponse"
                 }
               }
             }
           },
           "404": {
-            "description": "Team not found",
+            "description": "Team or organization not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3827,8 +4115,18 @@
       },
       "put": {
         "summary": "Update team",
-        "description": "Update a team's details",
+        "description": "Update a team's details and settings",
         "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
           {
             "name": "team_id",
             "in": "path",
@@ -3836,7 +4134,8 @@
             "schema": {
               "type": "string",
               "format": "uuid"
-            }
+            },
+            "description": "Team ID"
           }
         ],
         "requestBody": {
@@ -3844,7 +4143,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateTeamRequest"
+                "$ref": "#/components/schemas/TeamUpdate"
               }
             }
           }
@@ -3854,9 +4153,9 @@
             "description": "Updated team",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Team"
-                }
+                              "schema": {
+                "$ref": "#/components/schemas/TeamResponse"
+              }
               }
             }
           },
@@ -3871,13 +4170,21 @@
             }
           }
         }
-      }
-    },
-    "/teams/{team_id}/members": {
-      "post": {
-        "summary": "Add team member",
-        "description": "Add an existing agent to a team",
+      },
+      "delete": {
+        "summary": "Delete team",
+        "description": "Delete a team if it has no assigned agents",
         "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
           {
             "name": "team_id",
             "in": "path",
@@ -3885,7 +4192,74 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            },
+            "description": "Team ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Team deleted successfully"
+                    }
+                  }
+                }
+              }
             }
+          },
+          "400": {
+            "description": "Cannot delete team with assigned agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Team or organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/teams/{team_id}/members": {
+      "post": {
+        "summary": "Add team member",
+        "description": "Add an existing agent to a team",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Team ID"
           }
         ],
         "requestBody": {
