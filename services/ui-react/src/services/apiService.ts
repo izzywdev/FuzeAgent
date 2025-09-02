@@ -6,6 +6,11 @@ import type {
   Team,
   TeamCreate,
   TeamUpdate,
+  TeamFilters,
+  PaginatedTeamsResponse,
+  AddTeamMemberRequest,
+  TeamMember,
+  TeamStats,
   Agent,
   Task,
   Milestone,
@@ -228,34 +233,90 @@ class ApiService {
   // TEAMS
   // ============================================================================
 
-  async getTeams(): Promise<ApiResponse<Team[]>> {
-    return this.request<Team[]>('/teams')
+  // ============================================================================
+  // TEAMS MANAGEMENT
+  // ============================================================================
+
+  async getTeams(
+    orgId: string,
+    filters?: {
+      page?: number
+      page_size?: number
+      status?: string[]
+      team_type?: string[]
+      search?: string
+      sort_by?: string
+      sort_order?: 'asc' | 'desc'
+    }
+  ): Promise<ApiResponse<PaginatedTeamsResponse>> {
+    const params = new URLSearchParams()
+
+    if (filters?.page) params.append('page', filters.page.toString())
+    if (filters?.page_size) params.append('page_size', filters.page_size.toString())
+    if (filters?.status?.length) filters.status.forEach(s => params.append('status', s))
+    if (filters?.team_type?.length) filters.team_type.forEach(t => params.append('team_type', t))
+    if (filters?.search) params.append('search', filters.search)
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by)
+    if (filters?.sort_order) params.append('sort_order', filters.sort_order)
+
+    const queryString = params.toString()
+    const url = queryString ? `/organizations/${orgId}/teams?${queryString}` : `/organizations/${orgId}/teams`
+
+    return this.request<PaginatedTeamsResponse>(url)
   }
 
-  async getTeam(id: string): Promise<ApiResponse<Team>> {
-    return this.request<Team>(`/teams/${id}`)
+  async getTeam(orgId: string, teamId: string): Promise<ApiResponse<Team>> {
+    return this.request<Team>(`/organizations/${orgId}/teams/${teamId}`)
   }
 
-  async createTeam(data: TeamCreate): Promise<ApiResponse<Team>> {
-    return this.request<Team>('/teams', {
+  async createTeam(orgId: string, data: TeamCreate): Promise<ApiResponse<Team>> {
+    return this.request<Team>(`/organizations/${orgId}/teams`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     })
   }
 
-  async updateTeam(id: string, data: TeamUpdate): Promise<ApiResponse<Team>> {
-    return this.request<Team>(`/teams/${id}`, {
+  async updateTeam(orgId: string, teamId: string, data: TeamUpdate): Promise<ApiResponse<Team>> {
+    return this.request<Team>(`/organizations/${orgId}/teams/${teamId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     })
   }
 
-  async deleteTeam(id: string): Promise<ApiResponse<boolean>> {
-    return this.request<boolean>(`/teams/${id}`, {
+  async deleteTeam(orgId: string, teamId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/organizations/${orgId}/teams/${teamId}`, {
       method: 'DELETE'
     })
+  }
+
+  async addTeamMember(orgId: string, teamId: string, agentId: string): Promise<ApiResponse<{ message: string; agent_id: string; team_id: string }>> {
+    return this.request<{ message: string; agent_id: string; team_id: string }>(
+      `/organizations/${orgId}/teams/${teamId}/members`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agentId })
+      }
+    )
+  }
+
+  async removeTeamMember(orgId: string, teamId: string, agentId: string): Promise<ApiResponse<{ message: string; agent_id: string; team_id: string }>> {
+    return this.request<{ message: string; agent_id: string; team_id: string }>(
+      `/organizations/${orgId}/teams/${teamId}/members/${agentId}`,
+      {
+        method: 'DELETE'
+      }
+    )
+  }
+
+  async getTeamMembers(orgId: string, teamId: string): Promise<ApiResponse<TeamMember[]>> {
+    return this.request<TeamMember[]>(`/organizations/${orgId}/teams/${teamId}/members`)
+  }
+
+  async getTeamStats(orgId: string, teamId: string): Promise<ApiResponse<TeamStats>> {
+    return this.request<TeamStats>(`/organizations/${orgId}/teams/${teamId}/stats`)
   }
 
   // ============================================================================

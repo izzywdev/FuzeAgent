@@ -27,28 +27,98 @@ export interface Team {
   id: string
   organization_id: string
   name: string
-  description?: string
-  team_type: 'development' | 'qa' | 'design' | 'management' | 'general'
+  description: string
+  team_type: 'development' | 'operations' | 'management' | 'research'
+  color: string
+  status: 'active' | 'inactive'
   settings: Record<string, any>
   created_at: string
   updated_at: string
-  organization_name?: string
-  agent_count?: number
+  member_count: number
+  agent_count: number
+  task_count: number
+  completed_task_count: number
+  active_task_count: number
+  goal_count: number
+  milestone_count: number
+  efficiency_rate: number
+  avg_response_time: string
 }
 
 export interface TeamCreate {
-  organization_id: string
   name: string
   description?: string
-  team_type?: 'development' | 'qa' | 'design' | 'management' | 'general'
+  team_type?: 'development' | 'operations' | 'management' | 'research'
+  color?: string
   settings?: Record<string, any>
 }
 
 export interface TeamUpdate {
   name?: string
   description?: string
-  team_type?: 'development' | 'qa' | 'design' | 'management' | 'general'
+  team_type?: 'development' | 'operations' | 'management' | 'research'
+  color?: string
+  status?: 'active' | 'inactive'
   settings?: Record<string, any>
+}
+
+export interface TeamFilters {
+  status?: string[]
+  team_type?: string[]
+  search?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+}
+
+export interface PaginatedTeamsResponse {
+  teams: Team[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+  filters?: TeamFilters
+}
+
+export interface AddTeamMemberRequest {
+  agent_id: string
+}
+
+export interface TeamMember {
+  id: string
+  name: string
+  role?: string
+  type: string
+  status: string
+  task_count: number
+  completed_task_count: number
+  active_task_count: number
+  efficiency_rate: number
+  joined_date: string
+  performance: {
+    tasksCompleted: number
+    tasksActive: number
+    efficiency: string
+  }
+}
+
+export interface TeamStats {
+  team_id: string
+  team_name: string
+  agent_count: number
+  tasks: {
+    total: number
+    completed: number
+    active: number
+    pending: number
+    completion_rate: number
+  }
+  performance: {
+    efficiency_rate: number
+    avg_tasks_per_agent: number
+    avg_completed_per_agent: number
+  }
+  created_at: string
+  last_updated: string
 }
 
 // Agent types (updated)
