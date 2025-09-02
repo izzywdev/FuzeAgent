@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useApiService } from '../../hooks/useApiService'
+import type { Milestone } from '../../types'
+import { MilestoneList, MilestoneFormModal } from '../milestones'
+import { milestonesToDisplay } from '../milestones/utils'
+import type { MilestoneDisplay } from '../milestones/types'
 
 interface Goal {
   id: string
@@ -11,14 +15,9 @@ interface Goal {
   target_completion_date: string
   progress_percentage: number
   assigned_teams: string[]
-  milestones: {
-    id: string
-    title: string
-    status: string
-    due_date: string
-  }[]
   created_at: string
   updated_at: string
+  // milestones will be loaded separately
 }
 
 export function GoalsPage() {
@@ -29,6 +28,14 @@ export function GoalsPage() {
   const [goalToEdit, setGoalToEdit] = useState<Goal | null>(null)
   const navigate = useNavigate()
   const { goalId } = useParams()
+  const apiService = useApiService()
+
+  // Milestone state
+  const [milestones, setMilestones] = useState<MilestoneDisplay[]>([])
+  const [milestonesLoading, setMilestonesLoading] = useState(false)
+  const [showMilestoneForm, setShowMilestoneForm] = useState(false)
+  const [milestoneToEdit, setMilestoneToEdit] = useState<Milestone | null>(null)
+  const [selectedGoalForMilestones, setSelectedGoalForMilestones] = useState<Goal | null>(null)
 
   // Helper function to reload goals
   const reloadGoals = async () => {
@@ -40,6 +47,100 @@ export function GoalsPage() {
     } catch (error) {
       console.error('Error reloading goals:', error)
     }
+  }
+
+  // Milestone management functions
+  const loadMilestones = async (goal: Goal) => {
+    setSelectedGoalForMilestones(goal)
+    setMilestonesLoading(true)
+    try {
+      const response = await apiService.getGoalMilestones(goal.id)
+      if (response.ok && Array.isArray(response.data)) {
+        const displayMilestones = milestonesToDisplay(response.data)
+        setMilestones(displayMilestones)
+      } else {
+        setMilestones([])
+      }
+    } catch (error) {
+      console.error('Error loading milestones:', error)
+      setMilestones([])
+    } finally {
+      setMilestonesLoading(false)
+    }
+  }
+
+  const handleCreateMilestone = async (data: any) => {
+    try {
+      if (!selectedGoalForMilestones) return
+
+      const milestoneData = {
+        goal_id: selectedGoalForMilestones.id,
+        title: data.title,
+        description: data.description,
+        priority: data.priority,
+        target_date: data.target_date
+      }
+
+      const response = await apiService.createMilestone(milestoneData)
+      if (response.ok) {
+        await loadMilestones(selectedGoalForMilestones)
+      } else {
+        console.error('Failed to create milestone:', response.status)
+      }
+    } catch (error) {
+      console.error('Error creating milestone:', error)
+    }
+  }
+
+  const handleEditMilestone = async (milestone: Milestone) => {
+    setMilestoneToEdit(milestone)
+    setShowMilestoneForm(true)
+  }
+
+  const handleUpdateMilestone = async (data: any) => {
+    if (!milestoneToEdit) return
+
+    try {
+      const response = await apiService.updateMilestone(milestoneToEdit.id, {
+        title: data.title,
+        description: data.description,
+        priority: data.priority,
+        target_date: data.target_date
+      })
+
+      if (response.ok && selectedGoalForMilestones) {
+        await loadMilestones(selectedGoalForMilestones)
+        setMilestoneToEdit(null)
+        setShowMilestoneForm(false)
+      } else {
+        console.error('Failed to update milestone:', response.status)
+      }
+    } catch (error) {
+      console.error('Error updating milestone:', error)
+    }
+  }
+
+  const handleDeleteMilestone = async (milestone: Milestone) => {
+    try {
+      const response = await apiService.deleteMilestone(milestone.id)
+      if (response.ok && selectedGoalForMilestones) {
+        await loadMilestones(selectedGoalForMilestones)
+      } else {
+        console.error('Failed to delete milestone:', response.status)
+      }
+    } catch (error) {
+      console.error('Error deleting milestone:', error)
+    }
+  }
+
+  const handleViewMilestoneTasks = (milestone: Milestone) => {
+    // Navigate to milestone tasks view or open modal
+    console.log('View tasks for milestone:', milestone.title)
+  }
+
+  const handleCreateTaskForMilestone = (milestone: Milestone) => {
+    // Navigate to create task page or open modal
+    console.log('Create task for milestone:', milestone.title)
   }
 
   useEffect(() => {
@@ -235,38 +336,68 @@ export function GoalsPage() {
               </div>
             </div>
 
-            {/* Milestones */}
+            {/* Milestones Management */}
             <div style={{marginBottom: '2rem'}}>
-              <h3 style={{fontSize: '1.25rem', fontWeight: '600', color: '#111827', marginBottom: '1rem'}}>
-                Milestones ({goal.milestones.length})
-              </h3>
-              <div style={{display: 'grid', gap: '1rem'}}>
-                {goal.milestones.map((milestone) => (
-                  <div key={milestone.id} style={{
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    padding: '1rem', 
-                    backgroundColor: '#f9fafb', 
-                    borderRadius: '0.5rem',
-                    border: '1px solid #e5e7eb'
-                  }}>
-                    <div style={{
-                      width: '1rem',
-                      height: '1rem',
-                      borderRadius: '50%',
-                      backgroundColor: getStatusColor(milestone.status),
-                      marginRight: '1rem',
-                      flexShrink: 0
-                    }}></div>
-                    <div style={{flex: 1}}>
-                      <div style={{fontSize: '1rem', fontWeight: '500', color: '#111827'}}>{milestone.title}</div>
-                      <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                        Status: {milestone.status} • Due: {new Date(milestone.due_date).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+                <h3 style={{fontSize: '1.25rem', fontWeight: '600', color: '#111827'}}>
+                  Milestones
+                </h3>
+                <div style={{display: 'flex', gap: '0.5rem'}}>
+                  <button
+                    onClick={() => {
+                      setSelectedGoalForMilestones(goal)
+                      setShowMilestoneForm(true)
+                      setMilestoneToEdit(null)
+                    }}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    ➕ Add Milestone
+                  </button>
+                  <button
+                    onClick={() => loadMilestones(goal)}
+                    disabled={selectedGoalForMilestones?.id === goal.id && milestonesLoading}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: 'white',
+                      color: '#2563eb',
+                      border: '1px solid #93c5fd',
+                      borderRadius: '0.375rem',
+                      cursor: selectedGoalForMilestones?.id === goal.id && milestonesLoading ? 'not-allowed' : 'pointer',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    {selectedGoalForMilestones?.id === goal.id && milestonesLoading ? 'Loading...' : '📋 Load Milestones'}
+                  </button>
+                </div>
               </div>
+
+              {/* Milestones Display */}
+              {selectedGoalForMilestones?.id === goal.id && (
+                <MilestoneList
+                  milestones={milestones}
+                  loading={milestonesLoading}
+                  onEdit={handleEditMilestone}
+                  onDelete={handleDeleteMilestone}
+                  onViewTasks={handleViewMilestoneTasks}
+                  onCreateTask={handleCreateTaskForMilestone}
+                />
+              )}
             </div>
 
             {/* Details */}
@@ -617,6 +748,30 @@ export function GoalsPage() {
               // Reload goals
               await reloadGoals()
             }}
+          />
+        )}
+
+        {/* Milestone Form Modal */}
+        {showMilestoneForm && selectedGoalForMilestones && (
+          <MilestoneFormModal
+            isOpen={showMilestoneForm}
+            onClose={() => {
+              setShowMilestoneForm(false)
+              setMilestoneToEdit(null)
+            }}
+            onSubmit={milestoneToEdit ? handleUpdateMilestone : handleCreateMilestone}
+            initialData={milestoneToEdit ? {
+              title: milestoneToEdit.title,
+              description: milestoneToEdit.description,
+              priority: milestoneToEdit.priority,
+              target_date: milestoneToEdit.target_date,
+              goal_id: milestoneToEdit.goal_id
+            } : undefined}
+            title={milestoneToEdit ? 'Edit Milestone' : 'Create Milestone'}
+            submitButtonText={milestoneToEdit ? 'Update Milestone' : 'Create Milestone'}
+            loading={false}
+            goals={[selectedGoalForMilestones]}
+            mode={milestoneToEdit ? 'edit' : 'create'}
           />
         )}
       </main>
