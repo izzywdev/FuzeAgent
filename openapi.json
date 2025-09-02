@@ -1200,6 +1200,241 @@
           }
         },
         "required": ["milestones", "total", "page", "page_size", "total_pages"]
+      },
+      "Goal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the goal"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the organization this goal belongs to"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the goal"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the goal"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Priority level of the goal"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planning", "active", "completed", "on_hold"],
+            "description": "Current status of the goal"
+          },
+          "target_completion_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Target completion date"
+          },
+          "progress_percentage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Progress percentage (0-100)"
+          },
+          "assigned_teams": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of assigned team IDs"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp"
+          },
+          "team_count": {
+            "type": "integer",
+            "description": "Number of assigned teams"
+          },
+          "milestone_count": {
+            "type": "integer",
+            "description": "Total number of milestones"
+          },
+          "completed_milestone_count": {
+            "type": "integer",
+            "description": "Number of completed milestones"
+          }
+        },
+        "required": ["id", "organization_id", "title", "priority", "status", "progress_percentage", "assigned_teams", "created_at", "updated_at", "team_count", "milestone_count", "completed_milestone_count"]
+      },
+      "GoalCreate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the goal"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the goal"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Priority level (defaults to medium)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planning", "active", "completed", "on_hold"],
+            "description": "Status (defaults to planning)"
+          },
+          "target_completion_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Target completion date"
+          },
+          "assigned_teams": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of assigned team IDs"
+          }
+        },
+        "required": ["title", "description"]
+      },
+      "GoalUpdate": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Updated title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated description"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Updated priority"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["planning", "active", "completed", "on_hold"],
+            "description": "Updated status"
+          },
+          "target_completion_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Updated target date"
+          },
+          "assigned_teams": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Updated team assignments"
+          },
+          "progress_percentage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Updated progress percentage"
+          }
+        }
+      },
+      "GoalFilters": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["planning", "active", "completed", "on_hold"]
+            },
+            "description": "Filter by status"
+          },
+          "priority": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["low", "medium", "high", "critical"]
+            },
+            "description": "Filter by priority"
+          },
+          "assigned_team": {
+            "type": "string",
+            "description": "Filter by assigned team"
+          },
+          "date_range": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "to": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "description": "Filter by date range"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search in title and description"
+          },
+          "sort_by": {
+            "type": "string",
+            "enum": ["created_at", "target_completion_date", "priority", "progress_percentage", "title"],
+            "description": "Sort field"
+          },
+          "sort_order": {
+            "type": "string",
+            "enum": ["asc", "desc"],
+            "description": "Sort order"
+          }
+        }
+      },
+      "PaginatedGoalsResponse": {
+        "type": "object",
+        "properties": {
+          "goals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Goal"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of goals"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "page_size": {
+            "type": "integer",
+            "description": "Items per page"
+          },
+          "total_pages": {
+            "type": "integer",
+            "description": "Total number of pages"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/GoalFilters"
+          }
+        },
+        "required": ["goals", "total", "page", "page_size", "total_pages"]
       }
     }
   },
@@ -1496,9 +1731,9 @@
       }
     },
     "/organizations/{org_id}/goals": {
-      "get": {
-        "summary": "List organization goals",
-        "description": "Retrieve all goals for an organization",
+      "post": {
+        "summary": "Create goal",
+        "description": "Create a new goal for an organization",
         "parameters": [
           {
             "name": "org_id",
@@ -1507,7 +1742,155 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            },
+            "description": "Organization ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalCreate"
+              }
             }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Goal created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Goal"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List goals",
+        "description": "List goals for an organization with filtering, search, and pagination",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 100
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["planning", "active", "completed", "on_hold"]
+              }
+            },
+            "description": "Filter by status"
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              }
+            },
+            "description": "Filter by priority"
+          },
+          {
+            "name": "assigned_team",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by assigned team"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Filter by target date from"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Filter by target date to"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search in title and description"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["created_at", "target_completion_date", "priority", "progress_percentage", "title"],
+              "default": "created_at"
+            },
+            "description": "Sort field"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "desc"
+            },
+            "description": "Sort order"
           }
         ],
         "responses": {
@@ -1516,19 +1899,28 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Goal"
-                  }
+                  "$ref": "#/components/schemas/PaginatedGoalsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           }
         }
-      },
-      "post": {
-        "summary": "Create organization goal",
-        "description": "Create a new goal for the organization",
+      }
+    },
+    "/organizations/{org_id}/goals/{goal_id}": {
+      "get": {
+        "summary": "Get goal",
+        "description": "Get a specific goal by ID",
         "parameters": [
           {
             "name": "org_id",
@@ -1537,7 +1929,66 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "goal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Goal ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Goal details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Goal"
+                }
+              }
             }
+          },
+          "404": {
+            "description": "Goal not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update goal",
+        "description": "Update an existing goal",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "goal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Goal ID"
           }
         ],
         "requestBody": {
@@ -1545,18 +1996,166 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateGoalRequest"
+                "$ref": "#/components/schemas/GoalUpdate"
               }
             }
           }
         },
         "responses": {
-          "201": {
-            "description": "Created goal",
+          "200": {
+            "description": "Goal updated",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Goal"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Goal not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete goal",
+        "description": "Delete an existing goal",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "goal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Goal ID"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Goal deleted"
+          },
+          "404": {
+            "description": "Goal not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/organizations/{org_id}/goals/{goal_id}/statistics": {
+      "get": {
+        "summary": "Get goal statistics",
+        "description": "Get detailed statistics for a goal including milestone and task progress",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Organization ID"
+          },
+          {
+            "name": "goal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Goal ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Goal statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "goal_id": {
+                      "type": "string"
+                    },
+                    "milestones": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "completed": {
+                          "type": "integer"
+                        },
+                        "in_progress": {
+                          "type": "integer"
+                        },
+                        "completion_rate": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "tasks": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "completed": {
+                          "type": "integer"
+                        },
+                        "completion_rate": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "progress_percentage": {
+                      "type": "integer"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "last_updated": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Goal not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
