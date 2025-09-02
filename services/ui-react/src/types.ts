@@ -142,7 +142,88 @@ export interface CreateCustomAgent {
   }
 }
 
-// Extended types with relationships
+// ============================================================================
+// MILESTONES SYSTEM
+// ============================================================================
+
+// Milestone types
+export interface Milestone {
+  id: string
+  goal_id: string
+  title: string
+  description: string
+  status: 'not_started' | 'in_progress' | 'completed' | 'blocked' | 'cancelled'
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  progress_percentage: number
+  target_date: string
+  completed_at?: string
+  created_at: string
+  updated_at: string
+
+  // Relationships
+  goal?: Goal
+  tasks?: Task[]
+  task_count?: number
+  completed_task_count?: number
+}
+
+export interface MilestoneCreate {
+  goal_id: string
+  title: string
+  description: string
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  target_date: string
+}
+
+export interface MilestoneUpdate {
+  title?: string
+  description?: string
+  status?: 'not_started' | 'in_progress' | 'completed' | 'blocked' | 'cancelled'
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  progress_percentage?: number
+  target_date?: string
+}
+
+// Milestone search and filter options
+export interface MilestoneFilters {
+  status?: Milestone['status'][]
+  priority?: Milestone['priority'][]
+  goal_id?: string
+  date_range?: {
+    start_date: string
+    end_date: string
+  }
+  search?: string
+  sort_by?: 'created_at' | 'target_date' | 'priority' | 'progress_percentage' | 'title'
+  sort_order?: 'asc' | 'desc'
+}
+
+export interface MilestoneSearchResponse {
+  milestones: Milestone[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+  filters?: MilestoneFilters
+}
+
+// Extended Goal type with milestones
+export interface GoalWithMilestones extends Goal {
+  milestones: Milestone[]
+  milestone_count?: number
+  completed_milestone_count?: number
+}
+
+// Extended Task type with milestone relationship
+export interface TaskWithMilestone extends Task {
+  milestone_id?: string
+  milestone?: Milestone
+}
+
+// ============================================================================
+// EXTENDED TYPES WITH RELATIONSHIPS
+// ============================================================================
+
 export interface OrganizationWithTeams extends Organization {
   teams: Team[]
 }
@@ -157,4 +238,21 @@ export interface HierarchyContext {
   currentTeam: Team | null
   organizations: Organization[]
   teams: Team[]
+}
+
+// ============================================================================
+// PAGINATION TYPES
+// ============================================================================
+
+export interface PaginationOptions {
+  page?: number
+  page_size?: number
+}
+
+export interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
 }
