@@ -258,12 +258,118 @@ class ApiService {
     })
   }
 
-  async getTeamTasks(id: string): Promise<ApiResponse<Task[]>> {
-    return this.request<Task[]>(`/teams/${id}/tasks`)
+  // ============================================================================
+  // TASKS MANAGEMENT
+  // ============================================================================
+
+  async getTasks(
+    orgId: string,
+    filters?: {
+      page?: number;
+      page_size?: number;
+      status?: string[];
+      priority?: string[];
+      team_id?: string;
+      agent_id?: string;
+      milestone_id?: string;
+      date_from?: string;
+      date_to?: string;
+      search?: string;
+      sort_by?: string;
+      sort_order?: 'asc' | 'desc';
+    }
+  ): Promise<ApiResponse<PaginatedResponse<Task>>> {
+    const params = new URLSearchParams();
+
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.page_size) params.append('page_size', filters.page_size.toString());
+    if (filters?.status?.length) filters.status.forEach(s => params.append('status', s));
+    if (filters?.priority?.length) filters.priority.forEach(p => params.append('priority', p));
+    if (filters?.team_id) params.append('team_id', filters.team_id);
+    if (filters?.agent_id) params.append('agent_id', filters.agent_id);
+    if (filters?.milestone_id) params.append('milestone_id', filters.milestone_id);
+    if (filters?.date_from) params.append('date_from', filters.date_from);
+    if (filters?.date_to) params.append('date_to', filters.date_to);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by);
+    if (filters?.sort_order) params.append('sort_order', filters.sort_order);
+
+    const queryString = params.toString();
+    const url = `/organizations/${orgId}/tasks${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<PaginatedResponse<Task>>(url);
+  }
+
+  async getTask(orgId: string, taskId: string): Promise<ApiResponse<Task>> {
+    return this.request<Task>(`/organizations/${orgId}/tasks/${taskId}`);
+  }
+
+  async createTask(
+    orgId: string,
+    data: {
+      title: string;
+      description?: string;
+      priority?: 'low' | 'medium' | 'high' | 'critical';
+      status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+      team_id?: string;
+      agent_id?: string;
+      milestone_id?: string;
+    }
+  ): Promise<ApiResponse<Task>> {
+    return this.request<Task>(`/organizations/${orgId}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateTask(
+    orgId: string,
+    taskId: string,
+    data: {
+      title?: string;
+      description?: string;
+      priority?: 'low' | 'medium' | 'high' | 'critical';
+      status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+      team_id?: string;
+      agent_id?: string;
+      milestone_id?: string;
+      result?: string;
+    }
+  ): Promise<ApiResponse<Task>> {
+    return this.request<Task>(`/organizations/${orgId}/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteTask(orgId: string, taskId: string): Promise<ApiResponse<void>> {
+    return this.request<void>(`/organizations/${orgId}/tasks/${taskId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async executeTask(orgId: string, taskId: string): Promise<ApiResponse<{ message: string; task_id: string }>> {
+    return this.request<{ message: string; task_id: string }>(`/organizations/${orgId}/tasks/${taskId}/execute`, {
+      method: 'POST'
+    });
+  }
+
+  async getTeamTasks(orgId: string, teamId: string): Promise<ApiResponse<Task[]>> {
+    return this.request<Task[]>(`/organizations/${orgId}/tasks/teams/${teamId}`);
+  }
+
+  async getAgentTasks(orgId: string, agentId: string): Promise<ApiResponse<Task[]>> {
+    return this.request<Task[]>(`/organizations/${orgId}/tasks/agents/${agentId}`);
+  }
+
+  async getMilestoneTasks(orgId: string, milestoneId: string): Promise<ApiResponse<Task[]>> {
+    return this.request<Task[]>(`/organizations/${orgId}/tasks/milestones/${milestoneId}`);
   }
 
   async getTeamTools(id: string): Promise<ApiResponse<Tool[]>> {
-    return this.request<Tool[]>(`/teams/${id}/tools`)
+    return this.request<Tool[]>(`/teams/${id}/tools`);
   }
 
   async getTeamKnowledge(id: string): Promise<ApiResponse<KnowledgeDocument[]>> {
@@ -428,12 +534,12 @@ class ApiService {
     })
   }
 
+  // Legacy method for backward compatibility - use createTask instead
   async createTeamTask(teamId: string, data: { title: string; description: string; priority?: string }): Promise<ApiResponse<Task>> {
-    return this.request<Task>(`/teams/${teamId}/tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
+    // Note: This method needs organization context, but for backward compatibility we'll use a default org
+    // In production, this should be updated to accept orgId parameter
+    const orgId = '1'; // Default organization ID for backward compatibility
+    return this.createTask(orgId, { ...data, team_id: teamId });
   }
 
   async addTeamMember(teamId: string, agentId: string): Promise<ApiResponse<any>> {

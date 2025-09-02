@@ -92,14 +92,63 @@ export interface Task {
   id: string
   title: string
   description: string
-  type: string
-  assigned_to: string
-  assigned_agent_name: string
+  priority: 'low' | 'medium' | 'high' | 'critical'
   status: 'pending' | 'in_progress' | 'completed' | 'failed'
-  priority: number
+  team_id: string
+  agent_id: string
+  milestone_id: string
+  result: string
   created_at: string
-  completed_at?: string
+  updated_at: string
+  completed_at: string
+  team_name: string
+  agent_name: string
+  milestone_title: string
+}
+
+export interface TaskCreate {
+  title: string
+  description?: string
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  status?: 'pending' | 'in_progress' | 'completed' | 'failed'
+  team_id?: string
+  agent_id?: string
+  milestone_id?: string
+}
+
+export interface TaskUpdate {
+  title?: string
+  description?: string
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  status?: 'pending' | 'in_progress' | 'completed' | 'failed'
+  team_id?: string
+  agent_id?: string
+  milestone_id?: string
   result?: string
+}
+
+export interface TaskFilters {
+  status?: string[]
+  priority?: string[]
+  team_id?: string
+  agent_id?: string
+  milestone_id?: string
+  date_range?: {
+    from?: string
+    to?: string
+  }
+  search?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+}
+
+export interface PaginatedTasksResponse {
+  tasks: Task[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+  filters?: TaskFilters
 }
 
 export interface AgentTemplate {
