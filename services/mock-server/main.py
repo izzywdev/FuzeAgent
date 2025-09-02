@@ -8,6 +8,7 @@ from database import create_tables
 from organizations import router as organizations_router
 from teams import router as teams_router
 from agents import router as agents_router
+from milestones import router as milestones_router
 import logging
 import os
 
@@ -38,6 +39,7 @@ app.add_middleware(
 app.include_router(organizations_router)
 app.include_router(teams_router)
 app.include_router(agents_router)
+app.include_router(milestones_router)
 
 @app.on_event("startup")
 async def startup_event():
