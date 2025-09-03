@@ -655,8 +655,11 @@ export function AgentDetailsPage(): React.ReactElement {
     if (chatWebSocket || wsConnectingRef.current) return
     wsConnectingRef.current = true
 
+    // Use the same base URL as the API service for WebSocket connections
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/ws/agents/${agentId}/conversations/${conversationId}`
+    const apiBaseUrl = apiService.getBaseUrl() // Get the configured API base URL
+    const apiUrl = new URL(apiBaseUrl)
+    const wsUrl = `${wsProtocol}//${apiUrl.hostname}:${apiUrl.port}/ws/agents/${agentId}/conversations/${conversationId}`
     
     const ws = new WebSocket(wsUrl)
     

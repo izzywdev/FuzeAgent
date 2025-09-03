@@ -121,6 +121,13 @@ class ApiService {
   }
 
   /**
+   * Get the base URL for API calls
+   */
+  getBaseUrl(): string {
+    return this.baseUrl
+  }
+
+  /**
    * Make an API request with organization context
    */
   private async request<T>(

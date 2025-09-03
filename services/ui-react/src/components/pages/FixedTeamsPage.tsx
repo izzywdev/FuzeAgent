@@ -43,6 +43,18 @@ const isValidTeam = (team: any): team is Team => {
   )
 }
 
+// Check if team data needs normalization (less strict validation)
+const needsNormalization = (team: any): boolean => {
+  return (
+    !team ||
+    !team.id ||
+    !team.name ||
+    !Array.isArray(team.members) ||
+    !team.status ||
+    !team.color
+  )
+}
+
 // Normalize team data to ensure consistent structure
 const normalizeTeam = (team: any): Team => {
   return {
@@ -139,8 +151,12 @@ function FixedTeamsPageCore() {
           .map(team => {
             if (isValidTeam(team)) {
               return team
+            } else if (needsNormalization(team)) {
+              // Only log warning for teams that actually need normalization
+              console.warn('Team data needs normalization:', { id: team?.id, name: team?.name })
+              return normalizeTeam(team)
             } else {
-              console.warn('Invalid team data, normalizing:', team)
+              // Team has most required fields, just normalize missing ones
               return normalizeTeam(team)
             }
           })

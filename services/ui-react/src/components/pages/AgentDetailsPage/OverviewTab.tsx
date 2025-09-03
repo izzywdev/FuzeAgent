@@ -104,7 +104,7 @@ export function OverviewTab({ agent, tasks, chatMessages, containerInfo, contain
               </div>
               <div style={{display: 'flex', justifyContent: 'space-between'}}>
                 <span style={{color: '#6b7280'}}>CPU:</span>
-                <span>{containerInfo.cpu_usage ? `${containerInfo.cpu_usage.toFixed(1)}%` : 'N/A'}</span>
+                <span>{containerInfo.cpu_usage && typeof containerInfo.cpu_usage === 'number' ? `${containerInfo.cpu_usage.toFixed(1)}%` : 'N/A'}</span>
               </div>
               <div style={{display: 'flex', justifyContent: 'space-between'}}>
                 <span style={{color: '#6b7280'}}>Memory:</span>
