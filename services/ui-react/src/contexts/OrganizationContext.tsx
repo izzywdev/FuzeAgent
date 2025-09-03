@@ -8,6 +8,7 @@ interface Organization {
   created_at: string
   team_count?: number
   agent_count?: number
+  token: string
 }
 
 interface OrganizationContextType {
@@ -55,17 +56,25 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       // Load all organizations
       const response = await apiService.getOrganizations()
       if (response.ok) {
-        setOrganizations(Array.isArray(response.data) ? response.data : [])
-        
+        // Add tokens to organizations for token-based auth
+        const orgsWithTokens = (Array.isArray(response.data) ? response.data : []).map((org: any) => ({
+          ...org,
+          token: org.token || `org-token-${org.id}` // Generate token if not provided
+        }))
+        setOrganizations(orgsWithTokens)
+
         // Restore selected organization from localStorage
         const selectedOrgId = localStorage.getItem('selectedOrganizationId')
-        if (selectedOrgId && response.data.length > 0) {
-          const selectedOrg = response.data.find((org: Organization) => org.id === selectedOrgId)
+        if (selectedOrgId && orgsWithTokens.length > 0) {
+          const selectedOrg = orgsWithTokens.find((org: Organization) => org.id === selectedOrgId)
           if (selectedOrg) {
             setCurrentOrganization(selectedOrg)
+            // Set organization token in API service
+            apiService.setOrganizationToken(selectedOrg.token)
           } else {
             // Selected organization no longer exists, clear selection
             localStorage.removeItem('selectedOrganizationId')
+            apiService.setOrganizationToken(null)
           }
         }
       } else {
@@ -84,6 +93,8 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     if (org) {
       setCurrentOrganization(org)
       localStorage.setItem('selectedOrganizationId', orgId)
+      // Set organization token in API service
+      apiService.setOrganizationToken(org.token)
     }
   }
 
@@ -113,6 +124,8 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
   const clearOrganization = () => {
     setCurrentOrganization(null)
     localStorage.removeItem('selectedOrganizationId')
+    // Clear organization token in API service
+    apiService.setOrganizationToken(null)
   }
 
   const value: OrganizationContextType = {

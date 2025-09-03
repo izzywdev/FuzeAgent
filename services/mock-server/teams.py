@@ -11,7 +11,7 @@ Provides comprehensive CRUD operations for teams with:
 - Agent assignment and tracking
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, desc, asc, func
 from typing import List, Optional, Dict, Any
@@ -24,6 +24,29 @@ from database import get_db, Team, Organization, Agent, Task, Milestone
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+# Function to get organization from token header
+def get_organization_from_token(request: Request, db: Session = Depends(get_db)) -> Organization:
+    """Extract organization from X-Organization-Token header"""
+    token = request.headers.get("X-Organization-Token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Organization token required"
+        )
+
+    # For demo purposes, we'll use a simple token-to-org mapping
+    # In production, this would validate the token against your auth system
+    org_id = "a50af4d0-27f1-40ae-aea0-e847dc5c4ba9"  # Default org for demo
+
+    organization = db.query(Organization).filter(Organization.id == org_id).first()
+    if not organization:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found"
+        )
+
+    return organization
 
 # Pydantic models for request/response
 class TeamCreate(BaseModel):
@@ -126,8 +149,8 @@ def team_to_response(db: Session, team: Team) -> TeamResponse:
 
 @router.post("/", response_model=TeamResponse)
 async def create_team(
-    org_id: str,
     team: TeamCreate,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
@@ -135,15 +158,13 @@ async def create_team(
 
     Validates organization exists and handles team creation.
     """
-    # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
-    if not org:
-        raise HTTPException(status_code=404, detail="Organization not found")
+    # Get organization from token
+    org = get_organization_from_token(request, db)
 
     # Create team
     db_team = Team(
         id=str(uuid.uuid4()),
-        organization_id=org_id,
+        organization_id=org.id,
         name=team.name,
         description=team.description,
         team_type=team.team_type or "development",

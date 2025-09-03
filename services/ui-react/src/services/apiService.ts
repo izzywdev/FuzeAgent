@@ -110,14 +110,14 @@ interface Goal {
 // ============================================================================
 
 class ApiService {
-  private organizationId: string | null = null
+  private organizationToken: string | null = null
   private baseUrl: string = 'http://localhost:8001' // Default orchestrator URL
 
   /**
-   * Set the current organization ID for all API calls
+   * Set the current organization token for all API calls
    */
-  setOrganizationId(orgId: string | null) {
-    this.organizationId = orgId
+  setOrganizationToken(orgToken: string | null) {
+    this.organizationToken = orgToken
   }
 
   /**
@@ -131,13 +131,13 @@ class ApiService {
     const baseUrl = this.baseUrl
     const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`
     
-    // Add organization ID header if available
+    // Add organization token header if available
     const headers: Record<string, string> = {
       ...options.headers as Record<string, string>
     }
-    
-    if (this.organizationId) {
-      headers['X-Organization-ID'] = this.organizationId
+
+    if (this.organizationToken) {
+      headers['X-Organization-Token'] = this.organizationToken
     }
     
     // Add auth token if available
@@ -238,7 +238,6 @@ class ApiService {
   // ============================================================================
 
   async getTeams(
-    orgId: string,
     filters?: {
       page?: number
       page_size?: number
@@ -260,40 +259,40 @@ class ApiService {
     if (filters?.sort_order) params.append('sort_order', filters.sort_order)
 
     const queryString = params.toString()
-    const url = queryString ? `/organizations/${orgId}/teams?${queryString}` : `/organizations/${orgId}/teams`
+    const url = queryString ? `/teams?${queryString}` : '/teams'
 
     return this.request<PaginatedTeamsResponse>(url)
   }
 
-  async getTeam(orgId: string, teamId: string): Promise<ApiResponse<Team>> {
-    return this.request<Team>(`/organizations/${orgId}/teams/${teamId}`)
+  async getTeam(teamId: string): Promise<ApiResponse<Team>> {
+    return this.request<Team>(`/teams/${teamId}`)
   }
 
-  async createTeam(orgId: string, data: TeamCreate): Promise<ApiResponse<Team>> {
-    return this.request<Team>(`/organizations/${orgId}/teams`, {
+  async createTeam(data: TeamCreate): Promise<ApiResponse<Team>> {
+    return this.request<Team>('/teams', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     })
   }
 
-  async updateTeam(orgId: string, teamId: string, data: TeamUpdate): Promise<ApiResponse<Team>> {
-    return this.request<Team>(`/organizations/${orgId}/teams/${teamId}`, {
+  async updateTeam(teamId: string, data: TeamUpdate): Promise<ApiResponse<Team>> {
+    return this.request<Team>(`/teams/${teamId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     })
   }
 
-  async deleteTeam(orgId: string, teamId: string): Promise<ApiResponse<{ message: string }>> {
-    return this.request<{ message: string }>(`/organizations/${orgId}/teams/${teamId}`, {
+  async deleteTeam(teamId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/teams/${teamId}`, {
       method: 'DELETE'
     })
   }
 
-  async addTeamMember(orgId: string, teamId: string, agentId: string): Promise<ApiResponse<{ message: string; agent_id: string; team_id: string }>> {
+  async addTeamMember(teamId: string, agentId: string): Promise<ApiResponse<{ message: string; agent_id: string; team_id: string }>> {
     return this.request<{ message: string; agent_id: string; team_id: string }>(
-      `/organizations/${orgId}/teams/${teamId}/members`,
+      `/teams/${teamId}/members`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -302,21 +301,21 @@ class ApiService {
     )
   }
 
-  async removeTeamMember(orgId: string, teamId: string, agentId: string): Promise<ApiResponse<{ message: string; agent_id: string; team_id: string }>> {
+  async removeTeamMember(teamId: string, agentId: string): Promise<ApiResponse<{ message: string; agent_id: string; team_id: string }>> {
     return this.request<{ message: string; agent_id: string; team_id: string }>(
-      `/organizations/${orgId}/teams/${teamId}/members/${agentId}`,
+      `/teams/${teamId}/members/${agentId}`,
       {
         method: 'DELETE'
       }
     )
   }
 
-  async getTeamMembers(orgId: string, teamId: string): Promise<ApiResponse<TeamMember[]>> {
-    return this.request<TeamMember[]>(`/organizations/${orgId}/teams/${teamId}/members`)
+  async getTeamMembers(teamId: string): Promise<ApiResponse<TeamMember[]>> {
+    return this.request<TeamMember[]>(`/teams/${teamId}/members`)
   }
 
-  async getTeamStats(orgId: string, teamId: string): Promise<ApiResponse<TeamStats>> {
-    return this.request<TeamStats>(`/organizations/${orgId}/teams/${teamId}/stats`)
+  async getTeamStats(teamId: string): Promise<ApiResponse<TeamStats>> {
+    return this.request<TeamStats>(`/teams/${teamId}/stats`)
   }
 
   // ============================================================================
@@ -417,16 +416,16 @@ class ApiService {
     });
   }
 
-  async getTeamTasks(orgId: string, teamId: string): Promise<ApiResponse<Task[]>> {
-    return this.request<Task[]>(`/organizations/${orgId}/tasks/teams/${teamId}`);
+  async getTeamTasks(teamId: string): Promise<ApiResponse<Task[]>> {
+    return this.request<Task[]>(`/tasks/teams/${teamId}`);
   }
 
-  async getAgentTasks(orgId: string, agentId: string): Promise<ApiResponse<Task[]>> {
-    return this.request<Task[]>(`/organizations/${orgId}/tasks/agents/${agentId}`);
+  async getAgentTasks(agentId: string): Promise<ApiResponse<Task[]>> {
+    return this.request<Task[]>(`/tasks/agents/${agentId}`);
   }
 
-  async getMilestoneTasks(orgId: string, milestoneId: string): Promise<ApiResponse<Task[]>> {
-    return this.request<Task[]>(`/organizations/${orgId}/tasks/milestones/${milestoneId}`);
+  async getMilestoneTasks(milestoneId: string): Promise<ApiResponse<Task[]>> {
+    return this.request<Task[]>(`/tasks/milestones/${milestoneId}`);
   }
 
   async getTeamTools(id: string): Promise<ApiResponse<Tool[]>> {
@@ -434,18 +433,18 @@ class ApiService {
   }
 
   async getTeamKnowledge(orgId: string, teamId: string): Promise<ApiResponse<KnowledgeDocument[]>> {
-    return this.request<KnowledgeDocument[]>(`/organizations/${orgId}/teams/${teamId}/knowledge`)
+    return this.request<KnowledgeDocument[]>(`/teams/${teamId}/knowledge`)
   }
 
-  async getTeamKnowledgeContent(orgId: string, teamId: string, docId: string): Promise<ApiResponse<DocumentContent>> {
-    return this.request<DocumentContent>(`/organizations/${orgId}/teams/${teamId}/knowledge/${docId}/content`)
+  async getTeamKnowledgeContent(teamId: string, docId: string): Promise<ApiResponse<DocumentContent>> {
+    return this.request<DocumentContent>(`/teams/${teamId}/knowledge/${docId}/content`)
   }
 
   // ============================================================================
   // AGENTS
   // ============================================================================
 
-  async getAgents(orgId: string, filters?: {
+  async getAgents(filters?: {
     page?: number
     page_size?: number
     status?: string[]
@@ -467,7 +466,7 @@ class ApiService {
     if (filters?.sort_order) params.append('sort_order', filters.sort_order)
 
     const queryString = params.toString()
-    const url = `/organizations/${orgId}/agents${queryString ? `?${queryString}` : ''}`
+    const url = `/agents${queryString ? `?${queryString}` : ''}`
 
     return this.request<PaginatedResponse<Agent>>(url)
   }
