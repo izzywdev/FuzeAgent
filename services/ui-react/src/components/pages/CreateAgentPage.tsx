@@ -59,7 +59,7 @@ export function CreateAgentPage() {
           const teamsResponse = await apiService.getTeams()
           console.log('Teams response:', teamsResponse)
           if (teamsResponse.ok) {
-            const teamData = teamsResponse.data?.results || teamsResponse.data || []
+            const teamData = teamsResponse.data?.teams || []
             console.log('Team data:', teamData)
             setTeams(Array.isArray(teamData) ? teamData : [])
           } else {
