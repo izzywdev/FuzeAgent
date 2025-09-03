@@ -455,15 +455,18 @@ async def get_team_tasks(
 
 @router.get("/agents/{agent_id}", response_model=List[TaskResponse])
 async def get_agent_tasks(
-    org_id: str,
+    request: Request,
     agent_id: str,
+    org = Depends(get_organization_from_token),
     db: Session = Depends(get_db)
 ):
     """
     Get all tasks assigned to a specific agent.
     """
-    # Validate agent exists
-    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    # Validate agent exists and belongs to organization
+    agent = db.query(Agent).join(Team).filter(
+        and_(Agent.id == agent_id, Team.organization_id == org.id)
+    ).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
@@ -472,15 +475,18 @@ async def get_agent_tasks(
 
 @router.get("/milestones/{milestone_id}", response_model=List[TaskResponse])
 async def get_milestone_tasks(
-    org_id: str,
+    request: Request,
     milestone_id: str,
+    org = Depends(get_organization_from_token),
     db: Session = Depends(get_db)
 ):
     """
     Get all tasks for a specific milestone.
     """
-    # Validate milestone exists
-    milestone = db.query(Milestone).filter(Milestone.id == milestone_id).first()
+    # Validate milestone exists and belongs to organization
+    milestone = db.query(Milestone).join(Goal).filter(
+        and_(Milestone.id == milestone_id, Goal.organization_id == org.id)
+    ).first()
     if not milestone:
         raise HTTPException(status_code=404, detail="Milestone not found")
 
