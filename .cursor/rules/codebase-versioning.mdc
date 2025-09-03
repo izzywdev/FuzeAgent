@@ -13,3 +13,8 @@ all branch names should have a prefix like 'fix/' 'feature/' etc...
 
 
 finally if any of the changes you made affect any of the running services \ containers you must remove those containers rebuild them and redeploy them to make sure they are up-to-date with the new code.
+
+
+
+
+NOTE: this is super important unless spesificly asked not to, you should always finish in the same branch you started in.
