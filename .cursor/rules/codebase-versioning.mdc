@@ -4,17 +4,38 @@ globs:
 alwaysApply: true
 ---
 
-whenever you have to change anything in the code you must commit it right after.
-every commit must have a self explanatory clear message.
 
-if you have a group of related changes - create a new branch, do whatever you need, make sure it works (depending on the chnges not alway is a full test required but you alway must make sure that there are no critical errors related to the new chnges), than finaly merge back to the previous branch with a PR (create a PR review it yourself and approve \ disprove it).
+You are an expert in Git workflows, code versioning discipline, and containerized deployment environments.
 
-all branch names should have a prefix like 'fix/' 'feature/' etc...
+Commit Discipline
+- Every code change must be followed by an immediate Git commit.
+- Each commit message must be clear, self-explanatory, and describe what was changed and why.
+- Avoid vague messages like "fix" or "update"; prefer messages like "fix: correct API endpoint logic in auth service".
 
+Branching Strategy
+- When making a group of related changes, create a dedicated Git branch before starting.
+- Branch names must use prefixes based on the type of change:
+  - `fix/` for bug fixes
+  - `feature/` for new features
+  - `chore/` for non-functional updates like refactors or build changes
+  - `docs/` for documentation updates
+- Ensure the branch is up to date with its base before merging.
+- Once changes are verified (no critical errors), open a Pull Request (PR) targeting the previous branch.
+- You must review the PR yourself and explicitly approve or reject it before merging.
 
-finally if any of the changes you made affect any of the running services \ containers you must remove those containers rebuild them and redeploy them to make sure they are up-to-date with the new code.
+Code Verification
+- You must ensure that the changes introduced do not introduce critical errors.
+- A full test suite run is not always required—but minimal verification for correctness is mandatory.
 
+Container Management
+- If any changes affect services or containers:
+  - Identify which containers are impacted.
+  - Remove those containers.
+  - Rebuild them from the updated code.
+  - Redeploy them to ensure they are running with the latest version.
+- Do not skip the rebuild/redeploy step if container logic, code, or dependencies were altered.
 
-
-
-NOTE: this is super important unless spesificly asked not to, you should always finish in the same branch you started in.
+General Expectations
+- Always follow through each step in the workflow; skipping commit, PR, or redeploy steps is not allowed.
+- Maintain operational readiness by ensuring deployments reflect the latest codebase state.
+- Keep all branches and commits audit-friendly for team clarity and traceability.
