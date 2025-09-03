@@ -102,7 +102,25 @@ export function TeamDetailsPage() {
       try {
         const response = await apiService.getTeam(currentOrganization.id, teamId)
         if (response.ok) {
-          setTeam(response.data)
+          // Transform API response to match expected Team interface
+          const apiData = response.data
+          const transformedTeam: Team = {
+            id: apiData.id,
+            name: apiData.name,
+            description: apiData.description || '',
+            color: apiData.color || '#2563eb',
+            status: apiData.status || 'active',
+            created: apiData.created_at || apiData.created,
+            members: Array.isArray(apiData.members) ? apiData.members : [],
+            stats: {
+              totalTasks: apiData.task_count || 0,
+              completedTasks: apiData.completed_task_count || 0,
+              activeTasks: apiData.active_task_count || 0,
+              avgResponseTime: apiData.avg_response_time || '0s'
+            },
+            knowledgeBase: Array.isArray(apiData.knowledgeBase) ? apiData.knowledgeBase : []
+          }
+          setTeam(transformedTeam)
         } else {
           setError(`Failed to load team data: HTTP ${response.status}`)
           setShowErrorPage(true)
@@ -161,6 +179,43 @@ export function TeamDetailsPage() {
         <div style={{textAlign: 'center'}}>
           <div style={{fontSize: '2rem', marginBottom: '1rem'}}>⚠️</div>
           <p style={{color: '#dc2626', marginBottom: '1rem'}}>{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              cursor: 'pointer'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading state if data is still loading
+  if (loading) {
+    return (
+      <div style={{minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <div style={{textAlign: 'center'}}>
+          <div style={{fontSize: '2rem', marginBottom: '1rem'}}>⏳</div>
+          <p style={{color: '#6b7280'}}>Loading team details...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error if team data couldn't be loaded
+  if (!team) {
+    return (
+      <div style={{minHeight: '100vh', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+        <div style={{textAlign: 'center'}}>
+          <div style={{fontSize: '2rem', marginBottom: '1rem'}}>⚠️</div>
+          <p style={{color: '#dc2626', marginBottom: '1rem'}}>Failed to load team data</p>
           <button
             onClick={() => window.location.reload()}
             style={{
