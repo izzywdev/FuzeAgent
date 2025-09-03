@@ -15,12 +15,14 @@ import { AssignTaskModal } from './AgentDetailsPage/AssignTaskModal'
 import { DocumentViewer } from './AgentDetailsPage/DocumentViewer'
 import { InlineCss } from './AgentDetailsPage/InlineCss'
 import { useApiService } from '../../hooks/useApiService'
+import { useOrganization } from '../../contexts/OrganizationContext'
 
 
 
 export function AgentDetailsPage(): React.ReactElement {
   const { agentId } = useParams<{ agentId: string }>()
   const apiService = useApiService()
+  const { currentOrganization } = useOrganization()
   const [agent, setAgent] = useState<Agent | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [containerInfo, setContainerInfo] = useState<ContainerInfo | null>(null)
