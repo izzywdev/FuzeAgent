@@ -115,6 +115,8 @@ export function TeamDetailsPage() {
 
     // Load team data from API
     const loadTeamData = async () => {
+      if (!teamId) return
+      
       try {
         const response = await apiService.getTeam(teamId)
         if (response.ok) {
