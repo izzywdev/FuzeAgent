@@ -76,7 +76,7 @@ class PaginatedAgentsResponse(BaseModel):
     filters: Optional[AgentFilters]
 
 # Create router
-router = APIRouter(prefix="/organizations/{org_id}/agents", tags=["agents"])
+router = APIRouter(prefix="/agents", tags=["agents"])
 
 logger = logging.getLogger(__name__)
 

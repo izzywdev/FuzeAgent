@@ -81,7 +81,7 @@ class AddTeamMemberRequest(BaseModel):
     agent_id: str = Field(..., description="ID of the agent to add to the team")
 
 # Create router
-router = APIRouter(prefix="/organizations/{org_id}/teams", tags=["teams"])
+router = APIRouter(prefix="/teams", tags=["teams"])
 
 def team_to_response(db: Session, team: Team) -> TeamResponse:
     """Convert database team to API response format with related data."""

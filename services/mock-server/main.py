@@ -2,17 +2,11 @@
 Main FastAPI application for the mock server.
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from database import create_tables
-from organizations import router as organizations_router
-from teams import router as teams_router
-from agents import router as agents_router
-from goals import router as goals_router
-from tasks import router as tasks_router
-from milestones import router as milestones_router
 import logging
 import os
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +14,25 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+try:
+    from database import create_tables
+    logger.info("Database module imported successfully")
+except ImportError as e:
+    logger.error(f"Failed to import database module: {e}")
+    raise
+
+try:
+    from organizations import router as organizations_router
+    from teams import router as teams_router
+    from agents import router as agents_router
+    from goals import router as goals_router
+    from tasks import router as tasks_router
+    from milestones import router as milestones_router
+    logger.info("All routers imported successfully")
+except ImportError as e:
+    logger.error(f"Failed to import routers: {e}")
+    raise
 
 # Create FastAPI app
 app = FastAPI(
@@ -38,19 +51,40 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(organizations_router)
-app.include_router(teams_router, prefix="/organizations/{org_id}")
-app.include_router(agents_router, prefix="/organizations/{org_id}")
-app.include_router(goals_router)
-app.include_router(tasks_router)
-app.include_router(milestones_router)
+try:
+    app.include_router(organizations_router)
+    logger.info("Organizations router included")
+
+    app.include_router(teams_router, prefix="/organizations/{org_id}")
+    logger.info("Teams router included")
+
+    app.include_router(agents_router, prefix="/organizations/{org_id}")
+    logger.info("Agents router included")
+
+    app.include_router(goals_router)
+    logger.info("Goals router included")
+
+    app.include_router(tasks_router)
+    logger.info("Tasks router included")
+
+    app.include_router(milestones_router)
+    logger.info("Milestones router included")
+
+    logger.info("All routers registered successfully")
+except Exception as e:
+    logger.error(f"Failed to register routers: {e}")
+    raise
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize database tables on startup."""
     logger.info("Starting up Mock API server...")
-    create_tables()
-    logger.info("Database tables created/verified")
+    try:
+        create_tables()
+        logger.info("Database tables created/verified")
+    except Exception as e:
+        logger.error(f"Failed to create database tables: {e}")
+        raise
 
 @app.get("/")
 async def root():
