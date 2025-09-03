@@ -108,7 +108,7 @@ function FixedTeamsPageCore() {
         }
         
         console.log('Fetching teams from API...')
-        const response = await apiService.getTeams()
+        const response = await apiService.getTeams(currentOrganization.id)
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`)
@@ -116,20 +116,18 @@ function FixedTeamsPageCore() {
         
         console.log('API response:', response.data)
         
-        // Handle different response structures
+        // Handle paginated response structure
         let teamData: Team[]
-        
-        if (Array.isArray(response.data)) {
-          // Direct array response
+
+        if (response.data && Array.isArray(response.data.results)) {
+          // Paginated response with results property
+          teamData = response.data.results
+        } else if (Array.isArray(response.data)) {
+          // Fallback for direct array response
           teamData = response.data
         } else if (response.data && Array.isArray(response.data.teams)) {
           // Object with teams property
           teamData = response.data.teams
-        } else if (response.data && typeof response.data === 'object') {
-          // Single team object or other structure
-          teamData = Object.values(response.data).filter(item => 
-            item && typeof item === 'object' && 'id' in item
-          ) as Team[]
         } else {
           // Unexpected format
           console.warn('Unexpected API response format:', response.data)
