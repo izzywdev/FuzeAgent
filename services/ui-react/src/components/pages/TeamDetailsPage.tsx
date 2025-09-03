@@ -100,7 +100,7 @@ export function TeamDetailsPage() {
     // Load team data from API
     const loadTeamData = async () => {
       try {
-        const response = await apiService.getTeam(teamId)
+        const response = await apiService.getTeam(currentOrganization.id, teamId)
         if (response.ok) {
           setTeam(response.data)
         } else {
@@ -119,6 +119,40 @@ export function TeamDetailsPage() {
 
     loadTeamData()
   }, [teamId])
+
+
+
+  // Load agents list for add-member modal
+  useEffect(() => {
+    if (!showAddMember) return
+    if (!currentOrganization) return
+    const loadAgents = async () => {
+      try {
+        const res = await apiService.getAgents(currentOrganization.id)
+        if (res.ok) {
+          setAgentsList(res.data?.results || [])
+        }
+      } catch {}
+    }
+    loadAgents()
+  }, [showAddMember, currentOrganization])
+
+  // Load team tasks when tasks tab active or on open
+  useEffect(() => {
+    if (!teamId) return
+    if (activeTab !== 'tasks') return
+      const loadTasks = async () => {
+    try {
+      const response = await apiService.getTeamTasks(currentOrganization.id, teamId)
+      if (response.ok) {
+        setTeamTasks(Array.isArray(response.data) ? response.data : [])
+      }
+    } catch (error) {
+      console.error('Failed to load team tasks:', error)
+    }
+  }
+    loadTasks()
+  }, [teamId, activeTab])
 
   // Show error page if there's an error and we're not loading
   if (showErrorPage && !loading) {
@@ -144,38 +178,6 @@ export function TeamDetailsPage() {
       </div>
     )
   }
-
-  // Load agents list for add-member modal
-  useEffect(() => {
-    if (!showAddMember) return
-    if (!currentOrganization) return
-    const loadAgents = async () => {
-      try {
-        const res = await apiService.getAgents(currentOrganization.id)
-        if (res.ok) {
-          setAgentsList(res.data?.results || [])
-        }
-      } catch {}
-    }
-    loadAgents()
-  }, [showAddMember, currentOrganization])
-
-  // Load team tasks when tasks tab active or on open
-  useEffect(() => {
-    if (!teamId) return
-    if (activeTab !== 'tasks') return
-      const loadTasks = async () => {
-    try {
-      const response = await apiService.getTeamTasks(teamId)
-      if (response.ok) {
-        setTeamTasks(Array.isArray(response.data) ? response.data : [])
-      }
-    } catch (error) {
-      console.error('Failed to load team tasks:', error)
-    }
-  }
-    loadTasks()
-  }, [teamId, activeTab])
 
   const handleCreateTask = async () => {
     if (!teamId) return
@@ -214,7 +216,7 @@ export function TeamDetailsPage() {
     if (!teamId) return
     
     try {
-      const response = await apiService.getTeamKnowledge(teamId)
+      const response = await apiService.getTeamKnowledge(currentOrganization.id, teamId)
       if (response.ok) {
         setKnowledgeDocs(response.data)
       } else {
@@ -309,7 +311,7 @@ export function TeamDetailsPage() {
     setSelectedDocument(doc)
     
     try {
-      const response = await apiService.getTeamKnowledgeContent(teamId, doc.id)
+      const response = await apiService.getTeamKnowledgeContent(currentOrganization.id, teamId, doc.id)
       if (response.ok) {
         setDocumentContent(response.data.content)
         setShowDocumentViewer(true)
