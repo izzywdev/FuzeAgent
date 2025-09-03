@@ -50,7 +50,7 @@ export function FixedAgentsPage() {
       }
 
       try {
-        const response = await apiService.getAgents(currentOrganization.id)
+        const response = await apiService.getAgents()
 
         if (response.ok) {
           const agentData = response.data?.results || []

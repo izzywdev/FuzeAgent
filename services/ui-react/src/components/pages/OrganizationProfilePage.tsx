@@ -156,8 +156,8 @@ export function OrganizationProfilePage() {
 
       // Load agents and teams to calculate stats
       const [agentsResponse, teamsResponse] = await Promise.all([
-        apiService.getAgents(currentOrganization.id),
-        apiService.getTeams(currentOrganization.id)
+        apiService.getAgents(),
+        apiService.getTeams()
       ])
 
       if (agentsResponse.ok && teamsResponse.ok) {

@@ -54,7 +54,7 @@ function MyComponent() {
   const loadData = async () => {
     if (!currentOrganization) return
 
-    const response = await apiService.getAgents(currentOrganization.id)
+    const response = await apiService.getAgents()
     if (response.ok) {
       setAgents(response.data?.results || [])
     } else {

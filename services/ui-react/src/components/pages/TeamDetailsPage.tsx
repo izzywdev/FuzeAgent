@@ -146,7 +146,7 @@ export function TeamDetailsPage() {
     if (!currentOrganization) return
     const loadAgents = async () => {
       try {
-        const res = await apiService.getAgents(currentOrganization.id)
+        const res = await apiService.getAgents()
         if (res.ok) {
           setAgentsList(res.data?.results || [])
         }

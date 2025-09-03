@@ -108,7 +108,7 @@ function FixedTeamsPageCore() {
         }
         
         console.log('Fetching teams from API...')
-        const response = await apiService.getTeams(currentOrganization.id)
+        const response = await apiService.getTeams()
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`)
