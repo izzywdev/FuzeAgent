@@ -66,6 +66,9 @@ export function AgentDetailsPage(): React.ReactElement {
 
     // Load agent details
     const loadAgent = async () => {
+      if (!agentId) return
+      if (!currentOrganization) return // Wait for organization context
+      
       try {
         const response = await apiService.getAgent(agentId)
         if (response.ok) {
@@ -122,6 +125,9 @@ export function AgentDetailsPage(): React.ReactElement {
 
     // Load agent tasks
     const loadAgentTasks = async () => {
+      if (!agentId) return
+      if (!currentOrganization) return // Wait for organization context
+      
       try {
         const response = await apiService.getAgentTasks(agentId)
         if (response.ok) {
@@ -202,7 +208,7 @@ export function AgentDetailsPage(): React.ReactElement {
       loadContainerInfo()
       loadKnowledgeDocuments()
     }
-  }, [agentId])
+  }, [agentId, currentOrganization])
 
   const handleAssignTask = async () => {
     if (!agentId) return
@@ -231,6 +237,7 @@ export function AgentDetailsPage(): React.ReactElement {
   // Load knowledge documents for the agent
   const loadKnowledgeDocuments = async () => {
     if (!agentId) return
+    if (!currentOrganization) return // Wait for organization context
     
     try {
       const response = await apiService.getAgentKnowledge(agentId)
