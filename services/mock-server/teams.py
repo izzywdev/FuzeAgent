@@ -673,4 +673,56 @@ async def get_team_knowledge_content(request: Request, team_id: str, doc_id: str
 
     return mock_content[doc_id]
 
+@router.get("/{team_id}/tools", response_model=List[dict])
+async def get_team_tools(request: Request, team_id: str, db: Session = Depends(get_db)):
+    """
+    Get tools available for a specific team.
+
+    Validates organization and team access.
+    """
+    # Validate organization exists
+    org = get_organization_from_token(request, db)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    # Validate team exists and belongs to organization
+    team = db.query(Team).filter(
+        and_(Team.id == team_id, Team.organization_id == org.id)
+    ).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # For now, return mock tools data
+    mock_tools = [
+        {
+            "id": "tool1",
+            "name": "Code Review Tool",
+            "description": "Automated code review and quality analysis",
+            "type": "development",
+            "status": "active",
+            "version": "2.1.0",
+            "last_used": "2024-01-15T10:30:00Z"
+        },
+        {
+            "id": "tool2", 
+            "name": "Project Management",
+            "description": "Task tracking and project coordination",
+            "type": "management",
+            "status": "active",
+            "version": "1.5.2",
+            "last_used": "2024-01-14T15:45:00Z"
+        },
+        {
+            "id": "tool3",
+            "name": "Communication Hub",
+            "description": "Team messaging and collaboration",
+            "type": "communication", 
+            "status": "active",
+            "version": "3.0.1",
+            "last_used": "2024-01-15T09:15:00Z"
+        }
+    ]
+
+    return mock_tools
+
 
