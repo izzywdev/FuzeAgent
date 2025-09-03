@@ -64,7 +64,7 @@ export function CreateTeamPage() {
         }
       }
 
-      const response = await apiService.createTeam(teamData)
+      const response = await apiService.createTeam(currentOrganization.id, teamData)
 
       if (!response.ok) {
         throw new Error('Failed to create team')
