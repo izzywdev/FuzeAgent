@@ -91,11 +91,22 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 def agent_to_response(db: Session, agent: Agent) -> AgentResponse:
     """Convert database agent to API response format with related data."""
-    # Get team name if agent belongs to a team
+    # Get team name and organization info if agent belongs to a team
     team_name = None
+    organization_id = ""
     if agent.team_id:
         team = db.query(Team).filter(Team.id == agent.team_id).first()
-        team_name = team.name if team else None
+        if team:
+            team_name = team.name
+            organization_id = team.organization_id
+
+    # Parse config JSON
+    config = {}
+    if agent.config:
+        try:
+            config = json.loads(agent.config)
+        except:
+            config = {}
 
     # Calculate task statistics
     task_count = db.query(Task).filter(Task.agent_id == agent.id).count()
@@ -111,14 +122,14 @@ def agent_to_response(db: Session, agent: Agent) -> AgentResponse:
     return AgentResponse(
         id=agent.id,
         name=agent.name,
-        description=agent.description,
+        description=agent.role,  # Map role to description
         type=agent.type,
         team_id=agent.team_id,
-        model=agent.model,
-        tools=json.loads(agent.tools) if agent.tools else [],
-        settings=json.loads(agent.settings) if agent.settings else {},
+        model=config.get("model", "claude-sonnet-4-20250514"),
+        tools=config.get("tools", []),
+        settings=config.get("settings", {}),
         status=agent.status,
-        organization_id=agent.organization_id,
+        organization_id=organization_id,
         created_at=agent.created_at.isoformat(),
         updated_at=agent.updated_at.isoformat(),
         team_name=team_name,
@@ -146,8 +157,8 @@ async def get_agents(
     # Get organization from token
     org = get_organization_from_token(request, db)
 
-    # Build query
-    query = db.query(Agent).filter(Agent.organization_id == org.id)
+    # Build query - join with Team to filter by organization
+    query = db.query(Agent).join(Team).filter(Team.organization_id == org.id)
 
     # Apply filters
     if search:
@@ -200,9 +211,9 @@ async def get_agent(
     # Get organization from token
     org = get_organization_from_token(request, db)
 
-    agent = db.query(Agent).filter(
+    agent = db.query(Agent).join(Team).filter(
         Agent.id == agent_id,
-        Agent.organization_id == org.id
+        Team.organization_id == org.id
     ).first()
 
     if not agent:
@@ -234,15 +245,16 @@ async def create_agent(
     # Create agent
     db_agent = Agent(
         id=str(uuid.uuid4()),
-        organization_id=org.id,
-        name=agent.name,
-        description=agent.description,
-        type=agent.type,
         team_id=agent.team_id,
-        model=agent.model,
-        tools=json.dumps(agent.tools),
-        settings=json.dumps(agent.settings),
-        status=agent.status
+        name=agent.name,
+        role=agent.description,  # Map description to role field
+        type=agent.type,
+        status=agent.status,
+        config=json.dumps({
+            "model": agent.model,
+            "tools": agent.tools,
+            "settings": agent.settings
+        })
     )
 
     db.add(db_agent)
@@ -264,9 +276,9 @@ async def update_agent(
     # Get organization from token
     org = get_organization_from_token(request, db)
 
-    agent = db.query(Agent).filter(
+    agent = db.query(Agent).join(Team).filter(
         Agent.id == agent_id,
-        Agent.organization_id == org.id
+        Team.organization_id == org.id
     ).first()
 
     if not agent:
@@ -311,9 +323,9 @@ async def delete_agent(
     # Get organization from token
     org = get_organization_from_token(request, db)
 
-    agent = db.query(Agent).filter(
+    agent = db.query(Agent).join(Team).filter(
         Agent.id == agent_id,
-        Agent.organization_id == org.id
+        Team.organization_id == org.id
     ).first()
 
     if not agent:

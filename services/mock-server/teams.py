@@ -181,7 +181,7 @@ async def create_team(
 
 @router.get("/", response_model=PaginatedTeamsResponse)
 async def list_teams(
-    org_id: str,
+    request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     status: Optional[List[str]] = Query(None, description="Filter by status"),
@@ -196,13 +196,11 @@ async def list_teams(
 
     Supports comprehensive filtering by status, type, and search.
     """
-    # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
-    if not org:
-        raise HTTPException(status_code=404, detail="Organization not found")
+    # Get organization from token
+    org = get_organization_from_token(request, db)
 
     # Build query
-    query = db.query(Team).filter(Team.organization_id == org_id)
+    query = db.query(Team).filter(Team.organization_id == org.id)
 
     # Apply filters
     if status:
@@ -253,7 +251,7 @@ async def list_teams(
 
 @router.get("/{team_id}", response_model=TeamResponse)
 async def get_team(
-    org_id: str,
+    request: Request,
     team_id: str,
     db: Session = Depends(get_db)
 ):
@@ -263,13 +261,13 @@ async def get_team(
     Includes related agents and performance data.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Get team with organization validation
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
     
     if not team:
@@ -279,7 +277,7 @@ async def get_team(
 
 @router.put("/{team_id}", response_model=TeamResponse)
 async def update_team(
-    org_id: str,
+    request: Request,
     team_id: str,
     team_update: TeamUpdate,
     db: Session = Depends(get_db)
@@ -290,13 +288,13 @@ async def update_team(
     Handles team configuration updates and settings.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Get team
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
     
     if not team:
@@ -308,7 +306,7 @@ async def update_team(
         if field == "settings":
             setattr(team, field, json.dumps(value) if value else "{}")
         else:
-        setattr(team, field, value)
+            setattr(team, field, value)
     
     team.updated_at = datetime.utcnow()
     db.commit()
@@ -318,7 +316,7 @@ async def update_team(
 
 @router.delete("/{team_id}")
 async def delete_team(
-    org_id: str,
+    request: Request,
     team_id: str,
     db: Session = Depends(get_db)
 ):
@@ -328,13 +326,13 @@ async def delete_team(
     Removes the team and handles related cleanup.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Get team
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
 
     if not team:
@@ -355,7 +353,7 @@ async def delete_team(
 
 @router.post("/{team_id}/members", response_model=dict)
 async def add_team_member(
-    org_id: str,
+    request: Request,
     team_id: str,
     member_request: AddTeamMemberRequest,
     db: Session = Depends(get_db)
@@ -366,13 +364,13 @@ async def add_team_member(
     Validates team and agent relationships.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Validate team exists and belongs to organization
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -398,7 +396,7 @@ async def add_team_member(
 
 @router.delete("/{team_id}/members/{agent_id}")
 async def remove_team_member(
-    org_id: str,
+    request: Request,
     team_id: str,
     agent_id: str,
     db: Session = Depends(get_db)
@@ -407,13 +405,13 @@ async def remove_team_member(
     Remove an agent from a team.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Validate team exists and belongs to organization
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -434,7 +432,7 @@ async def remove_team_member(
 
 @router.get("/{team_id}/members", response_model=List[dict])
 async def get_team_members(
-    org_id: str,
+    request: Request,
     team_id: str,
     db: Session = Depends(get_db)
 ):
@@ -442,13 +440,13 @@ async def get_team_members(
     Get all members of a team with their details.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Validate team exists and belongs to organization
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -494,7 +492,7 @@ async def get_team_members(
 
 @router.get("/{team_id}/stats", response_model=dict)
 async def get_team_stats(
-    org_id: str,
+    request: Request,
     team_id: str,
     db: Session = Depends(get_db)
 ):
@@ -502,13 +500,13 @@ async def get_team_stats(
     Get comprehensive statistics for a team.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Validate team exists and belongs to organization
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -574,20 +572,20 @@ def get_all_teams_legacy(db: Session = Depends(get_db)):
 
 # Knowledge/Document endpoints for teams
 @router.get("/{team_id}/knowledge", response_model=List[dict])
-async def get_team_knowledge(org_id: str, team_id: str, db: Session = Depends(get_db)):
+async def get_team_knowledge(request: Request, team_id: str, db: Session = Depends(get_db)):
     """
     Get knowledge documents for a team.
 
     Validates organization and team access.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Validate team exists and belongs to organization
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -633,20 +631,20 @@ async def get_team_knowledge(org_id: str, team_id: str, db: Session = Depends(ge
     return mock_docs
 
 @router.get("/{team_id}/knowledge/{doc_id}/content", response_model=dict)
-async def get_team_knowledge_content(org_id: str, team_id: str, doc_id: str, db: Session = Depends(get_db)):
+async def get_team_knowledge_content(request: Request, team_id: str, doc_id: str, db: Session = Depends(get_db)):
     """
     Get content of a specific knowledge document.
 
     Validates organization and team access.
     """
     # Validate organization exists
-    org = db.query(Organization).filter(Organization.id == org_id).first()
+    org = get_organization_from_token(request, db)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     # Validate team exists and belongs to organization
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
