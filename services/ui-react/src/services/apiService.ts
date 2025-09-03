@@ -517,6 +517,10 @@ class ApiService {
     return this.request<Conversation[]>(`/agents/${id}/conversations`)
   }
 
+  async getAgentContainerStatus(id: string): Promise<ApiResponse<ContainerInfo>> {
+    return this.request<ContainerInfo>(`/agents/${id}/container/status`)
+  }
+
   async createAgentConversation(agentId: string, data: { title: string }): Promise<ApiResponse<Conversation>> {
     return this.request<Conversation>(`/agents/${agentId}/conversations`, {
       method: 'POST',

@@ -256,11 +256,12 @@ export function AgentDetailsPage(): React.ReactElement {
   // Load agent's primary conversation and messages
   const loadAgentPrimaryConversation = async () => {
     if (!agentId) return
+    if (!currentOrganization) return // Wait for organization context
     
     try {
-      const response = await fetch(`/agents/${agentId}/conversations`)
+      const response = await apiService.getAgentConversations(agentId)
       if (response.ok) {
-        const conversations = await response.json()
+        const conversations = response.data
         
         if (conversations.length > 0) {
           // Use the first (most recent) conversation as the primary one
@@ -440,12 +441,12 @@ export function AgentDetailsPage(): React.ReactElement {
   // Container Management Functions
   const loadContainerInfo = async () => {
     if (!agentId) return
+    if (!currentOrganization) return // Wait for organization context
     
     try {
-      const response = await fetch(`/agents/${agentId}/container/status`)
+      const response = await apiService.getAgentContainerStatus(agentId)
       if (response.ok) {
-        const data = await response.json()
-        setContainerInfo(data)
+        setContainerInfo(response.data)
       } else {
         console.error('Failed to load container status')
         setContainerInfo(null)
