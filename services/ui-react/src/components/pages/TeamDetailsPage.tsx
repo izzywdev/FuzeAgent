@@ -97,10 +97,26 @@ export function TeamDetailsPage() {
       window.history.replaceState({}, '', window.location.pathname)
     }
 
+    // Load knowledge documents for the team
+    const loadKnowledgeDocuments = async () => {
+      if (!teamId) return
+      
+      try {
+        const response = await apiService.getTeamKnowledge(teamId)
+        if (response.ok) {
+          setKnowledgeDocs(response.data)
+        } else {
+          console.error('Failed to load team documents:', response.status)
+        }
+      } catch (error) {
+        console.error('Error loading team documents:', error)
+      }
+    }
+
     // Load team data from API
     const loadTeamData = async () => {
       try {
-        const response = await apiService.getTeam(currentOrganization.id, teamId)
+        const response = await apiService.getTeam(teamId)
         if (response.ok) {
           // Transform API response to match expected Team interface
           const apiData = response.data
@@ -161,7 +177,7 @@ export function TeamDetailsPage() {
     if (activeTab !== 'tasks') return
       const loadTasks = async () => {
     try {
-      const response = await apiService.getTeamTasks(currentOrganization.id, teamId)
+      const response = await apiService.getTeamTasks(teamId)
       if (response.ok) {
         setTeamTasks(Array.isArray(response.data) ? response.data : [])
       }
@@ -266,21 +282,7 @@ export function TeamDetailsPage() {
     }
   }
 
-  // Load knowledge documents for the team
-  const loadKnowledgeDocuments = async () => {
-    if (!teamId) return
-    
-    try {
-      const response = await apiService.getTeamKnowledge(currentOrganization.id, teamId)
-      if (response.ok) {
-        setKnowledgeDocs(response.data)
-      } else {
-        console.error('Failed to load team documents:', response.status)
-      }
-    } catch (error) {
-      console.error('Error loading team documents:', error)
-    }
-  }
+
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -366,7 +368,7 @@ export function TeamDetailsPage() {
     setSelectedDocument(doc)
     
     try {
-      const response = await apiService.getTeamKnowledgeContent(currentOrganization.id, teamId, doc.id)
+      const response = await apiService.getTeamKnowledgeContent(teamId, doc.id)
       if (response.ok) {
         setDocumentContent(response.data.content)
         setShowDocumentViewer(true)
