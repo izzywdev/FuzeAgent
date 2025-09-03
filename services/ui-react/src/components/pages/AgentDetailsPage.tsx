@@ -636,12 +636,12 @@ export function AgentDetailsPage(): React.ReactElement {
 
   const loadConversationMessages = async (conversationId: string) => {
     if (!agentId) return
+    if (!currentOrganization) return // Wait for organization context
 
     try {
-      const response = await fetch(`/agents/${agentId}/conversations/${conversationId}/messages`)
+      const response = await apiService.getAgentConversationMessages(agentId, conversationId)
       if (response.ok) {
-        const messages = await response.json()
-        setChatMessages(messages)
+        setChatMessages(response.data)
       } else {
         console.error('Failed to load conversation messages')
       }

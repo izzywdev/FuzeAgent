@@ -375,6 +375,63 @@ async def get_agent_conversations(
 
     return mock_conversations
 
+@router.get("/{agent_id}/conversations/{conversation_id}/messages", response_model=List[dict])
+async def get_agent_conversation_messages(
+    agent_id: str,
+    conversation_id: str,
+    request: Request,
+    org = Depends(get_organization_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Get messages for a specific agent conversation.
+    Validates organization and agent access.
+    """
+    # Validate agent exists and belongs to organization
+    agent = db.query(Agent).join(Team).filter(
+        and_(Agent.id == agent_id, Team.organization_id == org.id)
+    ).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # For now, return mock conversation messages
+    mock_messages = [
+        {
+            "id": "msg1",
+            "conversation_id": conversation_id,
+            "sender": "user",
+            "content": "Hello, can you help me with this task?",
+            "timestamp": "2024-01-15T10:00:00Z",
+            "message_type": "text"
+        },
+        {
+            "id": "msg2", 
+            "conversation_id": conversation_id,
+            "sender": "agent",
+            "content": "Of course! I'd be happy to help you with that task. What specifically do you need assistance with?",
+            "timestamp": "2024-01-15T10:01:00Z",
+            "message_type": "text"
+        },
+        {
+            "id": "msg3",
+            "conversation_id": conversation_id,
+            "sender": "user", 
+            "content": "I need to implement a new feature for the user dashboard.",
+            "timestamp": "2024-01-15T10:02:00Z",
+            "message_type": "text"
+        },
+        {
+            "id": "msg4",
+            "conversation_id": conversation_id,
+            "sender": "agent",
+            "content": "Great! I can help you implement that feature. Let me start by analyzing the current dashboard structure and then we can plan the implementation together.",
+            "timestamp": "2024-01-15T10:03:00Z",
+            "message_type": "text"
+        }
+    ]
+
+    return mock_messages
+
 @router.get("/{agent_id}/container/status", response_model=dict)
 async def get_agent_container_status(
     agent_id: str,
@@ -396,7 +453,7 @@ async def get_agent_container_status(
     mock_status = {
         "status": "running",
         "container_id": f"agent-{agent_id[:8]}",
-        "image": agent.container_image or "node:20-bullseye",
+        "image": "node:20-bullseye",
         "created_at": "2024-01-15T09:00:00Z",
         "started_at": "2024-01-15T09:05:00Z",
         "cpu_usage": "15.2%",
