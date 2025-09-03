@@ -98,9 +98,10 @@ export function TeamDetailsPage() {
     }
 
     // Load knowledge documents for the team
-    const loadKnowledgeDocuments = async () => {
+    const loadTeamKnowledgeDocuments = async () => {
       if (!teamId) return
       
+      console.log('Loading team knowledge documents for teamId:', teamId)
       try {
         const response = await apiService.getTeamKnowledge(teamId)
         if (response.ok) {
@@ -148,7 +149,7 @@ export function TeamDetailsPage() {
       } finally {
         setLoading(false)
         if (teamId) {
-          loadKnowledgeDocuments()
+          loadTeamKnowledgeDocuments()
         }
       }
     }
@@ -308,7 +309,7 @@ export function TeamDetailsPage() {
     
     setUploading(false)
     setShowUpload(false)
-    await loadKnowledgeDocuments() // Reload documents
+    await loadTeamKnowledgeDocuments() // Reload documents
     
     // Reset file input
     event.target.value = ''
@@ -327,7 +328,7 @@ export function TeamDetailsPage() {
       
       if (response.ok) {
         console.log('URL added successfully')
-        await loadKnowledgeDocuments()
+        await loadTeamKnowledgeDocuments()
       } else {
         console.error('Failed to add URL:', response.status)
       }
@@ -389,7 +390,7 @@ export function TeamDetailsPage() {
       const response = await apiService.deleteTeamDocument(teamId, docId)
       
       if (response.ok) {
-        await loadKnowledgeDocuments()
+        await loadTeamKnowledgeDocuments()
       } else {
         console.error('Failed to delete document:', response.status)
       }
