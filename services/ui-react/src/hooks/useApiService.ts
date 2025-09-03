@@ -11,8 +11,8 @@ export function useApiService() {
   const { currentOrganization } = useOrganization()
   
   useEffect(() => {
-    apiService.setOrganizationId(currentOrganization?.id || null)
-  }, [currentOrganization?.id])
+    apiService.setOrganizationToken(currentOrganization?.token || null)
+  }, [currentOrganization?.token])
   
   return apiService
 }
