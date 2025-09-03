@@ -590,7 +590,7 @@ async def get_team_knowledge(request: Request, team_id: str, db: Session = Depen
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    logger.info(f"GET /organizations/{org_id}/teams/{team_id}/knowledge")
+    logger.info(f"GET /teams/{team_id}/knowledge")
 
     # For now, return mock data since we don't have a knowledge table
     mock_docs = [
