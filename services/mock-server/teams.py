@@ -211,7 +211,7 @@ async def list_teams(
 
     # Apply pagination
     teams = query.offset((page - 1) * page_size).limit(page_size).all()
-
+    
     # Convert to response format
     team_responses = [team_to_response(db, t) for t in teams]
 
@@ -250,7 +250,7 @@ async def get_team(
     team = db.query(Team).filter(
         and_(Team.id == team_id, Team.organization_id == org_id)
     ).first()
-
+    
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
@@ -277,18 +277,18 @@ async def update_team(
     team = db.query(Team).filter(
         and_(Team.id == team_id, Team.organization_id == org_id)
     ).first()
-
+    
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-
+    
     # Update fields
     update_data = team_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         if field == "settings":
             setattr(team, field, json.dumps(value) if value else "{}")
         else:
-            setattr(team, field, value)
-
+        setattr(team, field, value)
+    
     team.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(team)
@@ -434,7 +434,7 @@ async def get_team_members(
 
     # Get team agents
     agents = db.query(Agent).filter(Agent.team_id == team_id).all()
-
+    
     # Convert to response format
     members = []
     for agent in agents:
