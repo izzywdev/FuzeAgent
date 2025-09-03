@@ -59,7 +59,7 @@ try:
     app.include_router(teams_router, prefix="/organizations/{org_id}")
     logger.info("Teams router included")
 
-    app.include_router(agents_router, prefix="/organizations/{org_id}")
+    app.include_router(agents_router)
     logger.info("Agents router included")
 
     app.include_router(goals_router)
