@@ -433,7 +433,7 @@ class ApiService {
     return this.request<Tool[]>(`/teams/${id}/tools`);
   }
 
-  async getTeamKnowledge(orgId: string, teamId: string): Promise<ApiResponse<KnowledgeDocument[]>> {
+  async getTeamKnowledge(teamId: string): Promise<ApiResponse<KnowledgeDocument[]>> {
     return this.request<KnowledgeDocument[]>(`/teams/${teamId}/knowledge`)
   }
 
