@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useApiService } from '../../hooks/useApiService'
+import { useOrganization } from '../../contexts/OrganizationContext'
 
 interface Agent {
   id: string
@@ -14,6 +15,7 @@ interface Agent {
 
 export function FixedAgentsPage() {
   const apiService = useApiService()
+  const { currentOrganization } = useOrganization()
   const [agents, setAgents] = useState<Agent[]>([])
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,11 +43,17 @@ export function FixedAgentsPage() {
 
   useEffect(() => {
     const loadAgents = async () => {
+      if (!currentOrganization) {
+        console.log('No organization selected')
+        setLoading(false)
+        return
+      }
+
       try {
-        const response = await apiService.getAgents()
-        
+        const response = await apiService.getAgents(currentOrganization.id)
+
         if (response.ok) {
-          const agentData = Array.isArray(response.data) ? response.data : []
+          const agentData = response.data?.results || []
           setAgents(agentData)
           setFilteredAgents(agentData)
         } else {
@@ -63,7 +71,7 @@ export function FixedAgentsPage() {
     }
 
     loadAgents()
-  }, [])
+  }, [currentOrganization])
 
   return (
     <div style={{minHeight: '100vh', backgroundColor: '#f9fafb'}}>

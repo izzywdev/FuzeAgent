@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { TeamToolsSection } from './TeamToolsSection'
 import { useApiService } from '../../hooks/useApiService'
+import { useOrganization } from '../../contexts/OrganizationContext'
 
 interface TeamMember {
   id: string
@@ -56,6 +57,7 @@ export function TeamDetailsPage() {
   const { teamId } = useParams<{ teamId: string }>()
   const navigate = useNavigate()
   const apiService = useApiService()
+  const { currentOrganization } = useOrganization()
   const [team, setTeam] = useState<Team | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
@@ -146,16 +148,17 @@ export function TeamDetailsPage() {
   // Load agents list for add-member modal
   useEffect(() => {
     if (!showAddMember) return
+    if (!currentOrganization) return
     const loadAgents = async () => {
       try {
-        const res = await apiService.getAgents()
+        const res = await apiService.getAgents(currentOrganization.id)
         if (res.ok) {
-          setAgentsList(Array.isArray(res.data) ? res.data : [])
+          setAgentsList(res.data?.results || [])
         }
       } catch {}
     }
     loadAgents()
-  }, [showAddMember])
+  }, [showAddMember, currentOrganization])
 
   // Load team tasks when tasks tab active or on open
   useEffect(() => {

@@ -49,11 +49,14 @@ import { useApiService } from '../../hooks/useApiService'
 
 function MyComponent() {
   const apiService = useApiService()
-  
+  const { currentOrganization } = useOrganization()
+
   const loadData = async () => {
-    const response = await apiService.getAgents()
+    if (!currentOrganization) return
+
+    const response = await apiService.getAgents(currentOrganization.id)
     if (response.ok) {
-      setAgents(response.data)
+      setAgents(response.data?.results || [])
     } else {
       console.error('Failed to load agents:', response.status)
     }

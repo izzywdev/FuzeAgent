@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { OrganizationToolsSection } from './OrganizationToolsSection'
 import { useApiService } from '../../hooks/useApiService'
+import { useOrganization } from '../../contexts/OrganizationContext'
 
 interface OrganizationInfo {
   id: string
@@ -34,6 +35,7 @@ interface KnowledgeDocument {
 
 export function OrganizationProfilePage() {
   const apiService = useApiService()
+  const { currentOrganization } = useOrganization()
   const [orgInfo, setOrgInfo] = useState<OrganizationInfo>({
     id: '1',
     name: 'WCG - World Class Group',
@@ -150,15 +152,17 @@ export function OrganizationProfilePage() {
 
   const loadStats = async () => {
     try {
+      if (!currentOrganization) return
+
       // Load agents and teams to calculate stats
       const [agentsResponse, teamsResponse] = await Promise.all([
-        apiService.getAgents(),
-        apiService.getTeams()
+        apiService.getAgents(currentOrganization.id),
+        apiService.getTeams(currentOrganization.id)
       ])
 
       if (agentsResponse.ok && teamsResponse.ok) {
-        const agents = agentsResponse.data
-        const teams = teamsResponse.data
+        const agents = agentsResponse.data?.results || []
+        const teams = teamsResponse.data?.results || []
 
         setStats({
           totalAgents: Array.isArray(agents) ? agents.length : 0,

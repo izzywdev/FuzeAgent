@@ -121,7 +121,10 @@ export function FixedDashboard(): JSX.Element {
       setError(null)
       
       // Fetch all dashboard data using the API service
-      const { agents: agentsData, teams: teamsData, organizations: orgsData } = await apiService.getDashboardData()
+      if (!currentOrganization) {
+        throw new Error('No organization selected')
+      }
+      const { agents: agentsData, teams: teamsData, organizations: orgsData } = await apiService.getDashboardData(currentOrganization.id)
 
       // Update state with fetched data
       setAgents(agentsData)

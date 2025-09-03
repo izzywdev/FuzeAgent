@@ -445,8 +445,31 @@ class ApiService {
   // AGENTS
   // ============================================================================
 
-  async getAgents(): Promise<ApiResponse<Agent[]>> {
-    return this.request<Agent[]>('/agents')
+  async getAgents(orgId: string, filters?: {
+    page?: number
+    page_size?: number
+    status?: string[]
+    type?: string[]
+    team_id?: string
+    search?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+  }): Promise<ApiResponse<PaginatedResponse<Agent>>> {
+    const params = new URLSearchParams()
+
+    if (filters?.page) params.append('page', filters.page.toString())
+    if (filters?.page_size) params.append('page_size', filters.page_size.toString())
+    if (filters?.status?.length) filters.status.forEach(s => params.append('status', s))
+    if (filters?.type?.length) filters.type.forEach(t => params.append('type', t))
+    if (filters?.team_id) params.append('team_id', filters.team_id)
+    if (filters?.search) params.append('search', filters.search)
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by)
+    if (filters?.sort_order) params.append('sort_order', filters.sort_order)
+
+    const queryString = params.toString()
+    const url = `/organizations/${orgId}/agents${queryString ? `?${queryString}` : ''}`
+
+    return this.request<PaginatedResponse<Agent>>(url)
   }
 
   async getAgent(id: string): Promise<ApiResponse<Agent>> {
@@ -936,21 +959,21 @@ class ApiService {
   // DASHBOARD DATA
   // ============================================================================
 
-  async getDashboardData(): Promise<{
+  async getDashboardData(orgId: string): Promise<{
     agents: Agent[]
     teams: Team[]
     organizations: Organization[]
   }> {
     const [agentsResponse, teamsResponse, orgsResponse] = await Promise.all([
-      this.getAgents(),
-      this.getTeams(),
+      this.getAgents(orgId),
+      this.getTeams(orgId),
       this.getOrganizations()
     ])
 
     if (!agentsResponse.ok) {
       throw new Error(`Failed to fetch agents: ${agentsResponse.status}`)
     }
-    
+
     if (!teamsResponse.ok) {
       throw new Error(`Failed to fetch teams: ${teamsResponse.status}`)
     }
@@ -960,9 +983,9 @@ class ApiService {
     }
 
     return {
-      agents: agentsResponse.data,
-      teams: teamsResponse.data,
-      organizations: orgsResponse.data
+      agents: agentsResponse.data?.results || [],
+      teams: teamsResponse.data?.results || [],
+      organizations: orgsResponse.data || []
     }
   }
 }

@@ -70,13 +70,13 @@ export function FixedOrgChartPage() {
         }
 
         const [teamsRes, agentsRes] = await Promise.all([
-          apiService.getTeams(),
-          apiService.getAgents(),
+          apiService.getTeams(currentOrganization.id),
+          apiService.getAgents(currentOrganization.id),
         ])
-        
+
         setOrg(currentOrganization)
-        setTeams(teamsRes.ok ? teamsRes.data : [])
-        setAgents(agentsRes.ok ? agentsRes.data : [])
+        setTeams(teamsRes.ok ? teamsRes.data?.results || [] : [])
+        setAgents(agentsRes.ok ? agentsRes.data?.results || [] : [])
       } finally {
         setLoading(false)
       }
