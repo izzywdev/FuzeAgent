@@ -308,7 +308,7 @@ async def update_team(
         if field == "settings":
             setattr(team, field, json.dumps(value) if value else "{}")
         else:
-            setattr(team, field, value)
+        setattr(team, field, value)
     
     team.updated_at = datetime.utcnow()
     db.commit()
