@@ -10,7 +10,7 @@ Provides comprehensive CRUD operations for tasks with:
 - Task execution and result tracking
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, desc, asc
 from typing import List, Optional, Dict, Any
@@ -78,7 +78,27 @@ class PaginatedTasksResponse(BaseModel):
     filters: Optional[TaskFilters]
 
 # Create router
-router = APIRouter(prefix="/organizations/{org_id}/tasks", tags=["tasks"])
+router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+# Token-based organization authentication
+async def get_organization_from_token(request: Request, db: Session = Depends(get_db)):
+    """Extract organization from X-Organization-Token header"""
+    token = request.headers.get("X-Organization-Token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Organization token required")
+    
+    # For demo purposes, extract org ID from token (org-token-{id})
+    if token.startswith("org-token-"):
+        org_id = token.replace("org-token-", "")
+    else:
+        # Fallback: use token as org ID
+        org_id = token
+    
+    org = db.query(Organization).filter(Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    return org
 
 def task_to_response(db: Session, task: Task) -> TaskResponse:
     """Convert database task to API response format with related data."""
@@ -414,8 +434,9 @@ async def execute_task(
 
 @router.get("/teams/{team_id}", response_model=List[TaskResponse])
 async def get_team_tasks(
-    org_id: str,
+    request: Request,
     team_id: str,
+    org = Depends(get_organization_from_token),
     db: Session = Depends(get_db)
 ):
     """
@@ -423,7 +444,7 @@ async def get_team_tasks(
     """
     # Validate organization and team
     team = db.query(Team).filter(
-        and_(Team.id == team_id, Team.organization_id == org_id)
+        and_(Team.id == team_id, Team.organization_id == org.id)
     ).first()
 
     if not team:
