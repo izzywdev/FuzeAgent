@@ -29,6 +29,7 @@ try:
     from goals import router as goals_router
     from tasks import router as tasks_router
     from milestones import router as milestones_router
+    from agent_templates import router as agent_templates_router
     logger.info("All routers imported successfully")
 except ImportError as e:
     logger.error(f"Failed to import routers: {e}")
@@ -69,6 +70,9 @@ try:
 
     app.include_router(milestones_router)
     logger.info("Milestones router included")
+
+    app.include_router(agent_templates_router)
+    logger.info("Agent templates router included")
 
     logger.info("All routers registered successfully")
 except Exception as e:

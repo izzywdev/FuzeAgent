@@ -55,9 +55,10 @@ export function CreateAgentPage() {
       try {
         // Load teams for the current organization
         if (currentOrganization) {
-          const teamsResponse = await apiService.getTeams()
-          if (teamsResponse.ok && Array.isArray(teamsResponse.data)) {
-            setTeams(teamsResponse.data)
+          const teamsResponse = await apiService.getTeams(currentOrganization.id)
+          if (teamsResponse.ok) {
+            const teamData = teamsResponse.data?.results || teamsResponse.data || []
+            setTeams(Array.isArray(teamData) ? teamData : [])
           } else {
             setTeams([])
           }
