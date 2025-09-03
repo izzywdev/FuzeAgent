@@ -55,14 +55,19 @@ export function CreateAgentPage() {
       try {
         // Load teams for the current organization
         if (currentOrganization) {
+          console.log('Loading teams for organization:', currentOrganization.id)
           const teamsResponse = await apiService.getTeams()
+          console.log('Teams response:', teamsResponse)
           if (teamsResponse.ok) {
             const teamData = teamsResponse.data?.results || teamsResponse.data || []
+            console.log('Team data:', teamData)
             setTeams(Array.isArray(teamData) ? teamData : [])
           } else {
+            console.error('Failed to load teams:', teamsResponse.status)
             setTeams([])
           }
         } else {
+          console.log('No current organization, skipping teams load')
           setTeams([])
         }
 
