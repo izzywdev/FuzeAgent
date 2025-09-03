@@ -1,0 +1,15 @@
+---
+description: guides to chanseing the code.
+globs:
+alwaysApply: true
+---
+
+whenever you have to change anything in the code you must commit it right after.
+every commit must have a self explanatory clear message.
+
+if you have a group of related changes - create a new branch, do whatever you need, make sure it works (depending on the chnges not alway is a full test required but you alway must make sure that there are no critical errors related to the new chnges), than finaly merge back to the previous branch with a PR (create a PR review it yourself and approve \ disprove it).
+
+all branch names should have a prefix like 'fix/' 'feature/' etc...
+
+
+finally if any of the changes you made affect any of the running services \ containers you must remove those containers rebuild them and redeploy them to make sure they are up-to-date with the new code.
