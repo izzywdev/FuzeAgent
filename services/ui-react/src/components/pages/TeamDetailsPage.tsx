@@ -117,6 +117,7 @@ export function TeamDetailsPage() {
     // Load team data from API
     const loadTeamData = async () => {
       if (!teamId) return
+      if (!currentOrganization) return // Wait for organization context
       
       try {
         const response = await apiService.getTeam(teamId)
@@ -155,7 +156,7 @@ export function TeamDetailsPage() {
     }
 
     loadTeamData()
-  }, [teamId])
+  }, [teamId, currentOrganization])
 
 
 
