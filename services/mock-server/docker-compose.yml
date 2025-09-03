@@ -4,7 +4,7 @@ services:
   mock-server:
     build: .
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - mock_data:/app/data
     environment:
