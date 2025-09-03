@@ -506,7 +506,7 @@ class ApiService {
   }
 
   async getAgentKnowledge(id: string): Promise<ApiResponse<KnowledgeDocument[]>> {
-    return this.directRequest<KnowledgeDocument[]>(`/knowledge/agents/${id}/documents`)
+    return this.request<KnowledgeDocument[]>(`/agents/${id}/knowledge`)
   }
 
   async getAgentKnowledgeContent(agentId: string, docId: string): Promise<ApiResponse<DocumentContent>> {

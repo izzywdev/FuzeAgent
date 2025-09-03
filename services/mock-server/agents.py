@@ -335,3 +335,119 @@ async def delete_agent(
     db.commit()
 
     return {"message": "Agent deleted successfully"}
+
+@router.get("/{agent_id}/conversations", response_model=List[dict])
+async def get_agent_conversations(
+    agent_id: str,
+    request: Request,
+    org = Depends(get_organization_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Get conversations for a specific agent.
+    """
+    # Validate agent exists and belongs to organization
+    agent = db.query(Agent).join(Team).filter(
+        and_(Agent.id == agent_id, Team.organization_id == org.id)
+    ).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # For now, return mock conversation data
+    mock_conversations = [
+        {
+            "id": "conv1",
+            "title": "Code Review Discussion",
+            "status": "active",
+            "created_at": "2024-01-15T10:30:00Z",
+            "last_message": "The code looks good, just a few minor suggestions.",
+            "message_count": 15
+        },
+        {
+            "id": "conv2", 
+            "title": "Project Planning",
+            "status": "completed",
+            "created_at": "2024-01-14T15:45:00Z",
+            "last_message": "All tasks have been assigned and scheduled.",
+            "message_count": 8
+        }
+    ]
+
+    return mock_conversations
+
+@router.get("/{agent_id}/container/status", response_model=dict)
+async def get_agent_container_status(
+    agent_id: str,
+    request: Request,
+    org = Depends(get_organization_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Get container status for a specific agent.
+    """
+    # Validate agent exists and belongs to organization
+    agent = db.query(Agent).join(Team).filter(
+        and_(Agent.id == agent_id, Team.organization_id == org.id)
+    ).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # For now, return mock container status
+    mock_status = {
+        "status": "running",
+        "container_id": f"agent-{agent_id[:8]}",
+        "image": agent.container_image or "node:20-bullseye",
+        "created_at": "2024-01-15T09:00:00Z",
+        "started_at": "2024-01-15T09:05:00Z",
+        "cpu_usage": "15.2%",
+        "memory_usage": "256MB",
+        "network_status": "connected",
+        "health_status": "healthy"
+    }
+
+    return mock_status
+
+@router.get("/{agent_id}/knowledge", response_model=List[dict])
+async def get_agent_knowledge(
+    agent_id: str,
+    request: Request,
+    org = Depends(get_organization_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Get knowledge documents for a specific agent.
+    """
+    # Validate agent exists and belongs to organization
+    agent = db.query(Agent).join(Team).filter(
+        and_(Agent.id == agent_id, Team.organization_id == org.id)
+    ).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # For now, return mock knowledge documents
+    mock_docs = [
+        {
+            "id": "doc1",
+            "title": "Agent Configuration Guide",
+            "filename": "agent-config.md",
+            "type": "document",
+            "mime_type": "text/markdown",
+            "size": 2048,
+            "status": "active",
+            "upload_date": "2024-01-15T10:00:00Z",
+            "last_modified": "2024-01-15T10:00:00Z"
+        },
+        {
+            "id": "doc2",
+            "title": "API Documentation",
+            "filename": "api-docs.json",
+            "type": "document", 
+            "mime_type": "application/json",
+            "size": 5120,
+            "status": "active",
+            "upload_date": "2024-01-14T16:30:00Z",
+            "last_modified": "2024-01-14T16:30:00Z"
+        }
+    ]
+
+    return mock_docs
