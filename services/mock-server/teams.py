@@ -692,34 +692,62 @@ async def get_team_tools(request: Request, team_id: str, db: Session = Depends(g
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    # For now, return mock tools data
+    # For now, return mock tools data matching the expected TeamTool structure
     mock_tools = [
         {
-            "id": "tool1",
-            "name": "Code Review Tool",
-            "description": "Automated code review and quality analysis",
-            "type": "development",
-            "status": "active",
-            "version": "2.1.0",
-            "last_used": "2024-01-15T10:30:00Z"
+            "tool": {
+                "id": "tool1",
+                "key": "code_review",
+                "name": "Code Review Tool",
+                "description": "Automated code review and quality analysis",
+                "default_config": {
+                    "auto_assign": True,
+                    "severity_threshold": "medium",
+                    "review_timeout": 3600
+                }
+            },
+            "setting": {
+                "enabled": True,
+                "config_override": {
+                    "severity_threshold": "high"
+                }
+            }
         },
         {
-            "id": "tool2", 
-            "name": "Project Management",
-            "description": "Task tracking and project coordination",
-            "type": "management",
-            "status": "active",
-            "version": "1.5.2",
-            "last_used": "2024-01-14T15:45:00Z"
+            "tool": {
+                "id": "tool2",
+                "key": "project_management",
+                "name": "Project Management",
+                "description": "Task tracking and project coordination",
+                "default_config": {
+                    "auto_sync": True,
+                    "notification_enabled": True,
+                    "deadline_reminders": 24
+                }
+            },
+            "setting": {
+                "enabled": True,
+                "config_override": {}
+            }
         },
         {
-            "id": "tool3",
-            "name": "Communication Hub",
-            "description": "Team messaging and collaboration",
-            "type": "communication", 
-            "status": "active",
-            "version": "3.0.1",
-            "last_used": "2024-01-15T09:15:00Z"
+            "tool": {
+                "id": "tool3",
+                "key": "communication_hub",
+                "name": "Communication Hub",
+                "description": "Team messaging and collaboration",
+                "default_config": {
+                    "channels": ["general", "development"],
+                    "notifications": True,
+                    "message_retention": 30
+                }
+            },
+            "setting": {
+                "enabled": False,
+                "config_override": {
+                    "channels": ["general", "development", "alerts"]
+                }
+            }
         }
     ]
 
