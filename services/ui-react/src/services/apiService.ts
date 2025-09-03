@@ -475,9 +475,7 @@ class ApiService {
     })
   }
 
-  async getAgentTasks(id: string): Promise<ApiResponse<Task[]>> {
-    return this.request<Task[]>(`/agents/${id}/tasks`)
-  }
+
 
   async getAgentTools(id: string): Promise<ApiResponse<Tool[]>> {
     return this.request<Tool[]>(`/agents/${id}/tools`)
@@ -561,39 +559,7 @@ class ApiService {
     })
   }
 
-  // ============================================================================
-  // TASKS
-  // ============================================================================
 
-  async getTasks(): Promise<ApiResponse<Task[]>> {
-    return this.request<Task[]>('/tasks')
-  }
-
-  async getTask(id: string): Promise<ApiResponse<Task>> {
-    return this.request<Task>(`/tasks/${id}`)
-  }
-
-  async createTask(data: Partial<Task>): Promise<ApiResponse<Task>> {
-    return this.request<Task>('/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-  }
-
-  async updateTask(id: string, data: Partial<Task>): Promise<ApiResponse<Task>> {
-    return this.request<Task>(`/tasks/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-  }
-
-  async deleteTask(id: string): Promise<ApiResponse<boolean>> {
-    return this.request<boolean>(`/tasks/${id}`, {
-      method: 'DELETE'
-    })
-  }
 
   // Legacy method for backward compatibility - use createTask instead
   async createTeamTask(teamId: string, data: { title: string; description: string; priority?: string }): Promise<ApiResponse<Task>> {
@@ -603,13 +569,7 @@ class ApiService {
     return this.createTask(orgId, { ...data, team_id: teamId });
   }
 
-  async addTeamMember(teamId: string, agentId: string): Promise<ApiResponse<any>> {
-    return this.request<any>(`/teams/${teamId}/members`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agent_id: agentId })
-    })
-  }
+
 
   async uploadTeamDocument(teamId: string, file: File, title: string): Promise<ApiResponse<any>> {
     const formData = new FormData()
@@ -917,41 +877,7 @@ class ApiService {
     }>(url)
   }
 
-  /**
-   * Get all tasks associated with a milestone
-   */
-  async getMilestoneTasks(
-    milestoneId: string,
-    options: {
-      page?: number
-      page_size?: number
-      status?: ('pending' | 'in_progress' | 'completed' | 'failed')[]
-    } = {}
-  ): Promise<ApiResponse<{
-    tasks: Task[]
-    total: number
-    page: number
-    page_size: number
-    total_pages: number
-  }>> {
-    const params = new URLSearchParams()
 
-    if (options.page) params.append('page', options.page.toString())
-    if (options.page_size) params.append('page_size', options.page_size.toString())
-    if (options.status?.length) {
-      options.status.forEach(s => params.append('status', s))
-    }
-
-    const url = `/milestones/${milestoneId}/tasks${params.toString() ? '?' + params.toString() : ''}`
-
-    return this.request<{
-      tasks: Task[]
-      total: number
-      page: number
-      page_size: number
-      total_pages: number
-    }>(url)
-  }
 
   /**
    * Assign a task to a milestone
