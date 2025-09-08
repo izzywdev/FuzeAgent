@@ -43,7 +43,7 @@ export function SettingsTab({ agent, saving, setAgent, onSave }: SettingsTabProp
             </div>
             <div>
               <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Temperature</label>
-              <input type="number" value={agent.config?.temperature || agent.settings?.temperature ?? 0.7} readOnly min="0" max="2" step="0.1" style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}} />
+              <input type="number" value={agent.config?.temperature || (agent.settings?.temperature ?? 0.7)} readOnly min="0" max="2" step="0.1" style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}} />
             </div>
           </div>
           <div>
