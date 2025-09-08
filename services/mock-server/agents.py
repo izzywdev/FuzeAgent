@@ -522,3 +522,91 @@ async def get_agent_knowledge(
     ]
 
     return mock_docs
+
+@router.get("/{agent_id}/tools", response_model=List[dict])
+async def get_agent_tools(
+    agent_id: str,
+    request: Request,
+    org = Depends(get_organization_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Get tools for a specific agent.
+    """
+    # Validate agent exists and belongs to organization
+    agent = db.query(Agent).join(Team).filter(
+        and_(Agent.id == agent_id, Team.organization_id == org.id)
+    ).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Parse config to get tools
+    config = {}
+    if agent.config:
+        try:
+            config = json.loads(agent.config)
+        except:
+            config = {}
+
+    # Get tools from config or return default tools
+    tools = config.get("tools", [])
+    
+    # Convert to the format expected by the frontend
+    effective_tools = []
+    for tool_key in tools:
+        effective_tools.append({
+            "tool_id": f"tool_{tool_key}",
+            "key": tool_key,
+            "name": tool_key.replace("_", " ").title(),
+            "description": f"Tool for {tool_key.replace('_', ' ')}",
+            "enabled": True,
+            "config": {}
+        })
+
+    return effective_tools
+
+@router.put("/{agent_id}/tools/{tool_id}", response_model=dict)
+async def update_agent_tool(
+    agent_id: str,
+    tool_id: str,
+    tool_update: dict,
+    request: Request,
+    org = Depends(get_organization_from_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Update a tool for a specific agent.
+    """
+    # Validate agent exists and belongs to organization
+    agent = db.query(Agent).join(Team).filter(
+        and_(Agent.id == agent_id, Team.organization_id == org.id)
+    ).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Parse current config
+    config = {}
+    if agent.config:
+        try:
+            config = json.loads(agent.config)
+        except:
+            config = {}
+
+    # Update tools list based on tool_id and enabled status
+    tools = config.get("tools", [])
+    tool_key = tool_id.replace("tool_", "")
+    
+    if tool_update.get("enabled", True):
+        if tool_key not in tools:
+            tools.append(tool_key)
+    else:
+        tools = [t for t in tools if t != tool_key]
+    
+    config["tools"] = tools
+    agent.config = json.dumps(config)
+    agent.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(agent)
+
+    return {"message": "Tool updated successfully", "enabled": tool_update.get("enabled", True)}
