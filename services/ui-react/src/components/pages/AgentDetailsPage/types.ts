@@ -1,17 +1,23 @@
 export interface Agent {
   id: string
   name: string
-  role: string
+  role?: string
+  description?: string
   type: string
   status: string
   // Docker image to use for this agent's container. Defaults from template but can be overridden.
   container_image?: string
   // Environment variables to inject into the agent container
   container_env?: Record<string, string>
-  config: {
-    model: string
-    temperature: number
-    tools: string[]
+  // API response structure - these fields come directly from the API
+  model?: string
+  tools?: string[]
+  settings?: Record<string, any>
+  // Legacy config structure for backward compatibility
+  config?: {
+    model?: string
+    temperature?: number
+    tools?: string[]
     goal?: string
     backstory?: string
   }
@@ -19,6 +25,11 @@ export interface Agent {
   updated_at: string
   team_id?: string
   team_name?: string
+  // Additional fields from API response
+  organization_id?: string
+  task_count?: number
+  completed_tasks?: number
+  active_tasks?: number
 }
 
 export interface Task {

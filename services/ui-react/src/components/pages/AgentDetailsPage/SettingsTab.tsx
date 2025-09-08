@@ -22,28 +22,28 @@ export function SettingsTab({ agent, saving, setAgent, onSave }: SettingsTabProp
           </div>
           <div>
             <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Role</label>
-            <input type="text" value={agent.role} readOnly style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}} />
+            <input type="text" value={agent.role || agent.description || ''} readOnly style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}} />
           </div>
           <div>
             <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Goal</label>
-            <textarea value={agent.config.goal || ''} readOnly rows={3} style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem', resize: 'vertical'}} />
+            <textarea value={agent.config?.goal || agent.settings?.goal || ''} readOnly rows={3} style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem', resize: 'vertical'}} />
           </div>
           <div>
             <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Backstory</label>
-            <textarea value={agent.config.backstory || ''} readOnly rows={3} style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem', resize: 'vertical'}} />
+            <textarea value={agent.config?.backstory || agent.settings?.backstory || ''} readOnly rows={3} style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem', resize: 'vertical'}} />
           </div>
           <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
             <div>
               <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Model</label>
               <select style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}}>
-                <option value={agent.config?.model || 'claude-sonnet-4-20250514'}>{agent.config?.model || 'claude-sonnet-4-20250514'}</option>
+                <option value={agent.config?.model || agent.model || 'claude-sonnet-4-20250514'}>{agent.config?.model || agent.model || 'claude-sonnet-4-20250514'}</option>
                 <option value="claude-3-opus-20240229">claude-3-opus-20240229</option>
                 <option value="gpt-4">gpt-4</option>
               </select>
             </div>
             <div>
               <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>Temperature</label>
-              <input type="number" value={agent.config?.temperature ?? 0.7} readOnly min="0" max="2" step="0.1" style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}} />
+              <input type="number" value={agent.config?.temperature || agent.settings?.temperature ?? 0.7} readOnly min="0" max="2" step="0.1" style={{width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', fontSize: '0.875rem'}} />
             </div>
           </div>
           <div>
