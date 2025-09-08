@@ -83,6 +83,30 @@ export function TeamDetailsPage() {
   const [createTaskError, setCreateTaskError] = useState<string | null>(null)
   const [teamTasks, setTeamTasks] = useState<any[]>([])
   const [showErrorPage, setShowErrorPage] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+
+  // Load team members separately
+  useEffect(() => {
+    if (!teamId) return
+    if (!currentOrganization) return
+    
+    const loadTeamMembers = async () => {
+      try {
+        const response = await apiService.getTeamMembers(teamId)
+        if (response.ok) {
+          setTeamMembers(response.data || [])
+        } else {
+          console.error('Failed to load team members:', response.status)
+          setTeamMembers([])
+        }
+      } catch (err) {
+        console.error('Error loading team members:', err)
+        setTeamMembers([])
+      }
+    }
+    
+    loadTeamMembers()
+  }, [teamId, currentOrganization])
 
   useEffect(() => {
     if (!teamId) return
@@ -131,7 +155,7 @@ export function TeamDetailsPage() {
             color: apiData.color || '#2563eb',
             status: apiData.status || 'active',
             created: apiData.created_at || apiData.created,
-            members: Array.isArray(apiData.members) ? apiData.members : [],
+            members: teamMembers, // Use the separately loaded team members
             stats: {
               totalTasks: apiData.task_count || 0,
               completedTasks: apiData.completed_task_count || 0,
@@ -156,7 +180,7 @@ export function TeamDetailsPage() {
     }
 
     loadTeamData()
-  }, [teamId, currentOrganization])
+  }, [teamId, currentOrganization, teamMembers])
 
 
 
@@ -168,9 +192,20 @@ export function TeamDetailsPage() {
       try {
         const res = await apiService.getAgents()
         if (res.ok) {
-          setAgentsList(res.data?.results || [])
+          // Handle both old array format and new paginated format
+          let agentData = []
+          if (Array.isArray(res.data)) {
+            // Old format: direct array
+            agentData = res.data
+          } else if (res.data?.results) {
+            // New format: paginated object
+            agentData = res.data.results
+          }
+          setAgentsList(agentData)
         }
-      } catch {}
+      } catch (err) {
+        console.error('Failed to load agents for add member:', err)
+      }
     }
     loadAgents()
   }, [showAddMember, currentOrganization])
