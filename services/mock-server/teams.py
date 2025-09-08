@@ -359,9 +359,9 @@ async def add_team_member(
     db: Session = Depends(get_db)
 ):
     """
-    Add an agent to a team.
+    Move an agent to a team (from their current team).
 
-    Validates team and agent relationships.
+    Validates team and agent relationships and moves the agent.
     """
     # Validate organization exists
     org = get_organization_from_token(request, db)
@@ -375,24 +375,39 @@ async def add_team_member(
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    # Validate agent exists
-    agent = db.query(Agent).filter(Agent.id == member_request.agent_id).first()
+    # Validate agent exists and belongs to organization
+    agent = db.query(Agent).join(Team).filter(
+        and_(
+            Agent.id == member_request.agent_id,
+            Team.organization_id == org.id
+        )
+    ).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    # Check if agent is already in a team
-    if agent.team_id:
+    # Check if agent is already in this team
+    if agent.team_id == team_id:
         raise HTTPException(
             status_code=400,
-            detail="Agent is already assigned to a team. Please remove from current team first."
+            detail="Agent is already in this team."
         )
 
-    # Add agent to team
+    # Get current team name for response
+    current_team = db.query(Team).filter(Team.id == agent.team_id).first()
+    current_team_name = current_team.name if current_team else "Unknown Team"
+
+    # Move agent to new team
     agent.team_id = team_id
     agent.updated_at = datetime.utcnow()
     db.commit()
 
-    return {"message": "Agent added to team successfully", "agent_id": agent.id, "team_id": team_id}
+    return {
+        "message": f"Agent moved from {current_team_name} to {team.name} successfully", 
+        "agent_id": agent.id, 
+        "team_id": team_id,
+        "previous_team_id": current_team.id if current_team else None,
+        "previous_team_name": current_team_name
+    }
 
 @router.delete("/{team_id}/members/{agent_id}")
 async def remove_team_member(
@@ -429,6 +444,55 @@ async def remove_team_member(
     db.commit()
 
     return {"message": "Agent removed from team successfully", "agent_id": agent_id, "team_id": team_id}
+
+@router.get("/{team_id}/available-agents", response_model=List[dict])
+async def get_available_agents_for_team(
+    request: Request,
+    team_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get agents that can be moved to this team (agents from other teams in the same organization).
+    """
+    # Validate organization exists
+    org = get_organization_from_token(request, db)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    # Validate team exists and belongs to organization
+    team = db.query(Team).filter(
+        and_(Team.id == team_id, Team.organization_id == org.id)
+    ).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # Get agents from other teams in the same organization
+    agents = db.query(Agent).join(Team).filter(
+        and_(
+            Team.organization_id == org.id,
+            Agent.team_id != team_id  # Exclude agents already in this team
+        )
+    ).all()
+    
+    # Convert to response format
+    available_agents = []
+    for agent in agents:
+        # Get current team name
+        current_team = db.query(Team).filter(Team.id == agent.team_id).first()
+        current_team_name = current_team.name if current_team else "Unknown Team"
+        
+        available_agents.append({
+            "id": agent.id,
+            "name": agent.name,
+            "role": agent.role or "",
+            "type": agent.type,
+            "status": agent.status,
+            "current_team_id": agent.team_id,
+            "current_team_name": current_team_name,
+            "created_at": agent.created_at.isoformat()
+        })
+
+    return available_agents
 
 @router.get("/{team_id}/members", response_model=List[dict])
 async def get_team_members(

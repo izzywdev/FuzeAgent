@@ -184,31 +184,28 @@ export function TeamDetailsPage() {
 
 
 
-  // Load agents list for add-member modal
+  // Load available agents for add-member modal (agents from other teams)
   useEffect(() => {
     if (!showAddMember) return
     if (!currentOrganization) return
-    const loadAgents = async () => {
+    if (!teamId) return
+    
+    const loadAvailableAgents = async () => {
       try {
-        const res = await apiService.getAgents()
+        const res = await apiService.getAvailableAgentsForTeam(teamId)
         if (res.ok) {
-          // Handle both old array format and new paginated format
-          let agentData = []
-          if (Array.isArray(res.data)) {
-            // Old format: direct array
-            agentData = res.data
-          } else if (res.data?.results) {
-            // New format: paginated object
-            agentData = res.data.results
-          }
-          setAgentsList(agentData)
+          setAgentsList(res.data || [])
+        } else {
+          console.error('Failed to load available agents:', res.status)
+          setAgentsList([])
         }
       } catch (err) {
-        console.error('Failed to load agents for add member:', err)
+        console.error('Failed to load available agents for add member:', err)
+        setAgentsList([])
       }
     }
-    loadAgents()
-  }, [showAddMember, currentOrganization])
+    loadAvailableAgents()
+  }, [showAddMember, currentOrganization, teamId])
 
   // Load team tasks when tasks tab active or on open
   useEffect(() => {

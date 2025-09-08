@@ -348,6 +348,10 @@ class ApiService {
     return this.request<TeamMember[]>(`/teams/${teamId}/members`)
   }
 
+  async getAvailableAgentsForTeam(teamId: string): Promise<ApiResponse<any[]>> {
+    return this.request<any[]>(`/teams/${teamId}/available-agents`)
+  }
+
   async getTeamStats(teamId: string): Promise<ApiResponse<TeamStats>> {
     return this.request<TeamStats>(`/teams/${teamId}/stats`)
   }
