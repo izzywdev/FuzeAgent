@@ -15,7 +15,7 @@ interface Agent {
 
 export function FixedAgentsPage() {
   const apiService = useApiService()
-  const { currentOrganization } = useOrganization()
+  const { currentOrganization, loading: orgLoading } = useOrganization()
   const [agents, setAgents] = useState<Agent[]>([])
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,6 +43,14 @@ export function FixedAgentsPage() {
 
   useEffect(() => {
     const loadAgents = async () => {
+      console.log('loadAgents called, orgLoading:', orgLoading, 'currentOrganization:', currentOrganization)
+      
+      // Wait for organization context to finish loading
+      if (orgLoading) {
+        console.log('Organization context still loading, waiting...')
+        return
+      }
+      
       if (!currentOrganization) {
         console.log('No organization selected')
         setLoading(false)
@@ -50,14 +58,17 @@ export function FixedAgentsPage() {
       }
 
       try {
+        console.log('Loading agents for organization:', currentOrganization.id)
         const response = await apiService.getAgents()
+        console.log('Agents response:', response)
 
         if (response.ok) {
           const agentData = response.data?.results || []
+          console.log('Agent data:', agentData)
           setAgents(agentData)
           setFilteredAgents(agentData)
         } else {
-          console.error('Failed to load agents:', response.status)
+          console.error('Failed to load agents:', response.status, response.data)
           setAgents([])
           setFilteredAgents([])
         }
@@ -71,7 +82,7 @@ export function FixedAgentsPage() {
     }
 
     loadAgents()
-  }, [currentOrganization])
+  }, [currentOrganization, orgLoading])
 
   return (
     <div style={{minHeight: '100vh', backgroundColor: '#f9fafb'}}>

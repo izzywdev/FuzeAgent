@@ -140,7 +140,7 @@ def agent_to_response(db: Session, agent: Agent) -> AgentResponse:
         active_tasks=active_tasks
     )
 
-@router.get("/", response_model=List[AgentResponse])
+@router.get("/", response_model=dict)
 async def get_agents(
     request: Request,
     db: Session = Depends(get_db),
@@ -199,7 +199,14 @@ async def get_agents(
     # Convert to response format
     response_agents = [agent_to_response(db, agent) for agent in agents]
 
-    return response_agents
+    # Return paginated response format expected by UI
+    return {
+        "results": response_agents,
+        "total": total_count,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total_count + page_size - 1) // page_size
+    }
 
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(
