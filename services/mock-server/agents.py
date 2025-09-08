@@ -49,12 +49,12 @@ def get_organization_from_token(request: Request, db: Session = Depends(get_db))
 # Pydantic models for request/response
 class AgentCreate(BaseModel):
     name: str = Field(..., description="Name of the agent")
-    description: Optional[str] = Field(None, description="Description of the agent")
-    type: str = Field("assistant", description="Type of agent")
-    team_id: Optional[str] = Field(None, description="Team ID if agent belongs to a team")
-    model: str = Field("claude-sonnet-4-20250514", description="AI model to use")
-    tools: List[str] = Field(default_factory=list, description="Available tools")
-    settings: Dict[str, Any] = Field(default_factory=dict, description="Agent settings")
+    role: Optional[str] = Field(None, description="Role of the agent")
+    type: str = Field("developer", description="Type of agent")
+    team_id: str = Field(..., description="Team ID if agent belongs to a team")
+    container_image: Optional[str] = Field(None, description="Docker container image")
+    container_env: Optional[Dict[str, str]] = Field(default_factory=dict, description="Container environment variables")
+    config: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Agent configuration")
     status: str = Field("active", description="Agent status")
 
 class AgentUpdate(BaseModel):
@@ -69,6 +69,7 @@ class AgentUpdate(BaseModel):
 
 class AgentResponse(BaseModel):
     id: str
+    agent_id: Optional[str] = None  # For UI compatibility
     name: str
     description: Optional[str]
     type: str
@@ -121,6 +122,7 @@ def agent_to_response(db: Session, agent: Agent) -> AgentResponse:
 
     return AgentResponse(
         id=agent.id,
+        agent_id=agent.id,  # For UI compatibility
         name=agent.name,
         description=agent.role,  # Map role to description
         type=agent.type,
@@ -243,25 +245,30 @@ async def create_agent(
             raise HTTPException(status_code=404, detail="Team not found")
 
     # Create agent
+    config_data = agent.config or {}
+    config_data.update({
+        "container_image": agent.container_image,
+        "container_env": agent.container_env or {}
+    })
+    
     db_agent = Agent(
         id=str(uuid.uuid4()),
         team_id=agent.team_id,
         name=agent.name,
-        role=agent.description,  # Map description to role field
+        role=agent.role,
         type=agent.type,
         status=agent.status,
-        config=json.dumps({
-            "model": agent.model,
-            "tools": agent.tools,
-            "settings": agent.settings
-        })
+        config=json.dumps(config_data)
     )
 
     db.add(db_agent)
     db.commit()
     db.refresh(db_agent)
 
-    return agent_to_response(db, db_agent)
+    response_data = agent_to_response(db, db_agent)
+    # Add agent_id field for UI compatibility
+    response_data.agent_id = response_data.id
+    return response_data
 
 @router.put("/{agent_id}", response_model=AgentResponse)
 async def update_agent(

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { EnvEditor } from '../common/EnvEditor'
 import { useOrganization } from '../../contexts/OrganizationContext'
@@ -32,6 +32,7 @@ export function CreateAgentPage() {
   const [templates, setTemplates] = useState<AgentTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const loadingRef = useRef(false)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -52,6 +53,12 @@ export function CreateAgentPage() {
 
   useEffect(() => {
     const loadData = async () => {
+      // Prevent duplicate calls in React StrictMode
+      if (loadingRef.current) {
+        return
+      }
+      loadingRef.current = true
+      
       try {
         // Load teams for the current organization
         if (currentOrganization) {
@@ -72,7 +79,16 @@ export function CreateAgentPage() {
         }
 
         // Load agent templates
-        const templatesResponse = await apiService.getAgentTemplates()
+        console.log('Loading agent templates...')
+        let templatesResponse
+        try {
+          templatesResponse = await apiService.getAgentTemplates()
+          console.log('Templates response:', templatesResponse)
+        } catch (error) {
+          console.error('Error loading templates:', error)
+          setTemplates([])
+          return
+        }
         if (templatesResponse.ok) {
           const data = templatesResponse.data
           if (data && data.templates && Array.isArray(data.templates)) {
@@ -124,11 +140,12 @@ export function CreateAgentPage() {
         setTemplates([])
       } finally {
         setLoading(false)
+        loadingRef.current = false
       }
     }
 
     loadData()
-  }, [currentOrganization, apiService])
+  }, [currentOrganization])
 
   // Templates will be fetched from API
 
@@ -193,14 +210,19 @@ export function CreateAgentPage() {
 
   useEffect(() => {
     const tid = formData.team_id
-    if (!tid) { 
+    if (!tid || !currentOrganization) { 
       setTeamTools([])
       return 
     }
     
     const loadTeamTools = async () => {
       try {
+        console.log('Loading team tools for team:', tid)
+        console.log('Current organization:', currentOrganization?.id)
+        console.log('Organization token set:', !!apiService.getOrganizationToken())
+        
         const response = await apiService.getTeamTools(tid)
+        console.log('Team tools response:', response)
         if (response.ok && Array.isArray(response.data)) {
           setTeamTools(response.data)
         } else {
@@ -213,7 +235,7 @@ export function CreateAgentPage() {
     }
     
     loadTeamTools()
-  }, [formData.team_id, apiService])
+  }, [formData.team_id, currentOrganization])
 
   if (loading) {
     return (

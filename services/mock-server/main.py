@@ -5,7 +5,7 @@ Main FastAPI application for the mock server.
 import logging
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 # Configure logging
@@ -30,9 +30,10 @@ try:
     from tasks import router as tasks_router
     from milestones import router as milestones_router
     from agent_templates import router as agent_templates_router
-    logger.info("All routers imported successfully")
+    from websocket_handler import websocket_manager
+    logger.info("All routers and WebSocket handler imported successfully")
 except ImportError as e:
-    logger.error(f"Failed to import routers: {e}")
+    logger.error(f"Failed to import routers or WebSocket handler: {e}")
     raise
 
 # Create FastAPI app
@@ -103,6 +104,32 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+# ============================================================================
+# WebSocket Endpoints
+# ============================================================================
+
+@app.websocket("/ws/agents/{agent_id}/conversations/{conversation_id}")
+async def websocket_agent_conversation(websocket: WebSocket, agent_id: str, conversation_id: str):
+    """WebSocket endpoint for agent conversation chat"""
+    connection_id = None
+    
+    try:
+        connection_id = await websocket_manager.connect(websocket, agent_id, conversation_id)
+        
+        # Keep connection alive and handle messages
+        while True:
+            try:
+                message = await websocket.receive_text()
+                await websocket_manager.handle_message(websocket, message, agent_id, conversation_id)
+            except WebSocketDisconnect:
+                break
+                
+    except Exception as e:
+        logger.error(f"WebSocket error for agent {agent_id}, conversation {conversation_id}: {e}")
+    finally:
+        if connection_id:
+            await websocket_manager.disconnect(connection_id)
 
 if __name__ == "__main__":
     import uvicorn

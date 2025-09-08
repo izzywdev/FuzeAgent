@@ -175,6 +175,71 @@ class Milestone(Base):
 # Create all tables
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    # Initialize with sample data if database is empty
+    _initialize_sample_data()
+
+def _initialize_sample_data():
+    """Initialize database with sample data if it's empty."""
+    db = SessionLocal()
+    try:
+        # Check if we already have data
+        existing_orgs = db.query(Organization).count()
+        if existing_orgs > 0:
+            return  # Database already has data
+        
+        # Create sample organization
+        sample_org = Organization(
+            id="a50af4d0-27f1-40ae-aea0-e847dc5c4ba9",
+            name="Demo Organization",
+            description="A demo organization for testing FuzeAgent",
+            industry="Technology",
+            size="Medium",
+            founded="2024",
+            website="https://demo.fuzeagent.com",
+            settings="{}",
+            team_count=0,
+            agent_count=0
+        )
+        db.add(sample_org)
+        
+        # Create sample team
+        sample_team = Team(
+            id="team-1",
+            organization_id=sample_org.id,
+            name="Development Team",
+            description="Main development team",
+            team_type="development",
+            color="#2563eb",
+            status="active",
+            settings="{}"
+        )
+        db.add(sample_team)
+        
+        # Create sample agent
+        sample_agent = Agent(
+            id="agent-1",
+            team_id=sample_team.id,
+            name="Sample Agent",
+            role="Senior Developer",
+            type="developer",
+            status="active",
+            config='{"model": "claude-sonnet-4-20250514", "tools": [], "settings": {}}',
+            template_id=None
+        )
+        db.add(sample_agent)
+        
+        # Update counts
+        sample_org.team_count = 1
+        sample_org.agent_count = 1
+        
+        db.commit()
+        print("Sample data initialized successfully")
+        
+    except Exception as e:
+        print(f"Error initializing sample data: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 # Dependency to get database session
 def get_db():

@@ -49,11 +49,11 @@ AGENT_TEMPLATES = [
     }
 ]
 
-@router.get("/", response_model=List[Dict[str, Any]])
+@router.get("/", response_model=Dict[str, Any])
 async def get_agent_templates():
     """Get all available agent templates"""
     logger.info("GET /agent-templates - Retrieving all agent templates")
-    return AGENT_TEMPLATES
+    return {"templates": AGENT_TEMPLATES}
 
 @router.get("/{template_id}")
 async def get_agent_template(template_id: str):

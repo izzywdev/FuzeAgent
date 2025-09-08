@@ -128,6 +128,13 @@ class ApiService {
   }
 
   /**
+   * Get the current organization token
+   */
+  getOrganizationToken(): string | null {
+    return this.organizationToken
+  }
+
+  /**
    * Make an API request with organization context
    */
   private async request<T>(
@@ -158,7 +165,26 @@ class ApiService {
       headers
     })
     
-    const data = response.ok ? await response.json() : null
+    let data = null
+    if (response.ok) {
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json()
+        } else {
+          // If not JSON, try to parse as text
+          const text = await response.text()
+          console.warn('Non-JSON response received for URL:', fullUrl)
+          console.warn('Content-Type:', contentType)
+          console.warn('Response text (first 200 chars):', text.substring(0, 200))
+          data = null
+        }
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON for URL:', fullUrl)
+        console.error('Parse error:', parseError)
+        data = null
+      }
+    }
     
     return {
       data,

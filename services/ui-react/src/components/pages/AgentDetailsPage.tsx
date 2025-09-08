@@ -278,10 +278,15 @@ export function AgentDetailsPage(): React.ReactElement {
           // Create a default conversation immediately to persist state
           const created = await fetch(`/agents/${agentId}/conversations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `Conversation with ${agent?.name || 'Agent'}` }) })
           if (created.ok) {
-            const c = await created.json()
-            setSelectedConversation(c)
-            await loadConversationMessages(c.id)
-            startChatWebSocket(c.id)
+            try {
+              const c = await created.json()
+              setSelectedConversation(c)
+              await loadConversationMessages(c.id)
+              startChatWebSocket(c.id)
+            } catch (parseError) {
+              console.error('Failed to parse conversation creation response:', parseError)
+              return
+            }
           }
         }
       } else {
@@ -311,12 +316,17 @@ export function AgentDetailsPage(): React.ReactElement {
       })
       
       if (response.ok) {
-        const conversation = await response.json()
-        setSelectedConversation(conversation)
-        setChatMessages([])
-        
-        // Start WebSocket connection
-        startChatWebSocket(conversation.id)
+        try {
+          const conversation = await response.json()
+          setSelectedConversation(conversation)
+          setChatMessages([])
+          
+          // Start WebSocket connection
+          startChatWebSocket(conversation.id)
+        } catch (parseError) {
+          console.error('Failed to parse conversation creation response:', parseError)
+          return
+        }
         
         // created
       } else {
@@ -402,9 +412,13 @@ export function AgentDetailsPage(): React.ReactElement {
     try {
       const response = await fetch(`/knowledge/agents/${agentId}/documents/${doc.id}/content`)
       if (response.ok) {
-        const data = await response.json()
-        setDocumentContent(data.content)
-        setShowDocumentViewer(true)
+        try {
+          const data = await response.json()
+          setDocumentContent(data.content)
+          setShowDocumentViewer(true)
+        } catch (parseError) {
+          console.error('Failed to parse document content response:', parseError)
+        }
       } else {
         console.error('Failed to load document content')
       }
@@ -547,9 +561,14 @@ export function AgentDetailsPage(): React.ReactElement {
     try {
       const response = await fetch(`/agents/${agentId}/container/logs`)
       if (response.ok) {
-        const data = await response.json()
-        setContainerLogs(data.logs || [])
-        setShowContainerLogs(true)
+        try {
+          const data = await response.json()
+          setContainerLogs(data.logs || [])
+          setShowContainerLogs(true)
+        } catch (parseError) {
+          console.error('Failed to parse container logs response:', parseError)
+          return
+        }
         
         // Auto-start live logs if requested
         if (autoStartLive && !isLiveLogsActive) {
@@ -717,18 +736,23 @@ export function AgentDetailsPage(): React.ReactElement {
     try {
       const response = await fetch(`/agents/${agentId}/conversations`)
       if (response.ok) {
-        const list = await response.json()
-        setConversationsList(Array.isArray(list) ? list : [])
-        // Auto-select a conversation if none selected
-        if (!selectedConversation && Array.isArray(list) && list.length > 0) {
-          const first = list[0]
-          setSelectedConversation(first)
-          // Optimistically load any nested messages if the server returned them
-          if ((first as any)?.messages && Array.isArray((first as any).messages)) {
-            setChatMessages((first as any).messages)
+        try {
+          const list = await response.json()
+          setConversationsList(Array.isArray(list) ? list : [])
+          // Auto-select a conversation if none selected
+          if (!selectedConversation && Array.isArray(list) && list.length > 0) {
+            const first = list[0]
+            setSelectedConversation(first)
+            // Optimistically load any nested messages if the server returned them
+            if ((first as any)?.messages && Array.isArray((first as any).messages)) {
+              setChatMessages((first as any).messages)
+            }
+            await loadConversationMessages(first.id)
           }
-          await loadConversationMessages(first.id)
-          startChatWebSocket(first.id)
+        } catch (parseError) {
+          console.error('Failed to parse conversations response:', parseError)
+          setConversationsList([])
+          return
         }
       }
     } finally {
