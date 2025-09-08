@@ -184,8 +184,13 @@ def _initialize_sample_data():
     try:
         # Check if we already have data
         existing_orgs = db.query(Organization).count()
+        print(f"Existing organizations in database: {existing_orgs}")
+        
         if existing_orgs > 0:
+            print("Database already has data, skipping initialization")
             return  # Database already has data
+        
+        print("Initializing sample data...")
         
         # Create sample organization
         sample_org = Organization(
@@ -201,6 +206,7 @@ def _initialize_sample_data():
             agent_count=0
         )
         db.add(sample_org)
+        print(f"Created sample organization: {sample_org.name} ({sample_org.id})")
         
         # Create sample team
         sample_team = Team(
@@ -214,6 +220,7 @@ def _initialize_sample_data():
             settings="{}"
         )
         db.add(sample_team)
+        print(f"Created sample team: {sample_team.name} ({sample_team.id})")
         
         # Create sample agent
         sample_agent = Agent(
@@ -227,6 +234,7 @@ def _initialize_sample_data():
             template_id=None
         )
         db.add(sample_agent)
+        print(f"Created sample agent: {sample_agent.name} ({sample_agent.id})")
         
         # Update counts
         sample_org.team_count = 1

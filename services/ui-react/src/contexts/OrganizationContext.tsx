@@ -53,31 +53,49 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       setLoading(true)
       setError(null)
 
+      console.log('Loading organizations...')
       // Load all organizations
       const response = await apiService.getOrganizations()
+      console.log('Organizations response:', response)
+      
       if (response.ok) {
         // Add tokens to organizations for token-based auth
         const orgsWithTokens = (Array.isArray(response.data) ? response.data : []).map((org: any) => ({
           ...org,
           token: org.token || `org-token-${org.id}` // Generate token if not provided
         }))
+        console.log('Organizations with tokens:', orgsWithTokens)
         setOrganizations(orgsWithTokens)
 
         // Restore selected organization from localStorage
         const selectedOrgId = localStorage.getItem('selectedOrganizationId')
+        console.log('Selected org ID from localStorage:', selectedOrgId)
+        
         if (selectedOrgId && orgsWithTokens.length > 0) {
           const selectedOrg = orgsWithTokens.find((org: Organization) => org.id === selectedOrgId)
+          console.log('Found selected org:', selectedOrg)
           if (selectedOrg) {
             setCurrentOrganization(selectedOrg)
             // Set organization token in API service
             apiService.setOrganizationToken(selectedOrg.token)
+            console.log('Set current organization:', selectedOrg.name)
           } else {
             // Selected organization no longer exists, clear selection
+            console.log('Selected organization no longer exists, clearing selection')
             localStorage.removeItem('selectedOrganizationId')
             apiService.setOrganizationToken(null)
           }
+        } else if (orgsWithTokens.length > 0) {
+          // No organization selected, but we have organizations available
+          // Auto-select the first one for demo purposes
+          console.log('No organization selected, auto-selecting first available:', orgsWithTokens[0])
+          const firstOrg = orgsWithTokens[0]
+          setCurrentOrganization(firstOrg)
+          localStorage.setItem('selectedOrganizationId', firstOrg.id)
+          apiService.setOrganizationToken(firstOrg.token)
         }
       } else {
+        console.error('Failed to load organizations:', response.status, response.data)
         setError('Failed to load organizations')
       }
     } catch (err) {
