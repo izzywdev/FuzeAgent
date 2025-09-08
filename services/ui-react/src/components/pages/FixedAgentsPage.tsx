@@ -63,8 +63,23 @@ export function FixedAgentsPage() {
         console.log('Agents response:', response)
 
         if (response.ok) {
-          const agentData = response.data?.results || []
-          console.log('Agent data:', agentData)
+          console.log('Raw response.data:', response.data)
+          console.log('response.data type:', typeof response.data)
+          console.log('response.data is array:', Array.isArray(response.data))
+          
+          // Handle both old array format and new paginated format
+          let agentData = []
+          if (Array.isArray(response.data)) {
+            // Old format: direct array
+            agentData = response.data
+            console.log('Using old array format, agentData:', agentData)
+          } else if (response.data?.results) {
+            // New format: paginated object
+            agentData = response.data.results
+            console.log('Using new paginated format, agentData:', agentData)
+          }
+          
+          console.log('Final agent data:', agentData)
           setAgents(agentData)
           setFilteredAgents(agentData)
         } else {
