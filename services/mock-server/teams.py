@@ -438,12 +438,13 @@ async def remove_team_member(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found in this team")
 
-    # Remove agent from team
-    agent.team_id = None
-    agent.updated_at = datetime.utcnow()
-    db.commit()
-
-    return {"message": "Agent removed from team successfully", "agent_id": agent_id, "team_id": team_id}
+    # Note: In this system, agents must always be assigned to a team
+    # So "removing" an agent from a team means moving them to a default team
+    # For now, we'll just return an error since this operation isn't supported
+    raise HTTPException(
+        status_code=400,
+        detail="Cannot remove agent from team. Agents must always be assigned to a team. Use 'Move Agent' instead."
+    )
 
 @router.get("/{team_id}/available-agents", response_model=List[dict])
 async def get_available_agents_for_team(
