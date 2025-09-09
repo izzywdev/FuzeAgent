@@ -6,9 +6,6 @@ import type {
   Team,
   TeamCreate,
   TeamUpdate,
-  TeamFilters,
-  PaginatedTeamsResponse,
-  AddTeamMemberRequest,
   TeamMember,
   TeamStats,
   Agent,
@@ -40,6 +37,14 @@ interface ApiResponse<T> {
   data: T
   status: number
   ok: boolean
+}
+
+interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+  pages: number
 }
 
 interface KnowledgeDocument {
@@ -79,6 +84,13 @@ interface Message {
   timestamp: string
 }
 
+interface ChatMessage {
+  id: string
+  content: string
+  role: string
+  timestamp: string
+}
+
 interface Tool {
   id: string
   name: string
@@ -111,7 +123,7 @@ interface Goal {
 
 class ApiService {
   private organizationToken: string | null = null
-  private baseUrl: string = 'http://localhost:8001' // Default orchestrator URL
+  private baseUrl: string = 'http://localhost:8001' // New mock server URL
 
   /**
    * Set the current organization token for all API calls
@@ -216,8 +228,25 @@ class ApiService {
   // ORGANIZATIONS
   // ============================================================================
 
-  async getOrganizations(): Promise<ApiResponse<Organization[]>> {
-    return this.request<Organization[]>('/organizations')
+  async getOrganizations(filters?: {
+    page?: number
+    size?: number
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+    search?: string
+  }): Promise<ApiResponse<PaginatedResponse<Organization>>> {
+    const params = new URLSearchParams()
+    
+    if (filters?.page) params.append('page', filters.page.toString())
+    if (filters?.size) params.append('size', filters.size.toString())
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by)
+    if (filters?.sort_order) params.append('sort_order', filters.sort_order)
+    if (filters?.search) params.append('q', filters.search)
+
+    const queryString = params.toString()
+    const url = queryString ? `/organizations?${queryString}` : '/organizations'
+    
+    return this.request<PaginatedResponse<Organization>>(url)
   }
 
   async getOrganization(id: string): Promise<ApiResponse<Organization>> {
@@ -240,8 +269,8 @@ class ApiService {
     })
   }
 
-  async deleteOrganization(id: string): Promise<ApiResponse<boolean>> {
-    return this.request<boolean>(`/organizations/${id}`, {
+  async deleteOrganization(id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/organizations/${id}`, {
       method: 'DELETE'
     })
   }
@@ -273,36 +302,38 @@ class ApiService {
   async getTeams(
     filters?: {
       page?: number
-      page_size?: number
+      size?: number
       status?: string[]
       team_type?: string[]
       search?: string
       sort_by?: string
       sort_order?: 'asc' | 'desc'
+      organization_id?: string
     }
-  ): Promise<ApiResponse<PaginatedTeamsResponse>> {
+  ): Promise<ApiResponse<PaginatedResponse<Team>>> {
     const params = new URLSearchParams()
 
     // Only add parameters if they have valid values
     if (filters?.page && filters.page > 0) params.append('page', filters.page.toString())
-    if (filters?.page_size && filters.page_size > 0) params.append('page_size', filters.page_size.toString())
+    if (filters?.size && filters.size > 0) params.append('size', filters.size.toString())
     if (filters?.status?.length) filters.status.forEach(s => params.append('status', s))
     if (filters?.team_type?.length) filters.team_type.forEach(t => params.append('team_type', t))
-    if (filters?.search && filters.search.trim() && typeof filters.search === 'string') params.append('search', filters.search)
+    if (filters?.search && filters.search.trim() && typeof filters.search === 'string') params.append('q', filters.search)
     if (filters?.sort_by && filters.sort_by.trim()) params.append('sort_by', filters.sort_by)
     if (filters?.sort_order && filters.sort_order.trim()) params.append('sort_order', filters.sort_order)
+    if (filters?.organization_id) params.append('organization_id', filters.organization_id)
 
     const queryString = params.toString()
     const url = queryString ? `/teams?${queryString}` : '/teams'
 
-    return this.request<PaginatedTeamsResponse>(url)
+    return this.request<PaginatedResponse<Team>>(url)
   }
 
   async getTeam(teamId: string): Promise<ApiResponse<Team>> {
     return this.request<Team>(`/teams/${teamId}`)
   }
 
-  async createTeam(data: TeamCreate): Promise<ApiResponse<Team>> {
+  async createTeam(data: TeamCreate & { organization_id: string }): Promise<ApiResponse<Team>> {
     return this.request<Team>('/teams', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -361,10 +392,9 @@ class ApiService {
   // ============================================================================
 
   async getTasks(
-    orgId: string,
     filters?: {
       page?: number;
-      page_size?: number;
+      size?: number;
       status?: string[];
       priority?: string[];
       team_id?: string;
@@ -380,7 +410,7 @@ class ApiService {
     const params = new URLSearchParams();
 
     if (filters?.page) params.append('page', filters.page.toString());
-    if (filters?.page_size) params.append('page_size', filters.page_size.toString());
+    if (filters?.size) params.append('size', filters.size.toString());
     if (filters?.status?.length) filters.status.forEach(s => params.append('status', s));
     if (filters?.priority?.length) filters.priority.forEach(p => params.append('priority', p));
     if (filters?.team_id) params.append('team_id', filters.team_id);
@@ -388,33 +418,32 @@ class ApiService {
     if (filters?.milestone_id) params.append('milestone_id', filters.milestone_id);
     if (filters?.date_from) params.append('date_from', filters.date_from);
     if (filters?.date_to) params.append('date_to', filters.date_to);
-    if (filters?.search) params.append('search', filters.search);
+    if (filters?.search) params.append('q', filters.search);
     if (filters?.sort_by) params.append('sort_by', filters.sort_by);
     if (filters?.sort_order) params.append('sort_order', filters.sort_order);
 
     const queryString = params.toString();
-    const url = `/organizations/${orgId}/tasks${queryString ? `?${queryString}` : ''}`;
+    const url = `/tasks${queryString ? `?${queryString}` : ''}`;
 
     return this.request<PaginatedResponse<Task>>(url);
   }
 
-  async getTask(orgId: string, taskId: string): Promise<ApiResponse<Task>> {
-    return this.request<Task>(`/organizations/${orgId}/tasks/${taskId}`);
+  async getTask(taskId: string): Promise<ApiResponse<Task>> {
+    return this.request<Task>(`/tasks/${taskId}`);
   }
 
   async createTask(
-    orgId: string,
     data: {
       title: string;
       description?: string;
-      priority?: 'low' | 'medium' | 'high' | 'critical';
-      status?: 'pending' | 'in_progress' | 'completed' | 'failed';
-      team_id?: string;
+      priority?: 'low' | 'medium' | 'high';
+      status?: 'pending' | 'in_progress' | 'blocked' | 'closed' | 'closed_approved';
+      team_id: string;
       agent_id?: string;
       milestone_id?: string;
     }
   ): Promise<ApiResponse<Task>> {
-    return this.request<Task>(`/organizations/${orgId}/tasks`, {
+    return this.request<Task>('/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -422,34 +451,34 @@ class ApiService {
   }
 
   async updateTask(
-    orgId: string,
     taskId: string,
     data: {
       title?: string;
       description?: string;
-      priority?: 'low' | 'medium' | 'high' | 'critical';
-      status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+      priority?: 'low' | 'medium' | 'high';
+      status?: 'pending' | 'in_progress' | 'blocked' | 'closed' | 'closed_approved';
       team_id?: string;
       agent_id?: string;
       milestone_id?: string;
-      result?: string;
+      progress_pct?: number;
+      progress_notes?: string;
     }
   ): Promise<ApiResponse<Task>> {
-    return this.request<Task>(`/organizations/${orgId}/tasks/${taskId}`, {
+    return this.request<Task>(`/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
   }
 
-  async deleteTask(orgId: string, taskId: string): Promise<ApiResponse<void>> {
-    return this.request<void>(`/organizations/${orgId}/tasks/${taskId}`, {
+  async deleteTask(taskId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/tasks/${taskId}`, {
       method: 'DELETE'
     });
   }
 
-  async executeTask(orgId: string, taskId: string): Promise<ApiResponse<{ message: string; task_id: string }>> {
-    return this.request<{ message: string; task_id: string }>(`/organizations/${orgId}/tasks/${taskId}/execute`, {
+  async executeTask(taskId: string): Promise<ApiResponse<{ message: string; task_id: string }>> {
+    return this.request<{ message: string; task_id: string }>(`/tasks/${taskId}/execute`, {
       method: 'POST'
     });
   }
@@ -484,7 +513,7 @@ class ApiService {
 
   async getAgents(filters?: {
     page?: number
-    page_size?: number
+    size?: number
     status?: string[]
     type?: string[]
     team_id?: string
@@ -496,11 +525,11 @@ class ApiService {
 
     // Only add parameters if they have valid values
     if (filters?.page && filters.page > 0) params.append('page', filters.page.toString())
-    if (filters?.page_size && filters.page_size > 0) params.append('page_size', filters.page_size.toString())
+    if (filters?.size && filters.size > 0) params.append('size', filters.size.toString())
     if (filters?.status?.length) filters.status.forEach(s => params.append('status', s))
     if (filters?.type?.length) filters.type.forEach(t => params.append('type', t))
     if (filters?.team_id && filters.team_id.trim()) params.append('team_id', filters.team_id)
-    if (filters?.search && filters.search.trim() && typeof filters.search === 'string') params.append('search', filters.search)
+    if (filters?.search && filters.search.trim() && typeof filters.search === 'string') params.append('q', filters.search)
     if (filters?.sort_by && filters.sort_by.trim()) params.append('sort_by', filters.sort_by)
     if (filters?.sort_order && filters.sort_order.trim()) params.append('sort_order', filters.sort_order)
 
@@ -574,10 +603,6 @@ class ApiService {
     return this.request<Message[]>(`/agents/${agentId}/conversations/${conversationId}/messages`)
   }
 
-  async getAgentContainerStatus(id: string): Promise<ApiResponse<ContainerInfo>> {
-    return this.request<ContainerInfo>(`/agents/${id}/container/status`)
-  }
-
   async getAgentContainerLogs(id: string): Promise<ApiResponse<ContainerLogs>> {
     return this.request<ContainerLogs>(`/agents/${id}/container/logs`)
   }
@@ -598,15 +623,46 @@ class ApiService {
   // GOALS
   // ============================================================================
 
-  async getGoals(organizationId: string): Promise<ApiResponse<Goal[]>> {
-    return this.request<Goal[]>(`/organizations/${organizationId}/goals`)
+  async getGoals(filters?: {
+    page?: number
+    size?: number
+    organization_id?: string
+    status?: string[]
+    priority?: string[]
+    search?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+  }): Promise<ApiResponse<PaginatedResponse<Goal>>> {
+    const params = new URLSearchParams()
+    
+    if (filters?.page) params.append('page', filters.page.toString())
+    if (filters?.size) params.append('size', filters.size.toString())
+    if (filters?.organization_id) params.append('organization_id', filters.organization_id)
+    if (filters?.status?.length) filters.status.forEach(s => params.append('status', s))
+    if (filters?.priority?.length) filters.priority.forEach(p => params.append('priority', p))
+    if (filters?.search) params.append('q', filters.search)
+    if (filters?.sort_by) params.append('sort_by', filters.sort_by)
+    if (filters?.sort_order) params.append('sort_order', filters.sort_order)
+
+    const queryString = params.toString()
+    const url = queryString ? `/goals?${queryString}` : '/goals'
+    
+    return this.request<PaginatedResponse<Goal>>(url)
   }
 
   async getGoal(id: string): Promise<ApiResponse<Goal>> {
     return this.request<Goal>(`/goals/${id}`)
   }
 
-  async createGoal(data: Partial<Goal>): Promise<ApiResponse<Goal>> {
+  async createGoal(data: {
+    organization_id: string
+    title: string
+    description?: string
+    priority?: 'low' | 'medium' | 'high' | 'critical'
+    status?: 'planning' | 'active' | 'completed' | 'on_hold'
+    target_completion_date?: string
+    progress_percentage?: number
+  }): Promise<ApiResponse<Goal>> {
     return this.request<Goal>('/goals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -614,7 +670,14 @@ class ApiService {
     })
   }
 
-  async updateGoal(id: string, data: Partial<Goal>): Promise<ApiResponse<Goal>> {
+  async updateGoal(id: string, data: {
+    title?: string
+    description?: string
+    priority?: 'low' | 'medium' | 'high' | 'critical'
+    status?: 'planning' | 'active' | 'completed' | 'on_hold'
+    target_completion_date?: string
+    progress_percentage?: number
+  }): Promise<ApiResponse<Goal>> {
     return this.request<Goal>(`/goals/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -622,8 +685,8 @@ class ApiService {
     })
   }
 
-  async deleteGoal(id: string): Promise<ApiResponse<boolean>> {
-    return this.request<boolean>(`/goals/${id}`, {
+  async deleteGoal(id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/goals/${id}`, {
       method: 'DELETE'
     })
   }
@@ -632,10 +695,11 @@ class ApiService {
 
   // Legacy method for backward compatibility - use createTask instead
   async createTeamTask(teamId: string, data: { title: string; description: string; priority?: string }): Promise<ApiResponse<Task>> {
-    // Note: This method needs organization context, but for backward compatibility we'll use a default org
-    // In production, this should be updated to accept orgId parameter
-    const orgId = '1'; // Default organization ID for backward compatibility
-    return this.createTask(orgId, { ...data, team_id: teamId });
+    return this.createTask({ 
+      ...data, 
+      team_id: teamId,
+      priority: data.priority as 'low' | 'medium' | 'high' || 'medium'
+    });
   }
 
 
@@ -851,9 +915,8 @@ class ApiService {
   async createMilestone(data: {
     goal_id: string
     title: string
-    description: string
-    priority?: 'low' | 'medium' | 'high' | 'critical'
-    target_date: string
+    status?: 'planned' | 'in_progress' | 'completed' | 'on_hold' | 'cancelled'
+    due_date?: string
   }): Promise<ApiResponse<Milestone>> {
     return this.request<Milestone>('/milestones', {
       method: 'POST',
@@ -876,11 +939,8 @@ class ApiService {
     milestoneId: string,
     data: {
       title?: string
-      description?: string
-      status?: 'not_started' | 'in_progress' | 'completed' | 'blocked' | 'cancelled'
-      priority?: 'low' | 'medium' | 'high' | 'critical'
-      progress_percentage?: number
-      target_date?: string
+      status?: 'planned' | 'in_progress' | 'completed' | 'on_hold' | 'cancelled'
+      due_date?: string
     }
   ): Promise<ApiResponse<Milestone>> {
     return this.request<Milestone>(`/milestones/${milestoneId}`, {
@@ -893,8 +953,8 @@ class ApiService {
   /**
    * Delete a milestone
    */
-  async deleteMilestone(milestoneId: string): Promise<ApiResponse<void>> {
-    return this.request<void>(`/milestones/${milestoneId}`, {
+  async deleteMilestone(milestoneId: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/milestones/${milestoneId}`, {
       method: 'DELETE'
     })
   }
@@ -904,46 +964,28 @@ class ApiService {
    */
   async getMilestones(options: {
     page?: number
-    page_size?: number
+    size?: number
     goal_id?: string
-    status?: ('not_started' | 'in_progress' | 'completed' | 'blocked' | 'cancelled')[]
-    priority?: ('low' | 'medium' | 'high' | 'critical')[]
+    status?: ('planned' | 'in_progress' | 'completed' | 'on_hold' | 'cancelled')[]
     search?: string
-    sort_by?: 'created_at' | 'target_date' | 'priority' | 'progress_percentage' | 'title'
+    sort_by?: 'created_at' | 'due_date' | 'title'
     sort_order?: 'asc' | 'desc'
-  } = {}): Promise<ApiResponse<{
-    milestones: Milestone[]
-    total: number
-    page: number
-    page_size: number
-    total_pages: number
-    filters?: any
-  }>> {
+  } = {}): Promise<ApiResponse<PaginatedResponse<Milestone>>> {
     const params = new URLSearchParams()
 
     if (options.page) params.append('page', options.page.toString())
-    if (options.page_size) params.append('page_size', options.page_size.toString())
+    if (options.size) params.append('size', options.size.toString())
     if (options.goal_id) params.append('goal_id', options.goal_id)
     if (options.status?.length) {
       options.status.forEach(s => params.append('status', s))
     }
-    if (options.priority?.length) {
-      options.priority.forEach(p => params.append('priority', p))
-    }
-    if (options.search) params.append('search', options.search)
+    if (options.search) params.append('q', options.search)
     if (options.sort_by) params.append('sort_by', options.sort_by)
     if (options.sort_order) params.append('sort_order', options.sort_order)
 
     const url = `/milestones${params.toString() ? '?' + params.toString() : ''}`
 
-    return this.request<{
-      milestones: Milestone[]
-      total: number
-      page: number
-      page_size: number
-      total_pages: number
-      filters?: any
-    }>(url)
+    return this.request<PaginatedResponse<Milestone>>(url)
   }
 
 
@@ -973,7 +1015,7 @@ class ApiService {
     const response = await this.getMilestones({ goal_id: goalId })
     if (response.ok) {
       return {
-        data: response.data.milestones,
+        data: response.data.items,
         status: response.status,
         ok: response.ok
       }
@@ -1005,7 +1047,7 @@ class ApiService {
   // DASHBOARD DATA
   // ============================================================================
 
-  async getDashboardData(orgId: string): Promise<{
+  async getDashboardData(): Promise<{
     agents: Agent[]
     teams: Team[]
     organizations: Organization[]
@@ -1029,9 +1071,9 @@ class ApiService {
     }
 
     return {
-      agents: agentsResponse.data?.results || [],
-      teams: teamsResponse.data?.results || [],
-      organizations: orgsResponse.data || []
+      agents: agentsResponse.data?.items || [],
+      teams: teamsResponse.data?.items || [],
+      organizations: orgsResponse.data?.items || []
     }
   }
 }
