@@ -1,22 +1,41 @@
-version: '3.8'
+version: '3.9'
 
 services:
   mock-server:
     build: .
     ports:
       - "8001:8000"
-    volumes:
-      - mock_data:/app/data
     environment:
-      - DATABASE_URL=sqlite:///./data/mock_data_v2.db
+      - DATABASE_URL=postgresql://ariWeinberg:ariWeinberg@postgres:5432/ariWeinberg
+    depends_on:
+      - postgres
+    networks:
+      - mock-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 40s
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ariWeinberg
+      POSTGRES_USER: ariWeinberg
+      POSTGRES_PASSWORD: ariWeinberg
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mock-network
+    restart: unless-stopped
 
 volumes:
-  mock_data:
-    driver: local
+  postgres_data:
+
+networks:
+  mock-network:
+    driver: bridge

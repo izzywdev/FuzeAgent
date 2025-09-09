@@ -1,261 +1,66 @@
 """
-Database configuration and models for the mock server.
-Uses SQLite with SQLAlchemy for persistence.
+Database configuration and session management for FuzeAgent Mock Server
 """
-
-from sqlalchemy import create_engine, Column, String, Integer, DateTime, Text, Boolean, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
 import os
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+from contextlib import contextmanager
+from typing import Generator
 
-# Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/mock_data_v2.db")
+# Database URL - defaults to PostgreSQL with FuzeAgentMock schema
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", 
+    "postgresql://ariWeinberg:ariWeinberg@localhost:5432/ariWeinberg"
+)
 
-# Ensure data directory exists
-os.makedirs("./data", exist_ok=True)
+# Create engine with schema support
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    echo=False,  # Set to True for SQL debugging
+    connect_args={
+        "options": "-csearch_path=FuzeAgentMock,public"
+    }
+)
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Create declarative base
 Base = declarative_base()
 
-class Organization(Base):
-    __tablename__ = "organizations"
-    
-    id = Column(String, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    industry = Column(String)
-    size = Column(String)
-    founded = Column(String)
-    website = Column(String)
-    settings = Column(Text)  # JSON string
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    team_count = Column(Integer, default=0)
-    agent_count = Column(Integer, default=0)
-    
-    # Relationships
-    teams = relationship("Team", back_populates="organization")
-    tools = relationship("OrgTool", back_populates="organization")
+# Metadata for schema operations
+metadata = MetaData(schema="FuzeAgentMock")
 
-class Team(Base):
-    __tablename__ = "teams"
-    
-    id = Column(String, primary_key=True, index=True)
-    organization_id = Column(String, ForeignKey("organizations.id"), nullable=False)
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    team_type = Column(String)
-    color = Column(String, default="#2563eb")
-    status = Column(String, default="active")
-    settings = Column(Text)  # JSON string
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    organization = relationship("Organization", back_populates="teams")
-    agents = relationship("Agent", back_populates="team")
-    tool_settings = relationship("TeamToolSetting", back_populates="team")
-
-class Agent(Base):
-    __tablename__ = "agents"
-    
-    id = Column(String, primary_key=True, index=True)
-    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
-    name = Column(String, nullable=False)
-    role = Column(String)
-    type = Column(String, default="developer")
-    status = Column(String, default="active")
-    config = Column(Text)  # JSON string
-    template_id = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    team = relationship("Team", back_populates="agents")
-    tool_settings = relationship("AgentToolSetting", back_populates="agent")
-
-class OrgTool(Base):
-    __tablename__ = "org_tools"
-    
-    id = Column(String, primary_key=True, index=True)
-    org_id = Column(String, ForeignKey("organizations.id"), nullable=False)
-    key = Column(String, nullable=False)
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    default_config = Column(Text)  # JSON string
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    organization = relationship("Organization", back_populates="tools")
-    team_settings = relationship("TeamToolSetting", back_populates="tool")
-    agent_settings = relationship("AgentToolSetting", back_populates="tool")
-
-class TeamToolSetting(Base):
-    __tablename__ = "team_tool_settings"
-    
-    team_id = Column(String, ForeignKey("teams.id"), primary_key=True)
-    tool_id = Column(String, ForeignKey("org_tools.id"), primary_key=True)
-    enabled = Column(Boolean, default=False)
-    config_override = Column(Text)  # JSON string
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    team = relationship("Team", back_populates="tool_settings")
-    tool = relationship("OrgTool", back_populates="team_settings")
-
-class AgentToolSetting(Base):
-    __tablename__ = "agent_tool_settings"
-    
-    agent_id = Column(String, ForeignKey("agents.id"), primary_key=True)
-    tool_id = Column(String, ForeignKey("org_tools.id"), primary_key=True)
-    enabled = Column(Boolean, default=False)
-    config_override = Column(Text)  # JSON string
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    agent = relationship("Agent", back_populates="tool_settings")
-    tool = relationship("OrgTool", back_populates="agent_settings")
-
-class Task(Base):
-    __tablename__ = "tasks"
-
-    id = Column(String, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    status = Column(String, default="pending")  # pending, in_progress, completed, failed
-    priority = Column(String, default="medium")  # low, medium, high, critical
-    team_id = Column(String, ForeignKey("teams.id"))
-    agent_id = Column(String, ForeignKey("agents.id"))
-    milestone_id = Column(String, ForeignKey("milestones.id"))
-    result = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    completed_at = Column(DateTime)
-
-    # Relationships
-    milestone = relationship("Milestone", back_populates="tasks")
-
-class Goal(Base):
-    __tablename__ = "goals"
-
-    id = Column(String, primary_key=True, index=True)
-    organization_id = Column(String, ForeignKey("organizations.id"), nullable=False)
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    status = Column(String, default="active")
-    priority = Column(String, default="medium")
-    target_date = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    milestones = relationship("Milestone", back_populates="goal", cascade="all, delete-orphan")
-
-class Milestone(Base):
-    __tablename__ = "milestones"
-
-    id = Column(String, primary_key=True, index=True)
-    goal_id = Column(String, ForeignKey("goals.id"), nullable=False)
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    status = Column(String, default="not_started")  # not_started, in_progress, completed, blocked, cancelled
-    priority = Column(String, default="medium")  # low, medium, high, critical
-    progress_percentage = Column(Integer, default=0)
-    target_date = Column(DateTime, nullable=False)
-    completed_at = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    goal = relationship("Goal", back_populates="milestones")
-    tasks = relationship("Task", back_populates="milestone", cascade="all, delete-orphan")
-
-# Create all tables
-def create_tables():
-    Base.metadata.create_all(bind=engine)
-    # Initialize with sample data if database is empty
-    _initialize_sample_data()
-
-def _initialize_sample_data():
-    """Initialize database with sample data if it's empty."""
-    db = SessionLocal()
-    try:
-        # Check if we already have data
-        existing_orgs = db.query(Organization).count()
-        print(f"Existing organizations in database: {existing_orgs}")
-        
-        if existing_orgs > 0:
-            print("Database already has data, skipping initialization")
-            return  # Database already has data
-        
-        print("Initializing sample data...")
-        
-        # Create sample organization
-        sample_org = Organization(
-            id="a50af4d0-27f1-40ae-aea0-e847dc5c4ba9",
-            name="Demo Organization",
-            description="A demo organization for testing FuzeAgent",
-            industry="Technology",
-            size="Medium",
-            founded="2024",
-            website="https://demo.fuzeagent.com",
-            settings="{}",
-            team_count=0,
-            agent_count=0
-        )
-        db.add(sample_org)
-        print(f"Created sample organization: {sample_org.name} ({sample_org.id})")
-        
-        # Create sample team
-        sample_team = Team(
-            id="team-1",
-            organization_id=sample_org.id,
-            name="Development Team",
-            description="Main development team",
-            team_type="development",
-            color="#2563eb",
-            status="active",
-            settings="{}"
-        )
-        db.add(sample_team)
-        print(f"Created sample team: {sample_team.name} ({sample_team.id})")
-        
-        # Create sample agent
-        sample_agent = Agent(
-            id="agent-1",
-            team_id=sample_team.id,
-            name="Sample Agent",
-            role="Senior Developer",
-            type="developer",
-            status="active",
-            config='{"model": "claude-sonnet-4-20250514", "tools": [], "settings": {}}',
-            template_id=None
-        )
-        db.add(sample_agent)
-        print(f"Created sample agent: {sample_agent.name} ({sample_agent.id})")
-        
-        # Update counts
-        sample_org.team_count = 1
-        sample_org.agent_count = 1
-        
-        db.commit()
-        print("Sample data initialized successfully")
-        
-    except Exception as e:
-        print(f"Error initializing sample data: {e}")
-        db.rollback()
-    finally:
-        db.close()
-
-# Dependency to get database session
-def get_db():
+def get_db() -> Generator:
+    """Dependency to get database session"""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+@contextmanager
+def get_db_context():
+    """Context manager for database sessions"""
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+def init_db():
+    """Initialize database tables"""
+    # Import all models to ensure they are registered
+    from . import models
+    Base.metadata.create_all(bind=engine)
+
+def drop_all_tables():
+    """Drop all tables (for testing/reset)"""
+    Base.metadata.drop_all(bind=engine)
