@@ -5,7 +5,7 @@ These models exactly match the FuzeAgentMock database schema
 from sqlalchemy import (
     Column, String, Text, Integer, BigInteger, Boolean, 
     DateTime, Numeric, ForeignKey, UniqueConstraint, CheckConstraint,
-    Index, ARRAY, JSON, Enum as SQLEnum
+    Index, ARRAY, JSON, Enum as SQLEnum, PrimaryKeyConstraint
 )
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 from sqlalchemy.orm import relationship, declarative_base
@@ -114,11 +114,6 @@ class AgentTemplateEnvVar(Base):
     
     # Relationships
     template = relationship("AgentTemplate", back_populates="template_env_vars")
-    
-    __table_args__ = (
-        {"schema": "FuzeAgentMock"},
-        {"primary_key": (template_id, name)}
-    )
 
 # Agents
 class Agent(Base):
@@ -205,8 +200,8 @@ class AgentEnvVar(Base):
     agent = relationship("Agent", back_populates="agent_env_vars")
     
     __table_args__ = (
-        {"schema": "FuzeAgentMock"},
-        {"primary_key": (agent_id, name)}
+        PrimaryKeyConstraint("agent_id", "name"),
+        {"schema": "FuzeAgentMock"}
     )
 
 # Containers
@@ -288,8 +283,8 @@ class TeamToolSetting(Base):
     tool = relationship("OrgTool", back_populates="team_tool_settings")
     
     __table_args__ = (
-        {"schema": "FuzeAgentMock"},
-        {"primary_key": (team_id, tool_id)}
+        PrimaryKeyConstraint("team_id", "tool_id"),
+        {"schema": "FuzeAgentMock"}
     )
 
 class AgentToolSetting(Base):
@@ -307,8 +302,8 @@ class AgentToolSetting(Base):
     tool = relationship("OrgTool", back_populates="agent_tool_settings")
     
     __table_args__ = (
-        {"schema": "FuzeAgentMock"},
-        {"primary_key": (agent_id, tool_id)}
+        PrimaryKeyConstraint("agent_id", "tool_id"),
+        {"schema": "FuzeAgentMock"}
     )
 
 # Goals
@@ -350,8 +345,8 @@ class GoalAssignedTeam(Base):
     team = relationship("Team", back_populates="goal_assignments")
     
     __table_args__ = (
-        {"schema": "FuzeAgentMock"},
-        {"primary_key": (goal_id, team_id)}
+        PrimaryKeyConstraint("goal_id", "team_id"),
+        {"schema": "FuzeAgentMock"}
     )
 
 # Milestones
@@ -420,8 +415,8 @@ class TaskAssignment(Base):
     agent = relationship("Agent", back_populates="task_assignments")
     
     __table_args__ = (
-        {"schema": "FuzeAgentMock"},
-        {"primary_key": (task_id, agent_id)}
+        PrimaryKeyConstraint("task_id", "agent_id"),
+        {"schema": "FuzeAgentMock"}
     )
 
 # Conversations
