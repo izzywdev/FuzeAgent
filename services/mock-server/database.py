@@ -58,7 +58,7 @@ def get_db_context():
 def init_db():
     """Initialize database tables"""
     # Import all models to ensure they are registered
-    from . import models
+    import models
     Base.metadata.create_all(bind=engine)
 
 def drop_all_tables():

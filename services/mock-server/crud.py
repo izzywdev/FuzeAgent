@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Any, Type, TypeVar, Generic
 from uuid import UUID
 import math
 
-from . import models, schemas
+import models, schemas
 
 ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType")

@@ -15,27 +15,7 @@ import uuid
 
 Base = declarative_base()
 
-# Enums matching the database schema
-class EntityKind(str, SQLEnum):
-    ORGANIZATION = "organization"
-    TEAM = "team"
-    AGENT = "agent"
-
-class TaskStatus(str, SQLEnum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    BLOCKED = "blocked"
-    CLOSED = "closed"
-    CLOSED_APPROVED = "closed_approved"
-
-class TeamStatus(str, SQLEnum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-
-class ConversationStatus(str, SQLEnum):
-    RUNNING = "running"
-    PAUSED = "paused"
-    STOPPED = "stopped"
+# Enums are defined in schemas.py
 
 # Core registry table
 class Entity(Base):
@@ -43,7 +23,7 @@ class Entity(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    kind = Column(ENUM(EntityKind, name="entity_kind", schema="FuzeAgentMock"), nullable=False)
+    kind = Column(ENUM("organization", "team", "agent", name="entity_kind", schema="FuzeAgentMock"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
 
 # Organizations
@@ -80,7 +60,7 @@ class Team(Base):
     description = Column(Text)
     team_type = Column(Text)
     color = Column(Text)
-    status = Column(ENUM(TeamStatus, name="team_status", schema="FuzeAgentMock"), nullable=False, default=TeamStatus.ACTIVE)
+    status = Column(ENUM("active", "inactive", name="team_status", schema="FuzeAgentMock"), nullable=False, default="active")
     settings = Column(JSON, nullable=False, default={})
     team_lead = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"))
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
@@ -412,7 +392,7 @@ class Task(Base):
     milestone_id = Column(UUID(as_uuid=True), ForeignKey("milestones.id", ondelete="SET NULL"))
     title = Column(Text, nullable=False)
     description = Column(Text)
-    status = Column(ENUM(TaskStatus, name="task_status", schema="FuzeAgentMock"), nullable=False, default=TaskStatus.PENDING)
+    status = Column(ENUM("pending", "in_progress", "blocked", "closed", "closed_approved", name="task_status", schema="FuzeAgentMock"), nullable=False, default="pending")
     priority = Column(Text, nullable=False, default="medium")
     progress_pct = Column(Numeric(5, 2), nullable=False, default=0)
     progress_notes = Column(Text)
@@ -461,7 +441,7 @@ class Conversation(Base):
     
     owner_id = Column(UUID(as_uuid=True), primary_key=True)
     title = Column(Text)
-    status = Column(ENUM(ConversationStatus, name="conversation_status", schema="FuzeAgentMock"), nullable=False, default=ConversationStatus.RUNNING)
+    status = Column(ENUM("running", "paused", "stopped", name="conversation_status", schema="FuzeAgentMock"), nullable=False, default="running")
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     

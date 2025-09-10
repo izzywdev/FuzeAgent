@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 import uvicorn
 
-from . import crud, models, schemas, database
-from .database import get_db
+import crud, models, schemas, database
+from database import get_db
 
 # Create FastAPI app
 app = FastAPI(
