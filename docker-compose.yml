@@ -103,15 +103,13 @@ services:
     networks:
       - ai-team-network
 
-  # Mock API Server (Python with SQLite)
+  # Mock API Server (Python with PostgreSQL)
   mock-server:
     build: ./services/mock-server
     ports:
       - "8001:8000"
-    volumes:
-      - mock_data:/app/data
     environment:
-      - DATABASE_URL=sqlite:///./data/mock_data.db
+      - DATABASE_URL=postgresql://ariWeinberg:ariWeinberg@172.17.0.2:5432/ariWeinberg
     networks:
       - ai-team-network
     restart: unless-stopped
@@ -124,7 +122,7 @@ services:
 
   # UI (React)
   ui:
-    image: fuzeagent-ui:latest
+    build: ./services/ui-react
     ports:
       - "3031:3000"
     environment:

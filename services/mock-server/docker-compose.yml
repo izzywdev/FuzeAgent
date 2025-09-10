@@ -6,11 +6,7 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=postgresql://ariWeinberg:ariWeinberg@postgres:5432/ariWeinberg
-    depends_on:
-      - postgres
-    networks:
-      - mock-network
+      - DATABASE_URL=postgresql://ariWeinberg:ariWeinberg@172.17.0.2:5432/ariWeinberg
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -18,24 +14,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: ariWeinberg
-      POSTGRES_USER: ariWeinberg
-      POSTGRES_PASSWORD: ariWeinberg
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - mock-network
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-
-networks:
-  mock-network:
-    driver: bridge

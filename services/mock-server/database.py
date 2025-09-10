@@ -12,7 +12,7 @@ from typing import Generator
 # Database URL - defaults to PostgreSQL with FuzeAgentMock schema
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://ariWeinberg:ariWeinberg@localhost:5432/ariWeinberg"
+    "postgresql://ariWeinberg:ariWeinberg@172.17.0.2:5432/ariWeinberg"
 )
 
 # Create engine with schema support
