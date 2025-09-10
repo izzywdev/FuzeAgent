@@ -42,7 +42,7 @@ class PaginationParams(BaseModel):
     page: int = Field(1, ge=1, description="Page number (1-based)")
     size: int = Field(20, ge=1, le=100, description="Page size")
     sort_by: Optional[str] = Field(None, description="Field to sort by")
-    sort_order: str = Field("asc", regex="^(asc|desc)$", description="Sort order")
+    sort_order: str = Field("asc", pattern="^(asc|desc)$", description="Sort order")
 
 class PaginatedResponse(BaseModel):
     items: List[Any]
@@ -160,7 +160,7 @@ class AgentBase(BaseSchema):
     name: str = Field(..., min_length=1, max_length=255)
     role: Optional[str] = None
     type: Optional[str] = None
-    status: str = Field("active", regex="^(active|idle|inactive)$")
+    status: str = Field("active", pattern="^(active|idle|inactive)$")
     model: str = Field(..., min_length=1)
     temperature: float = Field(0.70, ge=0.0, le=2.0)
     top_p: Optional[float] = Field(None, ge=0.0, le=1.0)
@@ -186,7 +186,7 @@ class AgentUpdate(BaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     role: Optional[str] = None
     type: Optional[str] = None
-    status: Optional[str] = Field(None, regex="^(active|idle|inactive)$")
+    status: Optional[str] = Field(None, pattern="^(active|idle|inactive)$")
     model: Optional[str] = Field(None, min_length=1)
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
     top_p: Optional[float] = Field(None, ge=0.0, le=1.0)
@@ -216,8 +216,8 @@ class AgentResponse(AgentBase, TimestampMixin):
 class GoalBase(BaseSchema):
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    priority: str = Field("medium", regex="^(low|medium|high|critical)$")
-    status: str = Field("planning", regex="^(planning|active|completed|on_hold)$")
+    priority: str = Field("medium", pattern="^(low|medium|high|critical)$")
+    status: str = Field("planning", pattern="^(planning|active|completed|on_hold)$")
     target_completion_date: Optional[datetime] = None
     progress_percentage: float = Field(0.0, ge=0.0, le=100.0)
 
@@ -227,8 +227,8 @@ class GoalCreate(GoalBase):
 class GoalUpdate(BaseSchema):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
-    priority: Optional[str] = Field(None, regex="^(low|medium|high|critical)$")
-    status: Optional[str] = Field(None, regex="^(planning|active|completed|on_hold)$")
+    priority: Optional[str] = Field(None, pattern="^(low|medium|high|critical)$")
+    status: Optional[str] = Field(None, pattern="^(planning|active|completed|on_hold)$")
     target_completion_date: Optional[datetime] = None
     progress_percentage: Optional[float] = Field(None, ge=0.0, le=100.0)
 
@@ -239,7 +239,7 @@ class GoalResponse(GoalBase, TimestampMixin):
 # Milestone schemas
 class MilestoneBase(BaseSchema):
     title: str = Field(..., min_length=1, max_length=255)
-    status: str = Field("planned", regex="^(planned|in_progress|completed|cancelled)$")
+    status: str = Field("planned", pattern="^(planned|in_progress|completed|cancelled)$")
     due_date: Optional[datetime] = None
 
 class MilestoneCreate(MilestoneBase):
@@ -247,7 +247,7 @@ class MilestoneCreate(MilestoneBase):
 
 class MilestoneUpdate(BaseSchema):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
-    status: Optional[str] = Field(None, regex="^(planned|in_progress|completed|cancelled)$")
+    status: Optional[str] = Field(None, pattern="^(planned|in_progress|completed|cancelled)$")
     due_date: Optional[datetime] = None
 
 class MilestoneResponse(MilestoneBase, TimestampMixin):
@@ -259,7 +259,7 @@ class TaskBase(BaseSchema):
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     status: TaskStatus = TaskStatus.PENDING
-    priority: str = Field("medium", regex="^(low|medium|high)$")
+    priority: str = Field("medium", pattern="^(low|medium|high)$")
     progress_pct: float = Field(0.0, ge=0.0, le=100.0)
     progress_notes: Optional[str] = None
 
@@ -272,7 +272,7 @@ class TaskUpdate(BaseSchema):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     status: Optional[TaskStatus] = None
-    priority: Optional[str] = Field(None, regex="^(low|medium|high)$")
+    priority: Optional[str] = Field(None, pattern="^(low|medium|high)$")
     progress_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
     progress_notes: Optional[str] = None
     agent_id: Optional[UUID] = None
@@ -293,10 +293,10 @@ class TaskResponse(TaskBase, TimestampMixin):
 class KnowledgeBase(BaseSchema):
     title: str = Field(..., min_length=1, max_length=255)
     filename: Optional[str] = None
-    type: str = Field(..., regex="^(document|link|text)$")
+    type: str = Field(..., pattern="^(document|link|text)$")
     mime_type: Optional[str] = None
     size: Optional[int] = Field(None, ge=0)
-    status: str = Field("active", regex="^(active|processing|error)$")
+    status: str = Field("active", pattern="^(active|processing|error)$")
     content_preview: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
     source_url: Optional[str] = None
@@ -309,10 +309,10 @@ class KnowledgeCreate(KnowledgeBase):
 class KnowledgeUpdate(BaseSchema):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     filename: Optional[str] = None
-    type: Optional[str] = Field(None, regex="^(document|link|text)$")
+    type: Optional[str] = Field(None, pattern="^(document|link|text)$")
     mime_type: Optional[str] = None
     size: Optional[int] = Field(None, ge=0)
-    status: Optional[str] = Field(None, regex="^(active|processing|error)$")
+    status: Optional[str] = Field(None, pattern="^(active|processing|error)$")
     content_preview: Optional[str] = None
     tags: Optional[List[str]] = None
     source_url: Optional[str] = None
@@ -342,9 +342,9 @@ class ConversationResponse(ConversationBase, TimestampMixin):
 
 # Message schemas
 class MessageBase(BaseSchema):
-    role: str = Field(..., regex="^(user|assistant)$")
+    role: str = Field(..., pattern="^(user|assistant)$")
     content: Optional[str] = None
-    status: str = Field("sent", regex="^(sending|sent)$")
+    status: str = Field("sent", pattern="^(sending|sent)$")
     template_metadata: Optional[Dict[str, Any]] = None
 
 class MessageCreate(MessageBase):
@@ -352,7 +352,7 @@ class MessageCreate(MessageBase):
 
 class MessageUpdate(BaseSchema):
     content: Optional[str] = None
-    status: Optional[str] = Field(None, regex="^(sending|sent)$")
+    status: Optional[str] = Field(None, pattern="^(sending|sent)$")
     template_metadata: Optional[Dict[str, Any]] = None
 
 class MessageResponse(MessageBase, TimestampMixin):
