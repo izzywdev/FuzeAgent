@@ -163,7 +163,7 @@ class Agent(Base):
     agent_env_vars = relationship("AgentEnvVar", back_populates="agent", cascade="all, delete-orphan")
     containers = relationship("Container", back_populates="agent", cascade="all, delete-orphan")
     agent_tool_settings = relationship("AgentToolSetting", back_populates="agent", cascade="all, delete-orphan")
-    tasks = relationship("Task", back_populates="agent")
+    tasks = relationship("Task", back_populates="agent", foreign_keys="Task.agent_id")
     task_assignments = relationship("TaskAssignment", back_populates="agent", cascade="all, delete-orphan")
 
 # Team Lead History
