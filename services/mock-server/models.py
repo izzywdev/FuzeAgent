@@ -105,7 +105,10 @@ class AgentTemplate(Base):
 
 class AgentTemplateEnvVar(Base):
     __tablename__ = "agent_template_env_vars"
-    __table_args__ = {"schema": "FuzeAgentMock"}
+    __table_args__ = (
+        PrimaryKeyConstraint("template_id", "name"),
+        {"schema": "FuzeAgentMock"}
+    )
     
     template_id = Column(Text, ForeignKey("agent_templates.id", ondelete="CASCADE"), nullable=False)
     name = Column(Text, nullable=False)
@@ -118,9 +121,15 @@ class AgentTemplateEnvVar(Base):
 # Agents
 class Agent(Base):
     __tablename__ = "agents"
-    __table_args__ = {"schema": "FuzeAgentMock"}
+    __table_args__ = (
+        CheckConstraint("status IN ('active','idle','inactive')"),
+        CheckConstraint("temperature BETWEEN 0 AND 2"),
+        Index("idx_agents_team", "team_id"),
+        {"schema": "FuzeAgentMock"}
+    )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    entity_id = Column(UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
     team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
     name = Column(Text, nullable=False)
     role = Column(Text)
@@ -156,15 +165,6 @@ class Agent(Base):
     agent_tool_settings = relationship("AgentToolSetting", back_populates="agent", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="agent")
     task_assignments = relationship("TaskAssignment", back_populates="agent", cascade="all, delete-orphan")
-    
-    # Constraints
-    __table_args__ = (
-        CheckConstraint("status IN ('active','idle','inactive')"),
-        CheckConstraint("temperature BETWEEN 0 AND 2"),
-        ForeignKey("entities.id", ondelete="CASCADE"),
-        Index("idx_agents_team", "team_id"),
-        {"schema": "FuzeAgentMock"}
-    )
 
 # Team Lead History
 class TeamLeadHistory(Base):
