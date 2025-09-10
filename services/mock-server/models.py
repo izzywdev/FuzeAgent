@@ -65,7 +65,7 @@ class Team(Base):
     
     # Relationships
     organization = relationship("Organization", back_populates="teams")
-    agents = relationship("Agent", back_populates="team", cascade="all, delete-orphan")
+    agents = relationship("Agent", back_populates="team", cascade="all, delete-orphan", foreign_keys="Agent.team_id")
     tasks = relationship("Task", back_populates="team", cascade="all, delete-orphan")
     goal_assignments = relationship("GoalAssignedTeam", back_populates="team", cascade="all, delete-orphan")
     team_tool_settings = relationship("TeamToolSetting", back_populates="team", cascade="all, delete-orphan")
@@ -158,7 +158,7 @@ class Agent(Base):
     joined_date = Column(DateTime(timezone=True))
     
     # Relationships
-    team = relationship("Team", back_populates="agents")
+    team = relationship("Team", back_populates="agents", foreign_keys="Agent.team_id")
     template = relationship("AgentTemplate", back_populates="agents")
     agent_env_vars = relationship("AgentEnvVar", back_populates="agent", cascade="all, delete-orphan")
     containers = relationship("Container", back_populates="agent", cascade="all, delete-orphan")
