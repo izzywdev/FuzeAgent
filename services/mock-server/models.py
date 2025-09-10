@@ -169,7 +169,10 @@ class Agent(Base):
 # Team Lead History
 class TeamLeadHistory(Base):
     __tablename__ = "team_lead_history"
-    __table_args__ = {"schema": "FuzeAgentMock"}
+    __table_args__ = (
+        Index("idx_team_lead_history_team", "team_id", "changed_at"),
+        {"schema": "FuzeAgentMock"}
+    )
     
     id = Column(BigInteger, primary_key=True)
     team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
@@ -180,16 +183,14 @@ class TeamLeadHistory(Base):
     
     # Relationships
     team = relationship("Team", back_populates="team_lead_history")
-    
-    __table_args__ = (
-        Index("idx_team_lead_history_team", "team_id", "changed_at"),
-        {"schema": "FuzeAgentMock"}
-    )
 
 # Agent Environment Variables
 class AgentEnvVar(Base):
     __tablename__ = "agent_env_vars"
-    __table_args__ = {"schema": "FuzeAgentMock"}
+    __table_args__ = (
+        PrimaryKeyConstraint("agent_id", "name"),
+        {"schema": "FuzeAgentMock"}
+    )
     
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
     name = Column(Text, nullable=False)
@@ -198,11 +199,6 @@ class AgentEnvVar(Base):
     
     # Relationships
     agent = relationship("Agent", back_populates="agent_env_vars")
-    
-    __table_args__ = (
-        PrimaryKeyConstraint("agent_id", "name"),
-        {"schema": "FuzeAgentMock"}
-    )
 
 # Containers
 class Container(Base):
@@ -424,7 +420,7 @@ class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = {"schema": "FuzeAgentMock"}
     
-    owner_id = Column(UUID(as_uuid=True), primary_key=True)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
     title = Column(Text)
     status = Column(ENUM("running", "paused", "stopped", name="conversation_status", schema="FuzeAgentMock"), nullable=False, default="running")
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
@@ -432,11 +428,6 @@ class Conversation(Base):
     
     # Relationships
     messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan")
-    
-    __table_args__ = (
-        ForeignKey("entities.id", ondelete="CASCADE"),
-        {"schema": "FuzeAgentMock"}
-    )
 
 class ConversationMessage(Base):
     __tablename__ = "conversation_messages"
