@@ -52,14 +52,14 @@ class Team(Base):
     )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.organizations.id", ondelete="CASCADE"), nullable=False)
     name = Column(Text, nullable=False)
     description = Column(Text)
     team_type = Column(Text)
     color = Column(Text)
     status = Column(ENUM("active", "inactive", name="team_status", schema="FuzeAgentMock"), nullable=False, default="active")
     settings = Column(JSON, nullable=False, default={})
-    team_lead = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"))
+    team_lead = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="SET NULL"))
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
@@ -110,7 +110,7 @@ class AgentTemplateEnvVar(Base):
         {"schema": "FuzeAgentMock"}
     )
     
-    template_id = Column(Text, ForeignKey("agent_templates.id", ondelete="CASCADE"), nullable=False)
+    template_id = Column(Text, ForeignKey("FuzeAgentMock.agent_templates.id", ondelete="CASCADE"), nullable=False)
     name = Column(Text, nullable=False)
     value = Column(Text)
     is_secret = Column(Boolean, nullable=False, default=False)
@@ -129,8 +129,8 @@ class Agent(Base):
     )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    entity_id = Column(UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
-    team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
+    entity_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.entities.id", ondelete="CASCADE"), nullable=False)
+    team_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.teams.id", ondelete="CASCADE"), nullable=False)
     name = Column(Text, nullable=False)
     role = Column(Text)
     type = Column(Text)
@@ -151,7 +151,7 @@ class Agent(Base):
     log_level = Column(Text)
     tags = Column(ARRAY(Text))
     template_metadata = Column(JSON, nullable=False, default={})
-    template_id = Column(Text, ForeignKey("agent_templates.id", ondelete="SET NULL"))
+    template_id = Column(Text, ForeignKey("FuzeAgentMock.agent_templates.id", ondelete="SET NULL"))
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     last_activity = Column(DateTime(timezone=True))
@@ -175,9 +175,9 @@ class TeamLeadHistory(Base):
     )
     
     id = Column(BigInteger, primary_key=True)
-    team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
-    prev_lead_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"))
-    new_lead_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"))
+    team_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.teams.id", ondelete="CASCADE"), nullable=False)
+    prev_lead_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="SET NULL"))
+    new_lead_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="SET NULL"))
     reason = Column(Text, nullable=False)
     changed_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
@@ -192,7 +192,7 @@ class AgentEnvVar(Base):
         {"schema": "FuzeAgentMock"}
     )
     
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="CASCADE"), nullable=False)
     name = Column(Text, nullable=False)
     value = Column(Text)
     is_secret = Column(Boolean, nullable=False, default=False)
@@ -206,7 +206,7 @@ class Container(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="CASCADE"), nullable=False)
     external_id = Column(Text)
     provider = Column(Text, nullable=False)
     docker_image = Column(Text)
@@ -225,7 +225,7 @@ class OrgTool(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.organizations.id", ondelete="CASCADE"), nullable=False)
     key = Column(Text, nullable=False)
     name = Column(Text, nullable=False)
     description = Column(Text)
@@ -250,7 +250,7 @@ class OrgToolParam(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(BigInteger, primary_key=True)
-    tool_id = Column(UUID(as_uuid=True), ForeignKey("org_tools.id", ondelete="CASCADE"), nullable=False)
+    tool_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.org_tools.id", ondelete="CASCADE"), nullable=False)
     name = Column(Text, nullable=False)
     param_type = Column(Text, nullable=False)
     required = Column(Boolean, nullable=False, default=False)
@@ -268,8 +268,8 @@ class TeamToolSetting(Base):
     __tablename__ = "team_tool_settings"
     __table_args__ = {"schema": "FuzeAgentMock"}
     
-    team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
-    tool_id = Column(UUID(as_uuid=True), ForeignKey("org_tools.id", ondelete="CASCADE"), nullable=False)
+    team_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.teams.id", ondelete="CASCADE"), nullable=False)
+    tool_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.org_tools.id", ondelete="CASCADE"), nullable=False)
     enabled = Column(Boolean, nullable=False, default=True)
     config_override = Column(JSON)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
@@ -287,8 +287,8 @@ class AgentToolSetting(Base):
     __tablename__ = "agent_tool_settings"
     __table_args__ = {"schema": "FuzeAgentMock"}
     
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
-    tool_id = Column(UUID(as_uuid=True), ForeignKey("org_tools.id", ondelete="CASCADE"), nullable=False)
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="CASCADE"), nullable=False)
+    tool_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.org_tools.id", ondelete="CASCADE"), nullable=False)
     enabled = Column(Boolean, nullable=False, default=True)
     config_override = Column(JSON)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
@@ -308,7 +308,7 @@ class Goal(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.organizations.id", ondelete="CASCADE"), nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text)
     priority = Column(Text, nullable=False, default="medium")
@@ -333,8 +333,8 @@ class GoalAssignedTeam(Base):
     __tablename__ = "goal_assigned_teams"
     __table_args__ = {"schema": "FuzeAgentMock"}
     
-    goal_id = Column(UUID(as_uuid=True), ForeignKey("goals.id", ondelete="CASCADE"), nullable=False)
-    team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
+    goal_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.goals.id", ondelete="CASCADE"), nullable=False)
+    team_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.teams.id", ondelete="CASCADE"), nullable=False)
     
     # Relationships
     goal = relationship("Goal", back_populates="assigned_teams")
@@ -351,7 +351,7 @@ class Milestone(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    goal_id = Column(UUID(as_uuid=True), ForeignKey("goals.id", ondelete="CASCADE"), nullable=False)
+    goal_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.goals.id", ondelete="CASCADE"), nullable=False)
     title = Column(Text, nullable=False)
     status = Column(Text, nullable=False, default="planned")
     due_date = Column(DateTime(timezone=True))
@@ -368,17 +368,17 @@ class Task(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"))
-    milestone_id = Column(UUID(as_uuid=True), ForeignKey("milestones.id", ondelete="SET NULL"))
+    team_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.teams.id", ondelete="CASCADE"), nullable=False)
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="SET NULL"))
+    milestone_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.milestones.id", ondelete="SET NULL"))
     title = Column(Text, nullable=False)
     description = Column(Text)
     status = Column(ENUM("pending", "in_progress", "blocked", "closed", "closed_approved", name="task_status", schema="FuzeAgentMock"), nullable=False, default="pending")
     priority = Column(Text, nullable=False, default="medium")
     progress_pct = Column(Numeric(5, 2), nullable=False, default=0)
     progress_notes = Column(Text)
-    completed_by = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"))
-    approved_by = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"))
+    completed_by = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="SET NULL"))
+    approved_by = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="SET NULL"))
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     completed_at = Column(DateTime(timezone=True))
@@ -401,8 +401,8 @@ class TaskAssignment(Base):
     __tablename__ = "task_assignments"
     __table_args__ = {"schema": "FuzeAgentMock"}
     
-    task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.tasks.id", ondelete="CASCADE"), nullable=False)
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.agents.id", ondelete="CASCADE"), nullable=False)
     inherited = Column(Boolean, nullable=False, default=True)
     assigned_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
@@ -420,7 +420,7 @@ class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = {"schema": "FuzeAgentMock"}
     
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), primary_key=True)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.entities.id", ondelete="CASCADE"), primary_key=True)
     title = Column(Text)
     status = Column(ENUM("running", "paused", "stopped", name="conversation_status", schema="FuzeAgentMock"), nullable=False, default="running")
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
@@ -434,7 +434,7 @@ class ConversationMessage(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.owner_id", ondelete="CASCADE"), nullable=False)
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.conversations.owner_id", ondelete="CASCADE"), nullable=False)
     role = Column(Text, nullable=False)
     content = Column(Text)
     status = Column(Text, nullable=False, default="sent")
@@ -457,7 +457,7 @@ class Knowledge(Base):
     __table_args__ = {"schema": "FuzeAgentMock"}
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), nullable=False)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("FuzeAgentMock.entities.id", ondelete="CASCADE"), nullable=False)
     title = Column(Text, nullable=False)
     filename = Column(Text)
     type = Column(Text, nullable=False)
