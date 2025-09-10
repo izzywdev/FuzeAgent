@@ -6,6 +6,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Path
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
+from uuid import UUID
 import uvicorn
 
 import crud, models, schemas, database
