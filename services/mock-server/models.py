@@ -42,17 +42,14 @@ class Organization(Base):
     teams = relationship("Team", back_populates="organization", cascade="all, delete-orphan")
     goals = relationship("Goal", back_populates="organization", cascade="all, delete-orphan")
     org_tools = relationship("OrgTool", back_populates="organization", cascade="all, delete-orphan")
-    
-    # Foreign key constraint
-    __table_args__ = (
-        ForeignKey("entities.id", ondelete="CASCADE"),
-        {"schema": "FuzeAgentMock"}
-    )
 
 # Teams
 class Team(Base):
     __tablename__ = "teams"
-    __table_args__ = {"schema": "FuzeAgentMock"}
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name"),
+        {"schema": "FuzeAgentMock"}
+    )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
@@ -73,13 +70,6 @@ class Team(Base):
     goal_assignments = relationship("GoalAssignedTeam", back_populates="team", cascade="all, delete-orphan")
     team_tool_settings = relationship("TeamToolSetting", back_populates="team", cascade="all, delete-orphan")
     team_lead_history = relationship("TeamLeadHistory", back_populates="team", cascade="all, delete-orphan")
-    
-    # Constraints
-    __table_args__ = (
-        UniqueConstraint("organization_id", "name"),
-        ForeignKey("entities.id", ondelete="CASCADE"),
-        {"schema": "FuzeAgentMock"}
-    )
 
 # Agent Templates
 class AgentTemplate(Base):
