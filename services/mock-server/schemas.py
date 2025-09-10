@@ -51,6 +51,13 @@ class PaginatedResponse(BaseModel):
     size: int
     pages: int
 
+class PaginatedOrganizationsResponse(BaseModel):
+    items: List[OrganizationResponse]
+    total: int
+    page: int
+    size: int
+    pages: int
+
 # Search and Filter
 class SearchParams(BaseModel):
     q: Optional[str] = Field(None, description="Search query")

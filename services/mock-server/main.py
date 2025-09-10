@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 import uvicorn
+import math
 
 import crud, models, schemas, database
 from database import get_db
@@ -46,7 +47,7 @@ async def root():
     }
 
 # Organizations endpoints
-@app.get("/organizations", response_model=schemas.PaginatedResponse)
+@app.get("/organizations", response_model=schemas.PaginatedOrganizationsResponse)
 async def get_organizations(
     page: int = Query(1, ge=1, description="Page number"),
     size: int = Query(20, ge=1, le=100, description="Page size"),
@@ -69,7 +70,16 @@ async def get_organizations(
         search=q
     )
     
-    return crud.paginate_results(items, total, page, size)
+    # Convert SQLAlchemy models to Pydantic schemas
+    organization_schemas = [schemas.OrganizationResponse.model_validate(org) for org in items]
+    
+    return schemas.PaginatedOrganizationsResponse(
+        items=organization_schemas,
+        total=total,
+        page=page,
+        size=size,
+        pages=math.ceil(total / size) if total > 0 else 0
+    )
 
 @app.get("/organizations/{organization_id}", response_model=schemas.OrganizationResponse)
 async def get_organization(
@@ -80,7 +90,7 @@ async def get_organization(
     organization = crud.organization.get(db=db, id=organization_id)
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
-    return organization
+    return schemas.OrganizationResponse.model_validate(organization)
 
 @app.post("/organizations", response_model=schemas.OrganizationResponse)
 async def create_organization(
@@ -93,7 +103,8 @@ async def create_organization(
     if existing:
         raise HTTPException(status_code=400, detail="Organization with this name already exists")
     
-    return crud.organization.create(db=db, obj_in=organization)
+    created_org = crud.organization.create(db=db, obj_in=organization)
+    return schemas.OrganizationResponse.model_validate(created_org)
 
 @app.put("/organizations/{organization_id}", response_model=schemas.OrganizationResponse)
 async def update_organization(
@@ -106,7 +117,8 @@ async def update_organization(
     if not organization:
         raise HTTPException(status_code=404, detail="Organization not found")
     
-    return crud.organization.update(db=db, db_obj=organization, obj_in=organization_update)
+    updated_org = crud.organization.update(db=db, db_obj=organization, obj_in=organization_update)
+    return schemas.OrganizationResponse.model_validate(updated_org)
 
 @app.delete("/organizations/{organization_id}")
 async def delete_organization(
