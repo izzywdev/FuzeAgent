@@ -95,7 +95,7 @@ class AgentTemplate(Base):
     locale = Column(Text)
     log_level = Column(Text)
     tags = Column(ARRAY(Text))
-    metadata = Column(JSON, nullable=False, default={})
+    template_metadata = Column(JSON, nullable=False, default={})
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
@@ -146,7 +146,7 @@ class Agent(Base):
     locale = Column(Text)
     log_level = Column(Text)
     tags = Column(ARRAY(Text))
-    metadata = Column(JSON, nullable=False, default={})
+    template_metadata = Column(JSON, nullable=False, default={})
     template_id = Column(Text, ForeignKey("agent_templates.id", ondelete="SET NULL"))
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
@@ -452,7 +452,7 @@ class ConversationMessage(Base):
     role = Column(Text, nullable=False)
     content = Column(Text)
     status = Column(Text, nullable=False, default="sent")
-    metadata = Column(JSON)
+    template_metadata = Column(JSON)
     timestamp = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
     # Relationships

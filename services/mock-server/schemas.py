@@ -126,7 +126,7 @@ class AgentTemplateBase(BaseSchema):
     locale: Optional[str] = None
     log_level: Optional[str] = None
     tags: Optional[List[str]] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    template_metadata: Dict[str, Any] = Field(default_factory=dict)
 
 class AgentTemplateCreate(AgentTemplateBase):
     id: str = Field(..., min_length=1, max_length=255)
@@ -150,7 +150,7 @@ class AgentTemplateUpdate(BaseSchema):
     locale: Optional[str] = None
     log_level: Optional[str] = None
     tags: Optional[List[str]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    template_metadata: Optional[Dict[str, Any]] = None
 
 class AgentTemplateResponse(AgentTemplateBase, TimestampMixin):
     id: str
@@ -176,7 +176,7 @@ class AgentBase(BaseSchema):
     locale: Optional[str] = None
     log_level: Optional[str] = None
     tags: Optional[List[str]] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    template_metadata: Dict[str, Any] = Field(default_factory=dict)
 
 class AgentCreate(AgentBase):
     team_id: UUID
@@ -202,7 +202,7 @@ class AgentUpdate(BaseSchema):
     locale: Optional[str] = None
     log_level: Optional[str] = None
     tags: Optional[List[str]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    template_metadata: Optional[Dict[str, Any]] = None
     template_id: Optional[str] = None
 
 class AgentResponse(AgentBase, TimestampMixin):
@@ -345,7 +345,7 @@ class MessageBase(BaseSchema):
     role: str = Field(..., regex="^(user|assistant)$")
     content: Optional[str] = None
     status: str = Field("sent", regex="^(sending|sent)$")
-    metadata: Optional[Dict[str, Any]] = None
+    template_metadata: Optional[Dict[str, Any]] = None
 
 class MessageCreate(MessageBase):
     conversation_id: UUID
@@ -353,7 +353,7 @@ class MessageCreate(MessageBase):
 class MessageUpdate(BaseSchema):
     content: Optional[str] = None
     status: Optional[str] = Field(None, regex="^(sending|sent)$")
-    metadata: Optional[Dict[str, Any]] = None
+    template_metadata: Optional[Dict[str, Any]] = None
 
 class MessageResponse(MessageBase, TimestampMixin):
     id: UUID
