@@ -123,7 +123,7 @@ interface Goal {
 
 class ApiService {
   private organizationToken: string | null = null
-  private baseUrl: string = 'http://localhost:8002' // New mock server URL
+  private baseUrl: string = API_ENDPOINTS.BACKEND_API_BASE // Backend API URL
 
   /**
    * Set the current organization token for all API calls
@@ -198,6 +198,16 @@ class ApiService {
       }
     }
     
+    // For the new backend API, if data already matches our response format, return it as-is
+    // Otherwise, wrap it in our ApiResponse format
+    if (response.ok && data && typeof data === 'object') {
+      return {
+        data,
+        status: response.status,
+        ok: response.ok
+      }
+    }
+    
     return {
       data,
       status: response.status,
@@ -238,23 +248,21 @@ class ApiService {
     const params = new URLSearchParams()
     
     if (filters?.page) params.append('page', filters.page.toString())
-    if (filters?.size) params.append('size', filters.size.toString())
-    if (filters?.sort_by) params.append('sort_by', filters.sort_by)
-    if (filters?.sort_order) params.append('sort_order', filters.sort_order)
-    if (filters?.search) params.append('q', filters.search)
+    if (filters?.size) params.append('page_size', filters.size.toString())
+    if (filters?.search) params.append('search', filters.search)
 
     const queryString = params.toString()
-    const url = queryString ? `/organizations?${queryString}` : '/organizations'
+    const url = queryString ? `/api/organizations?${queryString}` : '/api/organizations'
     
     return this.request<PaginatedResponse<Organization>>(url)
   }
 
   async getOrganization(id: string): Promise<ApiResponse<Organization>> {
-    return this.request<Organization>(`/organizations/${id}`)
+    return this.request<Organization>(`/api/organizations/${id}`)
   }
 
   async createOrganization(data: OrganizationCreate): Promise<ApiResponse<Organization>> {
-    return this.request<Organization>('/organizations', {
+    return this.request<Organization>('/api/organizations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -262,7 +270,7 @@ class ApiService {
   }
 
   async updateOrganization(id: string, data: OrganizationUpdate): Promise<ApiResponse<Organization>> {
-    return this.request<Organization>(`/organizations/${id}`, {
+    return this.request<Organization>(`/api/organizations/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -270,7 +278,7 @@ class ApiService {
   }
 
   async deleteOrganization(id: string): Promise<ApiResponse<{ message: string }>> {
-    return this.request<{ message: string }>(`/organizations/${id}`, {
+    return this.request<{ message: string }>(`/api/organizations/${id}`, {
       method: 'DELETE'
     })
   }
