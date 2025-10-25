@@ -9,9 +9,13 @@ const getAPIEndpoints = () => {
   const isDevelopment = import.meta.env.NODE_ENV === 'development' || hostname === 'localhost'
   const sameOriginWs = `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}${window.location.port ? `:${window.location.port}` : ''}`
   
+  // Backend API URL - supports environment variable override
+  const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8000'
+  
   if (isDevelopment) {
     // Use same-origin relative paths in dev; a mock layer intercepts these
     return {
+      BACKEND_API_BASE: BACKEND_API_URL,
       ORCHESTRATOR_API_BASE: '',
       HIERARCHY_API_BASE: '',
       WEBSOCKET_BASE: sameOriginWs
@@ -19,6 +23,7 @@ const getAPIEndpoints = () => {
   } else {
     // Production endpoints (through nginx proxy)
     return {
+      BACKEND_API_BASE: BACKEND_API_URL,
       ORCHESTRATOR_API_BASE: `${protocol}//${hostname}/api`,
       HIERARCHY_API_BASE: `${protocol}//${hostname}/api`,
       WEBSOCKET_BASE: `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}/api`
