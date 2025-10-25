@@ -108,6 +108,21 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 class CRUDOrganization(CRUDBase[models.Organization, schemas.OrganizationCreate, schemas.OrganizationUpdate]):
     def get_by_name(self, db: Session, *, name: str) -> Optional[models.Organization]:
         return db.query(self.model).filter(self.model.name == name).first()
+    
+    def create(self, db: Session, *, obj_in: schemas.OrganizationCreate) -> models.Organization:
+        # First create the entity record
+        entity = models.Entity(kind="organization")
+        db.add(entity)
+        db.flush()  # Flush to get the entity ID
+        
+        # Create the organization with the same ID as the entity
+        obj_in_data = obj_in.model_dump()
+        obj_in_data["id"] = entity.id
+        db_obj = self.model(**obj_in_data)
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
 
     def get_multi_with_teams(
         self, 

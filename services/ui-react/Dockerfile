@@ -6,8 +6,10 @@ WORKDIR /app
 # Copy package files first (better caching)
 COPY package*.json ./
 
-# Install dependencies with caching optimizations
-RUN npm install --legacy-peer-deps --prefer-offline --no-audit --no-fund
+# Configure npm to handle SSL issues and install dependencies
+RUN npm config set strict-ssl false && \
+    npm config set registry https://registry.npmjs.org/ && \
+    npm install --legacy-peer-deps --no-audit --no-fund
 
 # Build stage
 FROM dependencies as build
