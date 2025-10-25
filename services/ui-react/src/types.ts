@@ -166,14 +166,14 @@ export interface Task {
   status: 'pending' | 'in_progress' | 'completed' | 'failed'
   team_id: string
   agent_id: string
-  milestone_id: string
+  milestone_id?: string
   result: string
   created_at: string
   updated_at: string
   completed_at: string
   team_name: string
   agent_name: string
-  milestone_title: string
+  milestone_title?: string
 }
 
 export interface TaskCreate {
@@ -326,6 +326,41 @@ export interface MilestoneSearchResponse {
   filters?: MilestoneFilters
 }
 
+// Goal types
+export interface Goal {
+  id: string
+  organization_id: string
+  title: string
+  description: string
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  status: 'planning' | 'active' | 'completed' | 'on_hold'
+  target_completion_date?: string
+  progress_percentage: number
+  created_at: string
+  updated_at: string
+  milestones?: Milestone[]
+  milestone_count?: number
+  completed_milestone_count?: number
+}
+
+export interface GoalCreate {
+  organization_id: string
+  title: string
+  description?: string
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  status?: 'planning' | 'active' | 'completed' | 'on_hold'
+  target_completion_date?: string
+}
+
+export interface GoalUpdate {
+  title?: string
+  description?: string
+  priority?: 'low' | 'medium' | 'high' | 'critical'
+  status?: 'planning' | 'active' | 'completed' | 'on_hold'
+  progress_percentage?: number
+  target_completion_date?: string
+}
+
 // Extended Goal type with milestones
 export interface GoalWithMilestones extends Goal {
   milestones: Milestone[]
@@ -369,7 +404,7 @@ export interface PaginationOptions {
 }
 
 export interface PaginatedResponse<T> {
-  data: T[]
+  items: T[]
   total: number
   page: number
   page_size: number

@@ -123,7 +123,7 @@ interface Goal {
 
 class ApiService {
   private organizationToken: string | null = null
-  private baseUrl: string = 'http://localhost:8001' // New mock server URL
+  private baseUrl: string = 'http://localhost:8002' // New mock server URL
 
   /**
    * Set the current organization token for all API calls
