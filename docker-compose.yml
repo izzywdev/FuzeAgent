@@ -15,7 +15,7 @@ services:
     networks:
       - ai-team-network
 
-  # Database for Context Storage
+  # Database for Context Storage and Backend
   postgres:
     image: pgvector/pgvector:pg16
     environment:
@@ -26,8 +26,14 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./services/backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - ai-team-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # Redis for Caching
   redis:
@@ -111,7 +117,8 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/fuzeagent
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - ai-team-network
     restart: unless-stopped
