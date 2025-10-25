@@ -15,26 +15,11 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useOrganization } from '../../contexts/OrganizationContext'
 import { useApiService } from '../../hooks/useApiService'
+import type { Agent } from '../../types'
 
 // ============================================================================
 // TYPES AND INTERFACES
 // ============================================================================
-
-/**
- * Represents an AI agent in the system
- */
-interface Agent {
-  id: string
-  name: string
-  type: string
-  status: 'active' | 'idle' | 'error'
-  tasks: {
-    completed: number
-    running: number
-    pending: number
-  }
-  lastActivity: string
-}
 
 /**
  * Dashboard metrics data
@@ -124,7 +109,7 @@ export function FixedDashboard(): JSX.Element {
       if (!currentOrganization) {
         throw new Error('No organization selected')
       }
-      const { agents: agentsData, teams: teamsData, organizations: orgsData } = await apiService.getDashboardData(currentOrganization.id)
+      const { agents: agentsData, teams: teamsData, organizations: orgsData } = await apiService.getDashboardData()
 
       // Update state with fetched data
       setAgents(agentsData)
@@ -196,6 +181,10 @@ export function FixedDashboard(): JSX.Element {
         return 'bg-green-500'
       case 'idle':
         return 'bg-yellow-500'
+      case 'busy':
+        return 'bg-blue-500'
+      case 'inactive':
+        return 'bg-gray-500'
       case 'error':
         return 'bg-red-500'
       default:
@@ -212,6 +201,10 @@ export function FixedDashboard(): JSX.Element {
         return 'text-green-700'
       case 'idle':
         return 'text-yellow-700'
+      case 'busy':
+        return 'text-blue-700'
+      case 'inactive':
+        return 'text-gray-700'
       case 'error':
         return 'text-red-700'
       default:
