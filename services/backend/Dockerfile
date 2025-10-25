@@ -9,5 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Run the initialization script
-CMD ["python", "init_db.py"]
+# Expose port
+EXPOSE 8000
+
+# Run the FastAPI application
+CMD ["python", "main.py"]

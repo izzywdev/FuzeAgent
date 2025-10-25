@@ -1,15 +1,18 @@
 # FuzeAgent Backend Service
 
-Backend service for FuzeAgent with SQLAlchemy and PostgreSQL.
+Backend service for FuzeAgent with SQLAlchemy, PostgreSQL, and FastAPI.
 
 ## Overview
 
-This service provides the core database layer for FuzeAgent, implementing the schema defined in `New - Schema.pdf`. It uses SQLAlchemy ORM to interact with PostgreSQL.
+This service provides a complete REST API for FuzeAgent, implementing the schema defined in `New - Schema.pdf`. It uses SQLAlchemy ORM to interact with PostgreSQL and FastAPI to expose a full CRUD API with pagination, search, and filtering for all tables.
 
 ## Features
 
 - Complete database schema implementation based on the provided schema
 - SQLAlchemy ORM models for all tables
+- FastAPI REST API with full CRUD operations
+- Pagination, search, and filtering for all endpoints
+- Automatic API documentation (Swagger/OpenAPI)
 - Database initialization scripts
 - Connection pooling and session management
 
@@ -81,17 +84,62 @@ export DATABASE_URL="postgresql://username:password@localhost:5432/fuzeagent"
 python init_db.py
 ```
 
-## Usage
-
-### Initialize Database
-
-Run the initialization script to create all tables:
-
+4. Start the API server:
 ```bash
-python init_db.py
+python main.py
 ```
 
-### Using in Code
+The API will be available at `http://localhost:8000`
+
+Access the interactive API documentation at:
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## API Usage
+
+### API Endpoints
+
+All tables have the following CRUD endpoints:
+
+- `GET /api/{table-name}` - List all items (with pagination and search)
+- `GET /api/{table-name}/{id}` - Get a single item by ID
+- `POST /api/{table-name}` - Create a new item
+- `PUT /api/{table-name}/{id}` - Update an existing item
+- `DELETE /api/{table-name}/{id}` - Delete an item
+
+### Query Parameters
+
+- `page` - Page number (default: 1)
+- `page_size` - Items per page (default: 20, max: 100)
+- `search` - Search term (searches across relevant fields)
+
+### Example API Calls
+
+```bash
+# List organizations with pagination
+curl "http://localhost:8000/api/organizations?page=1&page_size=10"
+
+# Search organizations
+curl "http://localhost:8000/api/organizations?search=company"
+
+# Get a specific organization
+curl "http://localhost:8000/api/organizations/{org-id}"
+
+# Create a new organization
+curl -X POST "http://localhost:8000/api/organizations" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Company", "description": "A great company"}'
+
+# Update an organization
+curl -X PUT "http://localhost:8000/api/organizations/{org-id}" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Name"}'
+
+# Delete an organization
+curl -X DELETE "http://localhost:8000/api/organizations/{org-id}"
+```
+
+## Using in Code
 
 ```python
 from database import SessionLocal, get_db
