@@ -103,6 +103,25 @@ services:
     networks:
       - ai-team-network
 
+  # Backend API Service (FastAPI with PostgreSQL)
+  backend:
+    build: ./services/backend
+    ports:
+      - "8002:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/fuzeagent
+    depends_on:
+      - postgres
+    networks:
+      - ai-team-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Mock API Server (Python with PostgreSQL)
   mock-server:
     build: ./services/mock-server
