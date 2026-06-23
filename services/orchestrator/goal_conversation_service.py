@@ -510,8 +510,8 @@ class GoalConversationService:
                 conversations = await conn.fetch(f"""
                     SELECT id, conversation_type, conversation_title, conversation_summary,
                            status, last_activity_at, created_at,
-                           COALESCE(array_length(string_to_array(messages::text, '}'), 1), 0) as message_count,
-                           COALESCE(array_length(string_to_array(action_items::text, '}'), 1), 0) as action_count
+                           COALESCE(array_length(string_to_array(messages::text, '}}'), 1), 0) as message_count,
+                           COALESCE(array_length(string_to_array(action_items::text, '}}'), 1), 0) as action_count
                     FROM goal_conversations
                     WHERE {where_clause}
                     ORDER BY last_activity_at DESC, created_at DESC
