@@ -4,9 +4,10 @@ Created: 2025-01-29T12:00:04
 Description: Adds audit logging capabilities for tracking changes to organizations, teams, and agents
 """
 
+
 async def upgrade(conn):
     """Apply the migration"""
-    
+
     # Create audit log table
     await conn.execute("""
         CREATE TABLE audit_logs (
@@ -22,12 +23,16 @@ async def upgrade(conn):
             user_agent TEXT
         );
     """)
-    
+
     # Create index for efficient querying
-    await conn.execute("CREATE INDEX idx_audit_logs_table_record ON audit_logs(table_name, record_id);")
-    await conn.execute("CREATE INDEX idx_audit_logs_changed_at ON audit_logs(changed_at);")
+    await conn.execute(
+        "CREATE INDEX idx_audit_logs_table_record ON audit_logs(table_name, record_id);"
+    )
+    await conn.execute(
+        "CREATE INDEX idx_audit_logs_changed_at ON audit_logs(changed_at);"
+    )
     await conn.execute("CREATE INDEX idx_audit_logs_action ON audit_logs(action);")
-    
+
     # Create audit trigger function
     await conn.execute("""
         CREATE OR REPLACE FUNCTION audit_trigger_function()
@@ -50,31 +55,32 @@ async def upgrade(conn):
         END;
         $$ LANGUAGE plpgsql;
     """)
-    
+
     # Add audit triggers to key tables
-    tables_to_audit = ['organizations', 'teams', 'agents']
-    
+    tables_to_audit = ["organizations", "teams", "agents"]
+
     for table in tables_to_audit:
         await conn.execute(f"""
             CREATE TRIGGER audit_trigger_{table}
             AFTER INSERT OR UPDATE OR DELETE ON {table}
             FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
         """)
-    
+
     print("✅ Created audit logging system with triggers")
+
 
 async def downgrade(conn):
     """Rollback the migration"""
-    
+
     # Drop triggers
-    tables_to_audit = ['organizations', 'teams', 'agents']
+    tables_to_audit = ["organizations", "teams", "agents"]
     for table in tables_to_audit:
         await conn.execute(f"DROP TRIGGER IF EXISTS audit_trigger_{table} ON {table};")
-    
+
     # Drop function
     await conn.execute("DROP FUNCTION IF EXISTS audit_trigger_function();")
-    
+
     # Drop audit logs table
     await conn.execute("DROP TABLE IF EXISTS audit_logs CASCADE;")
-    
+
     print("✅ Removed audit logging system")

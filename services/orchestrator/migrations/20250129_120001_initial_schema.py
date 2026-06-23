@@ -4,12 +4,13 @@ Created: 2025-01-29T12:00:01
 Description: Creates the foundational database schema with organizations, teams, agents, tasks, and interactions
 """
 
+
 async def upgrade(conn):
     """Apply the migration"""
-    
+
     # Enable vector extension
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-    
+
     # Create organizations table
     await conn.execute("""
         CREATE TABLE organizations (
@@ -21,7 +22,7 @@ async def upgrade(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    
+
     # Create teams table
     await conn.execute("""
         CREATE TABLE teams (
@@ -35,7 +36,7 @@ async def upgrade(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    
+
     # Create agents table
     await conn.execute("""
         CREATE TABLE agents (
@@ -51,7 +52,7 @@ async def upgrade(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    
+
     # Create agent interactions table
     await conn.execute("""
         CREATE TABLE interactions (
@@ -63,7 +64,7 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    
+
     # Create tasks table
     await conn.execute("""
         CREATE TABLE tasks (
@@ -79,7 +80,7 @@ async def upgrade(conn):
             completed_at TIMESTAMP
         );
     """)
-    
+
     # Create agent hierarchy table
     await conn.execute("""
         CREATE TABLE agent_hierarchy (
@@ -90,12 +91,13 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    
+
     print("✅ Created all base tables")
+
 
 async def downgrade(conn):
     """Rollback the migration"""
-    
+
     # Drop tables in reverse dependency order
     await conn.execute("DROP TABLE IF EXISTS agent_hierarchy CASCADE;")
     await conn.execute("DROP TABLE IF EXISTS tasks CASCADE;")
@@ -103,5 +105,5 @@ async def downgrade(conn):
     await conn.execute("DROP TABLE IF EXISTS agents CASCADE;")
     await conn.execute("DROP TABLE IF EXISTS teams CASCADE;")
     await conn.execute("DROP TABLE IF EXISTS organizations CASCADE;")
-    
+
     print("✅ Dropped all base tables")
