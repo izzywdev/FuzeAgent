@@ -47,6 +47,13 @@ const TasksView: React.FC<TasksViewProps> = React.memo(({ tasks, agents }) => {
     return agentMap[agentId] || 'Unknown Agent'
   }, [agentMap])
 
+  // Memoize sorted tasks
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+  }, [tasks])
+
   if (tasks.length === 0) {
     return (
       <div className="text-center py-12">
@@ -55,13 +62,6 @@ const TasksView: React.FC<TasksViewProps> = React.memo(({ tasks, agents }) => {
       </div>
     )
   }
-
-  // Memoize sorted tasks
-  const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-  }, [tasks])
 
   return (
     <div className="overflow-x-auto">

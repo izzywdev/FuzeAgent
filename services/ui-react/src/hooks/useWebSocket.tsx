@@ -137,7 +137,7 @@ export function useWebSocket(url: string, options: WebSocketOptions = {}): WebSo
         setConnectionStatus('error')
         console.error('WebSocket error:', error)
       }
-    } catch (err) {
+    } catch {
       setError('Failed to create WebSocket connection')
       setConnectionStatus('error')
     }

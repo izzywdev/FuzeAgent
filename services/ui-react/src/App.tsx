@@ -105,7 +105,7 @@ function App() {
     let ws: WebSocket | null = null
     try {
       ws = new WebSocket(`${API_ENDPOINTS.WEBSOCKET_BASE}/ws`)
-    } catch (e) {
+    } catch {
       console.warn('WebSocket unavailable, continuing without realtime updates')
       return
     }
@@ -176,7 +176,7 @@ function App() {
     
     return () => {
       clearInterval(pingInterval)
-      ws && ws.close()
+      ws?.close()
     }
   }, [])
 

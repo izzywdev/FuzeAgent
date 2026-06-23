@@ -684,7 +684,7 @@ function CreateGoalModal({ currentOrganizationId, onClose, onSuccess }: CreateGo
         // (In a real app, you might show an error or create locally)
         onSuccess()
       }
-    } catch (err) {
+    } catch {
       setError('Failed to create goal. Please try again.')
     } finally {
       setIsSubmitting(false)

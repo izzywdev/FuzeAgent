@@ -138,14 +138,15 @@ export function AgentDetailsPage() {
     }
   }
 
-  const handleFieldChange = (field: string, value: any) => {
+  const handleFieldChange = (field: string, value: unknown) => {
     if (editedAgent) {
       if (field.includes('.')) {
         const [parent, child] = field.split('.')
+        const parentValue = editedAgent[parent as keyof Agent]
         setEditedAgent({
           ...editedAgent,
           [parent]: {
-            ...editedAgent[parent as keyof Agent],
+            ...(typeof parentValue === 'object' && parentValue !== null ? parentValue : {}),
             [child]: value
           }
         })
@@ -579,7 +580,7 @@ export function AgentDetailsPage() {
           const logEntry = `[${data.timestamp || new Date().toISOString()}] ${data.stream || 'stdout'}: ${data.message}`
           setContainerLogs(prevLogs => [...prevLogs, logEntry])
         }
-      } catch (error) {
+      } catch {
         // If it's not JSON, treat as plain text log
         const logEntry = `[${new Date().toISOString()}] stdout: ${event.data}`
         setContainerLogs(prevLogs => [...prevLogs, logEntry])
@@ -2376,6 +2377,7 @@ export function AgentDetailsPage() {
       )}
 
       {/* Old chat modal code removed - now using persistent chat interface */}
+      {/* eslint-disable-next-line no-constant-binary-expression */}
       {false && (
         <div style={{
           position: 'fixed',

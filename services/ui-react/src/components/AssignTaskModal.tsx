@@ -24,7 +24,7 @@ const AssignTaskModal: React.FC<AssignTaskModalProps> = ({ agentName, onClose, o
 
     try {
       await onSubmit(formData)
-    } catch (err) {
+    } catch {
       setError('Failed to assign task')
     } finally {
       setLoading(false)

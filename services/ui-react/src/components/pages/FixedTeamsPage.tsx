@@ -13,10 +13,6 @@ interface Team {
   team_type?: string
 }
 
-interface ApiTeamsResponse {
-  teams?: Team[]
-}
-
 // Type guard to check if a team object is valid
 const isValidTeam = (team: any): team is Team => {
   return (

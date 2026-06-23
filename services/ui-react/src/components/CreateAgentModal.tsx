@@ -80,7 +80,7 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ template
         }
       }
       await onSubmit(data)
-    } catch (err) {
+    } catch {
       setError('Failed to create agent from template')
     } finally {
       setLoading(false)
@@ -112,7 +112,7 @@ const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({ template
         }
       }
       await onSubmit(data)
-    } catch (err) {
+    } catch {
       setError('Failed to create custom agent')
     } finally {
       setLoading(false)
