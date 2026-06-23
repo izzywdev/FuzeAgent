@@ -145,7 +145,7 @@ export function AgentDetailsPage() {
         setEditedAgent({
           ...editedAgent,
           [parent]: {
-            ...editedAgent[parent as keyof Agent],
+            ...(editedAgent[parent as keyof Agent] as Record<string, unknown>),
             [child]: value
           }
         })
