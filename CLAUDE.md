@@ -1,3 +1,19 @@
+<!-- FuzeSDLC governance overlay (L1) — extends the FuzeSDLC L0 baseline. Do not duplicate the baseline here; the baseline governs unless this repo overrides. -->
+
+# FuzeAgent — FuzeSDLC governance overlay
+
+This repo extends the canonical **FuzeSDLC baseline** ([`izzywdev/FuzeSDLC` · `CLAUDE.baseline.md`](https://github.com/izzywdev/FuzeSDLC/blob/main/CLAUDE.baseline.md), pinned `baselineRef: main`). Where this file is silent, the baseline governs; where it conflicts, this repo wins.
+
+- **Class:** `oss-public` — public repo, **MIT** licensed, open contribution/disclosure posture (see [`governance/repo-classes.md`](https://github.com/izzywdev/FuzeSDLC/blob/main/governance/repo-classes.md)). The engineering gates (ruleset, Harden Gate, signing, nightly) are identical across classes; class changes only licensing/contribution posture.
+- **Tier:** `product`.
+- **Expert:** **`fuzeagent-expert`** — consult it FIRST on any task to load FuzeAgent architecture/deploy/gotcha context before planning, coding, or debugging. It advises; it does not gate or own deliverables.
+- **Manifest:** [`.fuze/manifest.json`](.fuze/manifest.json) declares the instantiated agent subset and hardening settings.
+- **Channels:** `mcp` (the `mcp-servers/fuzeagent-server` MCP server) and `cli` (`migrate-cli.py`, `dbctl.sh`) — owned by `mcp-engineer` and `cli-engineer` respectively.
+- **Agents** live in [`.claude/agents/`](.claude/agents/) (single-responsibility, honest scoped "done"). Route by task type; each agent refuses out-of-scope work. Never hand one agent a whole feature.
+- **Delivery:** finish work as a **merged, signed PR**. **No deploy-on-push.** Prod is GitOps — never hand-deploy to prod.
+
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
