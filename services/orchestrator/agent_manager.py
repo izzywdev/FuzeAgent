@@ -4,6 +4,7 @@ import asyncio
 import docker
 import os
 import uuid
+from fastapi import HTTPException
 from claude_code_wrapper import ClaudeCodeWrapper
 from database import get_db_connection, DatabaseManager
 from sandbox_manager import AgentSandboxManager
