@@ -14,7 +14,7 @@ from task_queue import TaskQueue
 from context_service import ContextService
 from sandbox_manager import AgentSandboxManager
 from task_execution_engine import TaskExecutionEngine
-from database import get_db_connection
+from database import get_db_connection, DatabaseManager
 from knowledge_manager import knowledge_manager, DocumentMetadata
 from container_manager import container_manager, ContainerStatus, ContainerConfig
 from rag_integration import rag_system, RAGContext
@@ -1522,17 +1522,44 @@ async def get_file_operations_preview(task_id: str, batch_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get file preview: {str(e)}")
 
+async def _authorize_task_org(task_id: str, user: CurrentUser) -> None:
+    """Object-level authorization for a task-scoped action (issue #6 BOLA).
+
+    A task is owned through its assigned agent's organization (task ->
+    assigned_to agent -> team -> org). Resolve that org and require the caller
+    to have access (admins/service principals pass; otherwise the org id must be
+    in the verified token claims). Fails closed: a task whose owning org cannot
+    be determined is denied (403) for non-admins.
+    """
+    task = await app.state.task_queue.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    org_id = task.get("organization_id")
+    if not org_id:
+        agent_id = task.get("assigned_to")
+        if agent_id:
+            agent = await DatabaseManager.get_agent(str(agent_id))
+            if agent:
+                org_id = agent.get("organization_id")
+    # require_org_access fails closed: None/unknown org -> 403 for non-admins.
+    require_org_access(str(org_id) if org_id is not None else "", user)
+
+
 @app.post("/tasks/{task_id}/file-operations/{batch_id}/approve",
           tags=["file-operations", "human-in-loop"],
           summary="Approve File Operations",
           description="Approve or reject file operations from Claude SDK")
-async def approve_file_operations(task_id: str = Path(..., description="Task ID"), 
-                                  batch_id: str = Path(..., description="Batch ID"), 
-                                  approval_data: FileOperationApprovalRequest = Body(...)):
-    """Approve or reject file operations"""
+async def approve_file_operations(task_id: str = Path(..., description="Task ID"),
+                                  batch_id: str = Path(..., description="Batch ID"),
+                                  approval_data: FileOperationApprovalRequest = Body(...),
+                                  user: CurrentUser = Depends(require_user)):
+    """Approve or reject file operations (object-level authz — issue #6 BOLA)."""
     try:
+        # BOLA: caller must own the task (via its agent's org) to approve writes.
+        await _authorize_task_org(task_id, user)
+
         approved = approval_data.get("approved", False)
-        
+
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution or not execution.file_operations_engine:
             raise HTTPException(status_code=404, detail="Task not found or no file operations available")
@@ -1555,14 +1582,21 @@ async def approve_file_operations(task_id: str = Path(..., description="Task ID"
             }
         else:
             raise HTTPException(status_code=400, detail="Failed to process approval")
-            
+
+    except HTTPException:
+        # Preserve 401/403/404/400 (incl. the BOLA 403) instead of masking as 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to approve file operations: {str(e)}")
 
 @app.post("/tasks/{task_id}/file-operations/{batch_id}/rollback")
-async def rollback_file_operations(task_id: str, batch_id: str):
-    """Rollback applied file operations"""
+async def rollback_file_operations(task_id: str, batch_id: str,
+                                   user: CurrentUser = Depends(require_user)):
+    """Rollback applied file operations (object-level authz — issue #6 BOLA)."""
     try:
+        # BOLA: caller must own the task (via its agent's org) to roll back.
+        await _authorize_task_org(task_id, user)
+
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution or not execution.file_operations_engine:
             raise HTTPException(status_code=404, detail="Task not found or no file operations available")
@@ -1578,7 +1612,10 @@ async def rollback_file_operations(task_id: str, batch_id: str):
             }
         else:
             raise HTTPException(status_code=400, detail="Failed to rollback operations")
-            
+
+    except HTTPException:
+        # Preserve 401/403/404/400 (incl. the BOLA 403) instead of masking as 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to rollback file operations: {str(e)}")
 
