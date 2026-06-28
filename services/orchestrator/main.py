@@ -107,6 +107,7 @@ class AgentFromTemplateRequest(BaseModel):
     config: Dict[str, Any] = Field(default_factory=dict, description="Agent configuration")
     repository_settings: Dict[str, Any] = Field(default_factory=dict, description="Repository settings")
     sandbox_settings: Dict[str, Any] = Field(default_factory=dict, description="Sandbox settings")
+    overrides: Dict[str, Any] = Field(default_factory=dict, description="Per-agent config overrides")
     team_id: Optional[str] = Field(None, description="Team to attach the agent to")
     organization_id: Optional[str] = Field(None, description="Owning organization id")
 
@@ -911,14 +912,17 @@ async def get_task(task_id: str):
 
 # Autonomous Execution Endpoints
 @app.post("/agents/from-template")
-async def create_agent_from_template(request: dict):
-    """Create agent from template with repository settings"""
+async def create_agent_from_template(
+    request: AgentFromTemplateRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Create agent from template with repository settings (authenticated)."""
     try:
         # Extract template data
-        template_id = request.get("template_id")
-        name = request.get("name")
-        team_id = request.get("team_id")
-        overrides = request.get("overrides", {})
+        template_id = request.template_id
+        name = request.name
+        team_id = request.team_id
+        overrides = request.overrides
         
         # Get template configuration
         template_config = await app.state.agent_manager.get_template_config(template_id)
@@ -933,7 +937,7 @@ async def create_agent_from_template(request: dict):
             "template_id": template_id,
             "team_id": team_id,
             "config": {**template_config.get("config", {}), **overrides},
-            "repository_settings": request.get("repository_settings", {}),
+            "repository_settings": request.repository_settings,
             "sandbox_settings": {
                 "base_image": f"fuzeagent/dev-{template_id.split('_')[0]}:latest",
                 "resource_limits": template_config.get("resource_limits", {
@@ -1012,22 +1016,29 @@ async def get_agent_sandbox(agent_id: str):
 
 # Additional endpoints for UI support
 @app.put("/tasks/{task_id}")
-async def update_task(task_id: str, update_data: dict):
-    """Update task status and result"""
+async def update_task(
+    task_id: str,
+    update_data: TaskUpdateRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Update task status and result (authenticated, mass-assignment-safe)."""
     await app.state.task_queue.update_task_status(
         task_id=task_id,
-        status=update_data.get('status'),
-        result=update_data.get('result')
+        status=update_data.status,
+        result=update_data.result
     )
     return {"status": "updated"}
 
 @app.post("/context/interactions")
-async def store_interaction(interaction_data: dict):
-    """Store agent interaction"""
+async def store_interaction(
+    interaction_data: InteractionRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Store agent interaction (authenticated, mass-assignment-safe)."""
     interaction_id = await app.state.context_service.store_interaction(
-        agent_id=interaction_data.get('agent_id'),
-        content=interaction_data.get('content'),
-        metadata=interaction_data.get('metadata', {})
+        agent_id=interaction_data.agent_id,
+        content=interaction_data.content,
+        metadata=interaction_data.metadata
     )
     return {"interaction_id": interaction_id}
 
@@ -1308,8 +1319,12 @@ async def destroy_sandbox(sandbox_id: str):
 
 # Agent registration and communication endpoints
 @app.post("/agents/{agent_id}/register")
-async def register_agent(agent_id: str, registration_data: dict):
-    """Register an agent running in a sandbox container"""
+async def register_agent(
+    agent_id: str,
+    registration_data: AgentRegistrationRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Register an agent running in a sandbox container (authenticated)."""
     try:
         # Store agent registration info
         # This would typically update the agent's status and capabilities
@@ -1343,11 +1358,15 @@ async def get_next_task_for_agent(agent_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get next task: {str(e)}")
 
 @app.post("/agents/{agent_id}/error")
-async def report_agent_error(agent_id: str, error_data: dict):
-    """Report an error from an agent"""
+async def report_agent_error(
+    agent_id: str,
+    error_data: AgentErrorRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Report an error from an agent (authenticated, mass-assignment-safe)."""
     try:
         # Log the error and update agent status
-        logger.error(f"Agent {agent_id} reported error: {error_data.get('error')}")
+        logger.error(f"Agent {agent_id} reported error: {error_data.error}")
         
         # You might want to store this in a database or alerting system
         return {"status": "error_logged", "agent_id": agent_id}
@@ -1564,10 +1583,14 @@ async def get_claude_session_status(task_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get Claude session status: {str(e)}")
 
 @app.post("/tasks/{task_id}/claude-session/input")
-async def send_claude_session_input(task_id: str, input_data: dict):
-    """Send input to Claude SDK session"""
+async def send_claude_session_input(
+    task_id: str,
+    input_data: ClaudeSessionInputBody,
+    user: CurrentUser = Depends(require_user),
+):
+    """Send input to Claude SDK session (authenticated, mass-assignment-safe)."""
     try:
-        user_input = input_data.get("input", "")
+        user_input = input_data.input
         if not user_input:
             raise HTTPException(status_code=400, detail="Input cannot be empty")
             
@@ -1826,13 +1849,18 @@ async def cancel_coordination(session_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to cancel coordination: {str(e)}")
 
 @app.post("/agents/{from_agent_id}/communicate/{to_agent_id}")
-async def send_agent_communication(from_agent_id: str, to_agent_id: str, communication_data: dict):
-    """Send communication between agents"""
+async def send_agent_communication(
+    from_agent_id: str,
+    to_agent_id: str,
+    communication_data: AgentCommunicationBody,
+    user: CurrentUser = Depends(require_user),
+):
+    """Send communication between agents (authenticated, mass-assignment-safe)."""
     try:
-        message_type = communication_data.get("message_type", "notification")
-        content = communication_data.get("content", "")
-        metadata = communication_data.get("metadata", {})
-        
+        message_type = communication_data.message_type
+        content = communication_data.content
+        metadata = communication_data.metadata
+
         if not content:
             raise HTTPException(status_code=400, detail="Content cannot be empty")
             
