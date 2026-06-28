@@ -508,9 +508,24 @@ app = FastAPI(
     ]
 )
 
+# SECURITY (issue #6 / PR #7): non-wildcard, env-driven CORS allowlist.
+# allow_origins=["*"] with allow_credentials=True is a forbidden combination;
+# any "*" entry is stripped and we fall back to the local dev origins.
+def _cors_allow_origins() -> List[str]:
+    raw = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://localhost:3031,http://localhost",
+    )
+    origins = [o.strip() for o in raw.split(",") if o.strip() and o.strip() != "*"]
+    return origins or [
+        "http://localhost:3000",
+        "http://localhost:3031",
+        "http://localhost",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3031", "http://localhost"],
+    allow_origins=_cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
