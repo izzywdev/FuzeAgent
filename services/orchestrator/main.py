@@ -1,7 +1,7 @@
 from fastapi import FastAPI, WebSocket, HTTPException, Query, Path, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 import asyncio
 import os
@@ -20,6 +20,14 @@ from container_manager import container_manager, ContainerStatus, ContainerConfi
 from rag_integration import rag_system, RAGContext
 from websocket_manager import websocket_manager, WebSocketUpdate, UpdateType, notify_agent_status_change, notify_task_progress, notify_container_status_change, notify_knowledge_update
 from hierarchy_endpoints import router as hierarchy_router
+from fastapi import Depends
+from auth import (
+    get_current_user,
+    require_user,
+    require_admin,
+    require_org_access,
+    CurrentUser,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +87,62 @@ class ConversationMessage(BaseModel):
 class ChatMessageRequest(BaseModel):
     content: str
     metadata: Optional[Dict[str, Any]] = None
+
+# ---------------------------------------------------------------------------
+# Mass-assignment-safe request models (issue #6 MEDIUM-1 / BOPLA).
+# Each forbids unknown fields so clients cannot inject derived/sensitive
+# attributes (status, owner, ids) that should never be client-settable.
+# ---------------------------------------------------------------------------
+class SandboxExecuteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    command: str = Field(..., min_length=1, description="Command to execute in the sandbox")
+    working_dir: Optional[str] = Field(None, description="Optional working directory")
+
+class AgentFromTemplateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    template_id: str = Field(..., description="Template identifier")
+    name: str = Field(..., description="Agent name")
+    role: Optional[str] = Field(None, description="Agent role")
+    type: Optional[str] = Field(None, description="Agent type")
+    config: Dict[str, Any] = Field(default_factory=dict, description="Agent configuration")
+    repository_settings: Dict[str, Any] = Field(default_factory=dict, description="Repository settings")
+    sandbox_settings: Dict[str, Any] = Field(default_factory=dict, description="Sandbox settings")
+    team_id: Optional[str] = Field(None, description="Team to attach the agent to")
+    organization_id: Optional[str] = Field(None, description="Owning organization id")
+
+class TaskUpdateRequest(BaseModel):
+    # Only the fields a client is allowed to set. `status`/`result` are the
+    # intended mutable fields here; anything else is rejected.
+    model_config = ConfigDict(extra="forbid")
+    status: Optional[str] = Field(None, description="New task status")
+    result: Optional[Any] = Field(None, description="Task result payload")
+
+class InteractionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    agent_id: str = Field(..., description="Agent id the interaction belongs to")
+    content: str = Field(..., description="Interaction content")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Interaction metadata")
+
+class AgentRegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    container_id: Optional[str] = Field(None, description="Container id hosting the agent")
+    capabilities: List[str] = Field(default_factory=list, description="Agent capabilities")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Registration metadata")
+
+class AgentErrorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    error: str = Field(..., description="Error message")
+    details: Optional[Dict[str, Any]] = Field(None, description="Optional structured details")
+
+class ClaudeSessionInputBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    input: str = Field(..., min_length=1, description="Input to send to the Claude SDK session")
+
+class AgentCommunicationBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message_type: str = Field(default="notification", description="Message type")
+    content: str = Field(..., min_length=1, description="Message content")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 # Model Configuration Models
 class ProviderCredentialsRequest(BaseModel):
@@ -380,6 +444,11 @@ app = FastAPI(
     """,
     version="2.0.0",
     lifespan=lifespan,
+    # SECURITY (issue #6 CRITICAL-1): authenticate EVERY route by default.
+    # `get_current_user` short-circuits the public allowlist (health/docs) and
+    # raises 401 for any other route without a valid bearer token. Object-level
+    # authorization (BOLA) is layered on dangerous/by-id handlers below.
+    dependencies=[Depends(get_current_user)],
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=[
@@ -899,8 +968,14 @@ async def get_agent_templates():
           summary="Start Autonomous Task Execution",
           description="Begin autonomous execution of a task using Claude SDK integration",
           response_model=TaskResponse)
-async def start_task_execution(task_id: str = Path(..., description="Task ID to execute")):
-    """Start autonomous execution of a task"""
+async def start_task_execution(
+    task_id: str = Path(..., description="Task ID to execute"),
+    user: CurrentUser = Depends(require_user),
+):
+    """Start autonomous execution of a task.
+
+    SECURITY (issue #6 CRITICAL-1): autonomous execution must be authenticated.
+    """
     try:
         # This will be handled by the TaskExecutionEngine
         result = await app.state.task_queue.start_autonomous_execution(task_id)
@@ -1192,15 +1267,24 @@ async def list_sandboxes(agent_id: str = None, status: str = None):
         raise HTTPException(status_code=500, detail=f"Failed to list sandboxes: {str(e)}")
 
 @app.post("/sandboxes/{sandbox_id}/execute")
-async def execute_command_in_sandbox(sandbox_id: str, command_data: dict):
-    """Execute a command in a sandbox"""
+async def execute_command_in_sandbox(
+    sandbox_id: str,
+    command_data: SandboxExecuteRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Execute a command in a sandbox.
+
+    SECURITY (issue #6 CRITICAL-1): unauthenticated-RCE-by-design previously.
+    Now requires a verified principal (401 if absent) and an explicit,
+    extra-forbidding request model (no mass-assignment).
+    """
     try:
-        command = command_data.get("command")
-        working_dir = command_data.get("working_dir")
-        
+        command = command_data.command
+        working_dir = command_data.working_dir
+
         if not command:
             raise HTTPException(status_code=400, detail="Command is required")
-            
+
         result = await app.state.sandbox_manager.execute_command(
             sandbox_id=sandbox_id,
             command=command,
@@ -1860,9 +1944,18 @@ async def coordination_websocket_endpoint(websocket: WebSocket, session_id: str)
 async def store_provider_credentials(
     organization_id: str = Path(..., description="Organization ID"),
     provider: str = Path(..., description="Provider name"),
-    credentials: ProviderCredentialsRequest = Body(...)
+    credentials: ProviderCredentialsRequest = Body(...),
+    user: CurrentUser = Depends(require_user),
 ):
-    """Store encrypted API credentials for a model provider at organization level"""
+    """Store encrypted API credentials for a model provider at organization level.
+
+    SECURITY (issue #6 CRITICAL-2): this writes provider secrets scoped by the
+    path ``organization_id``. The path id is NOT the authorization boundary —
+    the caller must be authorized for that specific organization (object-level
+    authz, BOLA mitigation). Non-members get 403.
+    """
+    # Object-level authorization on the org id from the path (fail closed).
+    require_org_access(organization_id, user)
     try:
         from model_configuration import model_config_manager, ModelProvider
         
@@ -1900,9 +1993,14 @@ async def store_provider_credentials(
 async def get_available_models(
     organization_id: str = Path(..., description="Organization ID"),
     provider: Optional[str] = Query(None, description="Filter by provider"),
-    capabilities: Optional[str] = Query(None, description="Filter by capabilities (comma-separated)")
+    capabilities: Optional[str] = Query(None, description="Filter by capabilities (comma-separated)"),
+    user: CurrentUser = Depends(require_user),
 ):
-    """Get available AI models with provider credential validation"""
+    """Get available AI models with provider credential validation.
+
+    SECURITY (issue #6): object-level authz on the org id from the path.
+    """
+    require_org_access(organization_id, user)
     try:
         from model_configuration import model_config_manager, ModelProvider, ModelCapability
         
@@ -1941,9 +2039,14 @@ async def get_available_models(
           description="Configure model settings and preferences for an agent")
 async def configure_agent_model(
     agent_id: str = Path(..., description="Agent ID"),
-    config: AgentModelConfigRequest = Body(...)
+    config: AgentModelConfigRequest = Body(...),
+    user: CurrentUser = Depends(require_user),
 ):
-    """Configure model settings for an AI agent"""
+    """Configure model settings for an AI agent.
+
+    SECURITY (issue #6): repointing an agent at attacker-controlled models/keys
+    must be authenticated. Authorize the caller before mutating agent config.
+    """
     try:
         from model_configuration import model_config_manager, AgentModelConfig
         
@@ -1981,8 +2084,11 @@ async def configure_agent_model(
          tags=["model-configuration"],
          summary="Get Agent Model Configuration",
          description="Get current model configuration for an agent")
-async def get_agent_model_configuration(agent_id: str = Path(..., description="Agent ID")):
-    """Get model configuration for an AI agent"""
+async def get_agent_model_configuration(
+    agent_id: str = Path(..., description="Agent ID"),
+    user: CurrentUser = Depends(require_user),
+):
+    """Get model configuration for an AI agent (authenticated)."""
     try:
         from model_configuration import model_config_manager
         
