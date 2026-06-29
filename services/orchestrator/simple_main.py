@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from contextlib import asynccontextmanager
@@ -8,6 +8,31 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import os
 from agent_templates import template_manager, AgentCategory
+
+# SECURITY (issue #6 / PR #7): simple_main is a demo variant, but it must NEVER
+# ship a zero-auth, wildcard-CORS surface. It reuses the SAME hardened auth
+# module as main.py so that, however it is launched, the published :8000 surface
+# requires authN (401 fail-closed) and does not allow wildcard+credentials CORS.
+from auth import get_current_user
+
+
+def _cors_allow_origins() -> List[str]:
+    """Non-wildcard CORS allowlist from env (comma-separated).
+
+    Wildcard ("*") + credentials is a forbidden combination; we strip any "*"
+    and fall back to the local dev origins. credentials stay enabled only for
+    the explicit allowlist.
+    """
+    raw = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://localhost:3031,http://localhost",
+    )
+    origins = [o.strip() for o in raw.split(",") if o.strip() and o.strip() != "*"]
+    return origins or [
+        "http://localhost:3000",
+        "http://localhost:3031",
+        "http://localhost",
+    ]
 
 # Simple in-memory storage for demonstration
 agents_db = {}
@@ -60,12 +85,18 @@ app = FastAPI(
     title="FuzeAgent Orchestrator",
     description="AI Team Orchestration Platform - Simple Version",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    # SECURITY (issue #6 / PR #7): authenticate EVERY route by default.
+    # get_current_user short-circuits the public allowlist (/health, /docs, ...)
+    # and raises 401 for any other route without a valid bearer token.
+    dependencies=[Depends(get_current_user)],
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    # SECURITY: non-wildcard, env-driven allowlist. allow_origins=["*"] with
+    # allow_credentials=True is a forbidden combination and was removed.
+    allow_origins=_cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -13,9 +13,18 @@ from datetime import datetime, date
 import logging
 import asyncpg
 from database import get_db_connection
+from auth import require_user, CurrentUser
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/coordination", tags=["Cross-Product Coordination"])
+
+# SECURITY (issue #6 CRITICAL-1 / HIGH-2): require an authenticated principal
+# for every cross-product coordination route. This applies even if the router
+# is mounted on an app that lacks a global auth dependency (fail closed).
+router = APIRouter(
+    prefix="/coordination",
+    tags=["Cross-Product Coordination"],
+    dependencies=[Depends(require_user)],
+)
 
 # Pydantic Models
 class ProductRegistration(BaseModel):

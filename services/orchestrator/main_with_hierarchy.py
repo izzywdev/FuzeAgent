@@ -22,6 +22,13 @@ from models import (
 )
 from agent_templates import template_manager, AgentCategory
 from hierarchy_endpoints import router as hierarchy_router
+from auth import (
+    get_current_user,
+    require_user,
+    require_admin,
+    require_org_access,
+    CurrentUser,
+)
 
 # Default IDs for initial setup
 DEFAULT_ORG_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -139,6 +146,8 @@ app = FastAPI(
     """,
     version="2.0.0",
     lifespan=lifespan,
+    # SECURITY (issue #6 CRITICAL-1): authenticate every route by default.
+    dependencies=[Depends(get_current_user)],
     docs_url="/docs",
     redoc_url="/redoc",
     contact={
@@ -155,9 +164,20 @@ app = FastAPI(
     ]
 )
 
+# SECURITY (issue #6 MEDIUM-2): never use wildcard origins together with
+# credentials. Origins come from an explicit allowlist env var (comma
+# separated) and default to local dev hosts only.
+_cors_origins = [
+    o.strip()
+    for o in os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://localhost:3031,http://localhost",
+    ).split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -238,8 +258,17 @@ async def create_organization(org_data: OrganizationCreate):
         raise HTTPException(status_code=500, detail=f"Failed to create organization: {str(e)}")
 
 @app.get("/organizations/{org_id}", response_model=Organization)
-async def get_organization(org_id: str):
-    """Get organization by ID"""
+async def get_organization(
+    org_id: str,
+    user: CurrentUser = Depends(require_user),
+):
+    """Get organization by ID.
+
+    SECURITY (issue #6 HIGH-2 / BOLA): authorize the specific object — the
+    caller must be a member/admin of this org (403 otherwise), not merely
+    authenticated.
+    """
+    require_org_access(org_id, user)
     try:
         org = await DatabaseManager.get_organization(org_id)
         if not org:
@@ -251,8 +280,13 @@ async def get_organization(org_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get organization: {str(e)}")
 
 @app.put("/organizations/{org_id}", response_model=Organization)
-async def update_organization(org_id: str, org_data: OrganizationUpdate):
-    """Update organization"""
+async def update_organization(
+    org_id: str,
+    org_data: OrganizationUpdate,
+    user: CurrentUser = Depends(require_user),
+):
+    """Update organization (object-level authz — issue #6 HIGH-2)."""
+    require_org_access(org_id, user)
     try:
         # Convert to dict and remove None values
         update_data = {k: v for k, v in org_data.dict().items() if v is not None}
@@ -272,8 +306,12 @@ async def update_organization(org_id: str, org_data: OrganizationUpdate):
         raise HTTPException(status_code=500, detail=f"Failed to update organization: {str(e)}")
 
 @app.delete("/organizations/{org_id}")
-async def delete_organization(org_id: str):
-    """Delete organization"""
+async def delete_organization(
+    org_id: str,
+    user: CurrentUser = Depends(require_user),
+):
+    """Delete organization (object-level authz — issue #6 HIGH-2)."""
+    require_org_access(org_id, user)
     try:
         success = await DatabaseManager.delete_organization(org_id)
         if not success:
@@ -344,32 +382,52 @@ async def create_team(team_data: TeamCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create team: {str(e)}")
 
+async def _load_team_authorized(team_id: str, user: CurrentUser) -> Dict:
+    """Load a team and enforce object-level authz on its owning org.
+
+    SECURITY (issue #6 HIGH-2): a team is authorized via its parent
+    organization. Returns the team dict or raises 404 (missing) / 403 (not a
+    member of the team's org).
+    """
+    team = await DatabaseManager.get_team(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    org_id = str(team.get("organization_id"))
+    require_org_access(org_id, user)
+    return team
+
+
 @app.get("/teams/{team_id}", response_model=Team)
-async def get_team(team_id: str):
-    """Get team by ID"""
+async def get_team(
+    team_id: str,
+    user: CurrentUser = Depends(require_user),
+):
+    """Get team by ID (object-level authz via parent org — issue #6 HIGH-2)."""
     try:
-        team = await DatabaseManager.get_team(team_id)
-        if not team:
-            raise HTTPException(status_code=404, detail="Team not found")
-        return team
+        return await _load_team_authorized(team_id, user)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get team: {str(e)}")
 
 @app.put("/teams/{team_id}", response_model=Team)
-async def update_team(team_id: str, team_data: TeamUpdate):
-    """Update team"""
+async def update_team(
+    team_id: str,
+    team_data: TeamUpdate,
+    user: CurrentUser = Depends(require_user),
+):
+    """Update team (object-level authz via parent org — issue #6 HIGH-2)."""
     try:
+        await _load_team_authorized(team_id, user)
         update_data = {k: v for k, v in team_data.dict().items() if v is not None}
-        
+
         if not update_data:
             raise HTTPException(status_code=400, detail="No data provided for update")
-        
+
         success = await DatabaseManager.update_team(team_id, **update_data)
         if not success:
             raise HTTPException(status_code=404, detail="Team not found")
-        
+
         team = await DatabaseManager.get_team(team_id)
         return team
     except HTTPException:
@@ -378,13 +436,17 @@ async def update_team(team_id: str, team_data: TeamUpdate):
         raise HTTPException(status_code=500, detail=f"Failed to update team: {str(e)}")
 
 @app.delete("/teams/{team_id}")
-async def delete_team(team_id: str):
-    """Delete team"""
+async def delete_team(
+    team_id: str,
+    user: CurrentUser = Depends(require_user),
+):
+    """Delete team (object-level authz via parent org — issue #6 HIGH-2)."""
     try:
+        await _load_team_authorized(team_id, user)
         success = await DatabaseManager.delete_team(team_id)
         if not success:
             raise HTTPException(status_code=404, detail="Team not found")
-        
+
         return {"message": "Team deleted successfully"}
     except HTTPException:
         raise
@@ -481,12 +543,16 @@ async def create_agent_from_template(template_data: CreateAgentFromTemplate):
         raise HTTPException(status_code=500, detail=f"Failed to create agent from template: {str(e)}")
 
 @app.get("/agents/{agent_id}")
-async def get_agent(agent_id: str):
-    """Get agent by ID"""
+async def get_agent(
+    agent_id: str,
+    user: CurrentUser = Depends(require_user),
+):
+    """Get agent by ID (object-level authz via parent org — issue #6 HIGH-2)."""
     try:
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
+        require_org_access(str(agent.get("organization_id")), user)
         return agent
     except HTTPException:
         raise
@@ -641,8 +707,8 @@ async def assign_task_to_agent(agent_id: str, task_data: TaskCreate):
         500: {"description": "Failed to retrieve migration status"}
     }
 )
-async def get_migration_status():
-    """Get current migration status"""
+async def get_migration_status(user: CurrentUser = Depends(require_admin)):
+    """Get current migration status (admin/service principal only)."""
     try:
         database_url = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
         migration_manager = MigrationManager(database_url)
@@ -651,8 +717,15 @@ async def get_migration_status():
         raise HTTPException(status_code=500, detail=f"Failed to get migration status: {str(e)}")
 
 @app.post("/migrations/apply")
-async def apply_migrations(target_version: Optional[str] = None):
-    """Apply pending migrations"""
+async def apply_migrations(
+    target_version: Optional[str] = None,
+    user: CurrentUser = Depends(require_admin),
+):
+    """Apply pending migrations.
+
+    SECURITY (issue #6 HIGH-1): schema control is data-destructive and must be
+    restricted to an authenticated admin/service principal (403 otherwise).
+    """
     try:
         database_url = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
         migration_manager = MigrationManager(database_url)
@@ -667,8 +740,15 @@ async def apply_migrations(target_version: Optional[str] = None):
         raise HTTPException(status_code=500, detail=f"Failed to apply migrations: {str(e)}")
 
 @app.post("/migrations/rollback/{target_version}")
-async def rollback_migrations(target_version: str):
-    """Rollback migrations to target version"""
+async def rollback_migrations(
+    target_version: str,
+    user: CurrentUser = Depends(require_admin),
+):
+    """Rollback migrations to target version.
+
+    SECURITY (issue #6 HIGH-1): destructive schema rollback — admin/service
+    principal only (403 otherwise).
+    """
     try:
         database_url = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
         migration_manager = MigrationManager(database_url)
@@ -1041,6 +1121,57 @@ async def delegate_task(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Task delegation failed: {str(e)}")
 
+
+async def _authorize_agent_org(agent_id: str, user: CurrentUser) -> Dict[str, Any]:
+    """Object-level authorization for an A2A agent-scoped action (issue #6 BOLA).
+
+    Resolves the agent's owning organization (agent -> team -> org) and requires
+    the caller to have access (admins/service pass; otherwise the org id must be
+    in the verified token claims). Fails closed: unknown agent -> 404; an agent
+    with no resolvable org -> 403 for non-admins. Returns the agent row.
+    """
+    agent = await DatabaseManager.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    org_id = agent.get("organization_id")
+    require_org_access(str(org_id) if org_id is not None else "", user)
+    return agent
+
+
+async def _authorize_a2a_task_org(task_id: str, user: CurrentUser) -> None:
+    """Object-level authorization for an A2A task-scoped action (issue #6 BOLA).
+
+    Resolves the task's owning agents (requesting/assigned) from the a2a_tasks
+    table via the manager's pool, then authorizes the caller against that
+    agent's org. Fails closed: unknown task -> 404; no resolvable agent/org ->
+    403 for non-admins (admins/service principals still pass).
+    """
+    requesting_id = None
+    assigned_id = None
+    pool = getattr(app.state.a2a_manager, "pool", None)
+    if pool is not None:
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT requesting_agent_id, assigned_agent_id FROM a2a_tasks WHERE task_id = $1",
+                task_id,
+            )
+        if row is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        requesting_id = row["requesting_agent_id"]
+        assigned_id = row["assigned_agent_id"]
+
+    # Authorize against whichever owning agent we can resolve. If neither
+    # resolves to an org, require_org_access("") denies non-admins (fail closed).
+    for candidate in (assigned_id, requesting_id):
+        if not candidate:
+            continue
+        agent = await DatabaseManager.get_agent(str(candidate))
+        if agent and agent.get("organization_id"):
+            require_org_access(str(agent["organization_id"]), user)
+            return
+    require_org_access("", user)
+
+
 @app.get(
     "/a2a/agents/{agent_id}/card",
     tags=["A2A Protocol"],
@@ -1054,9 +1185,11 @@ async def delegate_task(
         500: {"description": "Failed to get agent card"}
     }
 )
-async def get_agent_card(agent_id: str):
-    """Get agent card for A2A protocol"""
+async def get_agent_card(agent_id: str, user: CurrentUser = Depends(require_user)):
+    """Get agent card for A2A protocol (object-level authz — issue #6 BOLA)."""
     try:
+        # BOLA: caller must be authorized for the agent's owning org.
+        await _authorize_agent_org(agent_id, user)
         # Check if agent exists in local registry
         if agent_id in app.state.a2a_manager.local_agents:
             agent_card = app.state.a2a_manager.local_agents[agent_id]
@@ -1092,15 +1225,15 @@ async def get_agent_card(agent_id: str):
 )
 async def send_a2a_message(
     sender_agent_id: str,
-    message_data: Dict[str, Any]
+    message_data: Dict[str, Any],
+    user: CurrentUser = Depends(require_user),
 ):
-    """Send a message between agents"""
+    """Send a message between agents (object-level authz — issue #6 BOLA)."""
     try:
-        # Verify sender agent exists
-        agent = await DatabaseManager.get_agent(sender_agent_id)
-        if not agent:
-            raise HTTPException(status_code=404, detail="Sender agent not found")
-        
+        # BOLA: caller must be authorized for the SENDER agent's owning org;
+        # this both verifies the sender exists and authorizes acting as it.
+        agent = await _authorize_agent_org(sender_agent_id, user)
+
         # Verify recipient agent exists
         recipient_agent = await DatabaseManager.get_agent(message_data["recipient_agent_id"])
         if not recipient_agent:
@@ -1142,15 +1275,14 @@ async def send_a2a_message(
 async def get_agent_a2a_tasks(
     agent_id: str,
     status_filter: Optional[List[str]] = None,
-    limit: int = 50
+    limit: int = 50,
+    user: CurrentUser = Depends(require_user),
 ):
-    """Get A2A tasks for an agent"""
+    """Get A2A tasks for an agent (object-level authz — issue #6 BOLA)."""
     try:
-        # Verify agent exists
-        agent = await DatabaseManager.get_agent(agent_id)
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
+        # BOLA: caller must be authorized for the agent's owning org.
+        await _authorize_agent_org(agent_id, user)
+
         # Convert string status to TaskStatus enum
         status_enum_filter = None
         if status_filter:
@@ -1190,10 +1322,14 @@ async def get_agent_a2a_tasks(
 )
 async def update_a2a_task_status(
     task_id: str,
-    status_data: Dict[str, Any]
+    status_data: Dict[str, Any],
+    user: CurrentUser = Depends(require_user),
 ):
-    """Update A2A task status"""
+    """Update A2A task status (object-level authz — issue #6 BOLA)."""
     try:
+        # BOLA: caller must be authorized for the task's owning agent's org.
+        await _authorize_a2a_task_org(task_id, user)
+
         await app.state.a2a_manager.update_task_status(
             task_id=task_id,
             status=TaskStatus(status_data["status"]),
@@ -1201,10 +1337,13 @@ async def update_a2a_task_status(
             output_data=status_data.get("output_data"),
             agent_id=status_data.get("agent_id")
         )
-        
+
         return {"task_id": task_id, "status": "updated"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        # Preserve 401/403/404 (incl. the BOLA 403) instead of masking as 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update task status: {str(e)}")
 
@@ -1224,15 +1363,14 @@ async def update_a2a_task_status(
 async def get_agent_a2a_messages(
     agent_id: str,
     conversation_id: Optional[str] = None,
-    limit: int = 50
+    limit: int = 50,
+    user: CurrentUser = Depends(require_user),
 ):
-    """Get A2A messages for an agent"""
+    """Get A2A messages for an agent (object-level authz — issue #6 BOLA)."""
     try:
-        # Verify agent exists
-        agent = await DatabaseManager.get_agent(agent_id)
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
+        # BOLA: caller must be authorized for the agent's owning org.
+        await _authorize_agent_org(agent_id, user)
+
         messages = await app.state.a2a_manager.get_agent_messages(
             agent_id=agent_id,
             conversation_id=conversation_id,

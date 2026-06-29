@@ -1,7 +1,7 @@
 from fastapi import FastAPI, WebSocket, HTTPException, Query, Path, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 import asyncio
 import os
@@ -14,12 +14,21 @@ from task_queue import TaskQueue
 from context_service import ContextService
 from sandbox_manager import AgentSandboxManager
 from task_execution_engine import TaskExecutionEngine
-from database import get_db_connection
+from database import get_db_connection, DatabaseManager
 from knowledge_manager import knowledge_manager, DocumentMetadata
 from container_manager import container_manager, ContainerStatus, ContainerConfig
 from rag_integration import rag_system, RAGContext
 from websocket_manager import websocket_manager, WebSocketUpdate, UpdateType, notify_agent_status_change, notify_task_progress, notify_container_status_change, notify_knowledge_update
 from hierarchy_endpoints import router as hierarchy_router
+from fastapi import Depends
+from auth import (
+    get_current_user,
+    require_user,
+    require_admin,
+    require_org_access,
+    authenticate_websocket,
+    CurrentUser,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +88,63 @@ class ConversationMessage(BaseModel):
 class ChatMessageRequest(BaseModel):
     content: str
     metadata: Optional[Dict[str, Any]] = None
+
+# ---------------------------------------------------------------------------
+# Mass-assignment-safe request models (issue #6 MEDIUM-1 / BOPLA).
+# Each forbids unknown fields so clients cannot inject derived/sensitive
+# attributes (status, owner, ids) that should never be client-settable.
+# ---------------------------------------------------------------------------
+class SandboxExecuteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    command: str = Field(..., min_length=1, description="Command to execute in the sandbox")
+    working_dir: Optional[str] = Field(None, description="Optional working directory")
+
+class AgentFromTemplateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    template_id: str = Field(..., description="Template identifier")
+    name: str = Field(..., description="Agent name")
+    role: Optional[str] = Field(None, description="Agent role")
+    type: Optional[str] = Field(None, description="Agent type")
+    config: Dict[str, Any] = Field(default_factory=dict, description="Agent configuration")
+    repository_settings: Dict[str, Any] = Field(default_factory=dict, description="Repository settings")
+    sandbox_settings: Dict[str, Any] = Field(default_factory=dict, description="Sandbox settings")
+    overrides: Dict[str, Any] = Field(default_factory=dict, description="Per-agent config overrides")
+    team_id: Optional[str] = Field(None, description="Team to attach the agent to")
+    organization_id: Optional[str] = Field(None, description="Owning organization id")
+
+class TaskUpdateRequest(BaseModel):
+    # Only the fields a client is allowed to set. `status`/`result` are the
+    # intended mutable fields here; anything else is rejected.
+    model_config = ConfigDict(extra="forbid")
+    status: Optional[str] = Field(None, description="New task status")
+    result: Optional[Any] = Field(None, description="Task result payload")
+
+class InteractionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    agent_id: str = Field(..., description="Agent id the interaction belongs to")
+    content: str = Field(..., description="Interaction content")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Interaction metadata")
+
+class AgentRegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    container_id: Optional[str] = Field(None, description="Container id hosting the agent")
+    capabilities: List[str] = Field(default_factory=list, description="Agent capabilities")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Registration metadata")
+
+class AgentErrorRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    error: str = Field(..., description="Error message")
+    details: Optional[Dict[str, Any]] = Field(None, description="Optional structured details")
+
+class ClaudeSessionInputBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    input: str = Field(..., min_length=1, description="Input to send to the Claude SDK session")
+
+class AgentCommunicationBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message_type: str = Field(default="notification", description="Message type")
+    content: str = Field(..., min_length=1, description="Message content")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 # Model Configuration Models
 class ProviderCredentialsRequest(BaseModel):
@@ -380,6 +446,11 @@ app = FastAPI(
     """,
     version="2.0.0",
     lifespan=lifespan,
+    # SECURITY (issue #6 CRITICAL-1): authenticate EVERY route by default.
+    # `get_current_user` short-circuits the public allowlist (health/docs) and
+    # raises 401 for any other route without a valid bearer token. Object-level
+    # authorization (BOLA) is layered on dangerous/by-id handlers below.
+    dependencies=[Depends(get_current_user)],
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=[
@@ -438,9 +509,24 @@ app = FastAPI(
     ]
 )
 
+# SECURITY (issue #6 / PR #7): non-wildcard, env-driven CORS allowlist.
+# allow_origins=["*"] with allow_credentials=True is a forbidden combination;
+# any "*" entry is stripped and we fall back to the local dev origins.
+def _cors_allow_origins() -> List[str]:
+    raw = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://localhost:3031,http://localhost",
+    )
+    origins = [o.strip() for o in raw.split(",") if o.strip() and o.strip() != "*"]
+    return origins or [
+        "http://localhost:3000",
+        "http://localhost:3031",
+        "http://localhost",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3031", "http://localhost"],
+    allow_origins=_cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -478,6 +564,12 @@ async def health_check():
 # WebSocket for real-time updates
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    # SECURITY (issue #6 / PR #7): app-level Depends(get_current_user) does NOT
+    # cover WebSocket routes. Authenticate at connect time BEFORE accept(); on
+    # failure authenticate_websocket() closes the socket (1008) and returns None.
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         while True:
@@ -494,6 +586,10 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.websocket("/ws/tasks/{task_id}")
 async def task_websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time task execution updates"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         while True:
@@ -533,6 +629,10 @@ async def task_websocket_endpoint(websocket: WebSocket, task_id: str):
 @app.websocket("/ws/tasks/{task_id}/conversation")
 async def conversation_websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time Claude SDK conversation streaming"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         # Get execution context
@@ -591,6 +691,10 @@ async def conversation_websocket_endpoint(websocket: WebSocket, task_id: str):
 @app.websocket("/ws/tasks/{task_id}/file-operations")
 async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time file operations updates"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         # Get execution context
@@ -842,14 +946,17 @@ async def get_task(task_id: str):
 
 # Autonomous Execution Endpoints
 @app.post("/agents/from-template")
-async def create_agent_from_template(request: dict):
-    """Create agent from template with repository settings"""
+async def create_agent_from_template(
+    request: AgentFromTemplateRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Create agent from template with repository settings (authenticated)."""
     try:
         # Extract template data
-        template_id = request.get("template_id")
-        name = request.get("name")
-        team_id = request.get("team_id")
-        overrides = request.get("overrides", {})
+        template_id = request.template_id
+        name = request.name
+        team_id = request.team_id
+        overrides = request.overrides
         
         # Get template configuration
         template_config = await app.state.agent_manager.get_template_config(template_id)
@@ -864,7 +971,7 @@ async def create_agent_from_template(request: dict):
             "template_id": template_id,
             "team_id": team_id,
             "config": {**template_config.get("config", {}), **overrides},
-            "repository_settings": request.get("repository_settings", {}),
+            "repository_settings": request.repository_settings,
             "sandbox_settings": {
                 "base_image": f"fuzeagent/dev-{template_id.split('_')[0]}:latest",
                 "resource_limits": template_config.get("resource_limits", {
@@ -899,8 +1006,14 @@ async def get_agent_templates():
           summary="Start Autonomous Task Execution",
           description="Begin autonomous execution of a task using Claude SDK integration",
           response_model=TaskResponse)
-async def start_task_execution(task_id: str = Path(..., description="Task ID to execute")):
-    """Start autonomous execution of a task"""
+async def start_task_execution(
+    task_id: str = Path(..., description="Task ID to execute"),
+    user: CurrentUser = Depends(require_user),
+):
+    """Start autonomous execution of a task.
+
+    SECURITY (issue #6 CRITICAL-1): autonomous execution must be authenticated.
+    """
     try:
         # This will be handled by the TaskExecutionEngine
         result = await app.state.task_queue.start_autonomous_execution(task_id)
@@ -937,22 +1050,29 @@ async def get_agent_sandbox(agent_id: str):
 
 # Additional endpoints for UI support
 @app.put("/tasks/{task_id}")
-async def update_task(task_id: str, update_data: dict):
-    """Update task status and result"""
+async def update_task(
+    task_id: str,
+    update_data: TaskUpdateRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Update task status and result (authenticated, mass-assignment-safe)."""
     await app.state.task_queue.update_task_status(
         task_id=task_id,
-        status=update_data.get('status'),
-        result=update_data.get('result')
+        status=update_data.status,
+        result=update_data.result
     )
     return {"status": "updated"}
 
 @app.post("/context/interactions")
-async def store_interaction(interaction_data: dict):
-    """Store agent interaction"""
+async def store_interaction(
+    interaction_data: InteractionRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Store agent interaction (authenticated, mass-assignment-safe)."""
     interaction_id = await app.state.context_service.store_interaction(
-        agent_id=interaction_data.get('agent_id'),
-        content=interaction_data.get('content'),
-        metadata=interaction_data.get('metadata', {})
+        agent_id=interaction_data.agent_id,
+        content=interaction_data.content,
+        metadata=interaction_data.metadata
     )
     return {"interaction_id": interaction_id}
 
@@ -1192,15 +1312,24 @@ async def list_sandboxes(agent_id: str = None, status: str = None):
         raise HTTPException(status_code=500, detail=f"Failed to list sandboxes: {str(e)}")
 
 @app.post("/sandboxes/{sandbox_id}/execute")
-async def execute_command_in_sandbox(sandbox_id: str, command_data: dict):
-    """Execute a command in a sandbox"""
+async def execute_command_in_sandbox(
+    sandbox_id: str,
+    command_data: SandboxExecuteRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Execute a command in a sandbox.
+
+    SECURITY (issue #6 CRITICAL-1): unauthenticated-RCE-by-design previously.
+    Now requires a verified principal (401 if absent) and an explicit,
+    extra-forbidding request model (no mass-assignment).
+    """
     try:
-        command = command_data.get("command")
-        working_dir = command_data.get("working_dir")
-        
+        command = command_data.command
+        working_dir = command_data.working_dir
+
         if not command:
             raise HTTPException(status_code=400, detail="Command is required")
-            
+
         result = await app.state.sandbox_manager.execute_command(
             sandbox_id=sandbox_id,
             command=command,
@@ -1224,8 +1353,12 @@ async def destroy_sandbox(sandbox_id: str):
 
 # Agent registration and communication endpoints
 @app.post("/agents/{agent_id}/register")
-async def register_agent(agent_id: str, registration_data: dict):
-    """Register an agent running in a sandbox container"""
+async def register_agent(
+    agent_id: str,
+    registration_data: AgentRegistrationRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Register an agent running in a sandbox container (authenticated)."""
     try:
         # Store agent registration info
         # This would typically update the agent's status and capabilities
@@ -1259,11 +1392,15 @@ async def get_next_task_for_agent(agent_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get next task: {str(e)}")
 
 @app.post("/agents/{agent_id}/error")
-async def report_agent_error(agent_id: str, error_data: dict):
-    """Report an error from an agent"""
+async def report_agent_error(
+    agent_id: str,
+    error_data: AgentErrorRequest,
+    user: CurrentUser = Depends(require_user),
+):
+    """Report an error from an agent (authenticated, mass-assignment-safe)."""
     try:
         # Log the error and update agent status
-        logger.error(f"Agent {agent_id} reported error: {error_data.get('error')}")
+        logger.error(f"Agent {agent_id} reported error: {error_data.error}")
         
         # You might want to store this in a database or alerting system
         return {"status": "error_logged", "agent_id": agent_id}
@@ -1404,17 +1541,44 @@ async def get_file_operations_preview(task_id: str, batch_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get file preview: {str(e)}")
 
+async def _authorize_task_org(task_id: str, user: CurrentUser) -> None:
+    """Object-level authorization for a task-scoped action (issue #6 BOLA).
+
+    A task is owned through its assigned agent's organization (task ->
+    assigned_to agent -> team -> org). Resolve that org and require the caller
+    to have access (admins/service principals pass; otherwise the org id must be
+    in the verified token claims). Fails closed: a task whose owning org cannot
+    be determined is denied (403) for non-admins.
+    """
+    task = await app.state.task_queue.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    org_id = task.get("organization_id")
+    if not org_id:
+        agent_id = task.get("assigned_to")
+        if agent_id:
+            agent = await DatabaseManager.get_agent(str(agent_id))
+            if agent:
+                org_id = agent.get("organization_id")
+    # require_org_access fails closed: None/unknown org -> 403 for non-admins.
+    require_org_access(str(org_id) if org_id is not None else "", user)
+
+
 @app.post("/tasks/{task_id}/file-operations/{batch_id}/approve",
           tags=["file-operations", "human-in-loop"],
           summary="Approve File Operations",
           description="Approve or reject file operations from Claude SDK")
-async def approve_file_operations(task_id: str = Path(..., description="Task ID"), 
-                                  batch_id: str = Path(..., description="Batch ID"), 
-                                  approval_data: FileOperationApprovalRequest = Body(...)):
-    """Approve or reject file operations"""
+async def approve_file_operations(task_id: str = Path(..., description="Task ID"),
+                                  batch_id: str = Path(..., description="Batch ID"),
+                                  approval_data: FileOperationApprovalRequest = Body(...),
+                                  user: CurrentUser = Depends(require_user)):
+    """Approve or reject file operations (object-level authz — issue #6 BOLA)."""
     try:
+        # BOLA: caller must own the task (via its agent's org) to approve writes.
+        await _authorize_task_org(task_id, user)
+
         approved = approval_data.get("approved", False)
-        
+
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution or not execution.file_operations_engine:
             raise HTTPException(status_code=404, detail="Task not found or no file operations available")
@@ -1437,14 +1601,21 @@ async def approve_file_operations(task_id: str = Path(..., description="Task ID"
             }
         else:
             raise HTTPException(status_code=400, detail="Failed to process approval")
-            
+
+    except HTTPException:
+        # Preserve 401/403/404/400 (incl. the BOLA 403) instead of masking as 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to approve file operations: {str(e)}")
 
 @app.post("/tasks/{task_id}/file-operations/{batch_id}/rollback")
-async def rollback_file_operations(task_id: str, batch_id: str):
-    """Rollback applied file operations"""
+async def rollback_file_operations(task_id: str, batch_id: str,
+                                   user: CurrentUser = Depends(require_user)):
+    """Rollback applied file operations (object-level authz — issue #6 BOLA)."""
     try:
+        # BOLA: caller must own the task (via its agent's org) to roll back.
+        await _authorize_task_org(task_id, user)
+
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution or not execution.file_operations_engine:
             raise HTTPException(status_code=404, detail="Task not found or no file operations available")
@@ -1460,7 +1631,10 @@ async def rollback_file_operations(task_id: str, batch_id: str):
             }
         else:
             raise HTTPException(status_code=400, detail="Failed to rollback operations")
-            
+
+    except HTTPException:
+        # Preserve 401/403/404/400 (incl. the BOLA 403) instead of masking as 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to rollback file operations: {str(e)}")
 
@@ -1480,10 +1654,14 @@ async def get_claude_session_status(task_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get Claude session status: {str(e)}")
 
 @app.post("/tasks/{task_id}/claude-session/input")
-async def send_claude_session_input(task_id: str, input_data: dict):
-    """Send input to Claude SDK session"""
+async def send_claude_session_input(
+    task_id: str,
+    input_data: ClaudeSessionInputBody,
+    user: CurrentUser = Depends(require_user),
+):
+    """Send input to Claude SDK session (authenticated, mass-assignment-safe)."""
     try:
-        user_input = input_data.get("input", "")
+        user_input = input_data.input
         if not user_input:
             raise HTTPException(status_code=400, detail="Input cannot be empty")
             
@@ -1742,13 +1920,18 @@ async def cancel_coordination(session_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to cancel coordination: {str(e)}")
 
 @app.post("/agents/{from_agent_id}/communicate/{to_agent_id}")
-async def send_agent_communication(from_agent_id: str, to_agent_id: str, communication_data: dict):
-    """Send communication between agents"""
+async def send_agent_communication(
+    from_agent_id: str,
+    to_agent_id: str,
+    communication_data: AgentCommunicationBody,
+    user: CurrentUser = Depends(require_user),
+):
+    """Send communication between agents (authenticated, mass-assignment-safe)."""
     try:
-        message_type = communication_data.get("message_type", "notification")
-        content = communication_data.get("content", "")
-        metadata = communication_data.get("metadata", {})
-        
+        message_type = communication_data.message_type
+        content = communication_data.content
+        metadata = communication_data.metadata
+
         if not content:
             raise HTTPException(status_code=400, detail="Content cannot be empty")
             
@@ -1800,6 +1983,10 @@ async def get_active_coordinations():
 @app.websocket("/ws/coordination/{session_id}")
 async def coordination_websocket_endpoint(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for real-time coordination updates"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         coordinator = getattr(app.state.task_execution_engine, 'multi_agent_coordinator', None)
@@ -1860,9 +2047,18 @@ async def coordination_websocket_endpoint(websocket: WebSocket, session_id: str)
 async def store_provider_credentials(
     organization_id: str = Path(..., description="Organization ID"),
     provider: str = Path(..., description="Provider name"),
-    credentials: ProviderCredentialsRequest = Body(...)
+    credentials: ProviderCredentialsRequest = Body(...),
+    user: CurrentUser = Depends(require_user),
 ):
-    """Store encrypted API credentials for a model provider at organization level"""
+    """Store encrypted API credentials for a model provider at organization level.
+
+    SECURITY (issue #6 CRITICAL-2): this writes provider secrets scoped by the
+    path ``organization_id``. The path id is NOT the authorization boundary —
+    the caller must be authorized for that specific organization (object-level
+    authz, BOLA mitigation). Non-members get 403.
+    """
+    # Object-level authorization on the org id from the path (fail closed).
+    require_org_access(organization_id, user)
     try:
         from model_configuration import model_config_manager, ModelProvider
         
@@ -1900,9 +2096,14 @@ async def store_provider_credentials(
 async def get_available_models(
     organization_id: str = Path(..., description="Organization ID"),
     provider: Optional[str] = Query(None, description="Filter by provider"),
-    capabilities: Optional[str] = Query(None, description="Filter by capabilities (comma-separated)")
+    capabilities: Optional[str] = Query(None, description="Filter by capabilities (comma-separated)"),
+    user: CurrentUser = Depends(require_user),
 ):
-    """Get available AI models with provider credential validation"""
+    """Get available AI models with provider credential validation.
+
+    SECURITY (issue #6): object-level authz on the org id from the path.
+    """
+    require_org_access(organization_id, user)
     try:
         from model_configuration import model_config_manager, ModelProvider, ModelCapability
         
@@ -1941,9 +2142,14 @@ async def get_available_models(
           description="Configure model settings and preferences for an agent")
 async def configure_agent_model(
     agent_id: str = Path(..., description="Agent ID"),
-    config: AgentModelConfigRequest = Body(...)
+    config: AgentModelConfigRequest = Body(...),
+    user: CurrentUser = Depends(require_user),
 ):
-    """Configure model settings for an AI agent"""
+    """Configure model settings for an AI agent.
+
+    SECURITY (issue #6): repointing an agent at attacker-controlled models/keys
+    must be authenticated. Authorize the caller before mutating agent config.
+    """
     try:
         from model_configuration import model_config_manager, AgentModelConfig
         
@@ -1981,8 +2187,11 @@ async def configure_agent_model(
          tags=["model-configuration"],
          summary="Get Agent Model Configuration",
          description="Get current model configuration for an agent")
-async def get_agent_model_configuration(agent_id: str = Path(..., description="Agent ID")):
-    """Get model configuration for an AI agent"""
+async def get_agent_model_configuration(
+    agent_id: str = Path(..., description="Agent ID"),
+    user: CurrentUser = Depends(require_user),
+):
+    """Get model configuration for an AI agent (authenticated)."""
     try:
         from model_configuration import model_config_manager
         
@@ -4281,6 +4490,10 @@ async def execute_container_command(
 @app.websocket("/agents/{agent_id}/container/logs/stream")
 async def stream_agent_container_logs(websocket: WebSocket, agent_id: str):
     """Stream container logs in real-time via WebSocket"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     
     try:
@@ -4478,7 +4691,12 @@ async def websocket_real_time_updates(
 ):
     """Main WebSocket endpoint for real-time updates"""
     import uuid
-    
+
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    current_user = await authenticate_websocket(websocket)
+    if current_user is None:
+        return
+
     connection_id = str(uuid.uuid4())
     
     # Parse subscriptions
@@ -4543,7 +4761,12 @@ async def websocket_real_time_updates(
 async def websocket_agent_updates(websocket: WebSocket, agent_id: str):
     """WebSocket endpoint for specific agent updates"""
     import uuid
-    
+
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    current_user = await authenticate_websocket(websocket)
+    if current_user is None:
+        return
+
     connection_id = f"agent-{agent_id}-{uuid.uuid4()}"
     
     try:
@@ -4580,9 +4803,14 @@ async def websocket_agent_updates(websocket: WebSocket, agent_id: str):
 async def websocket_agent_conversation(websocket: WebSocket, agent_id: str, conversation_id: str):
     """WebSocket endpoint for real-time agent conversation"""
     import uuid
-    
+
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    current_user = await authenticate_websocket(websocket)
+    if current_user is None:
+        return
+
     connection_id = f"conversation-{conversation_id}-{uuid.uuid4()}"
-    
+
     await websocket.accept()
     
     try:
@@ -4684,7 +4912,16 @@ async def websocket_agent_conversation(websocket: WebSocket, agent_id: str, conv
 async def websocket_organization_updates(websocket: WebSocket, organization_id: str):
     """WebSocket endpoint for organization-wide updates"""
     import uuid
-    
+
+    # SECURITY (issue #6 / PR #7): connect-time auth + object-level org authz
+    # (app deps don't cover WS). Close 1008 if not authorized for this org.
+    current_user = await authenticate_websocket(websocket)
+    if current_user is None:
+        return
+    if not current_user.can_access_org(str(organization_id)):
+        await websocket.close(code=1008)
+        return
+
     connection_id = f"org-{organization_id}-{uuid.uuid4()}"
     
     try:

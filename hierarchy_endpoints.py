@@ -9,7 +9,7 @@ import asyncpg
 import json
 import uuid
 import httpx
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -17,15 +17,39 @@ from typing import List, Optional, Dict, Set
 
 # Configuration
 import os
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:J7hplO7vKnbUsKDAsxpe4t9C0@localhost:5434/ai_context")
+# SECURITY (issue #6): do not ship a real-looking DB password as a default.
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5434/ai_context")
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
 
-app = FastAPI(title="FuzeAgent Hierarchy API", version="1.0.0")
+try:
+    from auth import get_current_user, require_user, require_org_access, CurrentUser, authenticate_websocket
+except Exception:  # pragma: no cover - allow import from repo root or service dir
+    from services.orchestrator.auth import (  # type: ignore
+        get_current_user, require_user, require_org_access, CurrentUser,
+        authenticate_websocket,
+    )
 
-# CORS middleware - very permissive for development
+# SECURITY (issue #6 CRITICAL-1): authenticate every route by default (health
+# and docs are on the allowlist inside get_current_user).
+app = FastAPI(
+    title="FuzeAgent Hierarchy API",
+    version="1.0.0",
+    dependencies=[Depends(get_current_user)],
+)
+
+# SECURITY (issue #6 MEDIUM-2): explicit, non-wildcard origins when credentials
+# are allowed (wildcard + credentials is both insecure and spec-invalid).
+_cors_origins = [
+    o.strip()
+    for o in os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://localhost:3031,http://localhost",
+    ).split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -157,7 +181,13 @@ async def create_organization(org_data: OrganizationCreate):
         return organization
 
 @app.get("/organizations/{organization_id}", response_model=Organization)
-async def get_organization(organization_id: str):
+async def get_organization(
+    organization_id: str,
+    user: CurrentUser = Depends(require_user),
+):
+    # SECURITY (issue #6 HIGH-2 / BOLA): authorize the specific org id from the
+    # path; bare ``WHERE id = $1`` is not an authorization boundary.
+    require_org_access(organization_id, user)
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow("""
             SELECT 
@@ -257,19 +287,23 @@ async def create_team(team_data: TeamCreate):
         return team
 
 @app.get("/teams/{team_id}", response_model=Team)
-async def get_team(team_id: str):
+async def get_team(
+    team_id: str,
+    user: CurrentUser = Depends(require_user),
+):
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow("""
-            SELECT 
+            SELECT
                 id::text, organization_id::text, name, description,
                 team_type, settings, created_at::text, updated_at::text
-            FROM teams 
+            FROM teams
             WHERE id = $1
         """, team_id)
-        
+
         if not row:
             raise HTTPException(status_code=404, detail="Team not found")
-        
+        # SECURITY (issue #6 HIGH-2): authorize via the team's parent org.
+        require_org_access(row['organization_id'], user)
         return Team(
             id=row['id'],
             organization_id=row['organization_id'],
@@ -284,6 +318,14 @@ async def get_team(team_id: str):
 # WebSocket endpoint for real-time updates
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    # SECURITY (issue #6 CRITICAL-2): authenticate BEFORE accept(). The
+    # app-wide ``dependencies=[Depends(get_current_user)]`` is a no-op on
+    # WebSocket routes (WS handshakes have no HTTP response channel); every WS
+    # handler must call authenticate_websocket() first — matching the pattern
+    # already used by all handlers in services/orchestrator/main.py.
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return  # authenticate_websocket already closed the socket (1008)
     await manager.connect(websocket)
     try:
         while True:
