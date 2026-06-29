@@ -22,10 +22,11 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
 
 try:
-    from auth import get_current_user, require_user, require_org_access, CurrentUser
+    from auth import get_current_user, require_user, require_org_access, CurrentUser, authenticate_websocket
 except Exception:  # pragma: no cover - allow import from repo root or service dir
     from services.orchestrator.auth import (  # type: ignore
         get_current_user, require_user, require_org_access, CurrentUser,
+        authenticate_websocket,
     )
 
 # SECURITY (issue #6 CRITICAL-1): authenticate every route by default (health
@@ -317,6 +318,14 @@ async def get_team(
 # WebSocket endpoint for real-time updates
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    # SECURITY (issue #6 CRITICAL-2): authenticate BEFORE accept(). The
+    # app-wide ``dependencies=[Depends(get_current_user)]`` is a no-op on
+    # WebSocket routes (WS handshakes have no HTTP response channel); every WS
+    # handler must call authenticate_websocket() first — matching the pattern
+    # already used by all handlers in services/orchestrator/main.py.
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return  # authenticate_websocket already closed the socket (1008)
     await manager.connect(websocket)
     try:
         while True:
