@@ -46,7 +46,7 @@ import os
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import Depends, HTTPException, Request, WebSocket, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPBearer
 
 try:  # python-jose is already a declared dependency (requirements.txt)
     from jose import JWTError, jwt
@@ -226,15 +226,48 @@ def _decode_token(token: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _bearer_from_request(request: Request) -> Optional[str]:
+    """Extract a bearer token from the ``Authorization`` header (manually).
+
+    We read the header directly rather than via ``Depends(HTTPBearer())`` so the
+    app-wide dependency does NOT pull in an HTTP-only security sub-dependency:
+    FastAPI attaches app-level ``dependencies`` to WebSocket routes too, and
+    ``HTTPBearer.__call__`` raises ``TypeError`` on a WebSocket connection
+    (it requires an HTTP ``Request``). Reading the header keeps this dependency
+    safe to evaluate in either scope. The standalone ``_bearer_scheme`` is still
+    exported for OpenAPI's Authorize button on individual routes.
+    """
+    header = request.headers.get("authorization") or request.headers.get(
+        "Authorization"
+    )
+    if not header:
+        return None
+    parts = header.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1] or None
+    return None
+
+
 async def get_current_user(
-    request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+    request: Request = None,  # type: ignore[assignment]
+    websocket: WebSocket = None,  # type: ignore[assignment]
 ) -> Optional[CurrentUser]:
     """App-wide authentication dependency.
 
     Returns the verified :class:`CurrentUser`, or raises 401. Public allowlist
     paths short-circuit and return ``None``. Fails closed for everything else.
+
+    NOTE: FastAPI attaches app-level ``dependencies`` to WebSocket routes too,
+    but injects a ``WebSocket`` (not a ``Request``) there. Both params are
+    therefore optional; on a WebSocket connection this dependency is a no-op
+    (returns ``None``) because a WS handshake cannot carry an HTTP 401 response
+    — WS handlers authenticate explicitly via :func:`authenticate_websocket`.
     """
+    # WebSocket scope: app-level deps cannot 401 a handshake. No-op here; the
+    # handler enforces auth via authenticate_websocket() before accept().
+    if websocket is not None or request is None:
+        return None
+
     # Public allowlist — health/readiness/docs are reachable without a token.
     if is_public_path(request.url.path):
         return None
@@ -256,10 +289,11 @@ async def get_current_user(
         )
         raise _UNAUTHENTICATED
 
-    if credentials is None or not credentials.credentials:
+    token = _bearer_from_request(request)
+    if not token:
         raise _UNAUTHENTICATED
 
-    claims = _decode_token(credentials.credentials)
+    claims = _decode_token(token)
     user = CurrentUser(claims)
     if not user.id:
         raise HTTPException(
