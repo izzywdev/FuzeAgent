@@ -26,6 +26,7 @@ from auth import (
     require_user,
     require_admin,
     require_org_access,
+    authenticate_websocket,
     CurrentUser,
 )
 
@@ -563,6 +564,12 @@ async def health_check():
 # WebSocket for real-time updates
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    # SECURITY (issue #6 / PR #7): app-level Depends(get_current_user) does NOT
+    # cover WebSocket routes. Authenticate at connect time BEFORE accept(); on
+    # failure authenticate_websocket() closes the socket (1008) and returns None.
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         while True:
@@ -579,6 +586,10 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.websocket("/ws/tasks/{task_id}")
 async def task_websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time task execution updates"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         while True:
@@ -618,6 +629,10 @@ async def task_websocket_endpoint(websocket: WebSocket, task_id: str):
 @app.websocket("/ws/tasks/{task_id}/conversation")
 async def conversation_websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time Claude SDK conversation streaming"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         # Get execution context
@@ -676,6 +691,10 @@ async def conversation_websocket_endpoint(websocket: WebSocket, task_id: str):
 @app.websocket("/ws/tasks/{task_id}/file-operations")
 async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time file operations updates"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         # Get execution context
@@ -1964,6 +1983,10 @@ async def get_active_coordinations():
 @app.websocket("/ws/coordination/{session_id}")
 async def coordination_websocket_endpoint(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for real-time coordination updates"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     try:
         coordinator = getattr(app.state.task_execution_engine, 'multi_agent_coordinator', None)
@@ -4467,6 +4490,10 @@ async def execute_container_command(
 @app.websocket("/agents/{agent_id}/container/logs/stream")
 async def stream_agent_container_logs(websocket: WebSocket, agent_id: str):
     """Stream container logs in real-time via WebSocket"""
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
     await websocket.accept()
     
     try:
@@ -4664,7 +4691,12 @@ async def websocket_real_time_updates(
 ):
     """Main WebSocket endpoint for real-time updates"""
     import uuid
-    
+
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    current_user = await authenticate_websocket(websocket)
+    if current_user is None:
+        return
+
     connection_id = str(uuid.uuid4())
     
     # Parse subscriptions
@@ -4729,7 +4761,12 @@ async def websocket_real_time_updates(
 async def websocket_agent_updates(websocket: WebSocket, agent_id: str):
     """WebSocket endpoint for specific agent updates"""
     import uuid
-    
+
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    current_user = await authenticate_websocket(websocket)
+    if current_user is None:
+        return
+
     connection_id = f"agent-{agent_id}-{uuid.uuid4()}"
     
     try:
@@ -4766,9 +4803,14 @@ async def websocket_agent_updates(websocket: WebSocket, agent_id: str):
 async def websocket_agent_conversation(websocket: WebSocket, agent_id: str, conversation_id: str):
     """WebSocket endpoint for real-time agent conversation"""
     import uuid
-    
+
+    # SECURITY (issue #6 / PR #7): connect-time auth (app deps don't cover WS).
+    current_user = await authenticate_websocket(websocket)
+    if current_user is None:
+        return
+
     connection_id = f"conversation-{conversation_id}-{uuid.uuid4()}"
-    
+
     await websocket.accept()
     
     try:
@@ -4870,7 +4912,16 @@ async def websocket_agent_conversation(websocket: WebSocket, agent_id: str, conv
 async def websocket_organization_updates(websocket: WebSocket, organization_id: str):
     """WebSocket endpoint for organization-wide updates"""
     import uuid
-    
+
+    # SECURITY (issue #6 / PR #7): connect-time auth + object-level org authz
+    # (app deps don't cover WS). Close 1008 if not authorized for this org.
+    current_user = await authenticate_websocket(websocket)
+    if current_user is None:
+        return
+    if not current_user.can_access_org(str(organization_id)):
+        await websocket.close(code=1008)
+        return
+
     connection_id = f"org-{organization_id}-{uuid.uuid4()}"
     
     try:

@@ -45,7 +45,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional, Set
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, WebSocket, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 try:  # python-jose is already a declared dependency (requirements.txt)
@@ -305,4 +305,89 @@ def require_org_access(organization_id: str, user: CurrentUser) -> CurrentUser:
             ...
     """
     user.require_org_access(organization_id)
+    return user
+
+
+# ---------------------------------------------------------------------------
+# WebSocket authentication
+# ---------------------------------------------------------------------------
+#
+# IMPORTANT: the app-wide ``dependencies=[Depends(get_current_user)]`` applied
+# to the FastAPI app does NOT run for WebSocket routes — Starlette only applies
+# router/app dependencies to HTTP requests. WebSocket handlers must therefore
+# authenticate explicitly, BEFORE ``websocket.accept()``. Browsers cannot set
+# an ``Authorization`` header on a WS handshake, so the token is accepted from
+# (in order): the ``Authorization: Bearer`` header (non-browser clients), the
+# ``Sec-WebSocket-Protocol`` subprotocol (``bearer,<token>``), or a ``token`` /
+# ``access_token`` query parameter. Fails closed: no/invalid token -> the
+# socket is closed with policy-violation (1008) and ``None`` is returned.
+
+
+def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
+    """Pull a bearer token from header, subprotocol, or query param."""
+    # 1) Authorization header (programmatic clients).
+    auth_header = websocket.headers.get("authorization") or websocket.headers.get(
+        "Authorization"
+    )
+    if auth_header:
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer" and parts[1]:
+            return parts[1]
+        if len(parts) == 1 and parts[0]:
+            return parts[0]
+
+    # 2) Sec-WebSocket-Protocol: "bearer, <token>" (browser-friendly).
+    proto = websocket.headers.get("sec-websocket-protocol")
+    if proto:
+        items = [p.strip() for p in proto.split(",") if p.strip()]
+        if len(items) == 2 and items[0].lower() in ("bearer", "authorization"):
+            return items[1]
+        if len(items) == 1 and items[0].lower() not in ("bearer", "authorization"):
+            return items[0]
+
+    # 3) Query parameter (last resort; avoid logging full URLs with tokens).
+    return websocket.query_params.get("token") or websocket.query_params.get(
+        "access_token"
+    )
+
+
+async def authenticate_websocket(websocket: WebSocket) -> Optional[CurrentUser]:
+    """Connect-time auth for a WebSocket. Returns the principal or closes 1008.
+
+    Call this FIRST inside every ``@app.websocket`` handler, before
+    ``accept()``. On failure it closes the socket (code 1008) and returns
+    ``None`` — the handler must ``return`` immediately when it gets ``None``.
+
+    The local-dev escape hatch mirrors :func:`get_current_user`: it only ever
+    bypasses when ``AUTH_DISABLED`` is set AND no verification material is
+    configured (never in a deployed environment).
+    """
+    # Local-dev bypass — only when NO secret/key configured.
+    if _AUTH_DISABLED and not _auth_configured():
+        logger.warning(
+            "AUTH_DISABLED set and no JWT material — WS authentication BYPASSED."
+        )
+        return CurrentUser({"sub": "dev-bypass", "is_admin": True})
+
+    if not _auth_configured():
+        logger.error("No JWT material configured; rejecting WS %s", websocket.url.path)
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return None
+
+    token = _extract_ws_token(websocket)
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return None
+
+    try:
+        claims = _decode_token(token)
+    except HTTPException:
+        # Invalid/expired token — close instead of raising (no HTTP response on WS).
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return None
+
+    user = CurrentUser(claims)
+    if not user.id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return None
     return user
