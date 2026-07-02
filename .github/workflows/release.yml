@@ -1,0 +1,108 @@
+name: Release (images + GitOps bump)
+
+# On push to main: build the four service images, push to GHCR tagged with the
+# commit SHA, then bump the four image tags in values-prod.yaml and commit.
+# Argo CD (run by FuzeInfra) sees the git change and rolls out the new images.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/orchestrator/**'
+      - 'services/ui-react/**'
+      - 'mcp-servers/fuzeagent-server/**'
+      - 'Dockerfile.hierarchy'
+      - 'hierarchy_endpoints.py'
+      - 'requirements-hierarchy.txt'
+      - 'deploy/helm/fuzeagent/**'
+      - '.github/workflows/release.yml'
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build-and-bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit the tag bump
+      packages: write # push to GHCR
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tag
+        id: tag
+        run: echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push orchestrator
+        uses: docker/build-push-action@v5
+        with:
+          context: services/orchestrator
+          file: services/orchestrator/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/izzywdev/fuzeagent-orchestrator:${{ steps.tag.outputs.sha }}
+            ghcr.io/izzywdev/fuzeagent-orchestrator:latest
+          cache-from: type=gha,scope=orchestrator
+          cache-to: type=gha,mode=max,scope=orchestrator
+
+      - name: Build & push hierarchy-api
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.hierarchy
+          push: true
+          tags: |
+            ghcr.io/izzywdev/fuzeagent-hierarchy-api:${{ steps.tag.outputs.sha }}
+            ghcr.io/izzywdev/fuzeagent-hierarchy-api:latest
+          cache-from: type=gha,scope=hierarchy
+          cache-to: type=gha,mode=max,scope=hierarchy
+
+      - name: Build & push ui
+        uses: docker/build-push-action@v5
+        with:
+          context: services/ui-react
+          file: services/ui-react/Dockerfile
+          push: true
+          # No VITE_API_URL build-arg: config/api.ts derives the API base from
+          # window.location.origin in production, and the UI's own nginx proxies
+          # same-origin /api/orchestrator + /api/hierarchy to the backends.
+          tags: |
+            ghcr.io/izzywdev/fuzeagent-ui:${{ steps.tag.outputs.sha }}
+            ghcr.io/izzywdev/fuzeagent-ui:latest
+          cache-from: type=gha,scope=ui
+          cache-to: type=gha,mode=max,scope=ui
+
+      - name: Build & push mcp-server
+        uses: docker/build-push-action@v5
+        with:
+          context: mcp-servers/fuzeagent-server
+          file: mcp-servers/fuzeagent-server/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/izzywdev/fuzeagent-mcp-server:${{ steps.tag.outputs.sha }}
+            ghcr.io/izzywdev/fuzeagent-mcp-server:latest
+          cache-from: type=gha,scope=mcp
+          cache-to: type=gha,mode=max,scope=mcp
+
+      - name: Bump image tags in values-prod.yaml (GitOps)
+        run: |
+          SHA="${{ steps.tag.outputs.sha }}"
+          # Rewrites the four app-image `tag:` lines. Datastore images are single
+          # `image:` strings (no tag: key), so they are untouched.
+          sed -i -E "s/^(\s*tag:).*/\1 ${SHA}/" deploy/helm/fuzeagent/values-prod.yaml
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add deploy/helm/fuzeagent/values-prod.yaml
+          git commit -m "release: fuzeagent images ${SHA} [skip ci]" || exit 0
+          git push

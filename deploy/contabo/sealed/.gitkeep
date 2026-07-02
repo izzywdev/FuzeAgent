@@ -1,0 +1,3 @@
+# Committed SealedSecrets land here (fuzeagent-secrets.yaml, ghcr-pull.yaml),
+# produced by .github/workflows/seal-secrets.yml and reconciled onto the cluster
+# by the fuzeagent-sealed Argo application. Only ciphertext is ever committed.
