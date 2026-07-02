@@ -20,11 +20,20 @@ const getAPIEndpoints = () => {
       WEBSOCKET_BASE: `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}:8000`
     }
   } else {
-    // Production endpoints (through nginx proxy)
+    // Production endpoints (through the UI's own nginx reverse-proxy).
+    // Two stable, distinct path prefixes so the two backends never collide
+    // on overlapping route names (e.g. /teams exists on both):
+    //   /api/orchestrator/* -> orchestrator:8000
+    //   /api/hierarchy/*    -> hierarchy-api:8006
     return {
-      ORCHESTRATOR_API_BASE: `${protocol}//${hostname}/api`,
-      HIERARCHY_API_BASE: `${protocol}//${hostname}/api`,
-      WEBSOCKET_BASE: `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}/api`
+      // Core orchestrator API (agents, tasks, goals, knowledge, rag, containers, conversations)
+      ORCHESTRATOR_API_BASE: `${protocol}//${hostname}/api/orchestrator`,
+
+      // Hierarchy API (organizations, teams)
+      HIERARCHY_API_BASE: `${protocol}//${hostname}/api/hierarchy`,
+
+      // WebSocket endpoints (served by the orchestrator)
+      WEBSOCKET_BASE: `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}/api/orchestrator`
     }
   }
 }
