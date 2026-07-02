@@ -14,6 +14,16 @@ reconciles them. We never `kubectl apply` to prod.
   - `ghcr-pull.yaml` — GHCR image-pull secret (name **must** match
     `imagePullSecrets` in `values-prod.yaml` = `ghcr-pull`).
 
+## Image pull / GHCR visibility
+The chart references `imagePullSecrets: [ghcr-pull]` so the day this repo goes
+private it Just Works. For now (repo class `oss-public`) we run with **public
+GHCR packages**: after the first `release.yml` build, set the four
+`ghcr.io/izzywdev/fuzeagent-*` packages to **public** (GitHub → package →
+Package settings → Change visibility). Public images pull anonymously, so the
+missing `ghcr-pull` secret is only a harmless warning event. To go private later:
+create a `read:packages` PAT, set repo secret `GHCR_PAT`, run the seal workflow
+(it then produces `sealed/ghcr-pull.yaml`), and flip the packages private.
+
 ## How to produce them
 Set repo Actions secrets first: `GHCR_PAT` (GHCR read), and optionally
 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`. Then run the
