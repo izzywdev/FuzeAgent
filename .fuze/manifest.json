@@ -1,0 +1,28 @@
+{
+  "repo": "izzywdev/FuzeAgent",
+  "class": "commercial-private",
+  "tier": "product",
+  "expert": "fuzeagent-expert",
+  "baselineRef": "main",
+  "agents": [
+    "contract-designer",
+    "backend-engineer",
+    "database-engineer",
+    "frontend-engineer",
+    "test-engineer",
+    "frontend-test-engineer",
+    "devops-engineer",
+    "docs-maintainer",
+    "security",
+    "mcp-engineer",
+    "fuzeagent-expert",
+    "fuzefront-expert",
+    "fuzeinfra-expert"
+  ],
+  "channels": ["mcp"],
+  "hardening": {
+    "ruleset": false,
+    "requireSignatures": false,
+    "deployOnPush": false
+  }
+}
