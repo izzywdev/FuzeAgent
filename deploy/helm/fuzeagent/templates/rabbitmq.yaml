@@ -1,0 +1,91 @@
+{{- if .Values.rabbitmq.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-data
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.rabbitmq.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: fuzeagent
+      app.kubernetes.io/component: rabbitmq
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: fuzeagent
+        app.kubernetes.io/component: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: {{ .Values.rabbitmq.image }}
+          ports:
+            - name: amqp
+              containerPort: {{ .Values.rabbitmq.port }}
+            - name: management
+              containerPort: {{ .Values.rabbitmq.managementPort }}
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: {{ .Values.rabbitmq.user | quote }}
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: RABBITMQ_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.rabbitmq.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rabbitmq-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rabbitmq
+spec:
+  selector:
+    app.kubernetes.io/part-of: fuzeagent
+    app.kubernetes.io/component: rabbitmq
+  ports:
+    - name: amqp
+      port: {{ .Values.rabbitmq.port }}
+      targetPort: amqp
+    - name: management
+      port: {{ .Values.rabbitmq.managementPort }}
+      targetPort: management
+{{- end }}
