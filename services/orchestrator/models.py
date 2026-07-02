@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import Enum
 import uuid
 
+
 # Enums
 class TeamType(str, Enum):
     DEVELOPMENT = "development"
@@ -12,6 +13,7 @@ class TeamType(str, Enum):
     MANAGEMENT = "management"
     GENERAL = "general"
 
+
 class AgentType(str, Enum):
     EXECUTIVE = "executive"
     DEVELOPER = "developer"
@@ -19,11 +21,13 @@ class AgentType(str, Enum):
     DESIGNER = "designer"
     SPECIALIZED = "specialized"
 
+
 class AgentStatus(str, Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     BUSY = "busy"
     ERROR = "error"
+
 
 class TaskStatus(str, Enum):
     PENDING = "pending"
@@ -31,19 +35,23 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+
 # Organization Models
 class OrganizationBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     settings: Dict[str, Any] = Field(default_factory=dict)
 
+
 class OrganizationCreate(OrganizationBase):
     pass
+
 
 class OrganizationUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     settings: Optional[Dict[str, Any]] = None
+
 
 class Organization(OrganizationBase):
     id: str
@@ -53,6 +61,7 @@ class Organization(OrganizationBase):
     class Config:
         from_attributes = True
 
+
 # Team Models
 class TeamBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -60,14 +69,17 @@ class TeamBase(BaseModel):
     team_type: TeamType = TeamType.GENERAL
     settings: Dict[str, Any] = Field(default_factory=dict)
 
+
 class TeamCreate(TeamBase):
     organization_id: str
+
 
 class TeamUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     team_type: Optional[TeamType] = None
     settings: Optional[Dict[str, Any]] = None
+
 
 class Team(TeamBase):
     id: str
@@ -78,6 +90,7 @@ class Team(TeamBase):
     class Config:
         from_attributes = True
 
+
 # Agent Models
 class AgentBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -86,8 +99,10 @@ class AgentBase(BaseModel):
     config: Dict[str, Any] = Field(default_factory=dict)
     template_id: Optional[str] = None
 
+
 class AgentCreate(AgentBase):
     team_id: str
+
 
 class AgentUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -97,6 +112,7 @@ class AgentUpdate(BaseModel):
     config: Optional[Dict[str, Any]] = None
     team_id: Optional[str] = None
     template_id: Optional[str] = None
+
 
 class Agent(AgentBase):
     id: str
@@ -108,20 +124,24 @@ class Agent(AgentBase):
     class Config:
         from_attributes = True
 
+
 # Extended models with relationships
 class AgentWithTeam(Agent):
     team_name: str
     organization_id: str
     organization_name: str
 
+
 class TeamWithAgents(Team):
     agents: List[Agent] = []
     agent_count: int = 0
+
 
 class OrganizationWithTeams(Organization):
     teams: List[TeamWithAgents] = []
     team_count: int = 0
     agent_count: int = 0
+
 
 # Task Models
 class TaskBase(BaseModel):
@@ -129,9 +149,11 @@ class TaskBase(BaseModel):
     description: Optional[str] = None
     priority: int = Field(default=5, ge=1, le=10)
 
+
 class TaskCreate(TaskBase):
     assigned_to: Optional[str] = None
     created_by: Optional[str] = None
+
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -140,6 +162,7 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = None
     assigned_to: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
+
 
 class Task(TaskBase):
     id: str
@@ -153,14 +176,17 @@ class Task(TaskBase):
     class Config:
         from_attributes = True
 
+
 class TaskWithAgent(Task):
     assigned_agent_name: Optional[str] = None
     created_by_agent_name: Optional[str] = None
+
 
 # Template Models (from existing agent_templates.py)
 class CreateAgentFromTemplate(BaseModel):
     template_id: str
     overrides: Dict[str, Any] = Field(default_factory=dict)
+
 
 class CreateCustomAgent(BaseModel):
     name: str
@@ -168,23 +194,28 @@ class CreateCustomAgent(BaseModel):
     type: str
     config: Dict[str, Any]
 
+
 # Response Models
 class OrganizationResponse(BaseModel):
     organization: Organization
     message: str = "Organization retrieved successfully"
 
+
 class TeamResponse(BaseModel):
     team: Team
     message: str = "Team retrieved successfully"
+
 
 class AgentResponse(BaseModel):
     agent: Agent
     message: str = "Agent retrieved successfully"
 
+
 class ListResponse(BaseModel):
     items: List[Any]
     total: int
     message: str = "Items retrieved successfully"
+
 
 # Statistics Models
 class OrganizationStats(BaseModel):
@@ -194,6 +225,7 @@ class OrganizationStats(BaseModel):
     total_tasks: int
     completed_tasks: int
     pending_tasks: int
+
 
 class TeamStats(BaseModel):
     total_agents: int

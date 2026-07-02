@@ -6,9 +6,10 @@ This migration adds comprehensive chat history storage with vector embeddings
 for RAG (Retrieval-Augmented Generation) functionality.
 """
 
+
 async def upgrade(conn):
     """Apply the migration - Add RAG chat history tables"""
-    
+
     # Agent Conversations Table
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS agent_conversations (
@@ -91,42 +92,42 @@ async def upgrade(conn):
         CREATE INDEX IF NOT EXISTS idx_agent_conversations_agent_session 
         ON agent_conversations(agent_id, session_id, created_at DESC);
     """)
-    
+
     await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_agent_conversations_embedding 
         ON agent_conversations USING ivfflat (embedding vector_cosine_ops);
     """)
-    
+
     await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_conversation_summaries_agent 
         ON conversation_summaries(agent_id, created_at DESC);
     """)
-    
+
     await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_conversation_summaries_embedding 
         ON conversation_summaries USING ivfflat (summary_embedding vector_cosine_ops);
     """)
-    
+
     await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_knowledge_base_agent 
         ON agent_knowledge_base(agent_id, content_type, created_at DESC);
     """)
-    
+
     await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_knowledge_base_embedding 
         ON agent_knowledge_base USING ivfflat (embedding vector_cosine_ops);
     """)
-    
+
     await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_knowledge_base_tags 
         ON agent_knowledge_base USING GIN(tags);
     """)
-    
+
     await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_chat_sessions_agent 
         ON chat_sessions(agent_id, status, last_activity DESC);
     """)
-    
+
     print("✅ Created performance indexes for RAG system")
 
     # Add triggers for automatic timestamp updates
@@ -140,7 +141,12 @@ async def upgrade(conn):
         $$ language 'plpgsql';
     """)
 
-    for table in ['agent_conversations', 'conversation_summaries', 'agent_knowledge_base', 'chat_sessions']:
+    for table in [
+        "agent_conversations",
+        "conversation_summaries",
+        "agent_knowledge_base",
+        "chat_sessions",
+    ]:
         await conn.execute(f"""
             DROP TRIGGER IF EXISTS update_{table}_updated_at ON {table};
             CREATE TRIGGER update_{table}_updated_at
@@ -148,7 +154,7 @@ async def upgrade(conn):
                 FOR EACH ROW
                 EXECUTE FUNCTION update_updated_at_column();
         """)
-    
+
     print("✅ Created automatic timestamp update triggers")
 
     # Add foreign key constraint for session references
@@ -157,32 +163,33 @@ async def upgrade(conn):
         ADD CONSTRAINT fk_conversations_session 
         FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE;
     """)
-    
+
     await conn.execute("""
         ALTER TABLE conversation_summaries 
         ADD CONSTRAINT fk_summaries_session 
         FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE;
     """)
-    
+
     print("✅ Added foreign key constraints for session references")
+
 
 async def downgrade(conn):
     """Rollback the migration - Remove RAG chat history tables"""
-    
+
     # Drop tables in reverse order to handle foreign key constraints
     tables = [
-        'agent_conversations',
-        'conversation_summaries', 
-        'agent_knowledge_base',
-        'chat_sessions'
+        "agent_conversations",
+        "conversation_summaries",
+        "agent_knowledge_base",
+        "chat_sessions",
     ]
-    
+
     for table in tables:
         await conn.execute(f"DROP TABLE IF EXISTS {table} CASCADE;")
         print(f"✅ Dropped {table} table")
-    
+
     # Drop the trigger function
     await conn.execute("DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;")
     print("✅ Dropped timestamp update function")
-    
+
     print("✅ RAG chat history system tables removed")

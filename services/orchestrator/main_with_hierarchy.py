@@ -13,12 +13,23 @@ from migration_manager import MigrationManager
 from rag_manager import RAGManager
 from a2a_protocol import A2AProtocolManager, TaskStatus, MessageType
 from models import (
-    Organization, OrganizationCreate, OrganizationUpdate,
-    Team, TeamCreate, TeamUpdate,
-    Agent, AgentCreate, AgentUpdate,
-    Task, TaskCreate, TaskUpdate,
-    OrganizationWithTeams, TeamWithAgents, AgentWithTeam,
-    CreateAgentFromTemplate, CreateCustomAgent
+    Organization,
+    OrganizationCreate,
+    OrganizationUpdate,
+    Team,
+    TeamCreate,
+    TeamUpdate,
+    Agent,
+    AgentCreate,
+    AgentUpdate,
+    Task,
+    TaskCreate,
+    TaskUpdate,
+    OrganizationWithTeams,
+    TeamWithAgents,
+    AgentWithTeam,
+    CreateAgentFromTemplate,
+    CreateCustomAgent,
 )
 from agent_templates import template_manager, AgentCategory
 from hierarchy_endpoints import router as hierarchy_router
@@ -34,46 +45,51 @@ from auth import (
 DEFAULT_ORG_ID = "550e8400-e29b-41d4-a716-446655440000"
 DEFAULT_TEAM_ID = "550e8400-e29b-41d4-a716-446655440001"
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup - Run database migrations and initialize RAG
     try:
-        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
+        database_url = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"
+        )
         anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-        
+
         if not anthropic_api_key:
             print("⚠️ ANTHROPIC_API_KEY not found - RAG features will be limited")
-        
+
         migration_manager = MigrationManager(database_url)
-        
+
         print("🔄 Running database migrations...")
         applied_migrations = await migration_manager.migrate_up()
-        
+
         if applied_migrations:
             print(f"✅ Applied {len(applied_migrations)} migrations:")
             for version in applied_migrations:
                 print(f"   - {version}")
         else:
             print("✅ Database is up to date - no migrations needed")
-        
+
         # Get migration status
         status = await migration_manager.get_migration_status()
-        print(f"📊 Migration Status: {status['applied_count']}/{status['total_migrations']} applied")
-        
+        print(
+            f"📊 Migration Status: {status['applied_count']}/{status['total_migrations']} applied"
+        )
+
         # Initialize RAG Manager
         print("🧠 Initializing RAG system...")
         rag_manager = RAGManager(database_url, anthropic_api_key)
         await rag_manager.initialize()
         app.state.rag_manager = rag_manager
         print("✅ RAG system initialized")
-        
+
         # Initialize A2A Protocol Manager
         print("🤝 Initializing A2A protocol...")
         a2a_manager = A2AProtocolManager(database_url)
         await a2a_manager.initialize()
         app.state.a2a_manager = a2a_manager
         print("✅ A2A protocol initialized")
-        
+
         # Check if default organization exists
         try:
             org = await DatabaseManager.get_organization(DEFAULT_ORG_ID)
@@ -83,21 +99,22 @@ async def lifespan(app: FastAPI):
                 print("⚠️ Default organization not found - check migrations")
         except Exception as e:
             print(f"⚠️ Database connection issue: {e}")
-            
+
     except Exception as e:
         print(f"❌ Startup failed: {e}")
         raise e
-    
+
     yield
-    
+
     # Shutdown
     print("🛑 Shutting down orchestrator...")
-    if hasattr(app.state, 'rag_manager'):
+    if hasattr(app.state, "rag_manager"):
         await app.state.rag_manager.close()
         print("✅ RAG system closed")
-    if hasattr(app.state, 'a2a_manager'):
+    if hasattr(app.state, "a2a_manager"):
         await app.state.a2a_manager.close()
         print("✅ A2A protocol closed")
+
 
 app = FastAPI(
     title="FuzeAgent Orchestrator",
@@ -161,7 +178,7 @@ app = FastAPI(
     servers=[
         {"url": "http://localhost:8000", "description": "Development server"},
         {"url": "https://api.fuzeagent.dev", "description": "Production server"},
-    ]
+    ],
 )
 
 # SECURITY (issue #6 MEDIUM-2): never use wildcard origins together with
@@ -190,8 +207,9 @@ app.include_router(hierarchy_router)
 # ORGANIZATION ENDPOINTS
 # ============================================================================
 
+
 @app.get(
-    "/organizations", 
+    "/organizations",
     response_model=List[Organization],
     tags=["Organizations"],
     summary="List all organizations",
@@ -204,7 +222,7 @@ app.include_router(hierarchy_router)
     responses={
         200: {"description": "List of organizations retrieved successfully"},
         500: {"description": "Internal server error"},
-    }
+    },
 )
 async def get_organizations():
     """Get all organizations"""
@@ -212,10 +230,13 @@ async def get_organizations():
         orgs = await DatabaseManager.get_organizations()
         return orgs
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get organizations: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get organizations: {str(e)}"
+        )
+
 
 @app.post(
-    "/organizations", 
+    "/organizations",
     response_model=Organization,
     tags=["Organizations"],
     summary="Create a new organization",
@@ -238,7 +259,7 @@ async def get_organizations():
         409: {"description": "Organization with this name already exists"},
         500: {"description": "Internal server error"},
     },
-    status_code=201
+    status_code=201,
 )
 async def create_organization(org_data: OrganizationCreate):
     """Create a new organization"""
@@ -246,16 +267,21 @@ async def create_organization(org_data: OrganizationCreate):
         org_id = await DatabaseManager.create_organization(
             name=org_data.name,
             description=org_data.description,
-            settings=org_data.settings
+            settings=org_data.settings,
         )
-        
+
         org = await DatabaseManager.get_organization(org_id)
         if not org:
-            raise HTTPException(status_code=500, detail="Failed to retrieve created organization")
-        
+            raise HTTPException(
+                status_code=500, detail="Failed to retrieve created organization"
+            )
+
         return org
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create organization: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create organization: {str(e)}"
+        )
+
 
 @app.get("/organizations/{org_id}", response_model=Organization)
 async def get_organization(
@@ -277,7 +303,10 @@ async def get_organization(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get organization: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get organization: {str(e)}"
+        )
+
 
 @app.put("/organizations/{org_id}", response_model=Organization)
 async def update_organization(
@@ -290,20 +319,23 @@ async def update_organization(
     try:
         # Convert to dict and remove None values
         update_data = {k: v for k, v in org_data.dict().items() if v is not None}
-        
+
         if not update_data:
             raise HTTPException(status_code=400, detail="No data provided for update")
-        
+
         success = await DatabaseManager.update_organization(org_id, **update_data)
         if not success:
             raise HTTPException(status_code=404, detail="Organization not found")
-        
+
         org = await DatabaseManager.get_organization(org_id)
         return org
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update organization: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update organization: {str(e)}"
+        )
+
 
 @app.delete("/organizations/{org_id}")
 async def delete_organization(
@@ -316,19 +348,23 @@ async def delete_organization(
         success = await DatabaseManager.delete_organization(org_id)
         if not success:
             raise HTTPException(status_code=404, detail="Organization not found")
-        
+
         return {"message": "Organization deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete organization: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete organization: {str(e)}"
+        )
+
 
 # ============================================================================
 # TEAM ENDPOINTS
 # ============================================================================
 
+
 @app.get(
-    "/teams", 
+    "/teams",
     response_model=List[Team],
     tags=["Teams"],
     summary="List teams",
@@ -345,7 +381,7 @@ async def delete_organization(
         200: {"description": "List of teams retrieved successfully"},
         404: {"description": "Organization not found (if organization_id provided)"},
         500: {"description": "Internal server error"},
-    }
+    },
 )
 async def get_teams(organization_id: Optional[str] = None):
     """Get teams, optionally filtered by organization"""
@@ -355,6 +391,7 @@ async def get_teams(organization_id: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get teams: {str(e)}")
 
+
 @app.post("/teams", response_model=Team)
 async def create_team(team_data: TeamCreate):
     """Create a new team"""
@@ -363,24 +400,27 @@ async def create_team(team_data: TeamCreate):
         org = await DatabaseManager.get_organization(team_data.organization_id)
         if not org:
             raise HTTPException(status_code=404, detail="Organization not found")
-        
+
         team_id = await DatabaseManager.create_team(
             organization_id=team_data.organization_id,
             name=team_data.name,
             description=team_data.description,
             team_type=team_data.team_type,
-            settings=team_data.settings
+            settings=team_data.settings,
         )
-        
+
         team = await DatabaseManager.get_team(team_id)
         if not team:
-            raise HTTPException(status_code=500, detail="Failed to retrieve created team")
-        
+            raise HTTPException(
+                status_code=500, detail="Failed to retrieve created team"
+            )
+
         return team
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create team: {str(e)}")
+
 
 async def _load_team_authorized(team_id: str, user: CurrentUser) -> Dict:
     """Load a team and enforce object-level authz on its owning org.
@@ -410,6 +450,7 @@ async def get_team(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get team: {str(e)}")
 
+
 @app.put("/teams/{team_id}", response_model=Team)
 async def update_team(
     team_id: str,
@@ -435,6 +476,7 @@ async def update_team(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update team: {str(e)}")
 
+
 @app.delete("/teams/{team_id}")
 async def delete_team(
     team_id: str,
@@ -453,9 +495,11 @@ async def delete_team(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete team: {str(e)}")
 
+
 # ============================================================================
 # AGENT ENDPOINTS (Updated for Teams)
 # ============================================================================
+
 
 @app.get("/agents")
 async def get_agents(team_id: Optional[str] = None):
@@ -466,6 +510,7 @@ async def get_agents(team_id: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get agents: {str(e)}")
 
+
 @app.post("/agents")
 async def create_agent(agent_data: AgentCreate):
     """Create a custom agent"""
@@ -474,25 +519,28 @@ async def create_agent(agent_data: AgentCreate):
         team = await DatabaseManager.get_team(agent_data.team_id)
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
-        
+
         agent_id = await DatabaseManager.insert_agent(
             team_id=agent_data.team_id,
             name=agent_data.name,
             role=agent_data.role,
             type=agent_data.type,
             config=agent_data.config,
-            template_id=agent_data.template_id
+            template_id=agent_data.template_id,
         )
-        
+
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
-            raise HTTPException(status_code=500, detail="Failed to retrieve created agent")
-        
+            raise HTTPException(
+                status_code=500, detail="Failed to retrieve created agent"
+            )
+
         return agent
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create agent: {str(e)}")
+
 
 @app.post("/agents/from-template")
 async def create_agent_from_template(template_data: CreateAgentFromTemplate):
@@ -501,46 +549,57 @@ async def create_agent_from_template(template_data: CreateAgentFromTemplate):
         template = template_manager.get_template(template_data.template_id)
         if not template:
             raise HTTPException(status_code=404, detail="Template not found")
-        
+
         # Get team_id from overrides or use default
-        if 'team_id' not in template_data.overrides:
-            raise HTTPException(status_code=400, detail="team_id is required in overrides")
-        
-        team_id = template_data.overrides['team_id']
-        
+        if "team_id" not in template_data.overrides:
+            raise HTTPException(
+                status_code=400, detail="team_id is required in overrides"
+            )
+
+        team_id = template_data.overrides["team_id"]
+
         # Verify team exists
         team = await DatabaseManager.get_team(team_id)
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
-        
+
         # Create agent config from template with overrides
         config = {
             "goal": template_data.overrides.get("goal", template.default_goal),
-            "backstory": template_data.overrides.get("backstory", template.default_backstory),
+            "backstory": template_data.overrides.get(
+                "backstory", template.default_backstory
+            ),
             "model": template.model,
-            "temperature": template_data.overrides.get("temperature", template.default_temperature),
+            "temperature": template_data.overrides.get(
+                "temperature", template.default_temperature
+            ),
             "tools": template.tools,
-            "skills": template.skills
+            "skills": template.skills,
         }
-        
+
         agent_id = await DatabaseManager.insert_agent(
             team_id=team_id,
             name=template_data.overrides.get("name", f"{template.name} Agent"),
             role=template.role,
             type=template.type,
             config=config,
-            template_id=template.template_id
+            template_id=template.template_id,
         )
-        
+
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
-            raise HTTPException(status_code=500, detail="Failed to retrieve created agent")
-        
+            raise HTTPException(
+                status_code=500, detail="Failed to retrieve created agent"
+            )
+
         return agent
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create agent from template: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create agent from template: {str(e)}"
+        )
+
 
 @app.get("/agents/{agent_id}")
 async def get_agent(
@@ -559,9 +618,11 @@ async def get_agent(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get agent: {str(e)}")
 
+
 # ============================================================================
 # AGENT TEMPLATE ENDPOINTS
 # ============================================================================
+
 
 @app.get(
     "/templates",
@@ -599,28 +660,37 @@ async def get_agent(
                                 "category": "development",
                                 "description": "Expert Python developer specializing in backend development",
                                 "tools": ["code_generation", "debugging", "testing"],
-                                "skills": ["python", "fastapi", "pytest"]
+                                "skills": ["python", "fastapi", "pytest"],
                             }
                         ],
-                        "categories": ["development", "quality_assurance", "devops", "business", "management", "hybrid"]
+                        "categories": [
+                            "development",
+                            "quality_assurance",
+                            "devops",
+                            "business",
+                            "management",
+                            "hybrid",
+                        ],
                     }
                 }
-            }
+            },
         }
-    }
+    },
 )
 async def get_templates():
     """Get all agent templates"""
     templates = template_manager.get_all_templates()
     return {
         "templates": templates,
-        "categories": [category.value for category in AgentCategory]
+        "categories": [category.value for category in AgentCategory],
     }
+
 
 @app.get("/templates/categories")
 async def get_template_categories():
     """Get template categories"""
     return {"categories": [category.value for category in AgentCategory]}
+
 
 @app.get("/templates/{template_id}")
 async def get_template(template_id: str):
@@ -630,9 +700,11 @@ async def get_template(template_id: str):
         raise HTTPException(status_code=404, detail="Template not found")
     return template
 
+
 # ============================================================================
 # TASK ENDPOINTS (Updated for Team Context)
 # ============================================================================
+
 
 @app.get("/tasks")
 async def get_tasks():
@@ -643,6 +715,7 @@ async def get_tasks():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get tasks: {str(e)}")
 
+
 @app.post("/agents/{agent_id}/tasks")
 async def assign_task_to_agent(agent_id: str, task_data: TaskCreate):
     """Assign a task to an agent"""
@@ -651,23 +724,25 @@ async def assign_task_to_agent(agent_id: str, task_data: TaskCreate):
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         task_id = await DatabaseManager.insert_task(
             title=task_data.title,
             description=task_data.description,
             assigned_to=agent_id,
-            created_by=task_data.created_by
+            created_by=task_data.created_by,
         )
-        
+
         return {"task_id": task_id, "message": "Task assigned successfully"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to assign task: {str(e)}")
 
+
 # ============================================================================
 # DATABASE MIGRATION ENDPOINTS
 # ============================================================================
+
 
 @app.get(
     "/migrations/status",
@@ -697,24 +772,29 @@ async def assign_task_to_agent(agent_id: str, task_data: TaskCreate):
                         "last_applied": {
                             "version": "20250129_120004",
                             "name": "add_audit_logs",
-                            "applied_at": "2025-01-29T12:05:23Z"
+                            "applied_at": "2025-01-29T12:05:23Z",
                         },
-                        "status": "up_to_date"
+                        "status": "up_to_date",
                     }
                 }
-            }
+            },
         },
-        500: {"description": "Failed to retrieve migration status"}
-    }
+        500: {"description": "Failed to retrieve migration status"},
+    },
 )
 async def get_migration_status(user: CurrentUser = Depends(require_admin)):
     """Get current migration status (admin/service principal only)."""
     try:
-        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
+        database_url = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"
+        )
         migration_manager = MigrationManager(database_url)
         return await migration_manager.get_migration_status()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get migration status: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get migration status: {str(e)}"
+        )
+
 
 @app.post("/migrations/apply")
 async def apply_migrations(
@@ -727,17 +807,26 @@ async def apply_migrations(
     restricted to an authenticated admin/service principal (403 otherwise).
     """
     try:
-        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
+        database_url = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"
+        )
         migration_manager = MigrationManager(database_url)
         applied = await migration_manager.migrate_up(target_version)
-        
+
         return {
             "applied_migrations": applied,
             "count": len(applied),
-            "message": f"Applied {len(applied)} migrations successfully" if applied else "No migrations to apply"
+            "message": (
+                f"Applied {len(applied)} migrations successfully"
+                if applied
+                else "No migrations to apply"
+            ),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to apply migrations: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to apply migrations: {str(e)}"
+        )
+
 
 @app.post("/migrations/rollback/{target_version}")
 async def rollback_migrations(
@@ -750,21 +839,31 @@ async def rollback_migrations(
     principal only (403 otherwise).
     """
     try:
-        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
+        database_url = os.getenv(
+            "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"
+        )
         migration_manager = MigrationManager(database_url)
         rolled_back = await migration_manager.migrate_down(target_version)
-        
+
         return {
             "rolled_back_migrations": rolled_back,
             "count": len(rolled_back),
-            "message": f"Rolled back {len(rolled_back)} migrations successfully" if rolled_back else "No migrations to rollback"
+            "message": (
+                f"Rolled back {len(rolled_back)} migrations successfully"
+                if rolled_back
+                else "No migrations to rollback"
+            ),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to rollback migrations: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to rollback migrations: {str(e)}"
+        )
+
 
 # ============================================================================
 # RAG CHAT HISTORY ENDPOINTS
 # ============================================================================
+
 
 @app.post(
     "/agents/{agent_id}/chat/sessions",
@@ -777,8 +876,8 @@ async def rollback_migrations(
     responses={
         201: {"description": "Chat session created successfully"},
         404: {"description": "Agent not found"},
-        500: {"description": "Failed to create chat session"}
-    }
+        500: {"description": "Failed to create chat session"},
+    },
 )
 async def create_chat_session(
     agent_id: str,
@@ -786,8 +885,8 @@ async def create_chat_session(
         "session_name": "New Session",
         "session_type": "conversation",
         "participants": [],
-        "context": {}
-    }
+        "context": {},
+    },
 ):
     """Create a new chat session for an agent"""
     try:
@@ -795,20 +894,23 @@ async def create_chat_session(
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         session_id = await app.state.rag_manager.create_chat_session(
             agent_id=agent_id,
             session_name=session_data.get("session_name"),
             session_type=session_data.get("session_type", "conversation"),
             participants=session_data.get("participants"),
-            context=session_data.get("context")
+            context=session_data.get("context"),
         )
-        
+
         return {"session_id": session_id, "status": "created"}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create chat session: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create chat session: {str(e)}"
+        )
+
 
 @app.post(
     "/agents/{agent_id}/chat/sessions/{session_id}/messages",
@@ -821,37 +923,36 @@ async def create_chat_session(
     responses={
         201: {"description": "Message stored successfully"},
         404: {"description": "Agent or session not found"},
-        500: {"description": "Failed to store message"}
-    }
+        500: {"description": "Failed to store message"},
+    },
 )
-async def store_message(
-    agent_id: str,
-    session_id: str,
-    message_data: Dict[str, Any]
-):
+async def store_message(agent_id: str, session_id: str, message_data: Dict[str, Any]):
     """Store a conversation message with vector embedding"""
     try:
         # Verify agent exists
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         message_id = await app.state.rag_manager.store_conversation_message(
             agent_id=agent_id,
             session_id=session_id,
             message_type=message_data.get("message_type", "user"),
             content=message_data["content"],
             metadata=message_data.get("metadata"),
-            parent_message_id=message_data.get("parent_message_id")
+            parent_message_id=message_data.get("parent_message_id"),
         )
-        
+
         return {"message_id": message_id, "status": "stored"}
     except HTTPException:
         raise
     except KeyError as e:
         raise HTTPException(status_code=400, detail=f"Missing required field: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to store message: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to store message: {str(e)}"
+        )
+
 
 @app.get(
     "/agents/{agent_id}/chat/search",
@@ -864,8 +965,8 @@ async def store_message(
     responses={
         200: {"description": "Search results retrieved successfully"},
         404: {"description": "Agent not found"},
-        500: {"description": "Search failed"}
-    }
+        500: {"description": "Search failed"},
+    },
 )
 async def search_conversation_history(
     agent_id: str,
@@ -873,7 +974,7 @@ async def search_conversation_history(
     limit: int = 10,
     similarity_threshold: float = 0.7,
     session_id: Optional[str] = None,
-    include_summaries: bool = True
+    include_summaries: bool = True,
 ):
     """Search conversation history using semantic similarity"""
     try:
@@ -881,25 +982,22 @@ async def search_conversation_history(
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         results = await app.state.rag_manager.search_conversation_history(
             agent_id=agent_id,
             query=query,
             limit=limit,
             similarity_threshold=similarity_threshold,
             session_id=session_id,
-            include_summaries=include_summaries
+            include_summaries=include_summaries,
         )
-        
-        return {
-            "query": query,
-            "results_count": len(results),
-            "results": results
-        }
+
+        return {"query": query, "results_count": len(results), "results": results}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
 
 @app.get(
     "/agents/{agent_id}/chat/sessions/{session_id}/context",
@@ -912,13 +1010,11 @@ async def search_conversation_history(
     responses={
         200: {"description": "Context retrieved successfully"},
         404: {"description": "Agent or session not found"},
-        500: {"description": "Failed to get context"}
-    }
+        500: {"description": "Failed to get context"},
+    },
 )
 async def get_conversation_context(
-    agent_id: str,
-    session_id: str,
-    context_window: int = 20
+    agent_id: str, session_id: str, context_window: int = 20
 ):
     """Get recent conversation context for an agent session"""
     try:
@@ -926,21 +1022,20 @@ async def get_conversation_context(
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         context = await app.state.rag_manager.get_conversation_context(
-            agent_id=agent_id,
-            session_id=session_id,
-            context_window=context_window
+            agent_id=agent_id, session_id=session_id, context_window=context_window
         )
-        
+
         if "error" in context:
             raise HTTPException(status_code=404, detail=context["error"])
-        
+
         return context
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get context: {str(e)}")
+
 
 @app.post(
     "/agents/{agent_id}/knowledge",
@@ -953,20 +1048,17 @@ async def get_conversation_context(
     responses={
         201: {"description": "Knowledge item added successfully"},
         404: {"description": "Agent not found"},
-        500: {"description": "Failed to add knowledge"}
-    }
+        500: {"description": "Failed to add knowledge"},
+    },
 )
-async def add_to_knowledge_base(
-    agent_id: str,
-    knowledge_data: Dict[str, Any]
-):
+async def add_to_knowledge_base(agent_id: str, knowledge_data: Dict[str, Any]):
     """Add content to agent's knowledge base"""
     try:
         # Verify agent exists
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         knowledge_id = await app.state.rag_manager.add_to_knowledge_base(
             agent_id=agent_id,
             content=knowledge_data["content"],
@@ -974,16 +1066,19 @@ async def add_to_knowledge_base(
             source_type=knowledge_data.get("source_type", "manual"),
             source_reference=knowledge_data.get("source_reference"),
             metadata=knowledge_data.get("metadata"),
-            tags=knowledge_data.get("tags")
+            tags=knowledge_data.get("tags"),
         )
-        
+
         return {"knowledge_id": knowledge_id, "status": "added"}
     except HTTPException:
         raise
     except KeyError as e:
         raise HTTPException(status_code=400, detail=f"Missing required field: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to add knowledge: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to add knowledge: {str(e)}"
+        )
+
 
 @app.get(
     "/agents/{agent_id}/knowledge/search",
@@ -996,8 +1091,8 @@ async def add_to_knowledge_base(
     responses={
         200: {"description": "Knowledge search results retrieved successfully"},
         404: {"description": "Agent not found"},
-        500: {"description": "Knowledge search failed"}
-    }
+        500: {"description": "Knowledge search failed"},
+    },
 )
 async def search_knowledge_base(
     agent_id: str,
@@ -1005,7 +1100,7 @@ async def search_knowledge_base(
     limit: int = 10,
     similarity_threshold: float = 0.7,
     content_types: Optional[List[str]] = None,
-    tags: Optional[List[str]] = None
+    tags: Optional[List[str]] = None,
 ):
     """Search agent's knowledge base using semantic similarity"""
     try:
@@ -1013,29 +1108,29 @@ async def search_knowledge_base(
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         results = await app.state.rag_manager.search_knowledge_base(
             agent_id=agent_id,
             query=query,
             limit=limit,
             similarity_threshold=similarity_threshold,
             content_types=content_types,
-            tags=tags
+            tags=tags,
         )
-        
-        return {
-            "query": query,
-            "results_count": len(results),
-            "results": results
-        }
+
+        return {"query": query, "results_count": len(results), "results": results}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Knowledge search failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Knowledge search failed: {str(e)}"
+        )
+
 
 # ============================================================================
 # A2A PROTOCOL ENDPOINTS
 # ============================================================================
+
 
 @app.get(
     "/a2a/agents/discover",
@@ -1047,15 +1142,15 @@ async def search_knowledge_base(
     """,
     responses={
         200: {"description": "Agent discovery results"},
-        500: {"description": "Discovery failed"}
-    }
+        500: {"description": "Discovery failed"},
+    },
 )
 async def discover_agents(
     capabilities: Optional[List[str]] = None,
     skills: Optional[List[str]] = None,
     availability_only: bool = True,
     team_id: Optional[str] = None,
-    organization_id: Optional[str] = None
+    organization_id: Optional[str] = None,
 ):
     """Discover agents based on capabilities and availability"""
     try:
@@ -1064,15 +1159,16 @@ async def discover_agents(
             skills=skills,
             availability_only=availability_only,
             team_id=team_id,
-            organization_id=organization_id
+            organization_id=organization_id,
         )
-        
+
         return {
             "agents_found": len(agents),
-            "agents": [agent.dict() for agent in agents]
+            "agents": [agent.dict() for agent in agents],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent discovery failed: {str(e)}")
+
 
 @app.post(
     "/a2a/agents/{requesting_agent_id}/delegate",
@@ -1086,20 +1182,17 @@ async def discover_agents(
         201: {"description": "Task delegated successfully"},
         404: {"description": "Agent not found"},
         400: {"description": "No suitable agents found"},
-        500: {"description": "Task delegation failed"}
-    }
+        500: {"description": "Task delegation failed"},
+    },
 )
-async def delegate_task(
-    requesting_agent_id: str,
-    task_data: Dict[str, Any]
-):
+async def delegate_task(requesting_agent_id: str, task_data: Dict[str, Any]):
     """Delegate a task to another agent"""
     try:
         # Verify requesting agent exists
         agent = await DatabaseManager.get_agent(requesting_agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Requesting agent not found")
-        
+
         task_id = await app.state.a2a_manager.delegate_task(
             requesting_agent_id=requesting_agent_id,
             task_title=task_data["title"],
@@ -1110,9 +1203,9 @@ async def delegate_task(
             required_skills=task_data.get("required_skills"),
             priority=task_data.get("priority", 5),
             deadline=task_data.get("deadline"),
-            input_data=task_data.get("input_data")
+            input_data=task_data.get("input_data"),
         )
-        
+
         return {"task_id": task_id, "status": "delegated"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1182,8 +1275,8 @@ async def _authorize_a2a_task_org(task_id: str, user: CurrentUser) -> None:
     responses={
         200: {"description": "Agent card retrieved successfully"},
         404: {"description": "Agent not found"},
-        500: {"description": "Failed to get agent card"}
-    }
+        500: {"description": "Failed to get agent card"},
+    },
 )
 async def get_agent_card(agent_id: str, user: CurrentUser = Depends(require_user)):
     """Get agent card for A2A protocol (object-level authz — issue #6 BOLA)."""
@@ -1194,20 +1287,23 @@ async def get_agent_card(agent_id: str, user: CurrentUser = Depends(require_user
         if agent_id in app.state.a2a_manager.local_agents:
             agent_card = app.state.a2a_manager.local_agents[agent_id]
             return agent_card.dict()
-        
+
         # If not in local registry, check if it's a valid agent
         agent = await DatabaseManager.get_agent(agent_id)
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
+
         # Create agent card on-the-fly
         agent_card = await app.state.a2a_manager._create_agent_card_from_agent(agent)
         return agent_card.dict()
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get agent card: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get agent card: {str(e)}"
+        )
+
 
 @app.post(
     "/a2a/agents/{sender_agent_id}/message",
@@ -1220,8 +1316,8 @@ async def get_agent_card(agent_id: str, user: CurrentUser = Depends(require_user
     responses={
         201: {"description": "Message sent successfully"},
         404: {"description": "Agent not found"},
-        500: {"description": "Failed to send message"}
-    }
+        500: {"description": "Failed to send message"},
+    },
 )
 async def send_a2a_message(
     sender_agent_id: str,
@@ -1235,10 +1331,12 @@ async def send_a2a_message(
         agent = await _authorize_agent_org(sender_agent_id, user)
 
         # Verify recipient agent exists
-        recipient_agent = await DatabaseManager.get_agent(message_data["recipient_agent_id"])
+        recipient_agent = await DatabaseManager.get_agent(
+            message_data["recipient_agent_id"]
+        )
         if not recipient_agent:
             raise HTTPException(status_code=404, detail="Recipient agent not found")
-        
+
         message_id = await app.state.a2a_manager.send_message(
             sender_agent_id=sender_agent_id,
             recipient_agent_id=message_data["recipient_agent_id"],
@@ -1247,9 +1345,9 @@ async def send_a2a_message(
             data=message_data.get("data"),
             task_id=message_data.get("task_id"),
             conversation_id=message_data.get("conversation_id"),
-            priority=message_data.get("priority", 5)
+            priority=message_data.get("priority", 5),
         )
-        
+
         return {"message_id": message_id, "status": "sent"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1257,6 +1355,7 @@ async def send_a2a_message(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
+
 
 @app.get(
     "/a2a/agents/{agent_id}/tasks",
@@ -1269,8 +1368,8 @@ async def send_a2a_message(
     responses={
         200: {"description": "Tasks retrieved successfully"},
         404: {"description": "Agent not found"},
-        500: {"description": "Failed to get tasks"}
-    }
+        500: {"description": "Failed to get tasks"},
+    },
 )
 async def get_agent_a2a_tasks(
     agent_id: str,
@@ -1289,23 +1388,26 @@ async def get_agent_a2a_tasks(
             try:
                 status_enum_filter = [TaskStatus(status) for status in status_filter]
             except ValueError as e:
-                raise HTTPException(status_code=400, detail=f"Invalid status value: {e}")
-        
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid status value: {e}"
+                )
+
         tasks = await app.state.a2a_manager.get_agent_tasks(
-            agent_id=agent_id,
-            status_filter=status_enum_filter,
-            limit=limit
+            agent_id=agent_id, status_filter=status_enum_filter, limit=limit
         )
-        
+
         return {
             "agent_id": agent_id,
             "tasks_count": len(tasks),
-            "tasks": [task.dict() for task in tasks]
+            "tasks": [task.dict() for task in tasks],
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get agent tasks: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get agent tasks: {str(e)}"
+        )
+
 
 @app.put(
     "/a2a/tasks/{task_id}/status",
@@ -1317,8 +1419,8 @@ async def get_agent_a2a_tasks(
     responses={
         200: {"description": "Task status updated successfully"},
         404: {"description": "Task not found"},
-        500: {"description": "Failed to update task status"}
-    }
+        500: {"description": "Failed to update task status"},
+    },
 )
 async def update_a2a_task_status(
     task_id: str,
@@ -1335,7 +1437,7 @@ async def update_a2a_task_status(
             status=TaskStatus(status_data["status"]),
             progress_percentage=status_data.get("progress_percentage"),
             output_data=status_data.get("output_data"),
-            agent_id=status_data.get("agent_id")
+            agent_id=status_data.get("agent_id"),
         )
 
         return {"task_id": task_id, "status": "updated"}
@@ -1345,7 +1447,10 @@ async def update_a2a_task_status(
         # Preserve 401/403/404 (incl. the BOLA 403) instead of masking as 500.
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update task status: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update task status: {str(e)}"
+        )
+
 
 @app.get(
     "/a2a/agents/{agent_id}/messages",
@@ -1357,8 +1462,8 @@ async def update_a2a_task_status(
     responses={
         200: {"description": "Messages retrieved successfully"},
         404: {"description": "Agent not found"},
-        500: {"description": "Failed to get messages"}
-    }
+        500: {"description": "Failed to get messages"},
+    },
 )
 async def get_agent_a2a_messages(
     agent_id: str,
@@ -1372,24 +1477,26 @@ async def get_agent_a2a_messages(
         await _authorize_agent_org(agent_id, user)
 
         messages = await app.state.a2a_manager.get_agent_messages(
-            agent_id=agent_id,
-            conversation_id=conversation_id,
-            limit=limit
+            agent_id=agent_id, conversation_id=conversation_id, limit=limit
         )
-        
+
         return {
             "agent_id": agent_id,
             "messages_count": len(messages),
-            "messages": [message.dict() for message in messages]
+            "messages": [message.dict() for message in messages],
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get agent messages: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get agent messages: {str(e)}"
+        )
+
 
 # ============================================================================
 # DEMO/HEALTH ENDPOINTS
 # ============================================================================
+
 
 @app.get("/")
 async def root():
@@ -1398,8 +1505,9 @@ async def root():
         "message": "FuzeAgent Orchestrator API",
         "version": "2.0.0",
         "features": ["Organizations", "Teams", "Agents", "Templates", "Tasks"],
-        "status": "running"
+        "status": "running",
     }
+
 
 @app.get("/demo")
 async def demo_endpoint():
@@ -1407,20 +1515,24 @@ async def demo_endpoint():
     try:
         # Get organizations with their teams and agents
         orgs = await DatabaseManager.get_organizations()
-        
+
         if not orgs:
-            return {"message": "No organizations found. Database may need initialization."}
-        
+            return {
+                "message": "No organizations found. Database may need initialization."
+            }
+
         demo_data = {
             "organizations": len(orgs),
             "sample_org": orgs[0] if orgs else None,
-            "message": "FuzeAgent Orchestrator running with hierarchical structure"
+            "message": "FuzeAgent Orchestrator running with hierarchical structure",
         }
-        
+
         return demo_data
     except Exception as e:
         return {"error": f"Demo endpoint failed: {str(e)}"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
