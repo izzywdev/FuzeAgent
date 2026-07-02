@@ -1,0 +1,51 @@
+# =============================================================================
+# Production overlay (Contabo k3s), consumed by the Argo CD `fuzeagent` Application.
+# Differs from defaults by: GHCR images, prod ingress host, GHCR pull secret.
+# The four `tag:` lines below are rewritten to the built commit SHA by
+# .github/workflows/release.yml (sed on `^(\s*tag:).*`) — keep them as the ONLY
+# `tag:` keys in this file (datastore images are single strings, not repo+tag).
+# All secrets come from the SealedSecret `fuzeagent-secrets` — never inline here.
+# =============================================================================
+
+# Private GHCR pull secret (sealed; name must match the SealedSecret exactly).
+imagePullSecrets:
+  - name: ghcr-pull
+
+orchestrator:
+  image:
+    repository: ghcr.io/izzywdev/fuzeagent-orchestrator
+    tag: latest
+  # First-light guardrails (also the chart default; pinned here for clarity).
+  execution:
+    autonomous: false
+    multiAgent: false
+    fileOps: false
+    mcp: true
+  # CORS allowlist = the same-origin admin host (the UI nginx proxies /api/* to
+  # the orchestrator, so the browser Origin is the ingress host).
+  auth:
+    corsAllowOrigins: "https://fuzeagent.prod.fuzefront.com"
+
+hierarchyApi:
+  image:
+    repository: ghcr.io/izzywdev/fuzeagent-hierarchy-api
+    tag: latest
+
+ui:
+  image:
+    repository: ghcr.io/izzywdev/fuzeagent-ui
+    tag: latest
+
+mcpServer:
+  image:
+    repository: ghcr.io/izzywdev/fuzeagent-mcp-server
+    tag: latest
+
+# Admin console — host sits under the *.prod.fuzefront.com wildcard, which is
+# already behind Cloudflare Access email-OTP + routed through the CF tunnel to
+# Traefik. No TLS block (CF terminates at the edge); no DNS change needed.
+ingress:
+  enabled: true
+  className: traefik
+  host: fuzeagent.prod.fuzefront.com
+  annotations: {}

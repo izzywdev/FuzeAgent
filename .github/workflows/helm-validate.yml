@@ -1,0 +1,48 @@
+name: Helm Chart Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/helm/**'
+      - '.github/workflows/helm-validate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deploy/helm/**'
+      - '.github/workflows/helm-validate.yml'
+
+jobs:
+  validate:
+    name: Lint & schema-validate chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Helm lint (all overlays)
+        run: |
+          helm lint deploy/helm/fuzeagent
+          helm lint deploy/helm/fuzeagent -f deploy/helm/fuzeagent/values-prod.yaml
+
+      - name: Install kubeconform
+        run: |
+          curl -sSLo /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+          sudo install /tmp/kubeconform /usr/local/bin/kubeconform
+
+      - name: Render & validate (default + prod overlays)
+        run: |
+          # -ignore-missing-schemas: Traefik / SealedSecret CRDs have no published
+          # JSON schema; matches FuzeInfra's helm-validate + deploy-prod convention.
+          for overlay in values.yaml values-prod.yaml; do
+            echo "::group::$overlay"
+            helm template fuzeagent deploy/helm/fuzeagent -f "deploy/helm/fuzeagent/$overlay" \
+              | kubeconform -strict -summary -kubernetes-version 1.29.0 -ignore-missing-schemas
+            echo "::endgroup::"
+          done
