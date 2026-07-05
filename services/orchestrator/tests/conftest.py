@@ -15,7 +15,9 @@ from faker import Faker
 
 # Set test environment
 os.environ["TESTING"] = "1"
-os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5434/ai_context_test"
+os.environ[
+    "DATABASE_URL"
+] = "postgresql://postgres:password@localhost:5434/ai_context_test"
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key"
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy1sb25n"
@@ -29,6 +31,7 @@ from migration_manager import MigrationManager
 
 fake = Faker()
 
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for the test session."""
@@ -36,63 +39,71 @@ def event_loop():
     yield loop
     loop.close()
 
+
 @pytest.fixture
 def client():
     """FastAPI test client"""
     with TestClient(app) as c:
         yield c
 
+
 @pytest.fixture
 async def db_pool():
     """Database connection pool for tests"""
     database_url = os.getenv("DATABASE_URL")
     pool = await asyncpg.create_pool(database_url, min_size=1, max_size=5)
-    
+
     # Clean up database before each test
     async with pool.acquire() as conn:
         # Drop all tables to start fresh
-        await conn.execute("""
+        await conn.execute(
+            """
             DROP SCHEMA IF EXISTS public CASCADE;
             CREATE SCHEMA public;
             CREATE EXTENSION IF NOT EXISTS vector;
-        """)
-    
+        """
+        )
+
     yield pool
     await pool.close()
+
 
 @pytest.fixture
 async def migration_manager(db_pool):
     """Migration manager for tests"""
     database_url = os.getenv("DATABASE_URL")
     manager = MigrationManager(database_url)
-    
+
     # Run migrations
     await manager.migrate_up()
-    
+
     yield manager
+
 
 @pytest.fixture
 async def rag_manager(migration_manager):
     """RAG manager for tests"""
     database_url = os.getenv("DATABASE_URL")
     api_key = os.getenv("ANTHROPIC_API_KEY")
-    
+
     manager = RAGManager(database_url, api_key)
     await manager.initialize()
-    
+
     yield manager
     await manager.close()
+
 
 @pytest.fixture
 async def a2a_manager(migration_manager):
     """A2A protocol manager for tests"""
     database_url = os.getenv("DATABASE_URL")
-    
+
     manager = A2AProtocolManager(database_url)
     await manager.initialize()
-    
+
     yield manager
     await manager.close()
+
 
 @pytest.fixture
 def mock_anthropic_client():
@@ -100,7 +111,9 @@ def mock_anthropic_client():
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[0].text = """
+    mock_response.content[
+        0
+    ].text = """
 ## Explanation
 This is a test implementation.
 
@@ -124,6 +137,7 @@ feat: add test function
     mock_client.messages.create.return_value = mock_response
     return mock_client
 
+
 @pytest.fixture
 def sample_organization():
     """Sample organization data"""
@@ -133,8 +147,9 @@ def sample_organization():
         "description": fake.text(max_nb_chars=200),
         "settings": {"timezone": "UTC", "currency": "USD"},
         "created_at": fake.date_time(),
-        "updated_at": fake.date_time()
+        "updated_at": fake.date_time(),
     }
+
 
 @pytest.fixture
 def sample_team():
@@ -147,8 +162,9 @@ def sample_team():
         "team_type": "development",
         "settings": {"max_agents": 10},
         "created_at": fake.date_time(),
-        "updated_at": fake.date_time()
+        "updated_at": fake.date_time(),
     }
+
 
 @pytest.fixture
 def sample_agent():
@@ -166,12 +182,13 @@ def sample_agent():
             "model": "claude-3-5-sonnet-20241022",
             "temperature": 0.7,
             "tools": ["code_generation", "debugging"],
-            "skills": ["python", "fastapi", "pytest"]
+            "skills": ["python", "fastapi", "pytest"],
         },
         "template_id": "python_developer",
         "created_at": fake.date_time(),
-        "updated_at": fake.date_time()
+        "updated_at": fake.date_time(),
     }
+
 
 @pytest.fixture
 def sample_task():
@@ -186,28 +203,31 @@ def sample_task():
         "priority": 5,
         "result": None,
         "created_at": fake.date_time(),
-        "completed_at": None
+        "completed_at": None,
     }
 
+
 @pytest.fixture
-async def setup_test_data(migration_manager, sample_organization, sample_team, sample_agent):
+async def setup_test_data(
+    migration_manager, sample_organization, sample_team, sample_agent
+):
     """Setup test data in database"""
     # Create organization
     org_id = await DatabaseManager.create_organization(
         name=sample_organization["name"],
         description=sample_organization["description"],
-        settings=sample_organization["settings"]
+        settings=sample_organization["settings"],
     )
-    
+
     # Create team
     team_id = await DatabaseManager.create_team(
         organization_id=org_id,
         name=sample_team["name"],
         description=sample_team["description"],
         team_type=sample_team["team_type"],
-        settings=sample_team["settings"]
+        settings=sample_team["settings"],
     )
-    
+
     # Create agent
     agent_id = await DatabaseManager.insert_agent(
         team_id=team_id,
@@ -215,14 +235,11 @@ async def setup_test_data(migration_manager, sample_organization, sample_team, s
         role=sample_agent["role"],
         type=sample_agent["type"],
         config=sample_agent["config"],
-        template_id=sample_agent["template_id"]
+        template_id=sample_agent["template_id"],
     )
-    
-    return {
-        "organization_id": org_id,
-        "team_id": team_id,
-        "agent_id": agent_id
-    }
+
+    return {"organization_id": org_id, "team_id": team_id, "agent_id": agent_id}
+
 
 @pytest.fixture
 def temp_directory():
@@ -230,11 +247,13 @@ def temp_directory():
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
+
 # Goals Management Test Fixtures
 @pytest.fixture
 def sample_goal():
     """Sample goal data"""
     from datetime import date, timedelta
+
     return {
         "id": "550e8400-e29b-41d4-a716-446655440010",
         "organization_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -245,7 +264,10 @@ def sample_goal():
         "target_value": 100000,
         "target_unit": "USD",
         "current_value": 0,
-        "success_criteria": {"revenue_target": 100000, "sustainability": "3_consecutive_months"},
+        "success_criteria": {
+            "revenue_target": 100000,
+            "sustainability": "3_consecutive_months",
+        },
         "start_date": date.today(),
         "target_deadline": date.today() + timedelta(days=180),
         "status": "active",
@@ -253,13 +275,15 @@ def sample_goal():
         "completion_confidence": 0.5,
         "assigned_teams": ["team-1", "team-2"],
         "tags": ["revenue", "growth"],
-        "metadata": {"business_critical": True}
+        "metadata": {"business_critical": True},
     }
+
 
 @pytest.fixture
 def sample_milestone():
     """Sample milestone data"""
     from datetime import date, timedelta
+
     return {
         "id": "550e8400-e29b-41d4-a716-446655440011",
         "goal_id": "550e8400-e29b-41d4-a716-446655440010",
@@ -268,19 +292,23 @@ def sample_milestone():
         "milestone_type": "checkpoint",
         "target_date": date.today() + timedelta(days=30),
         "success_criteria": {"setup_completed": True, "team_aligned": True},
-        "deliverables": [{"type": "infrastructure", "description": "Basic setup completed"}],
+        "deliverables": [
+            {"type": "infrastructure", "description": "Basic setup completed"}
+        ],
         "dependencies": [],
         "status": "planned",
         "progress_percentage": 0,
         "assigned_teams": ["team-1"],
         "priority_level": 8,
-        "weight_in_goal": 16.67
+        "weight_in_goal": 16.67,
     }
+
 
 @pytest.fixture
 def sample_goal_task():
     """Sample goal task data"""
     from datetime import date, timedelta
+
     return {
         "id": "550e8400-e29b-41d4-a716-446655440012",
         "goal_id": "550e8400-e29b-41d4-a716-446655440010",
@@ -295,8 +323,11 @@ def sample_goal_task():
         "status": "pending",
         "priority": 8,
         "requirements": {"deliverable": "strategy_document"},
-        "acceptance_criteria": [{"criteria": "Strategy document completed and approved"}]
+        "acceptance_criteria": [
+            {"criteria": "Strategy document completed and approved"}
+        ],
     }
+
 
 @pytest.fixture
 def sample_conversation():
@@ -308,12 +339,15 @@ def sample_conversation():
         "conversation_title": "Strategic Planning: Path to $100K MRR",
         "conversation_summary": "Initial strategic planning conversation",
         "conversation_context": {"focus": "revenue_growth", "timeline": "6_months"},
-        "participants": [{"type": "agent", "id": "izzy-ai", "name": "IzzyAI", "role": "CEO"}],
+        "participants": [
+            {"type": "agent", "id": "izzy-ai", "name": "IzzyAI", "role": "CEO"}
+        ],
         "messages": [],
         "insights_generated": [],
         "action_items": [],
-        "status": "active"
+        "status": "active",
     }
+
 
 @pytest.fixture
 def mock_goals_service():
@@ -329,15 +363,21 @@ def mock_goals_service():
     service.get_organization_goals_dashboard = AsyncMock()
     return service
 
+
 @pytest.fixture
 def mock_milestone_engine():
     """Mock Milestone Task Engine"""
     engine = AsyncMock()
     engine.generate_goal_execution_plan = AsyncMock()
-    engine.generate_monthly_milestones = AsyncMock(return_value=["milestone-1", "milestone-2"])
-    engine.generate_weekly_tasks_for_milestone = AsyncMock(return_value=["task-1", "task-2"])
+    engine.generate_monthly_milestones = AsyncMock(
+        return_value=["milestone-1", "milestone-2"]
+    )
+    engine.generate_weekly_tasks_for_milestone = AsyncMock(
+        return_value=["task-1", "task-2"]
+    )
     engine.generate_cross_functional_tasks = AsyncMock()
     return engine
+
 
 @pytest.fixture
 def mock_conversation_service():
@@ -352,6 +392,7 @@ def mock_conversation_service():
     service.get_goal_conversations = AsyncMock(return_value=[])
     return service
 
+
 @pytest.fixture
 def mock_tracking_service():
     """Mock Goal Tracking Service"""
@@ -362,15 +403,16 @@ def mock_tracking_service():
     service.get_organization_tracking_dashboard = AsyncMock()
     return service
 
+
 # Test data factories for Goals
 class GoalDataFactory:
     """Factory for creating test goal data"""
-    
+
     @staticmethod
     def create_goal_data(**overrides):
         """Create goal data with optional overrides"""
         from datetime import date, timedelta
-        
+
         default_data = {
             "title": "Test Goal",
             "description": "Test goal description",
@@ -382,20 +424,22 @@ class GoalDataFactory:
             "success_criteria": {"test": True},
             "assigned_teams": ["team-1"],
             "tags": ["test"],
-            "metadata": {"test_data": True}
+            "metadata": {"test_data": True},
         }
-        
+
         return {**default_data, **overrides}
+
 
 @pytest.fixture
 def goal_factory():
     """Provide goal data factory"""
     return GoalDataFactory()
 
+
 # Database test utilities for Goals
 class DatabaseTestUtils:
     """Utilities for database testing"""
-    
+
     @staticmethod
     def mock_database_row(data_dict):
         """Convert dict to mock database row"""
@@ -404,45 +448,49 @@ class DatabaseTestUtils:
             setattr(row, key, value)
             row[key] = value  # Support both attribute and dict access
         return row
-    
+
     @staticmethod
     def create_mock_goal_row():
         """Create a mock goal database row"""
         import uuid
         from datetime import date, datetime, timedelta
         from decimal import Decimal
-        
-        return DatabaseTestUtils.mock_database_row({
-            'id': str(uuid.uuid4()),
-            'organization_id': str(uuid.uuid4()),
-            'title': 'Mock Goal',
-            'description': 'Mock goal description',
-            'goal_type': 'business',
-            'priority_level': 8,
-            'target_value': Decimal('100000'),
-            'target_unit': 'USD',
-            'current_value': Decimal('25000'),
-            'success_criteria': '{"target_achieved": true}',
-            'start_date': date.today(),
-            'target_deadline': date.today() + timedelta(days=150),
-            'actual_completion_date': None,
-            'status': 'active',
-            'progress_percentage': Decimal('25.0'),
-            'completion_confidence': Decimal('0.7'),
-            'assigned_teams': ['team-1', 'team-2'],
-            'goal_owner_agent_id': None,
-            'stakeholder_agents': [],
-            'tags': ['test', 'mock'],
-            'metadata': '{"test": true}',
-            'created_by': None,
-            'created_at': datetime.now(),
-            'updated_at': datetime.now()
-        })
+
+        return DatabaseTestUtils.mock_database_row(
+            {
+                "id": str(uuid.uuid4()),
+                "organization_id": str(uuid.uuid4()),
+                "title": "Mock Goal",
+                "description": "Mock goal description",
+                "goal_type": "business",
+                "priority_level": 8,
+                "target_value": Decimal("100000"),
+                "target_unit": "USD",
+                "current_value": Decimal("25000"),
+                "success_criteria": '{"target_achieved": true}',
+                "start_date": date.today(),
+                "target_deadline": date.today() + timedelta(days=150),
+                "actual_completion_date": None,
+                "status": "active",
+                "progress_percentage": Decimal("25.0"),
+                "completion_confidence": Decimal("0.7"),
+                "assigned_teams": ["team-1", "team-2"],
+                "goal_owner_agent_id": None,
+                "stakeholder_agents": [],
+                "tags": ["test", "mock"],
+                "metadata": '{"test": true}',
+                "created_by": None,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
+            }
+        )
+
 
 @pytest.fixture
 def db_utils():
     """Provide database test utilities"""
     return DatabaseTestUtils()
+
 
 # Markers for different test categories
 pytest.mark.unit = pytest.mark.unit
