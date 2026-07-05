@@ -26,6 +26,7 @@ jobs:
     permissions:
       contents: write # commit the tag bump
       packages: write # push to GHCR
+      pull-requests: write # open the gitops bump PR
     steps:
       - uses: actions/checkout@v4
         with:
@@ -96,13 +97,23 @@ jobs:
           cache-to: type=gha,mode=max,scope=mcp
 
       - name: Bump image tags in values-prod.yaml (GitOps)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SHA="${{ steps.tag.outputs.sha }}"
+          BRANCH="release/gitops-bump-${SHA}"
           # Rewrites the four app-image `tag:` lines. Datastore images are single
           # `image:` strings (no tag: key), so they are untouched.
           sed -i -E "s/^(\s*tag:).*/\1 ${SHA}/" deploy/helm/fuzeagent/values-prod.yaml
-          git config user.email "action@github.com"
-          git config user.name "GitHub Action"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git checkout -b "${BRANCH}"
           git add deploy/helm/fuzeagent/values-prod.yaml
           git commit -m "release: fuzeagent images ${SHA} [skip ci]" || exit 0
-          git push
+          git push origin "${BRANCH}"
+          # Open a PR and immediately merge with admin bypass (ruleset: owner can bypass)
+          PR_URL=$(gh pr create \
+            --title "release: fuzeagent images ${SHA}" \
+            --body "Automated GitOps image-tag bump produced by the release workflow. [skip ci]" \
+            --base main --head "${BRANCH}")
+          gh pr merge "${PR_URL}" --admin --squash --delete-branch
