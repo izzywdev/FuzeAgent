@@ -25,8 +25,8 @@ FROM base as dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Install Claude Code CLI
-RUN curl -fsSL https://claude.ai/install.sh | bash
+# Note: Claude Code CLI intentionally not installed at build time (install.sh hangs CI).
+# Agents that need it mount it or install via entrypoint.
 
 # Runtime stage
 FROM base as runtime
