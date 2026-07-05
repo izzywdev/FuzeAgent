@@ -23,8 +23,10 @@ export default tseslint.config([
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_?' }],
       '@typescript-eslint/no-unused-expressions': 'warn',
+      '@typescript-eslint/no-namespace': 'warn',
       'no-constant-binary-expression': 'warn',
       'react-hooks/rules-of-hooks': 'warn',
+      'react-refresh/only-export-components': 'warn',
     },
   },
 ])
