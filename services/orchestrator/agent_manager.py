@@ -1,4 +1,5 @@
 from crewai import Crew, Agent, Task
+from fastapi import HTTPException
 from typing import Dict, List, Optional, Any
 import asyncio
 import docker

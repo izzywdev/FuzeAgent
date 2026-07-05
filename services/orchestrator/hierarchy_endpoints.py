@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 import json
 import httpx
 import asyncio
+from database import DatabaseManager
 
 router = APIRouter(prefix="/hierarchy", tags=["hierarchy"])
 
