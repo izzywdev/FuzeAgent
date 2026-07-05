@@ -1618,24 +1618,12 @@ class FuzeAgentMCPServer:
         import asyncio
         
         async def health_check(request):
-            """Health check endpoint"""
-            try:
-                # Test connection to FuzeAgent API
-                response = await self.api_client.get("/organizations")
-                org_count = len(response) if isinstance(response, list) else 0
-                return web.json_response({
-                    "status": "healthy", 
-                    "api_connection": "ok",
-                    "mcp_tools": 20,  # Updated to include Goals management tools
-                    "server_type": "sse",
-                    "organizations_count": org_count
-                })
-            except Exception as e:
-                return web.json_response({
-                    "status": "unhealthy", 
-                    "api_connection": "failed", 
-                    "error": str(e)
-                }, status=503)
+            """Health check endpoint — always 200 when the process is alive."""
+            return web.json_response({
+                "status": "healthy",
+                "server_type": "sse",
+                "mcp_tools": 20,
+            })
         
         # Create web app for health check
         app = web.Application()
