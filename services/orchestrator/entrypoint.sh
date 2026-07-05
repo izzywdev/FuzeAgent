@@ -26,8 +26,9 @@ wait_for_service() {
     echo "✅ $service_name is ready!"
 }
 
-# Wait for database
-wait_for_service database 5432 "PostgreSQL"
+# Wait for database (host comes from DATABASE_URL to avoid hardcoding service name)
+DB_HOST=$(echo "${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/ai_context}" | sed -E "s|.*@([^:/]+).*|\1|")
+wait_for_service "$DB_HOST" 5432 "PostgreSQL"
 
 # Wait for Redis
 wait_for_service redis 6379 "Redis"
