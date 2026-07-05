@@ -1,9 +1,10 @@
-from fastapi import FastAPI, WebSocket, HTTPException, Query, Path, Body, UploadFile, File, Form
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Path, Body, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 import asyncio
+import json
 import os
 import logging
 from datetime import datetime, date
@@ -2453,7 +2454,7 @@ async def add_organizational_knowledge(
 ):
     """Add knowledge to organization-level knowledge base"""
     try:
-        from organization_rag_manager import ContentType, KnowledgeCategory, SourceType
+        from organization_rag_manager import OrganizationRAGManager, ContentType, KnowledgeCategory, SourceType
         
         # Initialize services if not already done
         if not hasattr(app.state, 'org_rag_manager'):
