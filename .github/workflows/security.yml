@@ -87,7 +87,7 @@ jobs:
       run: |
         cd services/orchestrator
         pip install pip-licenses
-        pip-licenses --format=table
+        pip-licenses --format=plain
 
   docker-bench-security:
     name: Docker Security Benchmark

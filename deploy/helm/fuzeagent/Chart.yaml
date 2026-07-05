@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fuzeagent
+description: FuzeAgent — AI team-orchestration platform (orchestrator + hierarchy API + UI + MCP server), deployed onto the shared FuzeInfra Contabo k3s cluster via GitOps.
+type: application
+version: 0.1.0
+appVersion: "2.0.0"

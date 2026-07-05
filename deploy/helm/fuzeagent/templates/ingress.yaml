@@ -1,0 +1,30 @@
+{{- if .Values.ingress.enabled }}
+# Cloudflare Tunnel → Traefik (ClusterIP) → this Ingress. Cloudflare terminates
+# TLS at the edge, so there is NO tls: block and NO cert-manager annotations —
+# adding either would break the CF-tunnel-only invariant of the shared cluster.
+# Only "/" is routed here → the UI; the UI's own nginx reverse-proxies the
+# same-origin /api/orchestrator and /api/hierarchy paths to the backend Services.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fuzeagent
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui
+                port:
+                  number: {{ .Values.ui.port }}
+{{- end }}

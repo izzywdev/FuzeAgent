@@ -179,7 +179,7 @@ jobs:
         python -m pytest --cov=. --cov-report=html tests/ || true
     
     - name: Upload coverage HTML report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-report
         path: services/orchestrator/htmlcov/
@@ -214,7 +214,7 @@ jobs:
         safety check
     
     - name: Upload security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-reports
         path: |
@@ -323,7 +323,7 @@ jobs:
         fail_ci_if_error: false
     
     - name: Upload coverage HTML report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: frontend-coverage-report
         path: services/ui-react/coverage/
@@ -383,7 +383,7 @@ jobs:
         python -m pytest tests/ -m "not slow" --benchmark-only --benchmark-json=benchmark.json || true
     
     - name: Upload benchmark results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: benchmark-results
         path: services/orchestrator/benchmark.json

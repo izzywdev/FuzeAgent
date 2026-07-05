@@ -1,0 +1,34 @@
+{{- if .Values.resourceGovernance.enabled }}
+# Guardrails so FuzeAgent cannot exhaust the shared single-node cluster. The
+# ResourceQuota caps aggregate namespace usage; the LimitRange supplies default
+# requests/limits to any pod that omits them.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: fuzeagent-quota
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.resourceGovernance.quota.requestsCpu | quote }}
+    requests.memory: {{ .Values.resourceGovernance.quota.requestsMemory | quote }}
+    limits.cpu: {{ .Values.resourceGovernance.quota.limitsCpu | quote }}
+    limits.memory: {{ .Values.resourceGovernance.quota.limitsMemory | quote }}
+    pods: {{ .Values.resourceGovernance.quota.pods | quote }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: fuzeagent-limits
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: {{ .Values.resourceGovernance.limitRange.defaultCpu | quote }}
+        memory: {{ .Values.resourceGovernance.limitRange.defaultMemory | quote }}
+      defaultRequest:
+        cpu: {{ .Values.resourceGovernance.limitRange.defaultRequestCpu | quote }}
+        memory: {{ .Values.resourceGovernance.limitRange.defaultRequestMemory | quote }}
+{{- end }}
