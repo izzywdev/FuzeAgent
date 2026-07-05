@@ -23,6 +23,7 @@ orchestrator:
     mcp: true
   # CORS allowlist = the same-origin admin host (the UI nginx proxies /api/* to
   # the orchestrator, so the browser Origin is the ingress host).
+  runMigrations: false
   auth:
     corsAllowOrigins: "https://fuzeagent.prod.fuzefront.com"
 
