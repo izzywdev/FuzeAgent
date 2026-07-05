@@ -19,10 +19,8 @@ export default defineConfig({
       exposes: {
         './FuzeAgentApp': './src/App',
       },
-      shared: {
-        react: { singleton: true, requiredVersion: '^18.0.0' },
-        'react-dom': { singleton: true, requiredVersion: '^18.0.0' },
-      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      shared: ['react', 'react-dom'] as any,
     }),
   ],
   resolve: {
