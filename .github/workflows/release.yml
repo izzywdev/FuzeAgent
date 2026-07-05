@@ -116,4 +116,7 @@ jobs:
             --title "release: fuzeagent images ${SHA}" \
             --body "Automated GitOps image-tag bump produced by the release workflow. [skip ci]" \
             --base main --head "${BRANCH}")
-          gh pr merge "${PR_URL}" --admin --squash --delete-branch
+          # Approve as repo owner (bypasses CODEOWNERS requirement)
+          GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr review "${PR_URL}" --approve -b "Automated GitOps release"
+          # Enable auto-merge; the auto-merge.yml workflow will merge once checks pass
+          gh pr merge "${PR_URL}" --auto --squash --delete-branch
