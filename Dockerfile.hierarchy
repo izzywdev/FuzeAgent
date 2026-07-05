@@ -7,7 +7,8 @@ WORKDIR /app
 COPY requirements-hierarchy.txt .
 RUN pip install --no-cache-dir -r requirements-hierarchy.txt
 
-# Copy the hierarchy API script
+# Copy the auth module (shared with orchestrator) and the hierarchy API
+COPY services/orchestrator/auth.py .
 COPY hierarchy_endpoints.py .
 
 # Expose port
