@@ -270,6 +270,9 @@ async def lifespan(app: FastAPI):
     # Initialize sandbox manager
     app.state.sandbox_manager = AgentSandboxManager(database_url)
     await app.state.sandbox_manager.start()
+
+    # Start WebSocket manager background cleanup task
+    await websocket_manager.start()
     
     # Initialize task execution engine
     app.state.task_execution_engine = TaskExecutionEngine(app.state.sandbox_manager)
