@@ -53,18 +53,19 @@ spec:
             - name: data
               mountPath: /var/lib/rabbitmq
           readinessProbe:
-            exec:
-              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            tcpSocket:
+              port: 5672
             initialDelaySeconds: 20
             periodSeconds: 15
             failureThreshold: 6
-            timeoutSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
-            exec:
-              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            tcpSocket:
+              port: 5672
             initialDelaySeconds: 60
             periodSeconds: 30
-            timeoutSeconds: 10
+            failureThreshold: 5
+            timeoutSeconds: 5
           resources:
             {{- toYaml .Values.rabbitmq.resources | nindent 12 }}
       volumes:
