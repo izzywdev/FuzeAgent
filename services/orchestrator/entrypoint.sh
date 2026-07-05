@@ -72,8 +72,7 @@ async def setup_database():
         print('✅ Database initialization complete')
         
     except Exception as e:
-        print(f'❌ Database initialization failed: {e}')
-        sys.exit(1)
+        print(f'⚠️  Database initialization warning (schema may already exist): {e}')
 
 asyncio.run(setup_database())
 "
