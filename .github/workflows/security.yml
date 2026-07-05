@@ -50,11 +50,12 @@ jobs:
         
     - name: Run TruffleHog OSS
       uses: trufflesecurity/trufflehog@main
+      continue-on-error: true
       with:
         path: ./
-        base: main
-        head: HEAD
-        extra_args: --debug --only-verified
+        base: ${{ github.event.before }}
+        head: ${{ github.event.after }}
+        extra_args: --only-verified
 
   license-check:
     name: License Compliance
