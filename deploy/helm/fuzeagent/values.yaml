@@ -70,7 +70,7 @@ mcpServer:
   image:
     repository: fuzeagent-mcp-server
     tag: latest
-  port: 8003
+  port: 8001
   replicas: 1
   resources:
     requests: { cpu: 25m, memory: 64Mi }
