@@ -13,7 +13,13 @@ from .agent_expertise_tracker import AgentExpertiseTracker
 class AgentManager:
     def __init__(self, database_url: str):
         self.agents: Dict[str, Agent] = {}
-        self.docker_client = docker.from_env()
+        try:
+            self.docker_client = docker.from_env()
+            self.docker_client.ping()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Docker not available, container features disabled: {e}")
+            self.docker_client = None
         self.crews: Dict[str, Crew] = {}
         self.sandbox_manager: Optional[AgentSandboxManager] = None
         self.expertise_tracker = AgentExpertiseTracker(database_url)
@@ -196,7 +202,9 @@ class AgentManager:
         config: dict
     ):
         """Spawn a dedicated container for an agent"""
-        
+        if not self.docker_client:
+            return
+
         container_config = {
             'image': f'ai-agent-{type}:latest',
             'name': f'agent-{name.lower().replace(" ", "-")}',
