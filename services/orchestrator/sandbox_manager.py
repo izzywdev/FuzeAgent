@@ -76,7 +76,11 @@ class AgentSandboxManager:
 
     def __init__(self, database_url: str):
         self.database_url = database_url
-        self.docker_client = docker.from_env()
+        try:
+            self.docker_client = docker.from_env()
+        except Exception as e:
+            logger.warning(f"Docker not available, sandbox features disabled: {e}")
+            self.docker_client = None
         self.active_sandboxes: Dict[str, Sandbox] = {}
         self.cleanup_task: Optional[asyncio.Task] = None
 
