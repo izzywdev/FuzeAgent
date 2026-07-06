@@ -78,6 +78,7 @@ class AgentSandboxManager:
         self.database_url = database_url
         try:
             self.docker_client = docker.from_env()
+            self.docker_client.ping()  # force eager connection; lazy SDK won't fail until first API call
         except Exception as e:
             logger.warning(f"Docker not available, sandbox features disabled: {e}")
             self.docker_client = None
@@ -490,7 +491,7 @@ class AgentSandboxManager:
                 try:
                     # Try to get the container
                     container = None
-                    if row["container_id"]:
+                    if row["container_id"] and self.docker_client:
                         try:
                             container = self.docker_client.containers.get(
                                 row["container_id"]
