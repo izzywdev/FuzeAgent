@@ -128,7 +128,9 @@ fi
 # Start the application
 echo "🎯 Starting FuzeAgent Orchestrator with autonomous execution..."
 
-exec uvicorn main:app \
+# cd to / so Python sees /app as the 'app' package (relative imports need this)
+cd /
+exec python -m uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 1 \
