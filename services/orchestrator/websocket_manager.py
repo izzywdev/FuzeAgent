@@ -147,10 +147,13 @@ class WebSocketManager:
         self.org_connections: Dict[str, Set[str]] = {}  # org_id -> connection_ids
         self.update_handlers: Dict[UpdateType, List[Callable]] = {}
 
-        # Start cleanup task
-        asyncio.create_task(self._cleanup_task())
+        self._cleanup_task_handle = None
 
-    async def connect(
+    async def start(self):
+        """Start the background cleanup task. Call from FastAPI startup after event loop is running."""
+        self._cleanup_task_handle = asyncio.create_task(self._cleanup_task())
+
+        async def connect(
         self,
         websocket: WebSocket,
         connection_id: str,
