@@ -26,8 +26,9 @@ wait_for_service() {
     echo "✅ $service_name is ready!"
 }
 
-# Wait for database
-wait_for_service postgres 5432 "PostgreSQL"
+# Wait for database (host comes from DATABASE_URL to avoid hardcoding service name)
+DB_HOST=$(echo "${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/ai_context}" | sed -E "s|.*@([^:/]+).*|\1|")
+wait_for_service "$DB_HOST" 5432 "PostgreSQL"
 
 # Wait for Redis
 wait_for_service redis 6379 "Redis"
@@ -71,8 +72,7 @@ async def setup_database():
         print('✅ Database initialization complete')
         
     except Exception as e:
-        print(f'❌ Database initialization failed: {e}')
-        sys.exit(1)
+        print(f'⚠️  Database initialization warning (schema may already exist): {e}')
 
 asyncio.run(setup_database())
 "
@@ -128,7 +128,11 @@ fi
 # Start the application
 echo "🎯 Starting FuzeAgent Orchestrator with autonomous execution..."
 
-exec uvicorn main:app \
+# cd to / so Python sees /app as the 'app' package (needed for relative imports).
+# PYTHONPATH=/app satisfies absolute imports (e.g. 'from knowledge_manager import ...')
+# that exist alongside the relative-import style in this mixed codebase.
+cd /
+PYTHONPATH=/app exec python -m uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 1 \

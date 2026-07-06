@@ -1,0 +1,115 @@
+{{- if .Values.orchestrator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orchestrator
+spec:
+  replicas: {{ .Values.orchestrator.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: fuzeagent
+      app.kubernetes.io/component: orchestrator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: fuzeagent
+        app.kubernetes.io/component: orchestrator
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: orchestrator
+          image: "{{ .Values.orchestrator.image.repository }}:{{ .Values.orchestrator.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          # Uses the image ENTRYPOINT (entrypoint.sh): waits for postgres/redis/
+          # rabbitmq, runs migrations incl. CREATE EXTENSION vector, then uvicorn.
+          ports:
+            - name: http
+              containerPort: {{ .Values.orchestrator.port }}
+          env:
+            {{- include "fuzeagent.backendEnv" . | nindent 12 }}
+            - name: RUN_MIGRATIONS
+              value: {{ .Values.orchestrator.runMigrations | quote }}
+            - name: ENABLE_AUTONOMOUS_EXECUTION
+              value: {{ .Values.orchestrator.execution.autonomous | quote }}
+            - name: ENABLE_MULTI_AGENT_COORDINATION
+              value: {{ .Values.orchestrator.execution.multiAgent | quote }}
+            - name: ENABLE_FILE_OPERATIONS
+              value: {{ .Values.orchestrator.execution.fileOps | quote }}
+            - name: ENABLE_MCP_INTEGRATION
+              value: {{ .Values.orchestrator.execution.mcp | quote }}
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: OPENAI_API_KEY
+                  optional: true
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: GOOGLE_API_KEY
+                  optional: true
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: ENCRYPTION_KEY
+                  optional: true
+            # main:app enforces global auth (Depends(get_current_user)) and fails
+            # CLOSED without JWT material (PR #6/#7). JWT_SECRET is required.
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: JWT_SECRET
+            - name: JWT_ALGORITHM
+              value: {{ .Values.orchestrator.auth.jwtAlgorithm | quote }}
+            - name: JWT_AUDIENCE
+              value: {{ .Values.orchestrator.auth.jwtAudience | quote }}
+            - name: JWT_ISSUER
+              value: {{ .Values.orchestrator.auth.jwtIssuer | quote }}
+            # Non-wildcard CORS allowlist (wildcard + credentials is rejected by the app).
+            - name: CORS_ALLOW_ORIGINS
+              value: {{ .Values.orchestrator.auth.corsAllowOrigins | quote }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.orchestrator.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orchestrator
+spec:
+  selector:
+    app.kubernetes.io/part-of: fuzeagent
+    app.kubernetes.io/component: orchestrator
+  ports:
+    - name: http
+      port: {{ .Values.orchestrator.port }}
+      targetPort: http
+{{- end }}

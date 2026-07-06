@@ -45,8 +45,8 @@ afterEach(() => {
 
 // Mock environment variables
 vi.mock('../config/env', () => ({
-  API_URL: 'http://localhost:8000',
-  ENVIRONMENT: 'test',
+  API_URL: 'http://localhost:8006',
+  WS_URL_BASE: 'ws://localhost:8006',
 }))
 
 // Global test utilities

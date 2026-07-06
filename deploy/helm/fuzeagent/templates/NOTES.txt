@@ -1,0 +1,20 @@
+FuzeAgent deployed (release {{ .Release.Name }}, namespace {{ .Release.Namespace }}).
+
+Services (in-namespace DNS, names match docker-compose):
+  - orchestrator     : http://orchestrator:{{ .Values.orchestrator.port }}   (autonomous exec: {{ .Values.orchestrator.execution.autonomous }})
+  - hierarchy-api    : http://hierarchy-api:{{ .Values.hierarchyApi.port }}
+  - ui               : http://ui:{{ .Values.ui.port }}
+  - mcp-server       : http://mcp-server:{{ .Values.mcpServer.port }}
+  - postgres (pgvec) : postgres:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}
+  - redis            : redis:{{ .Values.redis.port }}
+  - rabbitmq         : rabbitmq:{{ .Values.rabbitmq.port }} (mgmt {{ .Values.rabbitmq.managementPort }})
+
+{{- if .Values.ingress.enabled }}
+External (via Cloudflare tunnel → Traefik):
+  https://{{ .Values.ingress.host }}
+{{- end }}
+
+Secrets come from the SealedSecret "{{ include "fuzeagent.secretName" . }}"
+(keys: POSTGRES_PASSWORD, RABBITMQ_PASSWORD, ANTHROPIC_API_KEY, OPENAI_API_KEY,
+GOOGLE_API_KEY, ENCRYPTION_KEY) + the "ghcr-pull" image-pull secret. Both are
+reconciled by the fuzeagent-sealed Argo application.

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from '../../config/env'
 import { Link, useNavigate } from 'react-router-dom'
 
 interface Team {
@@ -44,7 +45,7 @@ export function CreateAgentPage() {
 
   useEffect(() => {
     // Load teams
-    fetch('http://localhost:8000/teams')
+    fetch(`${API_URL}/teams`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -72,7 +73,7 @@ export function CreateAgentPage() {
       })
 
     // Load agent templates
-    fetch('http://localhost:8000/agent-templates')
+    fetch(`${API_URL}/agent-templates`)
       .then(res => res.json())
       .then(data => {
         if (data && data.templates && Array.isArray(data.templates)) {
@@ -179,7 +180,7 @@ export function CreateAgentPage() {
     setCreating(true)
 
     try {
-      const response = await fetch('http://localhost:8000/agents', {
+      const response = await fetch(`${API_URL}/agents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

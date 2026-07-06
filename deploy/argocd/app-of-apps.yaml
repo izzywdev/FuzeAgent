@@ -1,0 +1,25 @@
+# Root "app of apps". FuzeInfra registers this ONCE (argocd-register.yml, path
+# deploy/argocd); thereafter Argo reconciles everything under
+# deploy/argocd/applications automatically. Requires the `fuzeagent` AppProject,
+# which is authored IN FuzeInfra (argocd/projects/fuzeagent.yaml) — this repo
+# must NOT self-create a project granting the fuzeinfra namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fuzeagent-apps
+  namespace: argocd
+spec:
+  project: fuzeagent
+  source:
+    repoURL: https://github.com/izzywdev/FuzeAgent.git
+    targetRevision: main
+    path: deploy/argocd/applications
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

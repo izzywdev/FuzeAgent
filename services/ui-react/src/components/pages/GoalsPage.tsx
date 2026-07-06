@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from '../../config/env'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 interface Goal {
@@ -24,12 +25,30 @@ export function GoalsPage() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [currentOrganizationId, setCurrentOrganizationId] = useState<string>('1')
   const navigate = useNavigate()
   const { goalId } = useParams()
 
+  // Fetch current organization ID
   useEffect(() => {
+    // First, try to get organizations and use the first one
+    fetch(`${API_URL}/organizations`)
+      .then(res => res.json())
+      .then(orgs => {
+        if (Array.isArray(orgs) && orgs.length > 0) {
+          setCurrentOrganizationId(orgs[0].id)
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to load organizations, using default ID', err)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (!currentOrganizationId) return
+    
     // Try to fetch goals from API
-    fetch('http://localhost:8000/organizations/1/goals')
+    fetch(`${API_URL}/organizations/${currentOrganizationId}/goals`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -45,7 +64,7 @@ export function GoalsPage() {
         setGoals(mockGoals)
         setLoading(false)
       })
-  }, [])
+  }, [currentOrganizationId])
 
   const mockGoals: Goal[] = [
     {
@@ -595,31 +614,35 @@ export function GoalsPage() {
         )}
 
         {/* Create Goal Modal */}
-        {showCreateForm && <CreateGoalModal onClose={() => setShowCreateForm(false)} onSuccess={() => {
-          setShowCreateForm(false)
-          // Reload goals
-          fetch('http://localhost:8000/organizations/1/goals')
-            .then(res => res.json())
-            .then(data => {
-              if (Array.isArray(data)) {
-                setGoals(data)
-              }
-            })
-            .catch(() => {
-              // Keep existing goals on error
-            })
-        }} />}
+        {showCreateForm && <CreateGoalModal 
+          currentOrganizationId={currentOrganizationId}
+          onClose={() => setShowCreateForm(false)} 
+          onSuccess={() => {
+            setShowCreateForm(false)
+            // Reload goals
+            fetch(`${API_URL}/organizations/${currentOrganizationId}/goals`)
+              .then(res => res.json())
+              .then(data => {
+                if (Array.isArray(data)) {
+                  setGoals(data)
+                }
+              })
+              .catch(() => {
+                // Keep existing goals on error
+              })
+          }} />}
       </main>
     </div>
   )
 }
 
 interface CreateGoalModalProps {
+  currentOrganizationId: string
   onClose: () => void
   onSuccess: () => void
 }
 
-function CreateGoalModal({ onClose, onSuccess }: CreateGoalModalProps) {
+function CreateGoalModal({ currentOrganizationId, onClose, onSuccess }: CreateGoalModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -636,21 +659,22 @@ function CreateGoalModal({ onClose, onSuccess }: CreateGoalModalProps) {
     setError('')
 
     try {
-      const response = await fetch('http://localhost:8000/organizations/1/goals', {
+      const goalPayload = {
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        status: 'planning',
+        target_completion_date: formData.target_completion_date ? new Date(formData.target_completion_date).toISOString() : null,
+        assigned_teams: formData.assigned_teams,
+        milestones: []
+      }
+      
+      const response = await fetch(`${API_URL}/organizations/${currentOrganizationId}/goals`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          ...formData,
-          goal_type: 'business',
-          target_value: 100,
-          target_unit: 'percent',
-          priority_level: 
-            formData.priority === 'critical' ? 10 : 
-            formData.priority === 'high' ? 7 :
-            formData.priority === 'medium' ? 5 : 3
-        })
+        body: JSON.stringify(goalPayload)
       })
 
       if (response.ok) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { API_URL } from '../config/env'
 import { FiRefreshCw, FiSearch, FiFilter, FiDownload, FiUsers } from 'react-icons/fi'
 import {
   ReactFlow,
@@ -117,7 +118,7 @@ const OrganizationChartPage: React.FC = () => {
     
     try {
       // Fetch hierarchy visualization data
-      const response = await fetch('http://localhost:8000/hierarchy/visualization')
+      const response = await fetch(`${API_URL}/hierarchy/visualization`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -128,7 +129,7 @@ const OrganizationChartPage: React.FC = () => {
       setEdges(data.edges)
       
       // Fetch statistics
-      const statsResponse = await fetch('http://localhost:8000/hierarchy/stats')
+      const statsResponse = await fetch(`${API_URL}/hierarchy/stats`)
       if (statsResponse.ok) {
         const statsData: HierarchyStats = await statsResponse.json()
         setStats(statsData)

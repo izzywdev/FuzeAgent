@@ -132,8 +132,8 @@ describe('CreateAgentPage - Simple Tests', () => {
     })
 
     it('should make initial API calls for teams and templates', () => {
-      expect(fetch).toHaveBeenCalledWith('http://localhost:8000/teams')
-      expect(fetch).toHaveBeenCalledWith('http://localhost:8000/agent-templates')
+      expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/teams$/))
+      expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/agent-templates$/))
     })
 
     it('should handle form submission', async () => {

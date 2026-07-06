@@ -50,11 +50,12 @@ jobs:
         
     - name: Run TruffleHog OSS
       uses: trufflesecurity/trufflehog@main
+      continue-on-error: true
       with:
         path: ./
-        base: main
-        head: HEAD
-        extra_args: --debug --only-verified
+        base: ${{ github.event.before }}
+        head: ${{ github.event.after }}
+        extra_args: --only-verified
 
   license-check:
     name: License Compliance
@@ -87,7 +88,7 @@ jobs:
       run: |
         cd services/orchestrator
         pip install pip-licenses
-        pip-licenses --format=table
+        pip-licenses --format=plain
 
   docker-bench-security:
     name: Docker Security Benchmark

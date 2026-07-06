@@ -58,6 +58,17 @@ services:
       ENABLE_MCP_INTEGRATION: "true"
       # Security and encryption
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # Authentication (issue #6 / PR #7): JWT verification material so the
+      # global Depends(get_current_user) fails CLOSED (401) for unauthenticated
+      # requests on the published :8000 surface. Required — the app rejects all
+      # non-public routes when no secret/key is configured.
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-}
+      JWT_ISSUER: ${JWT_ISSUER:-}
+      # CORS allowlist (comma-separated). NON-wildcard. Wildcard + credentials
+      # is disallowed by the app and is a security regression.
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:3031,http://localhost}
       # Claude SDK configuration
       CLAUDE_CLI_PATH: "/usr/local/bin/claude"
       # Sandbox configuration
@@ -66,8 +77,12 @@ services:
       MAX_CONCURRENT_EXECUTIONS: "10"
       MAX_COORDINATION_SESSIONS: "5"
     user: root
-    entrypoint: ""
-    command: bash -c "cd /app && uvicorn simple_main:app --host 0.0.0.0 --port 8000"
+    # SECURITY (PR #7): do NOT override the image entrypoint. The hardened
+    # entrypoint.sh runs migrations and launches the AUTHENTICATED app
+    # `main:app` (global Depends(get_current_user) + non-wildcard CORS + BOLA
+    # authz). The previous `simple_main:app` override published a demo app with
+    # ZERO authN and allow_origins=["*"]+credentials on 0.0.0.0:8000.
+    # simple_main.py is an in-memory demo and is NOT the production surface.
     volumes:
       - orchestrator_workspaces:/app/workspaces
       - orchestrator_backups:/app/.fuzeagent/backups

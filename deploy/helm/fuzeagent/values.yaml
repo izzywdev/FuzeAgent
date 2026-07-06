@@ -1,0 +1,131 @@
+# =============================================================================
+# FuzeAgent default values (local/dev shape). Production overrides live in
+# values-prod.yaml (GHCR image tags rewritten by release.yml, prod ingress host).
+# Service names deliberately match docker-compose (postgres/redis/rabbitmq/
+# orchestrator/hierarchy-api/mcp-server/ui) so the app's hardcoded internal hosts
+# and the orchestrator entrypoint's host waits resolve inside the namespace.
+# =============================================================================
+
+global:
+  imagePullPolicy: IfNotPresent
+
+# GHCR pull secret (sealed; must match the name in the SealedSecret). Empty here
+# for local charts that use locally-built images.
+imagePullSecrets: []
+
+# Workloads read env from this Secret (materialised from a SealedSecret in prod).
+secret:
+  existingSecret: fuzeagent-secrets
+
+# --- Application services -----------------------------------------------------
+orchestrator:
+  enabled: true
+  image:
+    repository: fuzeagent-orchestrator
+    tag: latest
+  port: 8000
+  replicas: 1
+  # Safe first-light: NO autonomous container spawning / file ops / docker.sock on
+  # the shared single-node cluster. MCP is fine (no host escape surface).
+  execution:
+    autonomous: false
+    multiAgent: false
+    fileOps: false
+    mcp: true
+  runMigrations: true
+  # main:app fails closed without JWT material; CORS must be non-wildcard.
+  auth:
+    jwtAlgorithm: HS256
+    jwtAudience: ""
+    jwtIssuer: ""
+    corsAllowOrigins: "http://localhost:3000,http://localhost:3031"
+  resources:
+    requests: { cpu: 150m, memory: 384Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+hierarchyApi:
+  enabled: true
+  image:
+    repository: fuzeagent-hierarchy-api
+    tag: latest
+  port: 8006
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+ui:
+  enabled: true
+  image:
+    repository: fuzeagent-ui
+    tag: latest
+  port: 3000
+  replicas: 1
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+
+mcpServer:
+  enabled: true
+  image:
+    repository: fuzeagent-mcp-server
+    tag: latest
+  port: 8001
+  replicas: 1
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+
+# --- Namespaced datastores (self-contained first-light) -----------------------
+postgres:
+  enabled: true
+  image: pgvector/pgvector:pg16
+  port: 5432
+  database: ai_context
+  user: postgres
+  storage: 5Gi
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+redis:
+  enabled: true
+  image: redis:7-alpine
+  port: 6379
+  storage: 1Gi
+  resources:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+
+rabbitmq:
+  enabled: true
+  image: rabbitmq:3-management
+  port: 5672
+  managementPort: 15672
+  user: admin
+  storage: 2Gi
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+# --- Ingress (Traefik + Cloudflare tunnel; CF terminates TLS → no tls block) ---
+ingress:
+  enabled: true
+  className: traefik
+  host: fuzeagent.local
+  annotations: {}
+
+# --- Namespace guardrails on the shared node ----------------------------------
+resourceGovernance:
+  enabled: true
+  quota:
+    requestsCpu: "2"
+    requestsMemory: 4Gi
+    limitsCpu: "4"
+    limitsMemory: 8Gi
+    pods: "20"
+  limitRange:
+    defaultCpu: 500m
+    defaultMemory: 512Mi
+    defaultRequestCpu: 100m
+    defaultRequestMemory: 128Mi
