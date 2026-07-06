@@ -128,9 +128,11 @@ fi
 # Start the application
 echo "🎯 Starting FuzeAgent Orchestrator with autonomous execution..."
 
-# cd to / so Python sees /app as the 'app' package (relative imports need this)
+# cd to / so Python sees /app as the 'app' package (needed for relative imports).
+# PYTHONPATH=/app satisfies absolute imports (e.g. 'from knowledge_manager import ...')
+# that exist alongside the relative-import style in this mixed codebase.
 cd /
-exec python -m uvicorn app.main:app \
+PYTHONPATH=/app exec python -m uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers 1 \
