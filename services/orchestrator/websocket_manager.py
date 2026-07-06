@@ -153,7 +153,7 @@ class WebSocketManager:
         """Start the background cleanup task. Call from FastAPI startup after event loop is running."""
         self._cleanup_task_handle = asyncio.create_task(self._cleanup_task())
 
-        async def connect(
+    async def connect(
         self,
         websocket: WebSocket,
         connection_id: str,
