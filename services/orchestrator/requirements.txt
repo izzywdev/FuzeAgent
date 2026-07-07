@@ -56,6 +56,10 @@ aiohttp>=3.9.1
 # Authentication and security
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+PyJWT>=2.8.0
+
+# Kubernetes client
+kubernetes>=29.0.0
 
 # CLI and rich formatting
 click>=8.1.7

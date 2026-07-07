@@ -4,11 +4,21 @@ import asyncio
 import docker
 import os
 import uuid
+import logging
 from .claude_code_wrapper import ClaudeCodeWrapper
 from .database import get_db_connection, DatabaseManager
 from .sandbox_manager import AgentSandboxManager
 from .git_workflow_manager import GitWorkflowManager
 from .agent_expertise_tracker import AgentExpertiseTracker
+
+logger = logging.getLogger(__name__)
+
+try:
+    from kubernetes import client as k8s_client, config as k8s_config
+    from kubernetes.client.rest import ApiException
+    _K8S_AVAILABLE = True
+except ImportError:
+    _K8S_AVAILABLE = False
 
 class AgentManager:
     def __init__(self, database_url: str):
@@ -17,9 +27,24 @@ class AgentManager:
             self.docker_client = docker.from_env()
             self.docker_client.ping()
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Docker not available, container features disabled: {e}")
+            logger.warning(f"Docker not available, container features disabled: {e}")
             self.docker_client = None
+
+        self.k8s_batch_v1 = None
+        self.k8s_namespace = os.environ.get('POD_NAMESPACE', 'fuzeagent')
+        if _K8S_AVAILABLE:
+            try:
+                k8s_config.load_incluster_config()
+                self.k8s_batch_v1 = k8s_client.BatchV1Api()
+                logger.info("Kubernetes in-cluster config loaded")
+            except Exception:
+                try:
+                    k8s_config.load_kube_config()
+                    self.k8s_batch_v1 = k8s_client.BatchV1Api()
+                    logger.info("Kubernetes kubeconfig loaded (dev mode)")
+                except Exception as e:
+                    logger.warning(f"Kubernetes not available: {e}")
+
         self.crews: Dict[str, Crew] = {}
         self.sandbox_manager: Optional[AgentSandboxManager] = None
         self.expertise_tracker = AgentExpertiseTracker(database_url)
@@ -195,39 +220,146 @@ class AgentManager:
         return agent
     
     async def _spawn_agent_container(
-        self, 
-        name: str, 
-        role: str, 
-        type: str,
+        self,
+        name: str,
+        role: str,
+        agent_type: str,
         config: dict
-    ):
-        """Spawn a dedicated container for an agent"""
-        if not self.docker_client:
-            return
+    ) -> Optional[str]:
+        """Spawn a k8s Job for an agent. Falls back to Docker in dev."""
+        agent_id = config.get('agent_id', name)
+        image_map = {
+            'python_developer': 'ghcr.io/izzywdev/fuzeagent/claude-runner-python-dev:latest',
+            'typescript_developer': 'ghcr.io/izzywdev/fuzeagent/claude-runner-react-dev:latest',
+            'react_developer': 'ghcr.io/izzywdev/fuzeagent/claude-runner-react-dev:latest',
+            'security_developer': 'ghcr.io/izzywdev/fuzeagent/claude-runner-python-dev:latest',
+            'devops_engineer': 'ghcr.io/izzywdev/fuzeagent/claude-runner-python-dev:latest',
+            'qa_engineer': 'ghcr.io/izzywdev/fuzeagent/claude-runner-qa:latest',
+            'marketer': 'ghcr.io/izzywdev/fuzeagent/claude-runner-marketer:latest',
+        }
+        image = image_map.get(agent_type, 'ghcr.io/izzywdev/fuzeagent/claude-runner-python-dev:latest')
 
+        # Prefer k8s Jobs
+        if self.k8s_batch_v1:
+            return await self._spawn_k8s_job(agent_id, image, config)
+        # Dev fallback: Docker
+        if self.docker_client:
+            return await self._spawn_docker_container_legacy(agent_id, image, config)
+        logger.warning(f"No container runtime available for agent {agent_id}")
+        return None
+
+    async def _spawn_k8s_job(self, agent_id: str, image: str, config: dict) -> Optional[str]:
+        """Create a Kubernetes Job for an agent pod."""
+        loop = asyncio.get_event_loop()
+
+        # Job name must be DNS-safe, max 63 chars
+        job_name = f"agent-{agent_id[:50].lower().replace('_', '-').replace(' ', '-')}"
+
+        orchestrator_svc = os.environ.get('ORCHESTRATOR_SERVICE_NAME', 'fuzeagent-orchestrator')
+        ws_relay_url = f"ws://{orchestrator_svc}/agent-relay/{agent_id}"
+
+        job = k8s_client.V1Job(
+            api_version='batch/v1',
+            kind='Job',
+            metadata=k8s_client.V1ObjectMeta(
+                name=job_name,
+                namespace=self.k8s_namespace,
+                labels={'fuzeagent/agent-id': agent_id, 'fuzeagent/managed': 'true'},
+            ),
+            spec=k8s_client.V1JobSpec(
+                backoff_limit=0,
+                ttl_seconds_after_finished=3600,
+                template=k8s_client.V1PodTemplateSpec(
+                    spec=k8s_client.V1PodSpec(
+                        restart_policy='Never',
+                        containers=[
+                            k8s_client.V1Container(
+                                name='agent',
+                                image=image,
+                                env=[
+                                    k8s_client.V1EnvVar(name='AGENT_ID', value=agent_id),
+                                    k8s_client.V1EnvVar(name='WS_RELAY_URL', value=ws_relay_url),
+                                    k8s_client.V1EnvVar(
+                                        name='ANTHROPIC_API_KEY',
+                                        value_from=k8s_client.V1EnvVarSource(
+                                            secret_key_ref=k8s_client.V1SecretKeySelector(
+                                                name='fuzeagent-secrets',
+                                                key='ANTHROPIC_API_KEY',
+                                                optional=False,
+                                            )
+                                        ),
+                                    ),
+                                ],
+                                image_pull_policy='Always',
+                            )
+                        ],
+                    )
+                ),
+            ),
+        )
+
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: self.k8s_batch_v1.create_namespaced_job(namespace=self.k8s_namespace, body=job),
+            )
+            logger.info(f"Created k8s Job {job_name} for agent {agent_id}")
+            return job_name
+        except ApiException as e:
+            logger.error(f"Failed to create k8s Job for {agent_id}: {e}")
+            return None
+
+    async def _spawn_docker_container_legacy(self, agent_id: str, image: str, config: dict) -> Optional[str]:
+        """Dev fallback: run agent as a Docker container."""
         container_config = {
-            'image': f'ai-agent-{type}:latest',
-            'name': f'agent-{name.lower().replace(" ", "-")}',
+            'image': image,
+            'name': f'agent-{agent_id[:50].lower().replace("_", "-").replace(" ", "-")}',
             'environment': {
-                'AGENT_NAME': name,
-                'AGENT_ROLE': role,
-                'AGENT_TYPE': type,
+                'AGENT_ID': agent_id,
                 'RABBITMQ_URL': 'amqp://admin:password@rabbitmq:5672/',
                 'CONTEXT_API_URL': 'http://orchestrator:8000',
-                'ANTHROPIC_API_KEY': os.environ['ANTHROPIC_API_KEY']
+                'ANTHROPIC_API_KEY': os.environ.get('ANTHROPIC_API_KEY', ''),
             },
             'network': 'ai-team-network',
-            'restart_policy': {'Name': 'unless-stopped'}
+            'restart_policy': {'Name': 'unless-stopped'},
         }
-        
         try:
-            container = self.docker_client.containers.run(
-                detach=True,
-                **container_config
-            )
-            print(f"Spawned container for {name}: {container.id}")
+            container = self.docker_client.containers.run(detach=True, **container_config)
+            logger.info(f"Spawned Docker container for agent {agent_id}: {container.id}")
+            return container.id
         except Exception as e:
-            print(f"Error spawning container for {name}: {e}")
+            logger.error(f"Error spawning Docker container for agent {agent_id}: {e}")
+            return None
+
+    async def _terminate_agent_container(self, agent_id: str):
+        """Delete the k8s Job for an agent (cascades to pod)."""
+        if self.k8s_batch_v1:
+            job_name = f"agent-{agent_id[:50].lower().replace('_', '-').replace(' ', '-')}"
+            loop = asyncio.get_event_loop()
+            try:
+                await loop.run_in_executor(
+                    None,
+                    lambda: self.k8s_batch_v1.delete_namespaced_job(
+                        name=job_name,
+                        namespace=self.k8s_namespace,
+                        body=k8s_client.V1DeleteOptions(propagation_policy='Foreground'),
+                    ),
+                )
+                logger.info(f"Deleted k8s Job {job_name}")
+            except ApiException as e:
+                if e.status != 404:
+                    logger.error(f"Failed to delete k8s Job {job_name}: {e}")
+            return
+        # Docker fallback
+        if self.docker_client and agent_id in self.agents:
+            agent = self.agents[agent_id]
+            if container_id := agent.config.get('container_id'):
+                try:
+                    container = self.docker_client.containers.get(container_id)
+                    container.stop()
+                    container.remove()
+                except Exception as e:
+                    logger.warning(f"Docker container cleanup failed: {e}")
     
     def _get_tools_for_role(self, type: str, custom_tools: List[str]) -> List:
         """Get appropriate tools based on agent type"""
