@@ -1,6 +1,7 @@
 from fastapi import (
     FastAPI,
     WebSocket,
+    WebSocketDisconnect,
     HTTPException,
     Query,
     Path,
@@ -8,14 +9,19 @@ from fastapi import (
     UploadFile,
     File,
     Form,
+    Depends,
+    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+from collections import defaultdict
 import asyncio
 import os
 import logging
+import jwt
 from datetime import datetime, date
 from decimal import Decimal
 from contextlib import asynccontextmanager
@@ -40,6 +46,34 @@ from .websocket_manager import (
 from hierarchy_endpoints import router as hierarchy_router
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Auth helpers (Track 3)
+# ---------------------------------------------------------------------------
+_security = HTTPBearer(auto_error=False)
+_jwt_secret = os.environ.get('FUZEFRONT_JWT_SECRET', '')
+
+
+def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_security)):
+    """Verify FuzeFront JWT on mutating endpoints. Disabled when secret not set (dev)."""
+    if not _jwt_secret:
+        return None  # Auth disabled when secret not configured (dev mode)
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+    try:
+        payload = jwt.decode(credentials.credentials, _jwt_secret, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+
+# ---------------------------------------------------------------------------
+# Agent relay state (Track 4)
+# ---------------------------------------------------------------------------
+# agent_id -> list of subscriber WebSockets watching that agent's session
+agent_relay_subscribers: Dict[str, List[WebSocket]] = defaultdict(list)
 
 
 # Pydantic models for API documentation
@@ -868,7 +902,7 @@ async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str)
     description="Create a new AI agent with repository and sandbox settings",
     response_model=AgentResponse,
 )
-async def create_agent(agent_config: AgentCreateRequest):
+async def create_agent(agent_config: AgentCreateRequest, _auth=Depends(require_auth)):
     """Create a new AI agent with repository and sandbox settings"""
     try:
         agent = await app.state.agent_manager.create_agent(**agent_config)
@@ -912,6 +946,7 @@ async def list_agents():
 async def assign_task(
     agent_id: str = Path(..., description="Agent ID"),
     task: TaskCreateRequest = Body(...),
+    _auth=Depends(require_auth),
 ):
     """Assign a task to an agent"""
     task_id = await app.state.task_queue.assign_task(agent_id, task)
@@ -2316,6 +2351,50 @@ async def coordination_websocket_endpoint(websocket: WebSocket, session_id: str)
         print(f"Coordination WebSocket error for {session_id}: {e}")
     finally:
         await websocket.close()
+
+
+# ---------------------------------------------------------------------------
+# Agent relay WebSocket (Track 4)
+# ---------------------------------------------------------------------------
+@app.websocket("/agent-relay/{agent_id}")
+async def agent_relay_endpoint(websocket: WebSocket, agent_id: str):
+    """
+    Agent pods connect here to stream their session output.
+    Dashboard clients connect here to watch a specific agent's session.
+    Both use the same endpoint — first JSON message determines role:
+      {"role": "agent"}      -> agent pod streaming output
+      {"role": "subscriber"} -> human dashboard watcher (default)
+    """
+    await websocket.accept()
+    role = None
+    try:
+        init_msg = await websocket.receive_json()
+        role = init_msg.get("role", "subscriber")
+
+        if role == "agent":
+            # Stream from agent pod to all subscribers
+            async for data in websocket.iter_json():
+                msg = {"agentId": agent_id, **data}
+                dead = []
+                for sub in list(agent_relay_subscribers[agent_id]):
+                    try:
+                        await sub.send_json(msg)
+                    except Exception:
+                        dead.append(sub)
+                for d in dead:
+                    agent_relay_subscribers[agent_id].remove(d)
+        else:
+            # Human dashboard subscriber — wait for messages from agent
+            agent_relay_subscribers[agent_id].append(websocket)
+            await websocket.receive_text()  # keep alive until disconnect
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.warning(f"agent-relay {agent_id}: {e}")
+    finally:
+        subs = agent_relay_subscribers.get(agent_id, [])
+        if role != "agent" and websocket in subs:
+            subs.remove(websocket)
 
 
 # Model Configuration and API Key Management Endpoints
