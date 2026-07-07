@@ -1,3 +1,17 @@
+{{/* Full release name, capped at 63 chars. */}}
+{{- define "fuzeagent.fullname" -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/* ServiceAccount name used by the orchestrator (and RBAC). */}}
+{{- define "fuzeagent.serviceAccountName" -}}
+{{- if .Values.serviceAccount.name -}}
+{{- .Values.serviceAccount.name -}}
+{{- else -}}
+{{- include "fuzeagent.fullname" . }}-orchestrator
+{{- end -}}
+{{- end -}}
+
 {{/* Name of the Secret the workloads read from (SealedSecret provides it). */}}
 {{- define "fuzeagent.secretName" -}}
 {{- if .Values.secret.existingSecret -}}

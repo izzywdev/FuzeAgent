@@ -1,3 +1,10 @@
+# ServiceAccount + RBAC for the orchestrator (creates/deletes k8s Jobs for claude-runner).
+serviceAccount:
+  # Set to true to create the ServiceAccount, Role, and RoleBinding.
+  create: true
+  # Override the generated name; leave empty to use <release>-orchestrator.
+  name: ""
+
 # =============================================================================
 # FuzeAgent default values (local/dev shape). Production overrides live in
 # values-prod.yaml (GHCR image tags rewritten by release.yml, prod ingress host).
