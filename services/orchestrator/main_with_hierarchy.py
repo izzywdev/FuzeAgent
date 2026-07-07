@@ -743,9 +743,11 @@ async def apply_migrations(target_version: Optional[str] = None):
         return {
             "applied_migrations": applied,
             "count": len(applied),
-            "message": f"Applied {len(applied)} migrations successfully"
-            if applied
-            else "No migrations to apply",
+            "message": (
+                f"Applied {len(applied)} migrations successfully"
+                if applied
+                else "No migrations to apply"
+            ),
         }
     except Exception as e:
         raise HTTPException(
@@ -766,9 +768,11 @@ async def rollback_migrations(target_version: str):
         return {
             "rolled_back_migrations": rolled_back,
             "count": len(rolled_back),
-            "message": f"Rolled back {len(rolled_back)} migrations successfully"
-            if rolled_back
-            else "No migrations to rollback",
+            "message": (
+                f"Rolled back {len(rolled_back)} migrations successfully"
+                if rolled_back
+                else "No migrations to rollback"
+            ),
         }
     except Exception as e:
         raise HTTPException(

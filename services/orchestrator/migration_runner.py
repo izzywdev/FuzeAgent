@@ -23,15 +23,13 @@ class MigrationRunner:
 
     async def create_migrations_table(self, conn):
         """Create migrations tracking table if it doesn't exist"""
-        await conn.execute(
-            """
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 version VARCHAR(255) PRIMARY KEY,
                 filename VARCHAR(255) NOT NULL,
                 applied_at TIMESTAMP DEFAULT NOW()
             )
-        """
-        )
+        """)
 
     async def get_applied_migrations(self, conn) -> List[str]:
         """Get list of already applied migrations"""

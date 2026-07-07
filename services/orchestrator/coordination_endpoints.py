@@ -554,41 +554,33 @@ async def get_coordination_status():
     try:
         async with get_db_connection() as conn:
             # Get request counts by status
-            request_stats = await conn.fetch(
-                """
+            request_stats = await conn.fetch("""
                 SELECT status, priority, COUNT(*) as count
                 FROM coordination_requests 
                 GROUP BY status, priority
                 ORDER BY status, priority
-            """
-            )
+            """)
 
             # Get product count
-            product_count = await conn.fetchval(
-                """
+            product_count = await conn.fetchval("""
                 SELECT COUNT(*) FROM product_registry
-            """
-            )
+            """)
 
             # Get resource allocation stats
-            resource_stats = await conn.fetch(
-                """
+            resource_stats = await conn.fetch("""
                 SELECT resource_type, status, COUNT(*) as count
                 FROM resource_allocations
                 GROUP BY resource_type, status
-            """
-            )
+            """)
 
             # Get recent activity
-            recent_activity = await conn.fetch(
-                """
+            recent_activity = await conn.fetch("""
                 SELECT ch.action, ch.timestamp, cr.title, cr.requesting_product
                 FROM coordination_history ch
                 JOIN coordination_requests cr ON ch.coordination_request_id = cr.id
                 ORDER BY ch.timestamp DESC
                 LIMIT 10
-            """
-            )
+            """)
 
         return {
             "system_status": "operational",
@@ -611,15 +603,13 @@ async def list_coordination_protocols():
     """List available coordination protocols and procedures"""
     try:
         async with get_db_connection() as conn:
-            protocols = await conn.fetch(
-                """
+            protocols = await conn.fetch("""
                 SELECT protocol_name, coordination_type, scope, procedure_steps,
                        required_approvals, sla_requirements, is_active, version
                 FROM coordination_protocols
                 WHERE is_active = true
                 ORDER BY protocol_name ASC
-            """
-            )
+            """)
 
         return {
             "coordination_protocols": [dict(protocol) for protocol in protocols],

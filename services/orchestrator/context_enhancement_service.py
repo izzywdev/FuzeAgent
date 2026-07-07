@@ -433,9 +433,11 @@ class ContextEnhancementService:
                     enhancement = ContextEnhancement(
                         knowledge_id=result.knowledge.id,
                         title=result.knowledge.title,
-                        content=result.knowledge.content[:1000] + "..."
-                        if len(result.knowledge.content) > 1000
-                        else result.knowledge.content,
+                        content=(
+                            result.knowledge.content[:1000] + "..."
+                            if len(result.knowledge.content) > 1000
+                            else result.knowledge.content
+                        ),
                         source_type="organization",
                         category=result.knowledge.knowledge_category.value,
                         relevance_score=result.combined_score,
@@ -480,9 +482,11 @@ class ContextEnhancementService:
                     enhancement = ContextEnhancement(
                         knowledge_id=result.team_knowledge.id,
                         title=result.team_knowledge.title,
-                        content=result.team_knowledge.content[:1000] + "..."
-                        if len(result.team_knowledge.content) > 1000
-                        else result.team_knowledge.content,
+                        content=(
+                            result.team_knowledge.content[:1000] + "..."
+                            if len(result.team_knowledge.content) > 1000
+                            else result.team_knowledge.content
+                        ),
                         source_type="team",
                         category=result.team_knowledge.knowledge_category.value,
                         relevance_score=result.combined_score,

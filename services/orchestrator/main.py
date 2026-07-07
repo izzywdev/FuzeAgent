@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 # Auth helpers (Track 3)
 # ---------------------------------------------------------------------------
 _security = HTTPBearer(auto_error=False)
-_jwt_secret = os.environ.get('FUZEFRONT_JWT_SECRET', '')
+_jwt_secret = os.environ.get("FUZEFRONT_JWT_SECRET", "")
 
 
 def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_security)):
@@ -59,14 +59,20 @@ def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_security))
     if not _jwt_secret:
         return None  # Auth disabled when secret not configured (dev mode)
     if not credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token"
+        )
     try:
-        payload = jwt.decode(credentials.credentials, _jwt_secret, algorithms=['HS256'])
+        payload = jwt.decode(credentials.credentials, _jwt_secret, algorithms=["HS256"])
         return payload
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
+        )
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -859,9 +865,11 @@ async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str)
                                 "batch_id": batch.batch_id,
                                 "description": batch.description,
                                 "operations_count": len(batch.operations),
-                                "applied_at": batch.applied_at.isoformat()
-                                if batch.applied_at
-                                else None,
+                                "applied_at": (
+                                    batch.applied_at.isoformat()
+                                    if batch.applied_at
+                                    else None
+                                ),
                                 "timestamp": batch.created_at.isoformat(),
                             }
                         )
@@ -916,9 +924,9 @@ async def create_agent(agent_config: AgentCreateRequest, _auth=Depends(require_a
                 "type": agent_config.get("type"),
                 "repository_settings": agent_config.get("repository_settings", {}),
                 "sandbox_settings": agent_config.get("sandbox_settings", {}),
-                "created_at": agent.created_at
-                if hasattr(agent, "created_at")
-                else None,
+                "created_at": (
+                    agent.created_at if hasattr(agent, "created_at") else None
+                ),
             },
         }
     except Exception as e:
@@ -1766,9 +1774,9 @@ async def get_task_file_operations(
                     "approval_status": batch.approval_status.value,
                     "operations_count": len(batch.operations),
                     "created_at": batch.created_at.isoformat(),
-                    "applied_at": batch.applied_at.isoformat()
-                    if batch.applied_at
-                    else None,
+                    "applied_at": (
+                        batch.applied_at.isoformat() if batch.applied_at else None
+                    ),
                 }
             )
 
@@ -2991,9 +2999,11 @@ async def search_organizational_knowledge(
                 {
                     "knowledge_id": result.knowledge.id,
                     "title": result.knowledge.title,
-                    "content_preview": result.knowledge.content[:200] + "..."
-                    if len(result.knowledge.content) > 200
-                    else result.knowledge.content,
+                    "content_preview": (
+                        result.knowledge.content[:200] + "..."
+                        if len(result.knowledge.content) > 200
+                        else result.knowledge.content
+                    ),
                     "category": result.knowledge.knowledge_category.value,
                     "content_type": result.knowledge.content_type.value,
                     "similarity_score": result.similarity_score,
@@ -3099,9 +3109,11 @@ async def get_enhanced_context_for_agent(
                     "category": item.category,
                     "relevance_score": item.relevance_score,
                     "confidence_score": item.confidence_score,
-                    "content_preview": item.content[:200] + "..."
-                    if len(item.content) > 200
-                    else item.content,
+                    "content_preview": (
+                        item.content[:200] + "..."
+                        if len(item.content) > 200
+                        else item.content
+                    ),
                 }
                 for item in enhanced_context.organizational_knowledge
             ],
@@ -3112,9 +3124,11 @@ async def get_enhanced_context_for_agent(
                     "category": item.category,
                     "relevance_score": item.relevance_score,
                     "confidence_score": item.confidence_score,
-                    "content_preview": item.content[:200] + "..."
-                    if len(item.content) > 200
-                    else item.content,
+                    "content_preview": (
+                        item.content[:200] + "..."
+                        if len(item.content) > 200
+                        else item.content
+                    ),
                 }
                 for item in enhanced_context.team_knowledge
             ],
@@ -3778,13 +3792,13 @@ async def list_organization_goals(
                     "goal_type": goal.goal_type.value,
                     "status": goal.status.value,
                     "progress_percentage": float(goal.progress_percentage),
-                    "target_value": float(goal.target_value)
-                    if goal.target_value
-                    else None,
+                    "target_value": (
+                        float(goal.target_value) if goal.target_value else None
+                    ),
                     "target_unit": goal.target_unit,
-                    "current_value": float(goal.current_value)
-                    if goal.current_value
-                    else None,
+                    "current_value": (
+                        float(goal.current_value) if goal.current_value else None
+                    ),
                     "target_deadline": goal.target_deadline.isoformat(),
                     "priority_level": goal.priority_level,
                     "completion_confidence": float(goal.completion_confidence),
@@ -3828,9 +3842,11 @@ async def get_goal(goal_id: str = Path(..., description="Goal ID")):
             "success_criteria": goal.success_criteria,
             "start_date": goal.start_date.isoformat(),
             "target_deadline": goal.target_deadline.isoformat(),
-            "actual_completion_date": goal.actual_completion_date.isoformat()
-            if goal.actual_completion_date
-            else None,
+            "actual_completion_date": (
+                goal.actual_completion_date.isoformat()
+                if goal.actual_completion_date
+                else None
+            ),
             "priority_level": goal.priority_level,
             "completion_confidence": float(goal.completion_confidence),
             "assigned_teams": goal.assigned_teams,

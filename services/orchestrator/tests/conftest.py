@@ -15,9 +15,9 @@ from faker import Faker
 
 # Set test environment
 os.environ["TESTING"] = "1"
-os.environ[
-    "DATABASE_URL"
-] = "postgresql://postgres:password@localhost:5434/ai_context_test"
+os.environ["DATABASE_URL"] = (
+    "postgresql://postgres:password@localhost:5434/ai_context_test"
+)
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key"
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy1sb25n"
@@ -56,13 +56,11 @@ async def db_pool():
     # Clean up database before each test
     async with pool.acquire() as conn:
         # Drop all tables to start fresh
-        await conn.execute(
-            """
+        await conn.execute("""
             DROP SCHEMA IF EXISTS public CASCADE;
             CREATE SCHEMA public;
             CREATE EXTENSION IF NOT EXISTS vector;
-        """
-        )
+        """)
 
     yield pool
     await pool.close()
@@ -111,9 +109,7 @@ def mock_anthropic_client():
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[
-        0
-    ].text = """
+    mock_response.content[0].text = """
 ## Explanation
 This is a test implementation.
 

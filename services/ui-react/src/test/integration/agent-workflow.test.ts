@@ -9,8 +9,8 @@ import { mockApiResponses, mockFetch } from '../utils'
 describe('Agent Workflow Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset fetch mock
-    vi.mocked(fetch).mockClear()
+    // Reset fetch mock including pending once-queue to prevent leakage between tests
+    vi.mocked(fetch).mockReset()
   })
 
   describe('Agent Creation Workflow', () => {

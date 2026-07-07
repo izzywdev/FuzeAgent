@@ -479,13 +479,11 @@ class AgentSandboxManager:
     async def _load_existing_sandboxes(self):
         """Load existing sandboxes from database on startup"""
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                """
+            rows = await conn.fetch("""
                 SELECT * FROM agent_sandboxes 
                 WHERE status IN ('running', 'paused') 
                 AND destroyed_at IS NULL
-            """
-            )
+            """)
 
             for row in rows:
                 try:

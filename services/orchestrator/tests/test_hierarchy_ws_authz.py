@@ -43,9 +43,7 @@ os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5434/ai_c
 os.environ["ORCHESTRATOR_URL"] = "http://localhost:8000"
 
 # Add repo root to sys.path so ``import hierarchy_endpoints`` resolves.
-_REPO_ROOT = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..")
-)
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
