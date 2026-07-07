@@ -9,15 +9,13 @@ import { mockApiResponses, mockFetch } from '../utils'
 describe('Agent Workflow Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset fetch mock
-    vi.mocked(fetch).mockClear()
+    // Reset fetch mock including any queued one-time return values
+    vi.mocked(fetch).mockReset()
   })
 
   describe('Agent Creation Workflow', () => {
     it('should complete full agent creation flow', async () => {
       // Mock API responses in sequence
-      mockFetch.success(mockApiResponses.teams) // Load teams
-      mockFetch.success(mockApiResponses.templates) // Load templates
       mockFetch.success(mockApiResponses.createAgent) // Create agent
       mockFetch.success(mockApiResponses.agents[0]) // Get created agent
 

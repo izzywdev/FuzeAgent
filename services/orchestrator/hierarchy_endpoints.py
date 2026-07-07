@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException
+import asyncpg
+import os
+from fastapi import APIRouter, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from typing import List, Dict, Any, Optional
 import json
 import httpx
 import asyncio
+
+from auth import authenticate_websocket
+from database import DatabaseManager
 
 router = APIRouter(prefix="/hierarchy", tags=["hierarchy"])
 
@@ -388,3 +393,43 @@ async def search_hierarchy(q: str, entity_type: Optional[str] = None):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Standalone FastAPI app — used when hierarchy_endpoints is run as its own
+# service (hierarchy-api, port 8006).  Mounts the router above and adds a
+# /ws WebSocket endpoint with connect-time JWT auth.
+# ---------------------------------------------------------------------------
+
+app = FastAPI(title="FuzeAgent Hierarchy API")
+app.include_router(router)
+
+
+@app.on_event("startup")
+async def _pool_startup() -> None:
+    database_url = os.getenv(
+        "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"
+    )
+    app.state.pool = await asyncpg.create_pool(database_url)
+
+
+@app.on_event("shutdown")
+async def _pool_shutdown() -> None:
+    if hasattr(app.state, "pool"):
+        await app.state.pool.close()
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket) -> None:
+    """Real-time hierarchy stream. Auth via query-param, subprotocol, or header."""
+    user = await authenticate_websocket(websocket)
+    if user is None:
+        return
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        pass

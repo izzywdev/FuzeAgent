@@ -8,19 +8,21 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.orchestrator.goals_management_service import (
+pytestmark = pytest.mark.goals
+
+from goals_management_service import (
     GoalsManagementService,
     GoalType,
     GoalStatus,
     OrganizationGoal,
 )
-from services.orchestrator.milestone_task_engine import MilestoneTaskEngine
-from services.orchestrator.goal_conversation_service import (
+from milestone_task_engine import MilestoneTaskEngine
+from goal_conversation_service import (
     GoalConversationService,
     ConversationType,
     MessageType,
 )
-from services.orchestrator.goal_tracking_service import (
+from goal_tracking_service import (
     GoalTrackingService,
     RiskLevel,
     AlertSeverity,

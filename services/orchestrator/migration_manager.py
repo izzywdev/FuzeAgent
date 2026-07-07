@@ -199,7 +199,7 @@ class MigrationManager:
             logger.error(f"Failed to rollback migration {migration}: {str(e)}")
             raise MigrationError(f"Migration rollback {migration} failed: {str(e)}")
 
-    async def migrate_up(self, target_version: str = None) -> List[str]:
+    async def migrate_up(self, target_version: str = None) -> Dict:
         """Apply all pending migrations up to target version"""
         logger.info("Starting database migration...")
 
@@ -220,7 +220,7 @@ class MigrationManager:
 
             if not pending_migrations:
                 logger.info("No pending migrations found")
-                return []
+                return {"success": True, "applied_count": 0, "applied_versions": []}
 
             applied_migrations = []
             total_time = 0
@@ -233,7 +233,15 @@ class MigrationManager:
             logger.info(
                 f"Applied {len(applied_migrations)} migrations in {total_time}ms"
             )
-            return applied_migrations
+            return {
+                "success": True,
+                "applied_count": len(applied_migrations),
+                "applied_versions": applied_migrations,
+            }
+
+    async def close(self) -> None:
+        """No-op close for API compatibility (connections are per-call)."""
+        pass
 
     async def migrate_down(self, target_version: str) -> List[str]:
         """Rollback migrations down to target version"""

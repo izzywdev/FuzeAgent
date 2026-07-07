@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import uuid
 import json
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import os
 
 from database import DatabaseManager
@@ -54,7 +54,8 @@ async def lifespan(app: FastAPI):
         migration_manager = MigrationManager(database_url)
 
         print("🔄 Running database migrations...")
-        applied_migrations = await migration_manager.migrate_up()
+        migration_result = await migration_manager.migrate_up()
+        applied_migrations = migration_result.get("applied_versions", [])
 
         if applied_migrations:
             print(f"✅ Applied {len(applied_migrations)} migrations:")
@@ -738,7 +739,8 @@ async def apply_migrations(target_version: Optional[str] = None):
             "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"
         )
         migration_manager = MigrationManager(database_url)
-        applied = await migration_manager.migrate_up(target_version)
+        result = await migration_manager.migrate_up(target_version)
+        applied = result.get("applied_versions", [])
 
         return {
             "applied_migrations": applied,
