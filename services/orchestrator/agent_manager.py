@@ -410,7 +410,7 @@ class AgentManager:
             row = await conn.fetchrow("SELECT * FROM agents WHERE id = $1", agent_id)
             if row:
                 return dict(row)
-            raise HTTPException(status_code=404, detail="Agent not found")
+            raise ValueError(f"Agent not found: {agent_id}")
     
     async def get_updates(self) -> Dict:
         """Get real-time updates for WebSocket"""
