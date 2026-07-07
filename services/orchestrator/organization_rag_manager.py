@@ -9,10 +9,10 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union
-from dataclasses import dataclass, asdict
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import asyncpg
 import numpy as np
@@ -547,15 +547,15 @@ class OrganizationRAGManager:
             knowledge_category=KnowledgeCategory(row["knowledge_category"]),
             embedding=row["embedding"] if row["embedding"] else None,
             source_type=SourceType(row["source_type"]),
-            source_agent_id=str(row["source_agent_id"])
-            if row["source_agent_id"]
-            else None,
-            source_team_id=str(row["source_team_id"])
-            if row["source_team_id"]
-            else None,
-            source_task_id=str(row["source_task_id"])
-            if row["source_task_id"]
-            else None,
+            source_agent_id=(
+                str(row["source_agent_id"]) if row["source_agent_id"] else None
+            ),
+            source_team_id=(
+                str(row["source_team_id"]) if row["source_team_id"] else None
+            ),
+            source_task_id=(
+                str(row["source_task_id"]) if row["source_task_id"] else None
+            ),
             source_reference=row["source_reference"],
             relevance_score=row["relevance_score"],
             quality_score=row["quality_score"],
@@ -564,9 +564,11 @@ class OrganizationRAGManager:
             visibility_level=VisibilityLevel(row["visibility_level"]),
             access_teams=row["access_teams"] or [],
             access_agents=row["access_agents"] or [],
-            metadata=json.loads(row["metadata"])
-            if isinstance(row["metadata"], str)
-            else row["metadata"],
+            metadata=(
+                json.loads(row["metadata"])
+                if isinstance(row["metadata"], str)
+                else row["metadata"]
+            ),
             tags=row["tags"] or [],
             related_knowledge_ids=row["related_knowledge_ids"] or [],
             created_at=row["created_at"],
@@ -605,12 +607,10 @@ class OrganizationRAGManager:
     async def _verify_schema(self):
         """Verify that required database schema exists"""
         async with self.pool.acquire() as conn:
-            tables = await conn.fetchval(
-                """
+            tables = await conn.fetchval("""
                 SELECT COUNT(*) FROM information_schema.tables 
                 WHERE table_name = 'organization_knowledge_base'
-            """
-            )
+            """)
 
             if tables == 0:
                 raise Exception(

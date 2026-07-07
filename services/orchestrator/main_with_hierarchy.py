@@ -1,37 +1,38 @@
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-from contextlib import asynccontextmanager
-import uuid
 import json
+import os
+import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, List, Optional
-import os
 
+from a2a_protocol import A2AProtocolManager, MessageType, TaskStatus
+from agent_templates import AgentCategory, template_manager
 from database import DatabaseManager
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from migration_manager import MigrationManager
-from rag_manager import RAGManager
-from a2a_protocol import A2AProtocolManager, TaskStatus, MessageType
 from models import (
-    Organization,
-    OrganizationCreate,
-    OrganizationUpdate,
-    Team,
-    TeamCreate,
-    TeamUpdate,
     Agent,
     AgentCreate,
     AgentUpdate,
-    Task,
-    TaskCreate,
-    TaskUpdate,
-    OrganizationWithTeams,
-    TeamWithAgents,
     AgentWithTeam,
     CreateAgentFromTemplate,
     CreateCustomAgent,
+    Organization,
+    OrganizationCreate,
+    OrganizationUpdate,
+    OrganizationWithTeams,
+    Task,
+    TaskCreate,
+    TaskUpdate,
+    Team,
+    TeamCreate,
+    TeamUpdate,
+    TeamWithAgents,
 )
-from agent_templates import template_manager, AgentCategory
+from rag_manager import RAGManager
+
 from hierarchy_endpoints import router as hierarchy_router
 
 # Default IDs for initial setup
@@ -743,9 +744,11 @@ async def apply_migrations(target_version: Optional[str] = None):
         return {
             "applied_migrations": applied,
             "count": len(applied),
-            "message": f"Applied {len(applied)} migrations successfully"
-            if applied
-            else "No migrations to apply",
+            "message": (
+                f"Applied {len(applied)} migrations successfully"
+                if applied
+                else "No migrations to apply"
+            ),
         }
     except Exception as e:
         raise HTTPException(
@@ -766,9 +769,11 @@ async def rollback_migrations(target_version: str):
         return {
             "rolled_back_migrations": rolled_back,
             "count": len(rolled_back),
-            "message": f"Rolled back {len(rolled_back)} migrations successfully"
-            if rolled_back
-            else "No migrations to rollback",
+            "message": (
+                f"Rolled back {len(rolled_back)} migrations successfully"
+                if rolled_back
+                else "No migrations to rollback"
+            ),
         }
     except Exception as e:
         raise HTTPException(

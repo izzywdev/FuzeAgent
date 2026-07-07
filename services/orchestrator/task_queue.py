@@ -1,8 +1,10 @@
 import asyncio
-import aio_pika
 import json
 import os
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+import aio_pika
+
 from .database import DatabaseManager
 
 

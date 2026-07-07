@@ -13,16 +13,16 @@ Based on the A2A Protocol Specification:
 
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Union
 from enum import Enum
-import logging
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field
-from fastapi import HTTPException
-import httpx
 import asyncpg
+import httpx
+from fastapi import HTTPException
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -215,8 +215,7 @@ class A2AProtocolManager:
         """Create A2A protocol tables"""
         async with self.pool.acquire() as conn:
             # Agent cards table
-            await conn.execute(
-                """
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS a2a_agent_cards (
                     agent_id VARCHAR(255) PRIMARY KEY,
                     card_data JSONB NOT NULL,
@@ -228,12 +227,10 @@ class A2AProtocolManager:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """
-            )
+            """)
 
             # A2A tasks table
-            await conn.execute(
-                """
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS a2a_tasks (
                     task_id VARCHAR(255) PRIMARY KEY,
                     task_data JSONB NOT NULL,
@@ -245,12 +242,10 @@ class A2AProtocolManager:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     completed_at TIMESTAMP
                 );
-            """
-            )
+            """)
 
             # A2A messages table
-            await conn.execute(
-                """
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS a2a_messages (
                     message_id VARCHAR(255) PRIMARY KEY,
                     message_data JSONB NOT NULL,
@@ -263,12 +258,10 @@ class A2AProtocolManager:
                     delivered_at TIMESTAMP,
                     read_at TIMESTAMP
                 );
-            """
-            )
+            """)
 
             # Create indexes
-            await conn.execute(
-                """
+            await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_a2a_agent_cards_capabilities 
                 ON a2a_agent_cards USING GIN(capabilities);
                 
@@ -283,22 +276,19 @@ class A2AProtocolManager:
                 
                 CREATE INDEX IF NOT EXISTS idx_a2a_messages_conversation 
                 ON a2a_messages(conversation_id, created_at DESC);
-            """
-            )
+            """)
 
     async def _load_local_agents(self):
         """Load local agents into the registry"""
         async with self.pool.acquire() as conn:
             # Get all agents from the main agent table
-            agents = await conn.fetch(
-                """
+            agents = await conn.fetch("""
                 SELECT a.id, a.name, a.role, a.type, a.config, a.team_id,
                        t.organization_id
                 FROM agents a
                 LEFT JOIN teams t ON a.team_id = t.id
                 WHERE a.status = 'active'
-            """
-            )
+            """)
 
             for agent in agents:
                 agent_card = await self._create_agent_card_from_agent(dict(agent))

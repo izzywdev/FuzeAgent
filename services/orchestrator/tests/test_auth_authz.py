@@ -36,18 +36,17 @@ os.environ.pop("JWT_ISSUER", None)
 # Ensure the orchestrator package dir is importable (tests run from there).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import auth as auth_module
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from jose import jwt
 from pydantic import BaseModel, ConfigDict
 
-import auth as auth_module
-
 importlib.reload(auth_module)
-from auth import (  # noqa: E402
+from auth import require_admin  # noqa: E402
+from auth import (
     CurrentUser,
     get_current_user,
-    require_admin,
     require_org_access,
     require_user,
 )
@@ -85,8 +84,9 @@ def build_app() -> FastAPI:
         return {"status": "ok"}
 
     @app.post("/sandboxes/{sandbox_id}/execute")
-    async def execute(sandbox_id: str, body: ExecBody,
-                      user: CurrentUser = Depends(require_user)):
+    async def execute(
+        sandbox_id: str, body: ExecBody, user: CurrentUser = Depends(require_user)
+    ):
         return {"sandbox_id": sandbox_id, "command": body.command, "user": user.id}
 
     @app.post("/organizations/{org_id}/credentials")

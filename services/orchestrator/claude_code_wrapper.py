@@ -1,17 +1,17 @@
-from crewai.tools import BaseTool
-from typing import Type, Any, Optional, Dict, List
-from pydantic import BaseModel, Field
+import asyncio
+import json
+import os
 import subprocess
 import tempfile
-import os
-import json
-import asyncio
 import time
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Type
 
 # Import Anthropic SDK for real Claude integration
 import anthropic
 from anthropic import Anthropic
+from crewai.tools import BaseTool
+from pydantic import BaseModel, Field
 
 # Import conversation manager for full chat tracking
 from .conversation_manager import ConversationManager, MessageType
@@ -665,9 +665,9 @@ Please ensure the code is production-ready and follows industry standards.
                     model=self.model,
                     temperature=0.3,
                     metadata={
-                        "task_description": task[:200] + "..."
-                        if len(task) > 200
-                        else task,
+                        "task_description": (
+                            task[:200] + "..." if len(task) > 200 else task
+                        ),
                         "language": language,
                         "include_tests": include_tests,
                         "include_docs": include_docs,
@@ -758,9 +758,9 @@ Please ensure the code is production-ready and follows industry standards.
                                 "message_type": MessageType.TEST_RESULT,
                                 "content": json.dumps(test_results),
                                 "metadata": {
-                                    "test_framework": "pytest"
-                                    if language == "python"
-                                    else "jest",
+                                    "test_framework": (
+                                        "pytest" if language == "python" else "jest"
+                                    ),
                                     "workspace_path": self.workspace_path,
                                 },
                             },
@@ -796,9 +796,9 @@ Please ensure the code is production-ready and follows industry standards.
                             "content": str(e),
                             "metadata": {
                                 "error_type": type(e).__name__,
-                                "task_description": task[:200] + "..."
-                                if len(task) > 200
-                                else task,
+                                "task_description": (
+                                    task[:200] + "..." if len(task) > 200 else task
+                                ),
                             },
                         },
                     )

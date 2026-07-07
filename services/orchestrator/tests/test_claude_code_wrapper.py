@@ -2,8 +2,9 @@
 Test cases for Claude Code Wrapper functionality
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from claude_code_wrapper import ClaudeCodeWrapper
 
 
@@ -18,9 +19,7 @@ class TestClaudeCodeWrapper:
             mock_client = MagicMock()
             mock_response = MagicMock()
             mock_response.content = [MagicMock()]
-            mock_response.content[
-                0
-            ].text = """
+            mock_response.content[0].text = """
 ## Explanation
 This is a test implementation for calculating the factorial of a number.
 

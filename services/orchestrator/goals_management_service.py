@@ -2,7 +2,7 @@
 Goals Management Service for FuzeAgent
 
 This service manages organizational goals, milestones, tasks, and conversations.
-Provides a complete goal lifecycle from creation through completion with 
+Provides a complete goal lifecycle from creation through completion with
 AI-powered planning and milestone generation.
 """
 
@@ -10,11 +10,11 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, date
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
-from enum import Enum
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
@@ -791,9 +791,11 @@ class GoalsManagementService:
             target_value=row["target_value"],
             target_unit=row["target_unit"],
             current_value=row["current_value"],
-            success_criteria=json.loads(row["success_criteria"])
-            if isinstance(row["success_criteria"], str)
-            else row["success_criteria"],
+            success_criteria=(
+                json.loads(row["success_criteria"])
+                if isinstance(row["success_criteria"], str)
+                else row["success_criteria"]
+            ),
             start_date=row["start_date"],
             target_deadline=row["target_deadline"],
             actual_completion_date=row["actual_completion_date"],
@@ -801,14 +803,16 @@ class GoalsManagementService:
             progress_percentage=row["progress_percentage"],
             completion_confidence=row["completion_confidence"],
             assigned_teams=row["assigned_teams"] or [],
-            goal_owner_agent_id=str(row["goal_owner_agent_id"])
-            if row["goal_owner_agent_id"]
-            else None,
+            goal_owner_agent_id=(
+                str(row["goal_owner_agent_id"]) if row["goal_owner_agent_id"] else None
+            ),
             stakeholder_agents=row["stakeholder_agents"] or [],
             tags=row["tags"] or [],
-            metadata=json.loads(row["metadata"])
-            if isinstance(row["metadata"], str)
-            else row["metadata"],
+            metadata=(
+                json.loads(row["metadata"])
+                if isinstance(row["metadata"], str)
+                else row["metadata"]
+            ),
             created_by=str(row["created_by"]) if row["created_by"] else None,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
