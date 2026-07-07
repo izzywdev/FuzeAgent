@@ -37,9 +37,14 @@ jobs:
         working-directory: e2e
         run: npx playwright test
         env:
-          # Tests run against the live prod URLs — no secrets needed for public endpoints.
-          # If FuzeFront ever requires auth, add FUZEFRONT_TEST_EMAIL / _PASSWORD here.
           CI: 'true'
+          # Cloudflare Access service token — allows machine/CI access to
+          # fuzeagent.prod.fuzefront.com without a browser SSO session.
+          # Create in Zero Trust dashboard → Access → Service Tokens,
+          # then add CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET as
+          # repository secrets. Auth-gated tests are skipped when absent.
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Upload test report on failure
         if: failure()
