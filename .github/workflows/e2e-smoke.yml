@@ -1,0 +1,58 @@
+name: E2E Smoke (post-production)
+
+on:
+  # Run automatically after every successful release GitOps bump merges to main
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/helm/fuzeagent/values-prod.yaml'
+
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+  # Daily smoke at 06:00 UTC to catch regressions in prod
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  smoke:
+    name: Playwright smoke — FuzeAgent in FuzeFront
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright + deps
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install chromium --with-deps
+
+      - name: Run smoke tests against prod
+        working-directory: e2e
+        run: npx playwright test
+        env:
+          # Tests run against the live prod URLs — no secrets needed for public endpoints.
+          # If FuzeFront ever requires auth, add FUZEFRONT_TEST_EMAIL / _PASSWORD here.
+          CI: 'true'
+
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
+      - name: Upload failure screenshots / videos
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: e2e/test-results/
+          retention-days: 7
