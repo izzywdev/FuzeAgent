@@ -141,7 +141,9 @@ class CurrentUser:
                 claims.get("organizations")
                 or claims.get("orgs")
                 or claims.get("org_ids")
-                or ([claims["organization_id"]] if claims.get("organization_id") else [])
+                or (
+                    [claims["organization_id"]] if claims.get("organization_id") else []
+                )
             )
         )
         self.is_admin: bool = bool(claims.get("is_admin")) or any(

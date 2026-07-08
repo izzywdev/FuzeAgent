@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 # Auth helpers (Track 3)
 # ---------------------------------------------------------------------------
 _security = HTTPBearer(auto_error=False)
-_jwt_secret = os.environ.get('FUZEFRONT_JWT_SECRET', '')
+_jwt_secret = os.environ.get("FUZEFRONT_JWT_SECRET", "")
 
 
 def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_security)):
@@ -60,14 +60,20 @@ def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_security))
     if not _jwt_secret:
         return None  # Auth disabled when secret not configured (dev mode)
     if not credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token"
+        )
     try:
-        payload = jwt.decode(credentials.credentials, _jwt_secret, algorithms=['HS256'])
+        payload = jwt.decode(credentials.credentials, _jwt_secret, algorithms=["HS256"])
         return payload
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
+        )
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2901,7 +2907,12 @@ async def add_organizational_knowledge(
 ):
     """Add knowledge to organization-level knowledge base"""
     try:
-        from .organization_rag_manager import OrganizationRAGManager, ContentType, KnowledgeCategory, SourceType
+        from .organization_rag_manager import (
+            OrganizationRAGManager,
+            ContentType,
+            KnowledgeCategory,
+            SourceType,
+        )
 
         # Initialize services if not already done
         if not hasattr(app.state, "org_rag_manager"):

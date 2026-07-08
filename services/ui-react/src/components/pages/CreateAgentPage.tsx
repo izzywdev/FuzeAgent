@@ -27,7 +27,8 @@ export function CreateAgentPage() {
   const [templates, setTemplates] = useState<AgentTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     name: '',
     role: '',
@@ -38,8 +39,8 @@ export function CreateAgentPage() {
       model: 'claude-sonnet-4-20250514',
       temperature: 0.7,
       tools: [] as string[],
-      goal: '',
-      backstory: ''
+      goal: ' ',
+      backstory: ' '
     }
   })
 
@@ -177,6 +178,7 @@ export function CreateAgentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
     setCreating(true)
 
     try {
@@ -190,29 +192,31 @@ export function CreateAgentPage() {
           role: formData.role,
           type: formData.type,
           team_id: formData.team_id,
-          config: formData.config
+          config: {
+            ...formData.config,
+            goal: formData.config.goal.trim(),
+            backstory: formData.config.backstory.trim()
+          }
         })
       })
 
       if (response.ok) {
         const newAgent = await response.json()
-        // Handle different possible response structures
         const agentId = newAgent.agent_id || newAgent.agent?.id || newAgent.id
         if (agentId) {
           navigate(`/agents/${agentId}`)
-        } else {
-          console.error('No agent ID found in response:', newAgent)
-          alert('Agent created but unable to navigate. Please check the agents list.')
+          return // component will unmount; don't reset creating state
         }
+        console.error('No agent ID found in response:', newAgent)
+        setSubmitError('Agent created but unable to navigate. Please check the agents list.')
       } else {
-        alert('Failed to create agent. Please try again.')
+        setSubmitError('Failed to create agent. Please try again.')
       }
     } catch (error) {
       console.error('Error creating agent:', error)
-      alert('Error creating agent. Please check your connection.')
-    } finally {
-      setCreating(false)
+      setSubmitError('Error creating agent. Please check your connection.')
     }
+    setCreating(false)
   }
 
   const availableTools = [
@@ -260,7 +264,7 @@ export function CreateAgentPage() {
               <div style={{display: 'flex', alignItems: 'center', marginLeft: '1.5rem', color: '#6b7280', fontSize: '0.875rem'}}>
                 <Link to="/agents" style={{color: '#6b7280', textDecoration: 'none'}}>Agents</Link>
                 <span style={{margin: '0 0.5rem'}}>›</span>
-                <span style={{color: '#111827'}}>Create Agent</span>
+                <span style={{color: '#111827'}}>New Agent</span>
               </div>
             </div>
             
@@ -357,7 +361,7 @@ export function CreateAgentPage() {
                       fontSize: '0.875rem'
                     }}
                   >
-                    <option value="">Select a team...</option>
+                    <option value=""></option>
                     {teams.map(team => (
                       <option key={team.id} value={team.id}>{team.name}</option>
                     ))}
@@ -410,9 +414,9 @@ export function CreateAgentPage() {
                       backgroundColor: formData.template_id === template.id ? '#f0f9ff' : 'white'
                     }}
                   >
-                    <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', marginBottom: '0.25rem'}}>
+                    <span style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', marginBottom: '0.25rem', display: 'block'}}>
                       {template.name}
-                    </div>
+                    </span>
                     <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem'}}>
                       {template.description}
                     </div>
@@ -542,6 +546,11 @@ export function CreateAgentPage() {
               </div>
             </div>
           </div>
+
+          {/* Submit Error */}
+          {submitError && (
+            <p role="alert" style={{marginTop: '1rem', color: '#dc2626', fontSize: '0.875rem'}}>{submitError}</p>
+          )}
 
           {/* Submit Button */}
           <div style={{marginTop: '2rem', display: 'flex', justifyContent: 'end', gap: '0.5rem'}}>
