@@ -9,12 +9,10 @@ async def upgrade(conn):
     """Apply the migration"""
 
     # Vector search index (requires vector extension)
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX idx_interactions_embedding 
         ON interactions USING ivfflat (embedding vector_cosine_ops);
-    """
-    )
+    """)
 
     # Performance indexes
     await conn.execute("CREATE INDEX idx_tasks_status ON tasks(status);")
@@ -30,27 +28,21 @@ async def upgrade(conn):
     )
 
     # Unique constraints
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE UNIQUE INDEX idx_teams_name_per_org 
         ON teams(organization_id, name);
-    """
-    )
+    """)
 
     # Composite indexes for common queries
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX idx_agents_team_status 
         ON agents(team_id, status);
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX idx_tasks_agent_status 
         ON tasks(assigned_to, status);
-    """
-    )
+    """)
 
     print("✅ Created all database indexes")
 

@@ -212,13 +212,13 @@ describe('CreateAgentPage', () => {
             role: 'Test Developer',
             type: 'developer',
             team_id: 'test-team-id',
-            config: expect.objectContaining({
+            config: {
               model: 'claude-sonnet-4-20250514',
               temperature: 0.7,
               tools: [],
               goal: '',
               backstory: ''
-            })
+            }
           })
         })
       })

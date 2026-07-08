@@ -55,8 +55,7 @@ class DatabaseManager:
     async def get_organizations() -> List[Dict[str, Any]]:
         """Get all organizations with team and agent counts"""
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                """
+            rows = await conn.fetch("""
                 SELECT 
                     o.*,
                     COUNT(DISTINCT t.id) as team_count,
@@ -66,8 +65,7 @@ class DatabaseManager:
                 LEFT JOIN agents a ON t.id = a.team_id
                 GROUP BY o.id
                 ORDER BY o.created_at DESC
-                """
-            )
+                """)
             return [dict(row) for row in rows]
 
     @staticmethod
@@ -175,8 +173,7 @@ class DatabaseManager:
                     organization_id,
                 )
             else:
-                rows = await conn.fetch(
-                    """
+                rows = await conn.fetch("""
                     SELECT 
                         t.*,
                         o.name as organization_name,
@@ -186,8 +183,7 @@ class DatabaseManager:
                     LEFT JOIN agents a ON t.id = a.team_id
                     GROUP BY t.id, o.name
                     ORDER BY t.created_at DESC
-                    """
-                )
+                    """)
             return [dict(row) for row in rows]
 
     @staticmethod
@@ -294,8 +290,7 @@ class DatabaseManager:
                     team_id,
                 )
             else:
-                rows = await conn.fetch(
-                    """
+                rows = await conn.fetch("""
                     SELECT 
                         a.*,
                         t.name as team_name,
@@ -305,8 +300,7 @@ class DatabaseManager:
                     JOIN teams t ON a.team_id = t.id
                     JOIN organizations o ON t.organization_id = o.id
                     ORDER BY a.created_at DESC
-                    """
-                )
+                    """)
             return [dict(row) for row in rows]
 
     @staticmethod
@@ -362,14 +356,12 @@ class DatabaseManager:
     async def get_tasks():
         """Get all tasks"""
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                """
+            rows = await conn.fetch("""
                 SELECT t.*, a.name as assigned_agent_name
                 FROM tasks t
                 LEFT JOIN agents a ON t.assigned_to = a.id
                 ORDER BY t.created_at DESC
-                """
-            )
+                """)
             return [dict(row) for row in rows]
 
     @staticmethod

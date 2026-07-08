@@ -234,20 +234,22 @@ class ClaudeSDKManager:
             "task_id": session.task_id,
             "agent_id": session.agent_id,
             "state": session.state.value,
-            "current_interaction": {
-                "id": session.current_interaction.interaction_id,
-                "type": session.current_interaction.interaction_type.value,
-                "prompt": session.current_interaction.prompt,
-                "options": session.current_interaction.options,
-            }
-            if session.current_interaction
-            else None,
-            "started_at": session.started_at.isoformat()
-            if session.started_at
-            else None,
-            "last_activity": session.last_activity.isoformat()
-            if session.last_activity
-            else None,
+            "current_interaction": (
+                {
+                    "id": session.current_interaction.interaction_id,
+                    "type": session.current_interaction.interaction_type.value,
+                    "prompt": session.current_interaction.prompt,
+                    "options": session.current_interaction.options,
+                }
+                if session.current_interaction
+                else None
+            ),
+            "started_at": (
+                session.started_at.isoformat() if session.started_at else None
+            ),
+            "last_activity": (
+                session.last_activity.isoformat() if session.last_activity else None
+            ),
             "workspace_path": session.workspace_path,
         }
 
