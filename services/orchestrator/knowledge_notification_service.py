@@ -11,10 +11,10 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Set, Tuple
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import asyncpg
 from sentence_transformers import SentenceTransformer
@@ -267,9 +267,11 @@ class KnowledgeNotificationService:
                     notification_type=NotificationType.KNOWLEDGE_CONFLICT,
                     title=title,
                     message=message,
-                    knowledge_id=conflicting_knowledge_ids[0]
-                    if conflicting_knowledge_ids
-                    else None,
+                    knowledge_id=(
+                        conflicting_knowledge_ids[0]
+                        if conflicting_knowledge_ids
+                        else None
+                    ),
                     knowledge_type="conflict",
                     priority=Priority.HIGH,
                     requires_action=True,
@@ -512,8 +514,7 @@ class KnowledgeNotificationService:
                 params = []
 
                 if organization_id:
-                    where_conditions.append(
-                        """
+                    where_conditions.append("""
                         recipient_id IN (
                             SELECT id FROM organizations WHERE id = $1
                             UNION ALL
@@ -523,8 +524,7 @@ class KnowledgeNotificationService:
                             JOIN teams t ON a.team_id = t.id 
                             WHERE t.organization_id = $1
                         )
-                    """
-                    )
+                    """)
                     params.append(organization_id)
 
                 where_clause = "WHERE " + " AND ".join(where_conditions)
@@ -884,12 +884,14 @@ class KnowledgeNotificationService:
             priority=Priority(row["priority"]),
             requires_action=row["requires_action"],
             status=NotificationStatus(row["status"]),
-            suggested_actions=json.loads(row["suggested_actions"])
-            if row["suggested_actions"]
-            else [],
-            metadata=json.loads(row["metadata"])
-            if isinstance(row["metadata"], str)
-            else row["metadata"],
+            suggested_actions=(
+                json.loads(row["suggested_actions"]) if row["suggested_actions"] else []
+            ),
+            metadata=(
+                json.loads(row["metadata"])
+                if isinstance(row["metadata"], str)
+                else row["metadata"]
+            ),
             created_at=row["created_at"],
             expires_at=row["expires_at"],
         )
@@ -933,16 +935,11 @@ class KnowledgeNotificationService:
             try:
                 async with self.pool.acquire() as conn:
                     # Delete expired notifications
-                    deleted_expired = (
-                        await conn.fetchval(
-                            """
+                    deleted_expired = await conn.fetchval("""
                         DELETE FROM knowledge_notifications 
                         WHERE expires_at IS NOT NULL AND expires_at < NOW()
                         RETURNING COUNT(*)
-                    """
-                        )
-                        or 0
-                    )
+                    """) or 0
 
                     # Delete old dismissed notifications
                     cutoff_date = datetime.now() - timedelta(

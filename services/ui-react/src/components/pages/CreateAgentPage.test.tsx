@@ -212,13 +212,13 @@ describe('CreateAgentPage', () => {
             role: 'Test Developer',
             type: 'developer',
             team_id: 'test-team-id',
-            config: expect.objectContaining({
+            config: {
               model: 'claude-sonnet-4-20250514',
               temperature: 0.7,
               tools: [],
               goal: '',
               backstory: ''
-            })
+            }
           })
         })
       })
@@ -291,7 +291,7 @@ describe('CreateAgentPage', () => {
 
     it('should render breadcrumbs correctly', () => {
       expect(screen.getByText('Agents')).toBeInTheDocument()
-      expect(screen.getByText('Create Agent')).toBeInTheDocument()
+      expect(screen.getByText('Create Agent', { selector: 'span' })).toBeInTheDocument()
     })
 
     it('should have working cancel buttons', () => {

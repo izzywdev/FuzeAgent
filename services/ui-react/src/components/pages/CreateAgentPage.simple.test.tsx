@@ -145,7 +145,7 @@ describe('CreateAgentPage - Simple Tests', () => {
       await user.type(roleInput, 'Test Developer')
 
       // Select team
-      const teamSelect = screen.getByDisplayValue('') // Empty select initially
+      const teamSelect = screen.getByLabelText(/Team Assignment/)
       await user.selectOptions(teamSelect, 'test-team-id')
 
       // Mock API response

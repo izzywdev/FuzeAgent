@@ -2,29 +2,20 @@
 Unit tests for Goals Management Services
 """
 
-import pytest
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.orchestrator.goals_management_service import (
-    GoalsManagementService,
-    GoalType,
-    GoalStatus,
-    OrganizationGoal,
-)
-from services.orchestrator.milestone_task_engine import MilestoneTaskEngine
+import pytest
 from services.orchestrator.goal_conversation_service import (
-    GoalConversationService,
-    ConversationType,
-    MessageType,
-)
-from services.orchestrator.goal_tracking_service import (
-    GoalTrackingService,
-    RiskLevel,
-    AlertSeverity,
-)
+    ConversationType, GoalConversationService, MessageType)
+from services.orchestrator.goal_tracking_service import (AlertSeverity,
+                                                         GoalTrackingService,
+                                                         RiskLevel)
+from services.orchestrator.goals_management_service import (
+    GoalsManagementService, GoalStatus, GoalType, OrganizationGoal)
+from services.orchestrator.milestone_task_engine import MilestoneTaskEngine
 
 
 class TestGoalsManagementService:

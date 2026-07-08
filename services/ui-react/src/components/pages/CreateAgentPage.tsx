@@ -27,6 +27,7 @@ export function CreateAgentPage() {
   const [templates, setTemplates] = useState<AgentTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -77,15 +78,14 @@ export function CreateAgentPage() {
       .then(res => res.json())
       .then(data => {
         if (data && data.templates && Array.isArray(data.templates)) {
-          // Transform API response to match UI interface
           const transformedTemplates = data.templates.map((template: any) => ({
-            id: template.template_id,
+            id: template.template_id || template.id,
             name: template.name,
             description: template.description,
-            type: template.category || 'developer',
-            defaultConfig: {
+            type: template.category || template.type || 'developer',
+            defaultConfig: template.defaultConfig || {
               model: template.default_model || 'claude-sonnet-4-20250514',
-              temperature: template.default_temperature || 0.7,
+              temperature: template.default_temperature ?? 0.7,
               tools: template.tools || [],
               goal: template.default_goal || '',
               backstory: template.default_backstory || ''
@@ -178,6 +178,7 @@ export function CreateAgentPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreating(true)
+    setError(null)
 
     try {
       const response = await fetch(`${API_URL}/agents`, {
@@ -196,21 +197,22 @@ export function CreateAgentPage() {
 
       if (response.ok) {
         const newAgent = await response.json()
-        // Handle different possible response structures
         const agentId = newAgent.agent_id || newAgent.agent?.id || newAgent.id
         if (agentId) {
           navigate(`/agents/${agentId}`)
+          return
         } else {
           console.error('No agent ID found in response:', newAgent)
-          alert('Agent created but unable to navigate. Please check the agents list.')
+          setError('Agent created but unable to navigate. Please check the agents list.')
+          setCreating(false)
         }
       } else {
-        alert('Failed to create agent. Please try again.')
+        setError('Failed to create agent. Please try again.')
+        setCreating(false)
       }
-    } catch (error) {
-      console.error('Error creating agent:', error)
-      alert('Error creating agent. Please check your connection.')
-    } finally {
+    } catch (err) {
+      console.error('Error creating agent:', err)
+      setError('Error creating agent. Please check your connection.')
       setCreating(false)
     }
   }
@@ -399,7 +401,7 @@ export function CreateAgentPage() {
               
               <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
                 {templates.map(template => (
-                  <div 
+                  <div
                     key={template.id}
                     onClick={() => handleTemplateSelect(template)}
                     style={{
@@ -410,15 +412,15 @@ export function CreateAgentPage() {
                       backgroundColor: formData.template_id === template.id ? '#f0f9ff' : 'white'
                     }}
                   >
-                    <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', marginBottom: '0.25rem'}}>
+                    <span style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#111827', marginBottom: '0.25rem'}}>
                       {template.name}
-                    </div>
-                    <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem'}}>
+                    </span>
+                    <span style={{display: 'block', fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem'}}>
                       {template.description}
-                    </div>
-                    <div style={{fontSize: '0.75rem', color: '#9ca3af'}}>
+                    </span>
+                    <span style={{display: 'block', fontSize: '0.75rem', color: '#9ca3af'}}>
                       Model: {template.defaultConfig.model}
-                    </div>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -542,6 +544,13 @@ export function CreateAgentPage() {
               </div>
             </div>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div style={{marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.375rem', color: '#dc2626', fontSize: '0.875rem'}}>
+              {error}
+            </div>
+          )}
 
           {/* Submit Button */}
           <div style={{marginTop: '2rem', display: 'flex', justifyContent: 'end', gap: '0.5rem'}}>

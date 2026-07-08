@@ -9,19 +9,17 @@ task type, agent capabilities, and historical success patterns.
 import asyncio
 import json
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
-from .organization_rag_manager import (
-    OrganizationRAGManager,
-    KnowledgeCategory,
-    ContentType,
-    KnowledgeSearchResult,
-)
-from .team_knowledge_manager import TeamKnowledgeManager, TeamKnowledgeSearchResult
+from .organization_rag_manager import (ContentType, KnowledgeCategory,
+                                       KnowledgeSearchResult,
+                                       OrganizationRAGManager)
+from .team_knowledge_manager import (TeamKnowledgeManager,
+                                     TeamKnowledgeSearchResult)
 
 logger = logging.getLogger(__name__)
 
@@ -433,9 +431,11 @@ class ContextEnhancementService:
                     enhancement = ContextEnhancement(
                         knowledge_id=result.knowledge.id,
                         title=result.knowledge.title,
-                        content=result.knowledge.content[:1000] + "..."
-                        if len(result.knowledge.content) > 1000
-                        else result.knowledge.content,
+                        content=(
+                            result.knowledge.content[:1000] + "..."
+                            if len(result.knowledge.content) > 1000
+                            else result.knowledge.content
+                        ),
                         source_type="organization",
                         category=result.knowledge.knowledge_category.value,
                         relevance_score=result.combined_score,
@@ -480,9 +480,11 @@ class ContextEnhancementService:
                     enhancement = ContextEnhancement(
                         knowledge_id=result.team_knowledge.id,
                         title=result.team_knowledge.title,
-                        content=result.team_knowledge.content[:1000] + "..."
-                        if len(result.team_knowledge.content) > 1000
-                        else result.team_knowledge.content,
+                        content=(
+                            result.team_knowledge.content[:1000] + "..."
+                            if len(result.team_knowledge.content) > 1000
+                            else result.team_knowledge.content
+                        ),
                         source_type="team",
                         category=result.team_knowledge.knowledge_category.value,
                         relevance_score=result.combined_score,

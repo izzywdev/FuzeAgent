@@ -2,10 +2,11 @@
 Test cases for Migration Manager functionality
 """
 
-import pytest
 import os
 import tempfile
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from migration_manager import MigrationManager
 
 
@@ -40,14 +41,12 @@ class TestMigrationManager:
 
         # Check that migrations table exists
         async with manager.db_pool.acquire() as conn:
-            result = await conn.fetchrow(
-                """
+            result = await conn.fetchrow("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
                     WHERE table_name = 'schema_migrations'
                 );
-            """
-            )
+            """)
             assert result["exists"] is True
 
     async def test_get_applied_migrations_empty(self, migration_manager_clean):
@@ -74,8 +73,7 @@ class TestMigrationManager:
         for filename in migration_files:
             filepath = os.path.join(temp_directory, filename)
             with open(filepath, "w") as f:
-                f.write(
-                    f"""
+                f.write(f"""
 \"\"\"
 Migration: {filename}
 \"\"\"
@@ -85,8 +83,7 @@ async def up(conn):
 
 async def down(conn):
     await conn.execute("SELECT 1")
-"""
-                )
+""")
 
         # Update migrations directory for testing
         original_dir = manager.migrations_dir
@@ -154,14 +151,12 @@ async def down(conn):
 
         # Verify table was created
         async with manager.db_pool.acquire() as conn:
-            table_exists = await conn.fetchrow(
-                """
+            table_exists = await conn.fetchrow("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
                     WHERE table_name = 'test_migration_table'
                 );
-            """
-            )
+            """)
             assert table_exists["exists"] is True
 
         # Verify migration was recorded
@@ -210,14 +205,12 @@ async def down(conn):
 
         # Verify table exists
         async with manager.db_pool.acquire() as conn:
-            table_exists = await conn.fetchrow(
-                """
+            table_exists = await conn.fetchrow("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
                     WHERE table_name = 'rollback_test_table'
                 );
-            """
-            )
+            """)
             assert table_exists["exists"] is True
 
         # Rollback migration
@@ -228,14 +221,12 @@ async def down(conn):
 
         # Verify table was dropped
         async with manager.db_pool.acquire() as conn:
-            table_exists = await conn.fetchrow(
-                """
+            table_exists = await conn.fetchrow("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
                     WHERE table_name = 'rollback_test_table'
                 );
-            """
-            )
+            """)
             assert table_exists["exists"] is False
 
         # Verify migration was removed from applied list
@@ -359,30 +350,24 @@ async def down(conn):
 
             # Verify only first two tables exist
             async with manager.db_pool.acquire() as conn:
-                first_exists = await conn.fetchrow(
-                    """
+                first_exists = await conn.fetchrow("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
                         WHERE table_name = 'first_table'
                     );
-                """
-                )
-                second_exists = await conn.fetchrow(
-                    """
+                """)
+                second_exists = await conn.fetchrow("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
                         WHERE table_name = 'second_table'
                     );
-                """
-                )
-                third_exists = await conn.fetchrow(
-                    """
+                """)
+                third_exists = await conn.fetchrow("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
                         WHERE table_name = 'third_table'
                     );
-                """
-                )
+                """)
 
                 assert first_exists["exists"] is True
                 assert second_exists["exists"] is True
@@ -402,15 +387,13 @@ async def down(conn):
         for filename in migration_files:
             filepath = os.path.join(temp_directory, filename)
             with open(filepath, "w") as f:
-                f.write(
-                    """
+                f.write("""
 async def up(conn):
     await conn.execute("SELECT 1")
 
 async def down(conn):
     await conn.execute("SELECT 1")
-"""
-                )
+""")
 
         original_dir = manager.migrations_dir
         manager.migrations_dir = temp_directory

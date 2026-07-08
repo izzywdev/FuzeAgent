@@ -1,13 +1,14 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-from contextlib import asynccontextmanager
-import uuid
 import json
+import os
+import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, List, Optional
-import os
-from agent_templates import template_manager, AgentCategory
+
+from agent_templates import AgentCategory, template_manager
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 # Simple in-memory storage for demonstration
 agents_db = {}

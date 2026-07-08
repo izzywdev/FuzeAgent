@@ -2,23 +2,24 @@
 Knowledge Management System for FuzeAgent
 Handles document upload, storage, processing, and RAG integration
 """
+
+import asyncio
+import logging
+import mimetypes
 import os
 import uuid
-import mimetypes
-from typing import List, Optional, Dict, Any, BinaryIO
 from datetime import datetime
 from pathlib import Path
-import logging
-import asyncio
+from typing import Any, BinaryIO, Dict, List, Optional
 from urllib.parse import urlparse
-import requests
-from pydantic import BaseModel, Field
 
+import markdown
 # Document processing imports
 import PyPDF2
-from docx import Document as DocxDocument
-import markdown
+import requests
 from bs4 import BeautifulSoup
+from docx import Document as DocxDocument
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -205,9 +206,11 @@ class KnowledgeManager:
                 status="active",
                 upload_date=datetime.now(),
                 last_modified=datetime.now(),
-                content_preview=extracted_text[:500] + "..."
-                if len(extracted_text) > 500
-                else extracted_text,
+                content_preview=(
+                    extracted_text[:500] + "..."
+                    if len(extracted_text) > 500
+                    else extracted_text
+                ),
                 tags=tags or [],
                 organization_id=organization_id,
                 team_id=team_id,
@@ -280,9 +283,11 @@ class KnowledgeManager:
             # Create metadata
             metadata = DocumentMetadata(
                 id=doc_id,
-                title=title or soup.find("title").get_text()
-                if soup.find("title")
-                else url,
+                title=(
+                    title or soup.find("title").get_text()
+                    if soup.find("title")
+                    else url
+                ),
                 filename=f"url_{doc_id}.html",
                 type="link",
                 mime_type="text/html",
@@ -290,9 +295,11 @@ class KnowledgeManager:
                 status="active",
                 upload_date=datetime.now(),
                 last_modified=datetime.now(),
-                content_preview=extracted_text[:500] + "..."
-                if len(extracted_text) > 500
-                else extracted_text,
+                content_preview=(
+                    extracted_text[:500] + "..."
+                    if len(extracted_text) > 500
+                    else extracted_text
+                ),
                 tags=tags or [],
                 source_url=url,
                 organization_id=organization_id,
