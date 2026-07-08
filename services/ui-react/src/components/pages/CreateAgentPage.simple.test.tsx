@@ -107,10 +107,10 @@ describe('CreateAgentPage - Simple Tests', () => {
     })
 
     it('should allow template selection', async () => {
-      const templateCard = screen.getByText('React Developer').closest('div')
+      const templateCard = screen.getByText('React Developer').parentElement!
       expect(templateCard).toBeInTheDocument()
 
-      await user.click(templateCard!)
+      await user.click(templateCard)
 
       // Check if the template card gets highlighted (changes styling)
       await waitFor(() => {

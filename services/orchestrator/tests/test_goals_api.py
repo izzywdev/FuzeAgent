@@ -9,17 +9,17 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.orchestrator.main import app
-from services.orchestrator.goals_management_service import (
+from main import app
+from goals_management_service import (
     GoalType,
     GoalStatus,
     OrganizationGoal,
 )
-from services.orchestrator.goal_conversation_service import (
+from goal_conversation_service import (
     ConversationType,
     ConversationStatus,
 )
-from services.orchestrator.goal_tracking_service import RiskLevel, DeadlineRisk
+from goal_tracking_service import RiskLevel, DeadlineRisk
 
 # Test client
 client = TestClient(app)
@@ -111,6 +111,7 @@ def sample_organization_goal():
     )
 
 
+@pytest.mark.goals
 class TestGoalsManagementAPI:
     """Test Goals Management API endpoints"""
 
@@ -119,7 +120,7 @@ class TestGoalsManagementAPI:
         response = client.get("/health")
         assert response.status_code == 200
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_create_goal_success(self, mock_goals_service, sample_goal_data):
         """Test successful goal creation"""
         # Mock the service
@@ -139,7 +140,7 @@ class TestGoalsManagementAPI:
         # Verify service was called correctly
         mock_goals_service.create_goal.assert_called_once()
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_create_goal_invalid_data(self, mock_goals_service):
         """Test goal creation with invalid data"""
         invalid_data = {
@@ -151,7 +152,7 @@ class TestGoalsManagementAPI:
 
         assert response.status_code == 422  # Validation error
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_list_organization_goals(
         self, mock_goals_service, sample_organization_goal
     ):
@@ -168,7 +169,7 @@ class TestGoalsManagementAPI:
         assert len(data["goals"]) == 1
         assert data["goals"][0]["title"] == "Test Goal"
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_list_goals_with_filters(
         self, mock_goals_service, sample_organization_goal
     ):
@@ -193,7 +194,7 @@ class TestGoalsManagementAPI:
         # Verify service was called with filters
         mock_goals_service.list_organization_goals.assert_called_once()
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_get_goal_success(self, mock_goals_service, sample_organization_goal):
         """Test getting a specific goal"""
         mock_goals_service.get_goal = AsyncMock(return_value=sample_organization_goal)
@@ -207,7 +208,7 @@ class TestGoalsManagementAPI:
         assert data["goal_type"] == "business"
         assert data["status"] == "active"
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_get_goal_not_found(self, mock_goals_service):
         """Test getting non-existent goal"""
         mock_goals_service.get_goal = AsyncMock(return_value=None)
@@ -217,7 +218,7 @@ class TestGoalsManagementAPI:
         assert response.status_code == 404
         assert "Goal not found" in response.json()["detail"]
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_get_goal_overview(self, mock_goals_service):
         """Test getting goal overview"""
         mock_overview = {
@@ -236,7 +237,7 @@ class TestGoalsManagementAPI:
         assert len(data["milestones"]) == 1
         assert len(data["tasks"]) == 1
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_update_goal_progress(self, mock_goals_service):
         """Test updating goal progress"""
         mock_goals_service.update_goal_progress = AsyncMock(return_value=True)
@@ -255,7 +256,7 @@ class TestGoalsManagementAPI:
         assert data["goal_id"] == "goal-123"
         assert data["status"] == "updated"
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_update_goal_progress_not_found(self, mock_goals_service):
         """Test updating progress for non-existent goal"""
         mock_goals_service.update_goal_progress = AsyncMock(return_value=False)
@@ -267,10 +268,11 @@ class TestGoalsManagementAPI:
         assert response.status_code == 404
 
 
+@pytest.mark.goals
 class TestMilestonesAPI:
     """Test Milestones API endpoints"""
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_create_milestone(self, mock_goals_service, sample_milestone_data):
         """Test creating a milestone"""
         mock_goals_service.create_milestone = AsyncMock(return_value="milestone-123")
@@ -282,7 +284,7 @@ class TestMilestonesAPI:
         assert data["milestone_id"] == "milestone-123"
         assert data["status"] == "created"
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_create_task_from_milestone(self, mock_goals_service, sample_task_data):
         """Test creating a task from milestone"""
         mock_goals_service.create_task_from_milestone = AsyncMock(
@@ -297,10 +299,11 @@ class TestMilestonesAPI:
         assert data["status"] == "created"
 
 
+@pytest.mark.goals
 class TestPlanningEngineAPI:
     """Test Planning Engine API endpoints"""
 
-    @patch("services.orchestrator.main.app.state.milestone_task_engine")
+    @patch("main.app.state.milestone_task_engine")
     def test_generate_execution_plan(self, mock_engine):
         """Test generating execution plan"""
         mock_plan = {
@@ -318,7 +321,7 @@ class TestPlanningEngineAPI:
         assert data["goal_id"] == "goal-123"
         assert data["plan_type"] == "monthly_focused"
 
-    @patch("services.orchestrator.main.app.state.milestone_task_engine")
+    @patch("main.app.state.milestone_task_engine")
     def test_generate_monthly_milestones(self, mock_engine):
         """Test generating monthly milestones"""
         milestone_ids = ["milestone-1", "milestone-2", "milestone-3"]
@@ -332,7 +335,7 @@ class TestPlanningEngineAPI:
         assert data["count"] == 3
         assert data["milestone_ids"] == milestone_ids
 
-    @patch("services.orchestrator.main.app.state.milestone_task_engine")
+    @patch("main.app.state.milestone_task_engine")
     def test_generate_weekly_tasks(self, mock_engine):
         """Test generating weekly tasks"""
         task_ids = ["task-1", "task-2", "task-3", "task-4"]
@@ -351,7 +354,7 @@ class TestPlanningEngineAPI:
         assert data["count"] == 4
         assert data["task_ids"] == task_ids
 
-    @patch("services.orchestrator.main.app.state.milestone_task_engine")
+    @patch("main.app.state.milestone_task_engine")
     def test_generate_cross_functional_tasks(self, mock_engine):
         """Test generating cross-functional tasks"""
         functional_tasks = {
@@ -376,10 +379,11 @@ class TestPlanningEngineAPI:
         assert len(data["functional_tasks"]["development"]) == 2
 
 
+@pytest.mark.goals
 class TestConversationsAPI:
     """Test Goal Conversations API endpoints"""
 
-    @patch("services.orchestrator.main.app.state.goal_conversation_service")
+    @patch("main.app.state.goal_conversation_service")
     def test_create_goal_conversation(self, mock_service, sample_conversation_data):
         """Test creating a goal conversation"""
         mock_service.create_goal_conversation = AsyncMock(return_value="conv-123")
@@ -393,7 +397,7 @@ class TestConversationsAPI:
         assert data["conversation_id"] == "conv-123"
         assert data["status"] == "created"
 
-    @patch("services.orchestrator.main.app.state.goal_conversation_service")
+    @patch("main.app.state.goal_conversation_service")
     def test_get_goal_conversation(self, mock_service):
         """Test getting a goal conversation"""
         mock_conversation = {
@@ -413,7 +417,7 @@ class TestConversationsAPI:
         assert data["id"] == "conv-123"
         assert data["goal_id"] == "goal-123"
 
-    @patch("services.orchestrator.main.app.state.goal_conversation_service")
+    @patch("main.app.state.goal_conversation_service")
     def test_add_message_to_conversation(self, mock_service):
         """Test adding a message to conversation"""
         mock_service.add_message_to_conversation = AsyncMock(return_value="msg-123")
@@ -432,7 +436,7 @@ class TestConversationsAPI:
         assert data["message_id"] == "msg-123"
         assert data["status"] == "added"
 
-    @patch("services.orchestrator.main.app.state.goal_conversation_service")
+    @patch("main.app.state.goal_conversation_service")
     def test_generate_planning_milestones_from_conversation(self, mock_service):
         """Test generating milestones from conversation"""
         mock_milestones = [
@@ -451,7 +455,7 @@ class TestConversationsAPI:
         assert data["count"] == 2
         assert len(data["milestones"]) == 2
 
-    @patch("services.orchestrator.main.app.state.goal_conversation_service")
+    @patch("main.app.state.goal_conversation_service")
     def test_conduct_progress_review(self, mock_service):
         """Test conducting progress review"""
         mock_review = {
@@ -470,7 +474,7 @@ class TestConversationsAPI:
         assert data["review_period_days"] == 30
         assert "recommendations" in data
 
-    @patch("services.orchestrator.main.app.state.goal_conversation_service")
+    @patch("main.app.state.goal_conversation_service")
     def test_extract_action_items(self, mock_service):
         """Test extracting action items from conversation"""
         mock_action_items = [
@@ -489,7 +493,7 @@ class TestConversationsAPI:
         assert data["count"] == 2
         assert len(data["action_items"]) == 2
 
-    @patch("services.orchestrator.main.app.state.goal_conversation_service")
+    @patch("main.app.state.goal_conversation_service")
     def test_get_goal_conversations(self, mock_service):
         """Test getting conversations for a goal"""
         mock_conversations = [
@@ -507,10 +511,11 @@ class TestConversationsAPI:
         assert len(data["conversations"]) == 2
 
 
+@pytest.mark.goals
 class TestTrackingAPI:
     """Test Goal Tracking API endpoints"""
 
-    @patch("services.orchestrator.main.app.state.goal_tracking_service")
+    @patch("main.app.state.goal_tracking_service")
     def test_record_progress_tracking(self, mock_service):
         """Test recording progress tracking update"""
         mock_service.record_progress_update = AsyncMock(return_value="snapshot-123")
@@ -531,7 +536,7 @@ class TestTrackingAPI:
         assert data["snapshot_id"] == "snapshot-123"
         assert data["status"] == "recorded"
 
-    @patch("services.orchestrator.main.app.state.goal_tracking_service")
+    @patch("main.app.state.goal_tracking_service")
     def test_assess_deadline_risk(self, mock_service):
         """Test assessing deadline risk"""
         mock_risk = DeadlineRisk(
@@ -557,7 +562,7 @@ class TestTrackingAPI:
         assert len(data["critical_path_items"]) == 1
         assert len(data["mitigation_strategies"]) == 1
 
-    @patch("services.orchestrator.main.app.state.goal_tracking_service")
+    @patch("main.app.state.goal_tracking_service")
     def test_generate_progress_report(self, mock_service):
         """Test generating progress report"""
         mock_report = {
@@ -581,10 +586,11 @@ class TestTrackingAPI:
         assert "insights" in data
 
 
+@pytest.mark.goals
 class TestDashboardsAPI:
     """Test Dashboard API endpoints"""
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_get_organization_goals_dashboard(self, mock_service):
         """Test getting organization goals dashboard"""
         mock_dashboard = {
@@ -605,7 +611,7 @@ class TestDashboardsAPI:
         assert len(data["goals"]) == 1
         assert "statistics" in data
 
-    @patch("services.orchestrator.main.app.state.goal_tracking_service")
+    @patch("main.app.state.goal_tracking_service")
     def test_get_tracking_dashboard(self, mock_service):
         """Test getting tracking dashboard"""
         mock_dashboard = {
@@ -627,10 +633,11 @@ class TestDashboardsAPI:
         assert "risk_distribution" in data
 
 
+@pytest.mark.goals
 class TestErrorHandling:
     """Test error handling for Goals API"""
 
-    @patch("services.orchestrator.main.app.state.goals_service")
+    @patch("main.app.state.goals_service")
     def test_service_error_handling(self, mock_service):
         """Test handling of service errors"""
         mock_service.get_goal = AsyncMock(side_effect=Exception("Database error"))
@@ -666,12 +673,13 @@ class TestErrorHandling:
 
 
 # Integration test fixtures and utilities
+@pytest.mark.goals
 class TestGoalsAPIIntegration:
     """Integration tests for Goals API workflows"""
 
-    @patch("services.orchestrator.main.app.state.goals_service")
-    @patch("services.orchestrator.main.app.state.milestone_task_engine")
-    @patch("services.orchestrator.main.app.state.goal_conversation_service")
+    @patch("main.app.state.goals_service")
+    @patch("main.app.state.milestone_task_engine")
+    @patch("main.app.state.goal_conversation_service")
     def test_complete_goal_workflow(
         self,
         mock_conv_service,

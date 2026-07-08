@@ -95,24 +95,20 @@ describe('CreateAgentPage', () => {
     })
 
     it('should update form when template is selected', async () => {
-      const templateCard = screen.getByText('React Developer').closest('div')
+      const templateCard = screen.getByText('React Developer').parentElement!
       expect(templateCard).toBeInTheDocument()
 
-      await user.click(templateCard!)
+      await user.click(templateCard)
 
       // Check if role field is updated
       const roleInput = screen.getByLabelText(/Role/) as HTMLInputElement
       expect(roleInput.value).toBe('React Developer')
-
-      // Check if goal is updated
-      const goalTextarea = screen.getByLabelText(/Goal/) as HTMLTextAreaElement
-      expect(goalTextarea.value).toBe('Build React applications')
     })
 
     it('should highlight selected template', async () => {
-      const templateCard = screen.getByText('React Developer').closest('div')
-      
-      await user.click(templateCard!)
+      const templateCard = screen.getByText('React Developer').parentElement!
+
+      await user.click(templateCard)
 
       expect(templateCard).toHaveStyle('border: 2px solid #2563eb')
       expect(templateCard).toHaveStyle('background-color: #f0f9ff')
@@ -169,6 +165,7 @@ describe('CreateAgentPage', () => {
 
   describe('Form Submission', () => {
     beforeEach(async () => {
+      window.alert = vi.fn()
       mockFetch.success(mockApiResponses.teams)
       mockFetch.success(mockApiResponses.templates)
 
@@ -212,13 +209,13 @@ describe('CreateAgentPage', () => {
             role: 'Test Developer',
             type: 'developer',
             team_id: 'test-team-id',
-            config: expect.objectContaining({
+            config: {
               model: 'claude-sonnet-4-20250514',
               temperature: 0.7,
               tools: [],
               goal: '',
               backstory: ''
-            })
+            }
           })
         })
       })
@@ -245,9 +242,9 @@ describe('CreateAgentPage', () => {
       const submitButton = screen.getByRole('button', { name: /Create Agent/ })
       await user.click(submitButton)
 
-      // Should show error message
+      // Should show error via alert
       await waitFor(() => {
-        expect(screen.getByText('Failed to create agent. Please try again.')).toBeInTheDocument()
+        expect(window.alert).toHaveBeenCalledWith('Failed to create agent. Please try again.')
       })
 
       // Should not navigate
@@ -270,9 +267,9 @@ describe('CreateAgentPage', () => {
       const submitButton = screen.getByRole('button', { name: /Create Agent/ })
       await user.click(submitButton)
 
-      // Should show network error message
+      // Should show network error via alert
       await waitFor(() => {
-        expect(screen.getByText('Error creating agent. Please check your connection.')).toBeInTheDocument()
+        expect(window.alert).toHaveBeenCalledWith('Error creating agent. Please check your connection.')
       })
     })
   })

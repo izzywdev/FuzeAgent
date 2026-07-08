@@ -8,25 +8,26 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.orchestrator.goals_management_service import (
+from goals_management_service import (
     GoalsManagementService,
     GoalType,
     GoalStatus,
     OrganizationGoal,
 )
-from services.orchestrator.milestone_task_engine import MilestoneTaskEngine
-from services.orchestrator.goal_conversation_service import (
+from milestone_task_engine import MilestoneTaskEngine
+from goal_conversation_service import (
     GoalConversationService,
     ConversationType,
     MessageType,
 )
-from services.orchestrator.goal_tracking_service import (
+from goal_tracking_service import (
     GoalTrackingService,
     RiskLevel,
     AlertSeverity,
 )
 
 
+@pytest.mark.goals
 class TestGoalsManagementService:
     """Test GoalsManagementService"""
 
@@ -169,6 +170,7 @@ class TestGoalsManagementService:
         mock_conn.execute.assert_called_once()
 
 
+@pytest.mark.goals
 class TestMilestoneTaskEngine:
     """Test MilestoneTaskEngine"""
 
@@ -275,6 +277,7 @@ class TestMilestoneTaskEngine:
             assert len(task_ids) > 0
 
 
+@pytest.mark.goals
 class TestGoalConversationService:
     """Test GoalConversationService"""
 
@@ -382,6 +385,7 @@ class TestGoalConversationService:
             assert len(milestones) > 0
 
 
+@pytest.mark.goals
 class TestGoalTrackingService:
     """Test GoalTrackingService"""
 
@@ -544,6 +548,7 @@ class TestGoalTrackingService:
         assert len(report["progress_history"]) == 3
 
 
+@pytest.mark.goals
 class TestServiceIntegration:
     """Integration tests for Goals services working together"""
 
