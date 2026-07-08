@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from collections import defaultdict
 import asyncio
+import json
 import os
 import logging
 import jwt
@@ -2900,7 +2901,7 @@ async def add_organizational_knowledge(
 ):
     """Add knowledge to organization-level knowledge base"""
     try:
-        from .organization_rag_manager import ContentType, KnowledgeCategory, SourceType
+        from .organization_rag_manager import OrganizationRAGManager, ContentType, KnowledgeCategory, SourceType
 
         # Initialize services if not already done
         if not hasattr(app.state, "org_rag_manager"):

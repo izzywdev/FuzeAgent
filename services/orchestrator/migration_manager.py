@@ -8,6 +8,7 @@ import asyncpg
 import os
 import re
 import importlib.util
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
@@ -57,9 +58,14 @@ class MigrationManager:
             Path(__file__).parent / "migrations"
         )
 
-    async def _get_connection(self) -> asyncpg.Connection:
-        """Get database connection"""
-        return await asyncpg.connect(self.database_url)
+    @asynccontextmanager
+    async def _get_connection(self):
+        """Get database connection as an async context manager"""
+        conn = await asyncpg.connect(self.database_url)
+        try:
+            yield conn
+        finally:
+            await conn.close()
 
     async def _ensure_migrations_table(self, conn: asyncpg.Connection):
         """Create migrations tracking table if it doesn't exist"""
@@ -78,7 +84,7 @@ class MigrationManager:
 
     async def get_applied_migrations(self) -> List[str]:
         """Get list of applied migration versions"""
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             await self._ensure_migrations_table(conn)
             rows = await conn.fetch(
                 "SELECT version FROM schema_migrations ORDER BY version"
@@ -203,7 +209,7 @@ class MigrationManager:
         """Apply all pending migrations up to target version"""
         logger.info("Starting database migration...")
 
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             await self._ensure_migrations_table(conn)
 
             # Get applied and available migrations
@@ -239,7 +245,7 @@ class MigrationManager:
         """Rollback migrations down to target version"""
         logger.info(f"Rolling back migrations to version: {target_version}")
 
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             await self._ensure_migrations_table(conn)
 
             # Get applied migrations
@@ -270,7 +276,7 @@ class MigrationManager:
 
     async def get_migration_status(self) -> Dict:
         """Get current migration status"""
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             await self._ensure_migrations_table(conn)
 
             applied_versions = set(await self.get_applied_migrations())
@@ -308,7 +314,7 @@ class MigrationManager:
         """Reset database by dropping all tables (DANGER!)"""
         logger.warning("RESETTING DATABASE - ALL DATA WILL BE LOST!")
 
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             # Get all table names
             tables = await conn.fetch(
                 """

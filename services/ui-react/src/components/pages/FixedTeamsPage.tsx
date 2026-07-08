@@ -558,32 +558,36 @@ function FixedTeamsPageCore() {
               </div>
             </div>
 
-            <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-                <div>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Active Teams</p>
-                  <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
-                    {Array.isArray(teams) ? teams.filter(t => t?.status === 'active').length : 0}
-                  </p>
+            {Array.isArray(teams) && teams.length > 0 && (
+              <>
+                <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                    <div>
+                      <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Active Teams</p>
+                      <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
+                        {teams.filter(t => t?.status === 'active').length}
+                      </p>
+                    </div>
+                    <span style={{fontSize: '2rem'}}>⚡</span>
+                  </div>
                 </div>
-                <span style={{fontSize: '2rem'}}>⚡</span>
-              </div>
-            </div>
 
-            <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
-              <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
-                <div>
-                  <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Total Members</p>
-                  <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
-                    {Array.isArray(teams) ? teams.reduce((acc, team) => {
-                      const memberCount = Array.isArray(team?.members) ? team.members.length : 0
-                      return acc + memberCount
-                    }, 0) : 0}
-                  </p>
+                <div style={{backgroundColor: 'white', padding: '1.5rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb'}}>
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                    <div>
+                      <p style={{fontSize: '0.875rem', color: '#6b7280', margin: 0}}>Total Members</p>
+                      <p style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0.25rem 0 0 0'}}>
+                        {teams.reduce((acc, team) => {
+                          const memberCount = Array.isArray(team?.members) ? team.members.length : 0
+                          return acc + memberCount
+                        }, 0)}
+                      </p>
+                    </div>
+                    <span style={{fontSize: '2rem'}}>🤖</span>
+                  </div>
                 </div>
-                <span style={{fontSize: '2rem'}}>🤖</span>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
       </main>

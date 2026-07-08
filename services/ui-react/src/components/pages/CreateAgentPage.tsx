@@ -299,10 +299,11 @@ export function CreateAgentPage() {
               
               <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
                 <div>
-                  <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  <label htmlFor="agent-name" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Agent Name *
                   </label>
                   <input
+                    id="agent-name"
                     type="text"
                     required
                     value={formData.name}
@@ -319,10 +320,11 @@ export function CreateAgentPage() {
                 </div>
 
                 <div>
-                  <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  <label htmlFor="agent-role" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Role *
                   </label>
                   <input
+                    id="agent-role"
                     type="text"
                     required
                     value={formData.role}
@@ -339,10 +341,11 @@ export function CreateAgentPage() {
                 </div>
 
                 <div>
-                  <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  <label htmlFor="team-assignment" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Team Assignment *
                   </label>
                   <select
+                    id="team-assignment"
                     required
                     value={formData.team_id}
                     onChange={(e) => setFormData({...formData, team_id: e.target.value})}
@@ -362,10 +365,11 @@ export function CreateAgentPage() {
                 </div>
 
                 <div>
-                  <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  <label htmlFor="agent-type" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Agent Type
                   </label>
                   <select
+                    id="agent-type"
                     value={formData.type}
                     onChange={(e) => setFormData({...formData, type: e.target.value})}
                     style={{
@@ -427,10 +431,11 @@ export function CreateAgentPage() {
             
             <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
               <div>
-                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                <label htmlFor="config-model" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                   Model
                 </label>
                 <select
+                  id="config-model"
                   value={formData.config.model}
                   onChange={(e) => setFormData({...formData, config: {...formData.config, model: e.target.value}})}
                   style={{
@@ -448,10 +453,11 @@ export function CreateAgentPage() {
               </div>
 
               <div>
-                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                <label htmlFor="config-temperature" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                   Temperature
                 </label>
                 <input
+                  id="config-temperature"
                   type="number"
                   min="0"
                   max="2"
@@ -470,10 +476,11 @@ export function CreateAgentPage() {
             </div>
 
             <div style={{marginTop: '1.5rem'}}>
-              <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+              <label htmlFor="config-goal" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                 Goal
               </label>
               <textarea
+                id="config-goal"
                 value={formData.config.goal}
                 onChange={(e) => setFormData({...formData, config: {...formData.config, goal: e.target.value}})}
                 placeholder="What is this agent's primary objective?"
@@ -490,10 +497,11 @@ export function CreateAgentPage() {
             </div>
 
             <div style={{marginTop: '1.5rem'}}>
-              <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+              <label htmlFor="config-backstory" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                 Backstory
               </label>
               <textarea
+                id="config-backstory"
                 value={formData.config.backstory}
                 onChange={(e) => setFormData({...formData, config: {...formData.config, backstory: e.target.value}})}
                 placeholder="Describe the agent's background and expertise"
