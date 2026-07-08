@@ -291,7 +291,7 @@ describe('CreateAgentPage', () => {
 
     it('should render breadcrumbs correctly', () => {
       expect(screen.getByText('Agents')).toBeInTheDocument()
-      expect(screen.getByText('Create Agent')).toBeInTheDocument()
+      expect(screen.getByText('New Agent')).toBeInTheDocument()
     })
 
     it('should have working cancel buttons', () => {

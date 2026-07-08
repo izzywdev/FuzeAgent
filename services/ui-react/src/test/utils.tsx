@@ -58,7 +58,19 @@ export const mockOrganization = {
 export const mockApiResponses = {
   agents: [mockAgent],
   teams: [mockTeam],
-  templates: { templates: [mockTemplate] },
+  templates: {
+    templates: [{
+      template_id: 'react_developer',
+      name: 'React Developer',
+      description: 'Frontend developer specialized in React',
+      category: 'developer',
+      default_model: 'claude-sonnet-4-20250514',
+      default_temperature: 0.7,
+      tools: ['code_generation', 'code_review'],
+      default_goal: 'Build React applications',
+      default_backstory: 'Experienced React developer'
+    }]
+  },
   organizations: [mockOrganization],
   createAgent: {
     agent_id: 'new-agent-id',
