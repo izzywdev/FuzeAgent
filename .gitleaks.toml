@@ -1,0 +1,9 @@
+[allowlist]
+description = "FuzeAgent allowlist — suppress known false positives"
+
+# "legacy-hs256" is an auth-mode identifier string, not an actual secret.
+# It appears in services/orchestrator/auth.py as the default value for the
+# authMode claim in the @fuzefront/auth Identity contract.
+[[allowlist.regexes]]
+description = "auth-mode identifier literal"
+regex = '''legacy-hs256'''
