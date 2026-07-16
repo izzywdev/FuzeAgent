@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
@@ -16,7 +17,6 @@ let PlatformProvider: React.ComponentType<{ children: ReactNode }> | null = null
 let sdkIsInPlatform: (() => boolean) | null = null
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const sdk = require('@izzywdev/fuzefront-sdk-react')
   PlatformProvider = sdk.PlatformProvider ?? null
   sdkIsInPlatform = sdk.isInPlatform ?? null

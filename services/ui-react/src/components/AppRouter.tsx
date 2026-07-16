@@ -14,6 +14,8 @@ import { DashboardPage } from '../pages/DashboardPage'
 import DocsPage from '../pages/DocsPage'
 import ApiPlayground from './ApiPlayground'
 import { Layout } from './layout/Layout'
+import BillingPage from '../pages/BillingPage'
+import { IdentityOrgPage } from '../pages/IdentityPage'
 
 export default function AppRouter() {
   return (
@@ -31,6 +33,8 @@ export default function AppRouter() {
         <Route path="/teams/:teamId/details" element={<TeamDetailsPage />} />
         <Route path="/teams/:teamId/manage" element={<TeamDetailsPage />} />
         <Route path="/teams/:teamId/settings" element={<TeamDetailsPage />} />
+        <Route path="/billing" element={<Layout title="Billing & Usage" subtitle="Manage your subscription and usage"><BillingPage /></Layout>} />
+        <Route path="/org" element={<Layout title="Organization & Identity" subtitle="Manage members, roles, and API tokens"><IdentityOrgPage /></Layout>} />
         <Route path="/goals" element={<GoalsPage />} />
         <Route path="/goals/:goalId" element={<GoalsPage />} />
         <Route path="/organization-chart" element={<FixedOrgChartPage />} />
