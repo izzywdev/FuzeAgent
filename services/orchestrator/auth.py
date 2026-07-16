@@ -127,15 +127,27 @@ class CurrentUser:
 
     def __init__(self, claims: Dict[str, Any]):
         self.claims = claims
+        # ------------------------------------------------------------------
+        # @fuzefront/auth Identity-aligned fields (userId, tenantId, roles,
+        # email, authMode, issuedAt, expiresAt, issuer).
+        # See packages/auth/src/types.ts in FuzeFront for the contract.
+        # ------------------------------------------------------------------
         self.id: str = str(
-            claims.get("sub") or claims.get("user_id") or claims.get("uid") or ""
+            claims.get("sub") or claims.get("userId") or claims.get("user_id") or claims.get("uid") or ""
         )
+        # user_id alias kept for backward compat
+        self.user_id: str = self.id
         self.email: Optional[str] = claims.get("email")
         # Roles may arrive as a list or a space/comma separated string.
         self.roles: List[str] = _as_str_list(
             claims.get("roles") or claims.get("role") or []
         )
-        # Organizations the principal may act on.
+        # tenantId — primary org scope per @fuzefront/auth Identity contract.
+        # May be null in legacy-hs256 mode when not resolved out-of-band.
+        self.tenant_id: Optional[str] = (
+            claims.get("tenantId") or claims.get("tenant_id") or None
+        )
+        # Organizations the principal may act on (superset of tenantId).
         self.organizations: Set[str] = set(
             _as_str_list(
                 claims.get("organizations")
@@ -146,14 +158,21 @@ class CurrentUser:
                 )
             )
         )
+        # Promote tenantId into organizations if not already there.
+        if self.tenant_id:
+            self.organizations.add(self.tenant_id)
         self.is_admin: bool = bool(claims.get("is_admin")) or any(
             r.lower() in ("admin", "superadmin", "platform-admin") for r in self.roles
         )
-        # A service principal (machine token) used by trusted internal callers,
-        # e.g. the migration runner. Identified by a dedicated role/scope.
+        # A service principal (machine token) used by trusted internal callers.
         self.is_service: bool = bool(claims.get("is_service")) or any(
             r.lower() in ("service", "service-account", "system") for r in self.roles
         )
+        # Standard JWT claims aligned with @fuzefront/auth Identity
+        self.auth_mode: str = claims.get("authMode", "legacy-hs256")
+        self.issued_at: Optional[int] = claims.get("iat")
+        self.expires_at: Optional[int] = claims.get("exp")
+        self.issuer: Optional[str] = claims.get("iss")
 
     def can_access_org(self, organization_id: str) -> bool:
         """Object-level check: may this principal act on ``organization_id``?

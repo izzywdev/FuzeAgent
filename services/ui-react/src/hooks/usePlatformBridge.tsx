@@ -14,6 +14,7 @@
  *  2. Package absent    → sdkReady stays false; all hooks are no-ops.
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 import { useEffect } from 'react'
 
 // ---------------------------------------------------------------------------
@@ -29,7 +30,6 @@ let sdkReady = false
 try {
   // When the package is present this import is resolved at bundle time.
   // When absent the try/catch catches the module-not-found error.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   sdk = require('@izzywdev/fuzefront-sdk-react')
   sdkReady = true
 } catch {

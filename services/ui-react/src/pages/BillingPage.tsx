@@ -3,6 +3,7 @@
  * Degrades gracefully to a plain message when the package is absent.
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 import React from 'react'
 
 // ---------------------------------------------------------------------------
@@ -31,10 +32,8 @@ interface Subscription {
 let billing: BillingComponents | null = null
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   billing = require('@fuzefront/billing-ui')
   // Styles — import via require so the try/catch covers the CSS too.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   require('@fuzefront/billing-ui/styles.css')
 } catch {
   billing = null

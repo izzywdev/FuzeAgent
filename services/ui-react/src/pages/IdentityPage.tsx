@@ -3,6 +3,7 @@
  * Degrades gracefully when the package is absent.
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 import React from 'react'
 
 // ---------------------------------------------------------------------------
@@ -21,7 +22,6 @@ type IdentityComponents = {
 let identityPkg: IdentityComponents | null = null
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   identityPkg = require('@fuzefront/identity-ui')
 } catch {
   identityPkg = null
