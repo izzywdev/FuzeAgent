@@ -79,7 +79,7 @@ jobs:
         async def migrate():
             manager = MigrationManager('postgresql://postgres:password@localhost:5434/ai_context_test')
             result = await manager.migrate_up()
-            print(f'Applied {result[\"applied_count\"]} migrations')
+            print(f'Applied {len(result)} migrations')
             await manager.close()
         
         asyncio.run(migrate())

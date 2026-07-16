@@ -144,8 +144,8 @@ describe('CreateAgentPage - Simple Tests', () => {
       await user.type(nameInput, 'Test Agent')
       await user.type(roleInput, 'Test Developer')
 
-      // Select team
-      const teamSelect = screen.getByDisplayValue('') // Empty select initially
+      // Select team (use label association to avoid ambiguity with other selects)
+      const teamSelect = screen.getByRole('combobox', { name: /team assignment/i })
       await user.selectOptions(teamSelect, 'test-team-id')
 
       // Mock API response

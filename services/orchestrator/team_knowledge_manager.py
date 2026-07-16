@@ -16,14 +16,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
-from .organization_rag_manager import (
-    ContentType,
-    KnowledgeCategory,
-    KnowledgeSearchResult,
-    OrganizationRAGManager,
-    SourceType,
-    VisibilityLevel,
-)
+from .organization_rag_manager import (ContentType, KnowledgeCategory,
+                                       KnowledgeSearchResult,
+                                       OrganizationRAGManager, SourceType,
+                                       VisibilityLevel)
 
 logger = logging.getLogger(__name__)
 

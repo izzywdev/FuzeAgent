@@ -6,9 +6,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from agent_templates import AgentCategory, template_manager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+from agent_templates import AgentCategory, template_manager
 
 # Simple in-memory storage for demonstration
 agents_db = {}

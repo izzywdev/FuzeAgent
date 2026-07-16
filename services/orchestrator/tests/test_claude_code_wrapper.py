@@ -5,6 +5,7 @@ Test cases for Claude Code Wrapper functionality
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from claude_code_wrapper import ClaudeCodeWrapper
 
 

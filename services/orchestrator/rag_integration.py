@@ -14,9 +14,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import chromadb
 import numpy as np
 from chromadb.config import Settings
-from knowledge_manager import DocumentMetadata, knowledge_manager
 from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
+
+from knowledge_manager import DocumentMetadata, knowledge_manager
 
 logger = logging.getLogger(__name__)
 

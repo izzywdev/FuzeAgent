@@ -36,20 +36,17 @@ os.environ.pop("JWT_ISSUER", None)
 # Ensure the orchestrator package dir is importable (tests run from there).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import auth as auth_module
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from jose import jwt
 from pydantic import BaseModel, ConfigDict
 
+import auth as auth_module
+
 importlib.reload(auth_module)
-from auth import (
-    CurrentUser,
-    get_current_user,
-    require_admin,  # noqa: E402
-    require_org_access,
-    require_user,
-)
+from auth import require_admin  # noqa: E402
+from auth import (CurrentUser, get_current_user, require_org_access,
+                  require_user)
 
 SECRET = os.environ["JWT_SECRET"]
 ORG_A = "11111111-1111-1111-1111-111111111111"

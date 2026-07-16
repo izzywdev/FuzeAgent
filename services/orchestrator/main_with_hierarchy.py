@@ -6,34 +6,20 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
 from a2a_protocol import A2AProtocolManager, MessageType, TaskStatus
 from agent_templates import AgentCategory, template_manager
 from database import DatabaseManager
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from migration_manager import MigrationManager
-from models import (
-    Agent,
-    AgentCreate,
-    AgentUpdate,
-    AgentWithTeam,
-    CreateAgentFromTemplate,
-    CreateCustomAgent,
-    Organization,
-    OrganizationCreate,
-    OrganizationUpdate,
-    OrganizationWithTeams,
-    Task,
-    TaskCreate,
-    TaskUpdate,
-    Team,
-    TeamCreate,
-    TeamUpdate,
-    TeamWithAgents,
-)
-from rag_manager import RAGManager
-
 from hierarchy_endpoints import router as hierarchy_router
+from migration_manager import MigrationManager
+from models import (Agent, AgentCreate, AgentUpdate, AgentWithTeam,
+                    CreateAgentFromTemplate, CreateCustomAgent, Organization,
+                    OrganizationCreate, OrganizationUpdate,
+                    OrganizationWithTeams, Task, TaskCreate, TaskUpdate, Team,
+                    TeamCreate, TeamUpdate, TeamWithAgents)
+from rag_manager import RAGManager
 
 # Default IDs for initial setup
 DEFAULT_ORG_ID = "550e8400-e29b-41d4-a716-446655440000"

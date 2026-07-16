@@ -24,7 +24,6 @@ os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy1sb25n"
 
 from a2a_protocol import A2AProtocolManager
 from database import DatabaseManager
-
 # Import after setting environment variables
 from main_with_hierarchy import app
 from migration_manager import MigrationManager

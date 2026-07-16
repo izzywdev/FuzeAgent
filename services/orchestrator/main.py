@@ -9,20 +9,8 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 import jwt
-from fastapi import (
-    Body,
-    Depends,
-    FastAPI,
-    File,
-    Form,
-    HTTPException,
-    Path,
-    Query,
-    UploadFile,
-    WebSocket,
-    WebSocketDisconnect,
-    status,
-)
+from fastapi import (Body, Depends, FastAPI, File, Form, HTTPException, Path,
+                     Query, UploadFile, WebSocket, WebSocketDisconnect, status)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -31,7 +19,8 @@ from pydantic import BaseModel, Field
 from hierarchy_endpoints import router as hierarchy_router
 
 from .agent_manager import AgentManager
-from .container_manager import ContainerConfig, ContainerStatus, container_manager
+from .container_manager import (ContainerConfig, ContainerStatus,
+                                container_manager)
 from .context_service import ContextService
 from .database import get_db_connection
 from .knowledge_manager import DocumentMetadata, knowledge_manager
@@ -39,15 +28,11 @@ from .rag_integration import RAGContext, rag_system
 from .sandbox_manager import AgentSandboxManager
 from .task_execution_engine import TaskExecutionEngine
 from .task_queue import TaskQueue
-from .websocket_manager import (
-    UpdateType,
-    WebSocketUpdate,
-    notify_agent_status_change,
-    notify_container_status_change,
-    notify_knowledge_update,
-    notify_task_progress,
-    websocket_manager,
-)
+from .websocket_manager import (UpdateType, WebSocketUpdate,
+                                notify_agent_status_change,
+                                notify_container_status_change,
+                                notify_knowledge_update, notify_task_progress,
+                                websocket_manager)
 
 logger = logging.getLogger(__name__)
 
@@ -412,7 +397,8 @@ async def lifespan(app: FastAPI):
     # Initialize knowledge management system
     try:
         from .context_enhancement_service import ContextEnhancementService
-        from .knowledge_notification_service import KnowledgeNotificationService
+        from .knowledge_notification_service import \
+            KnowledgeNotificationService
         from .knowledge_propagation_engine import KnowledgePropagationEngine
         from .organization_rag_manager import OrganizationRAGManager
         from .task_knowledge_extractor import TaskKnowledgeExtractor
@@ -2470,11 +2456,8 @@ async def get_available_models(
 ):
     """Get available AI models with provider credential validation"""
     try:
-        from .model_configuration import (
-            ModelCapability,
-            ModelProvider,
-            model_config_manager,
-        )
+        from .model_configuration import (ModelCapability, ModelProvider,
+                                          model_config_manager)
 
         provider_filter = None
         if provider:
@@ -2740,10 +2723,7 @@ async def get_knowledge_notifications(
     """Get knowledge notifications for a recipient"""
     try:
         from .knowledge_notification_service import (
-            KnowledgeNotificationService,
-            NotificationStatus,
-            NotificationType,
-        )
+            KnowledgeNotificationService, NotificationStatus, NotificationType)
 
         # Initialize notification service if not already done
         if not hasattr(app.state, "notification_service"):
@@ -2910,12 +2890,9 @@ async def add_organizational_knowledge(
 ):
     """Add knowledge to organization-level knowledge base"""
     try:
-        from .organization_rag_manager import (
-            ContentType,
-            KnowledgeCategory,
-            OrganizationRAGManager,
-            SourceType,
-        )
+        from .organization_rag_manager import (ContentType, KnowledgeCategory,
+                                               OrganizationRAGManager,
+                                               SourceType)
 
         # Initialize services if not already done
         if not hasattr(app.state, "org_rag_manager"):
@@ -4330,7 +4307,8 @@ async def get_goal_conversations(
 ):
     """Get conversations for a goal"""
     try:
-        from .goal_conversation_service import ConversationStatus, ConversationType
+        from .goal_conversation_service import (ConversationStatus,
+                                                ConversationType)
 
         conv_type = ConversationType(conversation_type) if conversation_type else None
         conv_status = ConversationStatus(status) if status else None

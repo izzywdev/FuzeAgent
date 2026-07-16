@@ -9,17 +9,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 from services.orchestrator.goal_conversation_service import (
-    ConversationStatus,
-    ConversationType,
-)
+    ConversationStatus, ConversationType)
 from services.orchestrator.goal_tracking_service import DeadlineRisk, RiskLevel
-from services.orchestrator.goals_management_service import (
-    GoalStatus,
-    GoalType,
-    OrganizationGoal,
-)
+from services.orchestrator.goals_management_service import (GoalStatus,
+                                                            GoalType,
+                                                            OrganizationGoal)
 from services.orchestrator.main import app
 
 # Test client
