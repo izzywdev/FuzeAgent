@@ -6,15 +6,16 @@ Each agent gets its own sandboxed container with resource limits and security co
 """
 
 import asyncio
-import docker
 import json
 import logging
 import os
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import docker
 
 from .database import get_db_connection
 

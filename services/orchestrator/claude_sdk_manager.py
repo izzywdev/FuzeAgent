@@ -12,13 +12,13 @@ import os
 import re
 import subprocess
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any, Callable, AsyncGenerator
-from dataclasses import dataclass
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
-from .file_operations_engine import FileOperationsEngine, OperationBatch
 from .conversation_manager import ConversationManager, MessageType
+from .file_operations_engine import FileOperationsEngine, OperationBatch
 
 logger = logging.getLogger(__name__)
 

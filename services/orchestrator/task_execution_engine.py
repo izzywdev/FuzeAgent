@@ -16,20 +16,20 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
-from .database import get_db_connection, DatabaseManager
-from .sandbox_manager import AgentSandboxManager, Sandbox
-from .git_workflow_manager import GitWorkflowManager
 from .claude_code_wrapper import ClaudeCodeWrapper
-from .conversation_manager import ConversationManager, InteractionType
-from .file_operations_engine import FileOperationsEngine
 from .claude_sdk_manager import ClaudeSDKManager, ClaudeSDKSession
-from .task_knowledge_extractor import TaskKnowledgeExtractor
 from .context_enhancement_service import ContextEnhancementService
+from .conversation_manager import ConversationManager, InteractionType
+from .database import DatabaseManager, get_db_connection
+from .file_operations_engine import FileOperationsEngine
+from .git_workflow_manager import GitWorkflowManager
+from .sandbox_manager import AgentSandboxManager, Sandbox
+from .task_knowledge_extractor import TaskKnowledgeExtractor
 
 logger = logging.getLogger(__name__)
 

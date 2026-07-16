@@ -1,9 +1,10 @@
-import asyncpg
-import os
 import json
+import os
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+import asyncpg
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"

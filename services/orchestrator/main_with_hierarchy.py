@@ -1,37 +1,38 @@
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-from contextlib import asynccontextmanager
-import uuid
 import json
+import os
+import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-import os
 
+from a2a_protocol import A2AProtocolManager, MessageType, TaskStatus
+from agent_templates import AgentCategory, template_manager
 from database import DatabaseManager
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from migration_manager import MigrationManager
-from rag_manager import RAGManager
-from a2a_protocol import A2AProtocolManager, TaskStatus, MessageType
 from models import (
-    Organization,
-    OrganizationCreate,
-    OrganizationUpdate,
-    Team,
-    TeamCreate,
-    TeamUpdate,
     Agent,
     AgentCreate,
     AgentUpdate,
-    Task,
-    TaskCreate,
-    TaskUpdate,
-    OrganizationWithTeams,
-    TeamWithAgents,
     AgentWithTeam,
     CreateAgentFromTemplate,
     CreateCustomAgent,
+    Organization,
+    OrganizationCreate,
+    OrganizationUpdate,
+    OrganizationWithTeams,
+    Task,
+    TaskCreate,
+    TaskUpdate,
+    Team,
+    TeamCreate,
+    TeamUpdate,
+    TeamWithAgents,
 )
-from agent_templates import template_manager, AgentCategory
+from rag_manager import RAGManager
+
 from hierarchy_endpoints import router as hierarchy_router
 
 # Default IDs for initial setup

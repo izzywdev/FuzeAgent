@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any, Optional
-import json
-import httpx
 import asyncio
+import json
+from typing import Any, Dict, List, Optional
+
+import httpx
 from database import DatabaseManager
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/hierarchy", tags=["hierarchy"])
 

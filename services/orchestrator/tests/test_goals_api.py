@@ -2,24 +2,25 @@
 Comprehensive test coverage for Goals Management API endpoints
 """
 
-import pytest
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.orchestrator.main import app
+import pytest
+from fastapi.testclient import TestClient
+
+from services.orchestrator.goal_conversation_service import (
+    ConversationStatus,
+    ConversationType,
+)
+from services.orchestrator.goal_tracking_service import DeadlineRisk, RiskLevel
 from services.orchestrator.goals_management_service import (
-    GoalType,
     GoalStatus,
+    GoalType,
     OrganizationGoal,
 )
-from services.orchestrator.goal_conversation_service import (
-    ConversationType,
-    ConversationStatus,
-)
-from services.orchestrator.goal_tracking_service import RiskLevel, DeadlineRisk
+from services.orchestrator.main import app
 
 # Test client
 client = TestClient(app)

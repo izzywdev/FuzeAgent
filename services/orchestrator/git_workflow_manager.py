@@ -16,10 +16,11 @@ import logging
 import os
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
+
 from cryptography.fernet import Fernet
 
 logger = logging.getLogger(__name__)

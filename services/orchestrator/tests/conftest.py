@@ -4,14 +4,14 @@ Pytest configuration and fixtures for FuzeAgent tests
 
 import asyncio
 import os
-import pytest
 import tempfile
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
 
 import asyncpg
-from fastapi.testclient import TestClient
+import pytest
 from faker import Faker
+from fastapi.testclient import TestClient
 
 # Set test environment
 os.environ["TESTING"] = "1"
@@ -22,12 +22,13 @@ os.environ["ANTHROPIC_API_KEY"] = "test-api-key"
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy1sb25n"
 
+from a2a_protocol import A2AProtocolManager
+from database import DatabaseManager
+
 # Import after setting environment variables
 from main_with_hierarchy import app
-from database import DatabaseManager
-from rag_manager import RAGManager
-from a2a_protocol import A2AProtocolManager
 from migration_manager import MigrationManager
+from rag_manager import RAGManager
 
 fake = Faker()
 

@@ -4,12 +4,13 @@ Database Migration Runner for FuzeAgent Autonomous Execution
 """
 
 import asyncio
+import logging
 import os
 import sys
 from pathlib import Path
-import asyncpg
-import logging
 from typing import List
+
+import asyncpg
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

@@ -4,15 +4,16 @@ Database Migration Manager for FuzeAgent
 Handles schema migrations, data seeding, and version tracking.
 """
 
-import asyncpg
+import importlib.util
+import logging
 import os
 import re
-import importlib.util
 from contextlib import asynccontextmanager
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import asyncpg
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

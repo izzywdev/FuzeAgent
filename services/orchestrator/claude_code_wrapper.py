@@ -1,17 +1,17 @@
-from crewai.tools import BaseTool
-from typing import Type, Any, Optional, Dict, List
-from pydantic import BaseModel, Field
+import asyncio
+import json
+import os
 import subprocess
 import tempfile
-import os
-import json
-import asyncio
 import time
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Type
 
 # Import Anthropic SDK for real Claude integration
 import anthropic
 from anthropic import Anthropic
+from crewai.tools import BaseTool
+from pydantic import BaseModel, Field
 
 # Import conversation manager for full chat tracking
 from .conversation_manager import ConversationManager, MessageType

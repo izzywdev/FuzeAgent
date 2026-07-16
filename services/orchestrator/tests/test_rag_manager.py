@@ -2,8 +2,9 @@
 Test cases for RAG Manager functionality
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from rag_manager import RAGManager
 
 

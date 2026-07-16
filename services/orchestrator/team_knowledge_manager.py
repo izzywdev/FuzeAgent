@@ -9,20 +9,20 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
 from .organization_rag_manager import (
-    OrganizationRAGManager,
-    KnowledgeCategory,
     ContentType,
+    KnowledgeCategory,
+    KnowledgeSearchResult,
+    OrganizationRAGManager,
     SourceType,
     VisibilityLevel,
-    KnowledgeSearchResult,
 )
 
 logger = logging.getLogger(__name__)

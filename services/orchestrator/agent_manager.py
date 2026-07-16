@@ -1,20 +1,23 @@
-from crewai import Crew, Agent, Task
-from typing import Dict, List, Optional, Any
 import asyncio
-import docker
+import logging
 import os
 import uuid
-import logging
-from .claude_code_wrapper import ClaudeCodeWrapper
-from .database import get_db_connection, DatabaseManager
-from .sandbox_manager import AgentSandboxManager
-from .git_workflow_manager import GitWorkflowManager
+from typing import Any, Dict, List, Optional
+
+import docker
+from crewai import Agent, Crew, Task
+
 from .agent_expertise_tracker import AgentExpertiseTracker
+from .claude_code_wrapper import ClaudeCodeWrapper
+from .database import DatabaseManager, get_db_connection
+from .git_workflow_manager import GitWorkflowManager
+from .sandbox_manager import AgentSandboxManager
 
 logger = logging.getLogger(__name__)
 
 try:
-    from kubernetes import client as k8s_client, config as k8s_config
+    from kubernetes import client as k8s_client
+    from kubernetes import config as k8s_config
     from kubernetes.client.rest import ApiException
 
     _K8S_AVAILABLE = True

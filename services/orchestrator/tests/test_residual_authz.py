@@ -41,17 +41,16 @@ os.environ["CORS_ALLOW_ORIGINS"] = "http://localhost:3000,http://localhost:3031"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import auth as auth_module  # noqa: E402
 from fastapi import Body, Depends, FastAPI, Path, WebSocket  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from jose import jwt  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
-import auth as auth_module  # noqa: E402
-
 importlib.reload(auth_module)
-from auth import (  # noqa: E402
+from auth import (
     CurrentUser,
-    authenticate_websocket,
+    authenticate_websocket,  # noqa: E402
     get_current_user,
     require_org_access,
     require_user,

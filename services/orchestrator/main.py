@@ -1,50 +1,53 @@
+import asyncio
+import json
+import logging
+import os
+from collections import defaultdict
+from contextlib import asynccontextmanager
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+import jwt
 from fastapi import (
-    FastAPI,
-    WebSocket,
-    WebSocketDisconnect,
-    HTTPException,
-    Query,
-    Path,
     Body,
-    UploadFile,
+    Depends,
+    FastAPI,
     File,
     Form,
-    Depends,
+    HTTPException,
+    Path,
+    Query,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
-from collections import defaultdict
-import asyncio
-import json
-import os
-import logging
-import jwt
-from datetime import datetime, date
-from decimal import Decimal
-from contextlib import asynccontextmanager
+
+from hierarchy_endpoints import router as hierarchy_router
+
 from .agent_manager import AgentManager
-from .task_queue import TaskQueue
+from .container_manager import ContainerConfig, ContainerStatus, container_manager
 from .context_service import ContextService
+from .database import get_db_connection
+from .knowledge_manager import DocumentMetadata, knowledge_manager
+from .rag_integration import RAGContext, rag_system
 from .sandbox_manager import AgentSandboxManager
 from .task_execution_engine import TaskExecutionEngine
-from .database import get_db_connection
-from .knowledge_manager import knowledge_manager, DocumentMetadata
-from .container_manager import container_manager, ContainerStatus, ContainerConfig
-from .rag_integration import rag_system, RAGContext
+from .task_queue import TaskQueue
 from .websocket_manager import (
-    websocket_manager,
-    WebSocketUpdate,
     UpdateType,
+    WebSocketUpdate,
     notify_agent_status_change,
-    notify_task_progress,
     notify_container_status_change,
     notify_knowledge_update,
+    notify_task_progress,
+    websocket_manager,
 )
-from hierarchy_endpoints import router as hierarchy_router
 
 logger = logging.getLogger(__name__)
 
@@ -408,12 +411,12 @@ async def lifespan(app: FastAPI):
 
     # Initialize knowledge management system
     try:
-        from .organization_rag_manager import OrganizationRAGManager
-        from .team_knowledge_manager import TeamKnowledgeManager
-        from .knowledge_propagation_engine import KnowledgePropagationEngine
-        from .knowledge_notification_service import KnowledgeNotificationService
-        from .task_knowledge_extractor import TaskKnowledgeExtractor
         from .context_enhancement_service import ContextEnhancementService
+        from .knowledge_notification_service import KnowledgeNotificationService
+        from .knowledge_propagation_engine import KnowledgePropagationEngine
+        from .organization_rag_manager import OrganizationRAGManager
+        from .task_knowledge_extractor import TaskKnowledgeExtractor
+        from .team_knowledge_manager import TeamKnowledgeManager
 
         app.state.org_rag_manager = OrganizationRAGManager(database_url)
         await app.state.org_rag_manager.initialize()
@@ -455,10 +458,10 @@ async def lifespan(app: FastAPI):
 
     # Initialize goals management system
     try:
-        from .goals_management_service import GoalsManagementService
-        from .milestone_task_engine import MilestoneTaskEngine
         from .goal_conversation_service import GoalConversationService
         from .goal_tracking_service import GoalTrackingService
+        from .goals_management_service import GoalsManagementService
+        from .milestone_task_engine import MilestoneTaskEngine
 
         app.state.goals_service = GoalsManagementService(database_url)
         await app.state.goals_service.initialize()
@@ -2418,7 +2421,7 @@ async def store_provider_credentials(
 ):
     """Store encrypted API credentials for a model provider at organization level"""
     try:
-        from .model_configuration import model_config_manager, ModelProvider
+        from .model_configuration import ModelProvider, model_config_manager
 
         # Validate provider
         try:
@@ -2468,9 +2471,9 @@ async def get_available_models(
     """Get available AI models with provider credential validation"""
     try:
         from .model_configuration import (
-            model_config_manager,
-            ModelProvider,
             ModelCapability,
+            ModelProvider,
+            model_config_manager,
         )
 
         provider_filter = None
@@ -2523,7 +2526,7 @@ async def configure_agent_model(
 ):
     """Configure model settings for an AI agent"""
     try:
-        from .model_configuration import model_config_manager, AgentModelConfig
+        from .model_configuration import AgentModelConfig, model_config_manager
 
         agent_config = AgentModelConfig(
             agent_id=agent_id,
@@ -2678,7 +2681,7 @@ async def get_model_recommendations(
 ):
     """Get model recommendations based on task capabilities and cost constraints"""
     try:
-        from .model_configuration import model_config_manager, ModelCapability
+        from .model_configuration import ModelCapability, model_config_manager
 
         # Parse capabilities
         try:
@@ -2908,9 +2911,9 @@ async def add_organizational_knowledge(
     """Add knowledge to organization-level knowledge base"""
     try:
         from .organization_rag_manager import (
-            OrganizationRAGManager,
             ContentType,
             KnowledgeCategory,
+            OrganizationRAGManager,
             SourceType,
         )
 
@@ -4327,7 +4330,7 @@ async def get_goal_conversations(
 ):
     """Get conversations for a goal"""
     try:
-        from .goal_conversation_service import ConversationType, ConversationStatus
+        from .goal_conversation_service import ConversationStatus, ConversationType
 
         conv_type = ConversationType(conversation_type) if conversation_type else None
         conv_status = ConversationStatus(status) if status else None

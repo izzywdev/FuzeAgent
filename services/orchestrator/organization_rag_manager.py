@@ -9,10 +9,10 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union
-from dataclasses import dataclass, asdict
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import asyncpg
 import numpy as np

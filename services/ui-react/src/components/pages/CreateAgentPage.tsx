@@ -78,20 +78,33 @@ export function CreateAgentPage() {
       .then(res => res.json())
       .then(data => {
         if (data && data.templates && Array.isArray(data.templates)) {
-          // Transform API response to match UI interface
-          const transformedTemplates = data.templates.map((template: any) => ({
-            id: template.template_id,
-            name: template.name,
-            description: template.description,
-            type: template.category || 'developer',
-            defaultConfig: {
-              model: template.default_model || 'claude-sonnet-4-20250514',
-              temperature: template.default_temperature || 0.7,
-              tools: template.tools || [],
-              goal: template.default_goal || '',
-              backstory: template.default_backstory || ''
+          // Transform API response to match UI interface — handle both snake_case API
+          // format and camelCase format (used by test mocks / pre-transformed responses)
+          const transformedTemplates = data.templates.map((template: any) => {
+            if (template.defaultConfig) {
+              // Already in UI format
+              return {
+                id: template.id || template.template_id,
+                name: template.name,
+                description: template.description,
+                type: template.type || template.category || 'developer',
+                defaultConfig: template.defaultConfig
+              }
             }
-          }))
+            return {
+              id: template.template_id || template.id,
+              name: template.name,
+              description: template.description,
+              type: template.category || template.type || 'developer',
+              defaultConfig: {
+                model: template.default_model || 'claude-sonnet-4-20250514',
+                temperature: template.default_temperature || 0.7,
+                tools: template.tools || [],
+                goal: template.default_goal || '',
+                backstory: template.default_backstory || ''
+              }
+            }
+          })
           setTemplates(transformedTemplates)
         } else if (Array.isArray(data)) {
           setTemplates(data)

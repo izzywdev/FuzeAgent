@@ -9,17 +9,17 @@ task type, agent capabilities, and historical success patterns.
 import asyncio
 import json
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
 from .organization_rag_manager import (
-    OrganizationRAGManager,
-    KnowledgeCategory,
     ContentType,
+    KnowledgeCategory,
     KnowledgeSearchResult,
+    OrganizationRAGManager,
 )
 from .team_knowledge_manager import TeamKnowledgeManager, TeamKnowledgeSearchResult
 
