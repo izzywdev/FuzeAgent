@@ -133,7 +133,11 @@ class CurrentUser:
         # See packages/auth/src/types.ts in FuzeFront for the contract.
         # ------------------------------------------------------------------
         self.id: str = str(
-            claims.get("sub") or claims.get("userId") or claims.get("user_id") or claims.get("uid") or ""
+            claims.get("sub")
+            or claims.get("userId")
+            or claims.get("user_id")
+            or claims.get("uid")
+            or ""
         )
         # user_id alias kept for backward compat
         self.user_id: str = self.id
@@ -169,7 +173,7 @@ class CurrentUser:
             r.lower() in ("service", "service-account", "system") for r in self.roles
         )
         # Standard JWT claims aligned with @fuzefront/auth Identity
-        self.auth_mode: str = claims.get("authMode", "legacy-hs256")
+        self.auth_mode: str = claims.get("authMode", "legacy-hs256")  # gitleaks:allow
         self.issued_at: Optional[int] = claims.get("iat")
         self.expires_at: Optional[int] = claims.get("exp")
         self.issuer: Optional[str] = claims.get("iss")

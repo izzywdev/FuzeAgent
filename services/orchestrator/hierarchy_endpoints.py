@@ -3,8 +3,9 @@ import json
 from typing import Any, Dict, List, Optional
 
 import httpx
-from database import DatabaseManager
 from fastapi import APIRouter, HTTPException
+
+from database import DatabaseManager
 
 router = APIRouter(prefix="/hierarchy", tags=["hierarchy"])
 

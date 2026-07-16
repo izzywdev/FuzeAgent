@@ -43,7 +43,7 @@ try {
 
 export function isInPlatform(): boolean {
   if (typeof window === 'undefined') return false
-  if ((window as Record<string, unknown>).__FUZEFRONT__) return true
+  if ((window as unknown as Record<string, unknown>).__FUZEFRONT__) return true
   if (sdkReady && sdk?.isInPlatform) {
     try {
       return sdk.isInPlatform()
@@ -77,7 +77,7 @@ export function usePlatformUser(): PlatformUser | null {
   // Read from the window sentinel that PlatformProvider populates.
   if (!isInPlatform()) return null
   try {
-    const sentinel = (window as Record<string, unknown>).__FUZEFRONT__ as
+    const sentinel = (window as unknown as Record<string, unknown>).__FUZEFRONT__ as
       | { user?: PlatformUser }
       | undefined
     return sentinel?.user ?? null
