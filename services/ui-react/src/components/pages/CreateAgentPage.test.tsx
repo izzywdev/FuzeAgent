@@ -203,7 +203,7 @@ describe('CreateAgentPage', () => {
       // Should call API with correct data
       await waitFor(() => {
         const agentCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(
-          ([url]: [string]) => /\/agents$/.test(url)
+          (call: unknown[]) => /\/agents$/.test(call[0] as string)
         )
         expect(agentCall).toBeDefined()
         const [, options] = agentCall!
