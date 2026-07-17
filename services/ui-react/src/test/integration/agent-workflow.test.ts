@@ -16,8 +16,6 @@ describe('Agent Workflow Integration Tests', () => {
   describe('Agent Creation Workflow', () => {
     it('should complete full agent creation flow', async () => {
       // Mock API responses in sequence
-      mockFetch.success(mockApiResponses.teams) // Load teams
-      mockFetch.success(mockApiResponses.templates) // Load templates
       mockFetch.success(mockApiResponses.createAgent) // Create agent
       mockFetch.success(mockApiResponses.agents[0]) // Get created agent
 

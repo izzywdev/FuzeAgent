@@ -4,12 +4,13 @@ Database Migration Runner for FuzeAgent Autonomous Execution
 """
 
 import asyncio
+import logging
 import os
 import sys
 from pathlib import Path
-import asyncpg
-import logging
 from typing import List
+
+import asyncpg
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -23,15 +24,13 @@ class MigrationRunner:
 
     async def create_migrations_table(self, conn):
         """Create migrations tracking table if it doesn't exist"""
-        await conn.execute(
-            """
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 version VARCHAR(255) PRIMARY KEY,
                 filename VARCHAR(255) NOT NULL,
                 applied_at TIMESTAMP DEFAULT NOW()
             )
-        """
-        )
+        """)
 
     async def get_applied_migrations(self, conn) -> List[str]:
         """Get list of already applied migrations"""

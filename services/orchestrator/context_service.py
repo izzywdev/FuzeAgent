@@ -1,8 +1,10 @@
 import asyncio
 import json
 from typing import Dict, List, Optional
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
 from .database import get_db_connection
 
 

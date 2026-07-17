@@ -12,8 +12,7 @@ async def upgrade(conn):
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
 
     # Create organizations table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE organizations (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name VARCHAR(255) NOT NULL,
@@ -22,12 +21,10 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
 
     # Create teams table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE teams (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -38,12 +35,10 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
 
     # Create agents table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE agents (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -56,12 +51,10 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
 
     # Create agent interactions table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE interactions (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             agent_id UUID REFERENCES agents(id),
@@ -70,12 +63,10 @@ async def upgrade(conn):
             metadata JSONB,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
 
     # Create tasks table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE tasks (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             title VARCHAR(255) NOT NULL,
@@ -88,12 +79,10 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             completed_at TIMESTAMP
         );
-    """
-    )
+    """)
 
     # Create agent hierarchy table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE agent_hierarchy (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             parent_id UUID REFERENCES agents(id),
@@ -101,8 +90,7 @@ async def upgrade(conn):
             relationship_type VARCHAR(50),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
 
     print("✅ Created all base tables")
 

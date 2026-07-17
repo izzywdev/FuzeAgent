@@ -11,8 +11,7 @@ async def upgrade(conn):
     """Apply the migration - Add RAG chat history tables"""
 
     # Agent Conversations Table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS agent_conversations (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -25,13 +24,11 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
     print("✅ Created agent_conversations table")
 
     # Conversation Summaries Table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS conversation_summaries (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -45,13 +42,11 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
     print("✅ Created conversation_summaries table")
 
     # Knowledge Base Table for RAG
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS agent_knowledge_base (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
@@ -68,13 +63,11 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
     print("✅ Created agent_knowledge_base table")
 
     # Chat Sessions Table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS chat_sessions (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -91,72 +84,54 @@ async def upgrade(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
-    """
-    )
+    """)
     print("✅ Created chat_sessions table")
 
     # Create indexes for performance
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_agent_conversations_agent_session 
         ON agent_conversations(agent_id, session_id, created_at DESC);
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_agent_conversations_embedding 
         ON agent_conversations USING ivfflat (embedding vector_cosine_ops);
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_conversation_summaries_agent 
         ON conversation_summaries(agent_id, created_at DESC);
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_conversation_summaries_embedding 
         ON conversation_summaries USING ivfflat (summary_embedding vector_cosine_ops);
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_knowledge_base_agent 
         ON agent_knowledge_base(agent_id, content_type, created_at DESC);
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_knowledge_base_embedding 
         ON agent_knowledge_base USING ivfflat (embedding vector_cosine_ops);
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_knowledge_base_tags 
         ON agent_knowledge_base USING GIN(tags);
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_chat_sessions_agent 
         ON chat_sessions(agent_id, status, last_activity DESC);
-    """
-    )
+    """)
 
     print("✅ Created performance indexes for RAG system")
 
     # Add triggers for automatic timestamp updates
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE OR REPLACE FUNCTION update_updated_at_column()
         RETURNS TRIGGER AS $$
         BEGIN
@@ -164,8 +139,7 @@ async def upgrade(conn):
             RETURN NEW;
         END;
         $$ language 'plpgsql';
-    """
-    )
+    """)
 
     for table in [
         "agent_conversations",
@@ -173,34 +147,28 @@ async def upgrade(conn):
         "agent_knowledge_base",
         "chat_sessions",
     ]:
-        await conn.execute(
-            f"""
+        await conn.execute(f"""
             DROP TRIGGER IF EXISTS update_{table}_updated_at ON {table};
             CREATE TRIGGER update_{table}_updated_at
                 BEFORE UPDATE ON {table}
                 FOR EACH ROW
                 EXECUTE FUNCTION update_updated_at_column();
-        """
-        )
+        """)
 
     print("✅ Created automatic timestamp update triggers")
 
     # Add foreign key constraint for session references
-    await conn.execute(
-        """
+    await conn.execute("""
         ALTER TABLE agent_conversations 
         ADD CONSTRAINT fk_conversations_session 
         FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE;
-    """
-    )
+    """)
 
-    await conn.execute(
-        """
+    await conn.execute("""
         ALTER TABLE conversation_summaries 
         ADD CONSTRAINT fk_summaries_session 
         FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE;
-    """
-    )
+    """)
 
     print("✅ Added foreign key constraints for session references")
 

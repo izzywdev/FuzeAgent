@@ -2,15 +2,17 @@
 WebSocket Manager for FuzeAgent
 Handles real-time updates for agents, tasks, containers, and system notifications
 """
+
 import asyncio
 import json
 import logging
-from typing import Dict, Set, Optional, Any, List, Callable
+import weakref
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field
+from typing import Any, Callable, Dict, List, Optional, Set
+
 from fastapi import WebSocket, WebSocketDisconnect
-import weakref
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -453,9 +455,11 @@ async def notify_knowledge_update(
         agent_id=agent_id,
         data={
             "document_title": document_title,
-            "message": f"Knowledge base updated: {document_title}"
-            if document_title
-            else "Knowledge base updated",
+            "message": (
+                f"Knowledge base updated: {document_title}"
+                if document_title
+                else "Knowledge base updated"
+            ),
         },
     )
 

@@ -10,10 +10,10 @@ import asyncio
 import json
 import logging
 import statistics
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Set
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from collections import defaultdict, Counter
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import asyncpg
 import numpy as np
@@ -721,9 +721,9 @@ class KnowledgeAnalyticsService:
 
         return {
             "sharing_rate": sharing_rate,
-            "total_propagations": sharing_stats["total_propagations"]
-            if sharing_stats
-            else 0,
+            "total_propagations": (
+                sharing_stats["total_propagations"] if sharing_stats else 0
+            ),
             "avg_confidence": sharing_stats["avg_confidence"] if sharing_stats else 0.0,
         }
 

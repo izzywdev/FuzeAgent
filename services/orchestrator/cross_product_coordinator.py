@@ -3,7 +3,7 @@ Cross-Product Coordination Service for WCG Multi-Product Environment
 
 This service manages coordination protocols between different products in the WCG ecosystem:
 - FuzeAgent (AI team orchestration)
-- FuzeFront (Frontend platform)  
+- FuzeFront (Frontend platform)
 - HubHit (Admin portals)
 - DeployAI (AI deployment tools)
 - And other WCG products
@@ -15,10 +15,10 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import asyncpg
 
@@ -369,13 +369,11 @@ class CrossProductCoordinator:
         # Add relevant agents based on coordination type
         try:
             async with self.db_pool.acquire() as conn:
-                agents = await conn.fetch(
-                    """
+                agents = await conn.fetch("""
                     SELECT id FROM agents 
                     WHERE type IN ('executive', 'manager') 
                     AND status = 'active'
-                """
-                )
+                """)
                 stakeholders.update([str(agent["id"]) for agent in agents])
         except Exception as e:
             logger.error(f"Error identifying stakeholders: {e}")
@@ -511,9 +509,11 @@ class CrossProductCoordinator:
                 """,
                     request.id,
                     request.status.value,
-                    json.dumps(request.resolution_plan)
-                    if request.resolution_plan
-                    else None,
+                    (
+                        json.dumps(request.resolution_plan)
+                        if request.resolution_plan
+                        else None
+                    ),
                     request.resolved_at,
                     request.updated_at,
                 )
