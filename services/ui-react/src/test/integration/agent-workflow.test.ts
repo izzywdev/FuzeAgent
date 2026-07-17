@@ -8,9 +8,7 @@ import { mockApiResponses, mockFetch } from '../utils'
 
 describe('Agent Workflow Integration Tests', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    // Reset fetch mock
-    vi.mocked(fetch).mockClear()
+    vi.resetAllMocks()
   })
 
   describe('Agent Creation Workflow', () => {

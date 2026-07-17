@@ -40,7 +40,7 @@ afterEach(() => {
 // Cleanup after each test case
 afterEach(() => {
   cleanup()
-  vi.clearAllMocks()
+  vi.resetAllMocks()
 })
 
 // Mock environment variables
