@@ -3,7 +3,7 @@
   "class": "oss-public",
   "tier": "product",
   "expert": "fuzeagent-expert",
-  "baselineRef": "main",
+  "baselineRef": "v1",
   "agents": [
     "fuzeagent-expert",
     "contract-designer",
