@@ -1,0 +1,70 @@
+# Self-hosted Managed-Agents worker for the FuzeInfra devops environment.
+#
+# Runs the agent's tools inside our cluster/network, holding the real credentials.
+# Prod is GitOps under ArgoCD selfHeal — do NOT kubectl-apply this by hand on prod;
+# wire it into helm/fuzeinfra (or a dedicated Argo Application) and let Argo sync.
+# Secrets MUST be delivered as SealedSecrets (see scripts/seal-secret.sh), never
+# committed in plaintext.
+#
+# Required secret keys:
+#   agent-worker-secret:  ANTHROPIC_ENVIRONMENT_ID, ANTHROPIC_ENVIRONMENT_KEY
+#   devops-cluster-access: config           (a SCOPED-RBAC kubeconfig, not admin)
+#   devops-github:         GH_TOKEN         (fine-scoped PAT / GitHub App token)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-worker-devops
+  namespace: fuzeinfra
+  labels:
+    app.kubernetes.io/name: agent-worker
+    app.kubernetes.io/part-of: agent-templates
+    fuzeinfra.io/role: devops
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-worker
+        fuzeinfra.io/role: devops
+    spec:
+      # A ServiceAccount with a SCOPED Role (read + gitops-safe verbs), not admin.
+      # The guard shims are a backstop, not the primary control — RBAC is.
+      serviceAccountName: agent-worker-devops
+      containers:
+        - name: worker
+          image: ghcr.io/izzywdev/fuzeinfra/agent-worker:dev # bump via CI/release
+          imagePullPolicy: IfNotPresent
+          command: ["/usr/local/bin/run-worker.sh"]
+          env:
+            - name: ANTHROPIC_ENVIRONMENT_ID
+              valueFrom: { secretKeyRef: { name: agent-worker-secret, key: ANTHROPIC_ENVIRONMENT_ID } }
+            - name: ANTHROPIC_ENVIRONMENT_KEY
+              valueFrom: { secretKeyRef: { name: agent-worker-secret, key: ANTHROPIC_ENVIRONMENT_KEY } }
+            - name: KUBECONFIG
+              value: /var/run/devops/kube/config
+            - name: GH_TOKEN
+              valueFrom: { secretKeyRef: { name: devops-github, key: GH_TOKEN } }
+            - name: WORKER_WORKDIR
+              value: /workspace
+          volumeMounts:
+            - name: kubeconfig
+              mountPath: /var/run/devops/kube
+              readOnly: true
+            - name: workspace
+              mountPath: /workspace
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+      volumes:
+        - name: kubeconfig
+          secret:
+            secretName: devops-cluster-access
+            items: [{ key: config, path: config }]
+        - name: workspace
+          emptyDir: {}

@@ -1,0 +1,78 @@
+# Handoff MCP server — the agent-to-agent orchestration carrier.
+#
+# Prod is GitOps under ArgoCD selfHeal — do NOT kubectl-apply by hand on prod; wire
+# this into helm/fuzeinfra (or a dedicated Argo Application) and let Argo sync.
+#
+# Runtime inputs:
+#   Secret  handoff-mcp-secret   -> ANTHROPIC_API_KEY   (SealedSecret; scripts/seal-secret.sh)
+#   ConfigMap handoff-state      -> agent-ids.json, vault-ids.json, memory-ids.json,
+#                                   environment-ids.json
+# The ConfigMap is produced in CI: check out the repo, run the sync scripts against
+# the workspace (sync_environments -> sync_agents -> sync_vaults -> sync_memory), then
+#   kubectl create configmap handoff-state --from-file=agent-templates/sync/.state \
+#     --dry-run=client -o yaml > handoff-state.configmap.yaml   # commit -> Argo syncs
+# The ids are NOT secrets (agent/env/vault/memory ids, not tokens), so committing them
+# is fine. Rotate creds in the vault (sync_vaults) — no image/config change needed.
+#
+# HANDOFF_MCP_URL for the role agents = http://handoff-mcp.fuzeinfra.svc.cluster.local:8000/mcp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: handoff-mcp
+  namespace: fuzeinfra
+  labels:
+    app.kubernetes.io/name: handoff-mcp
+    app.kubernetes.io/part-of: agent-templates
+spec:
+  selector:
+    app.kubernetes.io/name: handoff-mcp
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: handoff-mcp
+  namespace: fuzeinfra
+  labels:
+    app.kubernetes.io/name: handoff-mcp
+    app.kubernetes.io/part-of: agent-templates
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: handoff-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: handoff-mcp
+    spec:
+      containers:
+        - name: handoff-mcp
+          image: ghcr.io/izzywdev/fuzeinfra/agent-handoff:dev # bump via CI/release
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: ANTHROPIC_API_KEY
+              valueFrom: { secretKeyRef: { name: handoff-mcp-secret, key: ANTHROPIC_API_KEY } }
+            - name: FUZE_STATE_DIR
+              value: /state
+          volumeMounts:
+            - name: state
+              mountPath: /state
+              readOnly: true
+          readinessProbe:
+            tcpSocket: { port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+      volumes:
+        - name: state
+          configMap:
+            name: handoff-state
