@@ -16,10 +16,11 @@ import logging
 import os
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
+
 from cryptography.fernet import Fernet
 
 logger = logging.getLogger(__name__)
@@ -75,9 +76,7 @@ class GitWorkflowManager:
         self.task_id = task_id
         self.repo_url = repo_settings.get("repository_url")
         self.default_branch = repo_settings.get("default_branch", "main")
-        self.workspace_path = repo_settings.get(
-            "workspace_path", f"/workspaces/{task_id}"
-        )
+        self.workspace_path = repo_settings.get("workspace_path", f"/workspaces/{task_id}")
         self.auto_create_pr = repo_settings.get("auto_create_pr", True)
         self.require_review = repo_settings.get("require_review", True)
 
@@ -86,9 +85,7 @@ class GitWorkflowManager:
         self.git_user_email = f"agent-{agent_id}@fuzeagent.ai"
 
         # Encrypted token handling
-        self.encryption_key = os.environ.get(
-            "FUZE_ENCRYPTION_KEY", Fernet.generate_key()
-        )
+        self.encryption_key = os.environ.get("FUZE_ENCRYPTION_KEY", Fernet.generate_key())
         if isinstance(self.encryption_key, str):
             self.encryption_key = self.encryption_key.encode()
         self.fernet = Fernet(self.encryption_key)
@@ -194,9 +191,7 @@ class GitWorkflowManager:
 
         try:
             # Push to remote
-            await self._run_git_command(
-                ["push", "--set-upstream", "origin", self.feature_branch]
-            )
+            await self._run_git_command(["push", "--set-upstream", "origin", self.feature_branch])
 
             logger.info(f"✅ Pushed branch {self.feature_branch} to remote")
             return True
@@ -205,9 +200,7 @@ class GitWorkflowManager:
             logger.error(f"❌ Failed to push branch: {e.stderr}")
             return False
 
-    async def create_pull_request(
-        self, title: str, description: str, target_branch: Optional[str] = None
-    ) -> Optional[PullRequest]:
+    async def create_pull_request(self, title: str, description: str, target_branch: Optional[str] = None) -> Optional[PullRequest]:
         """Create a pull request using GitHub CLI"""
         if not self.feature_branch:
             raise ValueError("No feature branch for pull request")
@@ -283,18 +276,14 @@ class GitWorkflowManager:
                             commit_hash,
                         ]
                     )
-                    files_changed = [
-                        f.strip() for f in files_result.stdout.split("\n") if f.strip()
-                    ]
+                    files_changed = [f.strip() for f in files_result.stdout.split("\n") if f.strip()]
 
                     commits.append(
                         GitCommit(
                             hash=commit_hash,
                             message=message,
                             author=author,
-                            timestamp=datetime.fromisoformat(
-                                timestamp.replace(" ", "T")
-                            ),
+                            timestamp=datetime.fromisoformat(timestamp.replace(" ", "T")),
                             files_changed=files_changed,
                         )
                     )
@@ -374,9 +363,7 @@ class GitWorkflowManager:
 
                 # Delete remote branch (optional)
                 try:
-                    await self._run_git_command(
-                        ["push", "origin", "--delete", self.feature_branch]
-                    )
+                    await self._run_git_command(["push", "origin", "--delete", self.feature_branch])
                 except subprocess.CalledProcessError:
                     # Remote branch might not exist or already deleted
                     pass
@@ -392,9 +379,7 @@ class GitWorkflowManager:
         """Clone the repository to workspace"""
         # Prepare authenticated URL
         if self.github_token and "github.com" in self.repo_url:
-            auth_url = self.repo_url.replace(
-                "https://github.com/", f"https://{self.github_token}@github.com/"
-            )
+            auth_url = self.repo_url.replace("https://github.com/", f"https://{self.github_token}@github.com/")
         else:
             auth_url = self.repo_url
 
@@ -439,16 +424,12 @@ class GitWorkflowManager:
         except subprocess.CalledProcessError:
             # If rebase fails, create a new branch with timestamp
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            branch_name = (
-                f"feature/agent-{self.agent_id[:8]}-task-{self.task_id[:8]}-{timestamp}"
-            )
+            branch_name = f"feature/agent-{self.agent_id[:8]}-task-{self.task_id[:8]}-{timestamp}"
             await self._run_git_command(["checkout", "-b", branch_name])
 
         return branch_name
 
-    def _build_commit_message(
-        self, message: str, iteration: Optional[int] = None
-    ) -> str:
+    def _build_commit_message(self, message: str, iteration: Optional[int] = None) -> str:
         """Build a descriptive commit message"""
         prefix = "🤖"
         if iteration:
@@ -513,9 +494,7 @@ Generated by FuzeAgent autonomous development system.
                 url=pr_data["url"],
                 branch=pr_data["headRefName"],
                 status=pr_data["state"],
-                created_at=datetime.fromisoformat(
-                    pr_data["createdAt"].replace("Z", "+00:00")
-                ),
+                created_at=datetime.fromisoformat(pr_data["createdAt"].replace("Z", "+00:00")),
             )
 
         except Exception as e:
@@ -534,9 +513,7 @@ Generated by FuzeAgent autonomous development system.
         """Run git command in workspace directory"""
         return await self._run_command(["git"] + args, cwd=self.workspace_path)
 
-    async def _run_command(
-        self, args: List[str], cwd: Optional[str] = None
-    ) -> subprocess.CompletedProcess:
+    async def _run_command(self, args: List[str], cwd: Optional[str] = None) -> subprocess.CompletedProcess:
         """Run shell command asynchronously"""
         process = await asyncio.create_subprocess_exec(
             *args,
@@ -556,9 +533,7 @@ Generated by FuzeAgent autonomous development system.
         )
 
         if result.returncode != 0:
-            raise subprocess.CalledProcessError(
-                result.returncode, args, result.stdout, result.stderr
-            )
+            raise subprocess.CalledProcessError(result.returncode, args, result.stdout, result.stderr)
 
         return result
 

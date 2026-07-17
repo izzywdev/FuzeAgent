@@ -127,31 +127,16 @@ class CurrentUser:
 
     def __init__(self, claims: Dict[str, Any]):
         self.claims = claims
-        self.id: str = str(
-            claims.get("sub") or claims.get("user_id") or claims.get("uid") or ""
-        )
+        self.id: str = str(claims.get("sub") or claims.get("user_id") or claims.get("uid") or "")
         self.email: Optional[str] = claims.get("email")
         # Roles may arrive as a list or a space/comma separated string.
-        self.roles: List[str] = _as_str_list(
-            claims.get("roles") or claims.get("role") or []
-        )
+        self.roles: List[str] = _as_str_list(claims.get("roles") or claims.get("role") or [])
         # Organizations the principal may act on.
-        self.organizations: Set[str] = set(
-            _as_str_list(
-                claims.get("organizations")
-                or claims.get("orgs")
-                or claims.get("org_ids")
-                or ([claims["organization_id"]] if claims.get("organization_id") else [])
-            )
-        )
-        self.is_admin: bool = bool(claims.get("is_admin")) or any(
-            r.lower() in ("admin", "superadmin", "platform-admin") for r in self.roles
-        )
+        self.organizations: Set[str] = set(_as_str_list(claims.get("organizations") or claims.get("orgs") or claims.get("org_ids") or ([claims["organization_id"]] if claims.get("organization_id") else [])))
+        self.is_admin: bool = bool(claims.get("is_admin")) or any(r.lower() in ("admin", "superadmin", "platform-admin") for r in self.roles)
         # A service principal (machine token) used by trusted internal callers,
         # e.g. the migration runner. Identified by a dedicated role/scope.
-        self.is_service: bool = bool(claims.get("is_service")) or any(
-            r.lower() in ("service", "service-account", "system") for r in self.roles
-        )
+        self.is_service: bool = bool(claims.get("is_service")) or any(r.lower() in ("service", "service-account", "system") for r in self.roles)
 
     def can_access_org(self, organization_id: str) -> bool:
         """Object-level check: may this principal act on ``organization_id``?
@@ -237,9 +222,7 @@ def _bearer_from_request(request: Request) -> Optional[str]:
     safe to evaluate in either scope. The standalone ``_bearer_scheme`` is still
     exported for OpenAPI's Authorize button on individual routes.
     """
-    header = request.headers.get("authorization") or request.headers.get(
-        "Authorization"
-    )
+    header = request.headers.get("authorization") or request.headers.get("Authorization")
     if not header:
         return None
     parts = header.split()
@@ -275,10 +258,7 @@ async def get_current_user(
     # Local-dev escape hatch — only when NO verification material is configured.
     # In any prod-like environment a secret/key is set and this never triggers.
     if _AUTH_DISABLED and not _auth_configured():
-        logger.warning(
-            "AUTH_DISABLED is set and no JWT secret/key configured — "
-            "authentication is BYPASSED. This must never happen in production."
-        )
+        logger.warning("AUTH_DISABLED is set and no JWT secret/key configured — " "authentication is BYPASSED. This must never happen in production.")
         return CurrentUser({"sub": "dev-bypass", "is_admin": True})
 
     # Fail closed if auth is not configured in a deployed environment.
@@ -360,9 +340,7 @@ def require_org_access(organization_id: str, user: CurrentUser) -> CurrentUser:
 def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
     """Pull a bearer token from header, subprotocol, or query param."""
     # 1) Authorization header (programmatic clients).
-    auth_header = websocket.headers.get("authorization") or websocket.headers.get(
-        "Authorization"
-    )
+    auth_header = websocket.headers.get("authorization") or websocket.headers.get("Authorization")
     if auth_header:
         parts = auth_header.split()
         if len(parts) == 2 and parts[0].lower() == "bearer" and parts[1]:
@@ -380,9 +358,7 @@ def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
             return items[0]
 
     # 3) Query parameter (last resort; avoid logging full URLs with tokens).
-    return websocket.query_params.get("token") or websocket.query_params.get(
-        "access_token"
-    )
+    return websocket.query_params.get("token") or websocket.query_params.get("access_token")
 
 
 async def authenticate_websocket(websocket: WebSocket) -> Optional[CurrentUser]:
@@ -398,9 +374,7 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[CurrentUser]:
     """
     # Local-dev bypass — only when NO secret/key configured.
     if _AUTH_DISABLED and not _auth_configured():
-        logger.warning(
-            "AUTH_DISABLED set and no JWT material — WS authentication BYPASSED."
-        )
+        logger.warning("AUTH_DISABLED set and no JWT material — WS authentication BYPASSED.")
         return CurrentUser({"sub": "dev-bypass", "is_admin": True})
 
     if not _auth_configured():

@@ -2,24 +2,24 @@
 Comprehensive test coverage for Goals Management API endpoints
 """
 
-import pytest
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.orchestrator.main import app
+import pytest
+from fastapi.testclient import TestClient
+from services.orchestrator.goal_conversation_service import (
+    ConversationStatus,
+    ConversationType,
+)
+from services.orchestrator.goal_tracking_service import DeadlineRisk, RiskLevel
 from services.orchestrator.goals_management_service import (
-    GoalType,
     GoalStatus,
+    GoalType,
     OrganizationGoal,
 )
-from services.orchestrator.goal_conversation_service import (
-    ConversationType,
-    ConversationStatus,
-)
-from services.orchestrator.goal_tracking_service import RiskLevel, DeadlineRisk
+from services.orchestrator.main import app
 
 # Test client
 client = TestClient(app)
@@ -152,13 +152,9 @@ class TestGoalsManagementAPI:
         assert response.status_code == 422  # Validation error
 
     @patch("services.orchestrator.main.app.state.goals_service")
-    def test_list_organization_goals(
-        self, mock_goals_service, sample_organization_goal
-    ):
+    def test_list_organization_goals(self, mock_goals_service, sample_organization_goal):
         """Test listing organization goals"""
-        mock_goals_service.list_organization_goals = AsyncMock(
-            return_value=[sample_organization_goal]
-        )
+        mock_goals_service.list_organization_goals = AsyncMock(return_value=[sample_organization_goal])
 
         response = client.get("/organizations/org-123/goals")
 
@@ -169,13 +165,9 @@ class TestGoalsManagementAPI:
         assert data["goals"][0]["title"] == "Test Goal"
 
     @patch("services.orchestrator.main.app.state.goals_service")
-    def test_list_goals_with_filters(
-        self, mock_goals_service, sample_organization_goal
-    ):
+    def test_list_goals_with_filters(self, mock_goals_service, sample_organization_goal):
         """Test listing goals with status and type filters"""
-        mock_goals_service.list_organization_goals = AsyncMock(
-            return_value=[sample_organization_goal]
-        )
+        mock_goals_service.list_organization_goals = AsyncMock(return_value=[sample_organization_goal])
 
         response = client.get(
             "/organizations/org-123/goals",
@@ -285,9 +277,7 @@ class TestMilestonesAPI:
     @patch("services.orchestrator.main.app.state.goals_service")
     def test_create_task_from_milestone(self, mock_goals_service, sample_task_data):
         """Test creating a task from milestone"""
-        mock_goals_service.create_task_from_milestone = AsyncMock(
-            return_value="task-123"
-        )
+        mock_goals_service.create_task_from_milestone = AsyncMock(return_value="task-123")
 
         response = client.post("/milestones/milestone-123/tasks", json=sample_task_data)
 
@@ -336,14 +326,10 @@ class TestPlanningEngineAPI:
     def test_generate_weekly_tasks(self, mock_engine):
         """Test generating weekly tasks"""
         task_ids = ["task-1", "task-2", "task-3", "task-4"]
-        mock_engine.generate_weekly_tasks_for_milestone = AsyncMock(
-            return_value=task_ids
-        )
+        mock_engine.generate_weekly_tasks_for_milestone = AsyncMock(return_value=task_ids)
 
         focus_areas = ["development", "testing"]
-        response = client.post(
-            "/milestones/milestone-123/generate-weekly-tasks", json=focus_areas
-        )
+        response = client.post("/milestones/milestone-123/generate-weekly-tasks", json=focus_areas)
 
         assert response.status_code == 200
         data = response.json()
@@ -359,14 +345,10 @@ class TestPlanningEngineAPI:
             "marketing": ["marketing-task-1"],
             "sales": ["sales-task-1", "sales-task-2"],
         }
-        mock_engine.generate_cross_functional_tasks = AsyncMock(
-            return_value=functional_tasks
-        )
+        mock_engine.generate_cross_functional_tasks = AsyncMock(return_value=functional_tasks)
 
         target_functions = ["development", "marketing", "sales"]
-        response = client.post(
-            "/goals/goal-123/generate-cross-functional-tasks", json=target_functions
-        )
+        response = client.post("/goals/goal-123/generate-cross-functional-tasks", json=target_functions)
 
         assert response.status_code == 200
         data = response.json()
@@ -384,9 +366,7 @@ class TestConversationsAPI:
         """Test creating a goal conversation"""
         mock_service.create_goal_conversation = AsyncMock(return_value="conv-123")
 
-        response = client.post(
-            "/goals/goal-123/conversations", json=sample_conversation_data
-        )
+        response = client.post("/goals/goal-123/conversations", json=sample_conversation_data)
 
         assert response.status_code == 200
         data = response.json()
@@ -439,9 +419,7 @@ class TestConversationsAPI:
             {"title": "Phase 1", "description": "Initial setup"},
             {"title": "Phase 2", "description": "Implementation"},
         ]
-        mock_service.generate_planning_milestones = AsyncMock(
-            return_value=mock_milestones
-        )
+        mock_service.generate_planning_milestones = AsyncMock(return_value=mock_milestones)
 
         response = client.post("/conversations/conv-123/generate-milestones")
 
@@ -461,9 +439,7 @@ class TestConversationsAPI:
         }
         mock_service.conduct_progress_review = AsyncMock(return_value=mock_review)
 
-        response = client.post(
-            "/conversations/conv-123/conduct-progress-review?review_period_days=30"
-        )
+        response = client.post("/conversations/conv-123/conduct-progress-review?review_period_days=30")
 
         assert response.status_code == 200
         data = response.json()
@@ -477,9 +453,7 @@ class TestConversationsAPI:
             {"id": "action-1", "title": "Review strategy", "status": "pending"},
             {"id": "action-2", "title": "Update timeline", "status": "pending"},
         ]
-        mock_service.extract_action_items_from_conversation = AsyncMock(
-            return_value=mock_action_items
-        )
+        mock_service.extract_action_items_from_conversation = AsyncMock(return_value=mock_action_items)
 
         response = client.post("/conversations/conv-123/extract-action-items")
 
@@ -593,9 +567,7 @@ class TestDashboardsAPI:
             "statistics": {"total_goals": 1, "active_goals": 1},
             "upcoming_deadlines": [],
         }
-        mock_service.get_organization_goals_dashboard = AsyncMock(
-            return_value=mock_dashboard
-        )
+        mock_service.get_organization_goals_dashboard = AsyncMock(return_value=mock_dashboard)
 
         response = client.get("/organizations/org-123/goals-dashboard")
 
@@ -614,9 +586,7 @@ class TestDashboardsAPI:
             "risk_distribution": {"high": 1, "medium": 1, "low": 1},
             "goals_with_risk_assessment": [],
         }
-        mock_service.get_organization_tracking_dashboard = AsyncMock(
-            return_value=mock_dashboard
-        )
+        mock_service.get_organization_tracking_dashboard = AsyncMock(return_value=mock_dashboard)
 
         response = client.get("/organizations/org-123/tracking-dashboard")
 
@@ -685,9 +655,7 @@ class TestGoalsAPIIntegration:
         # Mock service responses
         mock_goals_service.create_goal = AsyncMock(return_value="goal-123")
         mock_conv_service.create_goal_conversation = AsyncMock(return_value="conv-123")
-        mock_engine.generate_goal_execution_plan = AsyncMock(
-            return_value={"goal_id": "goal-123", "milestones": [], "summary": {}}
-        )
+        mock_engine.generate_goal_execution_plan = AsyncMock(return_value={"goal_id": "goal-123", "milestones": [], "summary": {}})
 
         # 1. Create goal
         response = client.post("/organizations/org-123/goals", json=sample_goal_data)
@@ -695,9 +663,7 @@ class TestGoalsAPIIntegration:
         goal_id = response.json()["goal_id"]
 
         # 2. Create conversation
-        response = client.post(
-            f"/goals/{goal_id}/conversations", json=sample_conversation_data
-        )
+        response = client.post(f"/goals/{goal_id}/conversations", json=sample_conversation_data)
         assert response.status_code == 200
         conv_id = response.json()["conversation_id"]
 

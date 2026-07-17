@@ -1,8 +1,10 @@
 import asyncio
 import json
 from typing import Dict, List, Optional
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
 from .database import get_db_connection
 
 
@@ -16,9 +18,7 @@ class ContextService:
         embedding = self.embedding_model.encode(text)
         return embedding.tolist()
 
-    async def store_interaction(
-        self, agent_id: str, content: str, metadata: Dict = None
-    ) -> str:
+    async def store_interaction(self, agent_id: str, content: str, metadata: Dict = None) -> str:
         """Store agent interaction with embedding"""
         embedding = self.generate_embedding(content)
 

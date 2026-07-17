@@ -10,11 +10,11 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, date
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass
-from decimal import Decimal
 from calendar import monthrange
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
@@ -80,9 +80,7 @@ class MilestoneTaskEngine:
         logger.info("Initializing MilestoneTaskEngine")
 
         try:
-            self.pool = await asyncpg.create_pool(
-                self.database_url, min_size=1, max_size=5, command_timeout=60
-            )
+            self.pool = await asyncpg.create_pool(self.database_url, min_size=1, max_size=5, command_timeout=60)
 
             logger.info("MilestoneTaskEngine initialized successfully")
 
@@ -96,9 +94,7 @@ class MilestoneTaskEngine:
             await self.pool.close()
         logger.info("MilestoneTaskEngine closed")
 
-    async def generate_goal_execution_plan(
-        self, goal_id: str, planning_context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    async def generate_goal_execution_plan(self, goal_id: str, planning_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate comprehensive execution plan with milestones and tasks for a goal"""
 
         try:
@@ -115,24 +111,18 @@ class MilestoneTaskEngine:
                     raise ValueError(f"Goal {goal_id} not found")
 
                 # Generate time-based milestone structure
-                milestone_plan = await self._generate_milestone_structure(
-                    goal, planning_context
-                )
+                milestone_plan = await self._generate_milestone_structure(goal, planning_context)
 
                 # Create milestones in database
                 milestone_ids = []
                 for milestone_data in milestone_plan["milestones"]:
-                    milestone_id = await self._create_milestone_from_plan(
-                        goal_id, milestone_data
-                    )
+                    milestone_id = await self._create_milestone_from_plan(goal_id, milestone_data)
                     milestone_ids.append(milestone_id)
 
                     # Generate tasks for each milestone
                     task_ids = []
                     for task_data in milestone_data.get("tasks", []):
-                        task_id = await self._create_task_from_plan(
-                            goal_id, milestone_id, task_data
-                        )
+                        task_id = await self._create_task_from_plan(goal_id, milestone_id, task_data)
                         task_ids.append(task_id)
 
                     milestone_data["generated_task_ids"] = task_ids
@@ -150,10 +140,7 @@ class MilestoneTaskEngine:
                             "execution_plan_generated": True,
                             "plan_generation_date": datetime.now().isoformat(),
                             "milestone_count": len(milestone_ids),
-                            "estimated_task_count": sum(
-                                len(m.get("tasks", []))
-                                for m in milestone_plan["milestones"]
-                            ),
+                            "estimated_task_count": sum(len(m.get("tasks", [])) for m in milestone_plan["milestones"]),
                         }
                     ),
                 )
@@ -169,22 +156,14 @@ class MilestoneTaskEngine:
                     "generated_milestone_ids": milestone_ids,
                     "summary": {
                         "total_milestones": len(milestone_ids),
-                        "estimated_duration_weeks": milestone_plan[
-                            "estimated_duration_weeks"
-                        ],
-                        "complexity_assessment": milestone_plan[
-                            "complexity_assessment"
-                        ],
-                        "recommended_team_size": milestone_plan[
-                            "recommended_team_size"
-                        ],
+                        "estimated_duration_weeks": milestone_plan["estimated_duration_weeks"],
+                        "complexity_assessment": milestone_plan["complexity_assessment"],
+                        "recommended_team_size": milestone_plan["recommended_team_size"],
                     },
                     "generated_at": datetime.now().isoformat(),
                 }
 
-                logger.info(
-                    f"Generated execution plan for goal {goal_id}: {len(milestone_ids)} milestones"
-                )
+                logger.info(f"Generated execution plan for goal {goal_id}: {len(milestone_ids)} milestones")
 
                 return execution_plan
 
@@ -226,35 +205,22 @@ class MilestoneTaskEngine:
 
                 while current_date <= end_date:
                     # Calculate monthly target (progressive increase)
-                    months_total = (
-                        (end_date.year - start_date.year) * 12
-                        + (end_date.month - start_date.month)
-                        + 1
-                    )
+                    months_total = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month) + 1
 
                     # Use progressive growth curve for revenue goals
-                    if (
-                        goal["goal_type"] == "business"
-                        and "revenue" in goal["title"].lower()
-                    ):
-                        monthly_target = self._calculate_progressive_revenue_target(
-                            target_value, month_counter, months_total
-                        )
+                    if goal["goal_type"] == "business" and "revenue" in goal["title"].lower():
+                        monthly_target = self._calculate_progressive_revenue_target(target_value, month_counter, months_total)
                     else:
                         # Linear progression for other goals
                         monthly_target = (target_value * month_counter) / months_total
 
                     # Create milestone
-                    milestone_title = (
-                        f"Month {month_counter}: {goal['title']} Milestone"
-                    )
+                    milestone_title = f"Month {month_counter}: {goal['title']} Milestone"
                     milestone_description = f"Achieve {monthly_target} {goal['target_unit']} by end of month {month_counter}"
 
                     # Get last day of month
                     last_day = monthrange(current_date.year, current_date.month)[1]
-                    milestone_date = date(
-                        current_date.year, current_date.month, last_day
-                    )
+                    milestone_date = date(current_date.year, current_date.month, last_day)
 
                     milestone_id = await conn.execute(
                         """
@@ -297,15 +263,11 @@ class MilestoneTaskEngine:
                     if current_date.month == 12:
                         current_date = date(current_date.year + 1, 1, 1)
                     else:
-                        current_date = date(
-                            current_date.year, current_date.month + 1, 1
-                        )
+                        current_date = date(current_date.year, current_date.month + 1, 1)
 
                     month_counter += 1
 
-                logger.info(
-                    f"Generated {len(monthly_milestones)} monthly milestones for goal {goal_id}"
-                )
+                logger.info(f"Generated {len(monthly_milestones)} monthly milestones for goal {goal_id}")
 
                 return monthly_milestones
 
@@ -313,9 +275,7 @@ class MilestoneTaskEngine:
             logger.error(f"Error generating monthly milestones for goal {goal_id}: {e}")
             raise
 
-    async def generate_weekly_tasks_for_milestone(
-        self, milestone_id: str, focus_areas: Optional[List[str]] = None
-    ) -> List[str]:
+    async def generate_weekly_tasks_for_milestone(self, milestone_id: str, focus_areas: Optional[List[str]] = None) -> List[str]:
         """Generate weekly task breakdown for a milestone"""
 
         try:
@@ -334,42 +294,28 @@ class MilestoneTaskEngine:
                     raise ValueError(f"Milestone {milestone_id} not found")
 
                 # Calculate weeks available
-                weeks_to_deadline = max(
-                    1, (milestone["target_date"] - date.today()).days // 7
-                )
+                weeks_to_deadline = max(1, (milestone["target_date"] - date.today()).days // 7)
 
                 # Generate task templates based on goal type and milestone
-                task_templates = self._get_task_templates_for_milestone(
-                    milestone["goal_type"], milestone["milestone_type"], focus_areas
-                )
+                task_templates = self._get_task_templates_for_milestone(milestone["goal_type"], milestone["milestone_type"], focus_areas)
 
                 # Create weekly tasks
                 weekly_tasks = []
                 for week_num in range(1, min(weeks_to_deadline + 1, 8)):  # Max 8 weeks
                     for template in task_templates:
-                        if self._should_create_task_for_week(
-                            template, week_num, weeks_to_deadline
-                        ):
-                            task_id = await self._create_weekly_task(
-                                milestone["goal_id"], milestone_id, template, week_num
-                            )
+                        if self._should_create_task_for_week(template, week_num, weeks_to_deadline):
+                            task_id = await self._create_weekly_task(milestone["goal_id"], milestone_id, template, week_num)
                             weekly_tasks.append(task_id)
 
-                logger.info(
-                    f"Generated {len(weekly_tasks)} weekly tasks for milestone {milestone_id}"
-                )
+                logger.info(f"Generated {len(weekly_tasks)} weekly tasks for milestone {milestone_id}")
 
                 return weekly_tasks
 
         except Exception as e:
-            logger.error(
-                f"Error generating weekly tasks for milestone {milestone_id}: {e}"
-            )
+            logger.error(f"Error generating weekly tasks for milestone {milestone_id}: {e}")
             raise
 
-    async def generate_cross_functional_tasks(
-        self, goal_id: str, target_functions: Optional[List[str]] = None
-    ) -> Dict[str, List[str]]:
+    async def generate_cross_functional_tasks(self, goal_id: str, target_functions: Optional[List[str]] = None) -> Dict[str, List[str]]:
         """Generate tasks across different business functions for a goal"""
 
         if target_functions is None:
@@ -397,37 +343,27 @@ class MilestoneTaskEngine:
 
                 for function in target_functions:
                     # Get function-specific task templates
-                    function_templates = self._get_functional_task_templates(
-                        goal["goal_type"], function
-                    )
+                    function_templates = self._get_functional_task_templates(goal["goal_type"], function)
 
                     function_task_ids = []
                     for template in function_templates:
-                        task_id = await self._create_functional_task(
-                            goal_id, function, template
-                        )
+                        task_id = await self._create_functional_task(goal_id, function, template)
                         function_task_ids.append(task_id)
 
                     functional_tasks[function] = function_task_ids
                     self.tasks_generated += len(function_task_ids)
 
-                logger.info(
-                    f"Generated cross-functional tasks for goal {goal_id}: {functional_tasks}"
-                )
+                logger.info(f"Generated cross-functional tasks for goal {goal_id}: {functional_tasks}")
 
                 return functional_tasks
 
         except Exception as e:
-            logger.error(
-                f"Error generating cross-functional tasks for goal {goal_id}: {e}"
-            )
+            logger.error(f"Error generating cross-functional tasks for goal {goal_id}: {e}")
             raise
 
     # Helper methods for milestone and task generation
 
-    async def _generate_milestone_structure(
-        self, goal: Dict[str, Any], planning_context: Optional[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def _generate_milestone_structure(self, goal: Dict[str, Any], planning_context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Generate the overall milestone structure for a goal"""
 
         goal_type = goal["goal_type"]
@@ -460,9 +396,7 @@ class MilestoneTaskEngine:
                 target_deadline,
             )
 
-            milestone_data = self._create_milestone_data(
-                goal, milestone_counter, current_date, next_date, plan_type
-            )
+            milestone_data = self._create_milestone_data(goal, milestone_counter, current_date, next_date, plan_type)
             milestones.append(milestone_data)
 
             current_date = next_date + timedelta(days=1)
@@ -501,21 +435,15 @@ class MilestoneTaskEngine:
         template = self._get_milestone_template(goal_type, milestone_number, plan_type)
 
         milestone_data = {
-            "title": template["title"].format(
-                number=milestone_number, goal_title=goal["title"]
-            ),
-            "description": template["description"].format(
-                number=milestone_number, target_date=target_date.strftime("%B %d, %Y")
-            ),
+            "title": template["title"].format(number=milestone_number, goal_title=goal["title"]),
+            "description": template["description"].format(number=milestone_number, target_date=target_date.strftime("%B %d, %Y")),
             "milestone_type": template["milestone_type"],
             "target_date": target_date.isoformat(),
             "weight_in_goal": template["weight_in_goal"],
             "priority_level": template["priority_level"],
             "success_criteria": template["success_criteria"],
             "deliverables": template["deliverables"],
-            "tasks": self._generate_tasks_for_milestone(
-                goal, template, start_date, target_date
-            ),
+            "tasks": self._generate_tasks_for_milestone(goal, template, start_date, target_date),
         }
 
         return milestone_data
@@ -549,9 +477,7 @@ class MilestoneTaskEngine:
 
         return tasks[: self.max_tasks_per_milestone]
 
-    def _calculate_progressive_revenue_target(
-        self, final_target: Decimal, current_month: int, total_months: int
-    ) -> Decimal:
+    def _calculate_progressive_revenue_target(self, final_target: Decimal, current_month: int, total_months: int) -> Decimal:
         """Calculate progressive revenue target using growth curve"""
 
         # Use exponential growth curve for revenue goals
@@ -562,20 +488,14 @@ class MilestoneTaskEngine:
             base_monthly_target = final_target / (total_months * 2)  # Start lower
         else:
             # Progressive increase with diminishing growth rate
-            base_monthly_target = (final_target * current_month * growth_factor) / (
-                total_months * total_months
-            )
+            base_monthly_target = (final_target * current_month * growth_factor) / (total_months * total_months)
 
         return min(base_monthly_target, final_target)
 
-    def _get_milestone_template(
-        self, goal_type: str, milestone_number: int, plan_type: str
-    ) -> Dict[str, Any]:
+    def _get_milestone_template(self, goal_type: str, milestone_number: int, plan_type: str) -> Dict[str, Any]:
         """Get appropriate milestone template based on goal type and sequence"""
 
-        templates = self.milestone_templates.get(
-            goal_type, self.milestone_templates["business"]
-        )
+        templates = self.milestone_templates.get(goal_type, self.milestone_templates["business"])
 
         # Select template based on milestone position
         if milestone_number == 1:
@@ -615,9 +535,7 @@ class MilestoneTaskEngine:
                             "complexity_level": "medium",
                             "estimated_hours": Decimal("20.0"),
                             "requirements": {"deliverable": "market_research_report"},
-                            "acceptance_criteria": [
-                                {"criteria": "Research report completed and reviewed"}
-                            ],
+                            "acceptance_criteria": [{"criteria": "Research report completed and reviewed"}],
                         },
                         {
                             "title": "Team Structure and Role Definition",
@@ -626,9 +544,7 @@ class MilestoneTaskEngine:
                             "complexity_level": "low",
                             "estimated_hours": Decimal("10.0"),
                             "requirements": {"deliverable": "org_chart"},
-                            "acceptance_criteria": [
-                                {"criteria": "All roles defined and communicated"}
-                            ],
+                            "acceptance_criteria": [{"criteria": "All roles defined and communicated"}],
                         },
                     ],
                 },
@@ -642,9 +558,7 @@ class MilestoneTaskEngine:
                         "kpi_targets_met": True,
                         "growth_metrics_positive": True,
                     },
-                    "deliverables": [
-                        {"type": "metrics", "description": "Growth targets achieved"}
-                    ],
+                    "deliverables": [{"type": "metrics", "description": "Growth targets achieved"}],
                     "task_templates": [
                         {
                             "title": "Marketing Campaign Launch",
@@ -656,11 +570,7 @@ class MilestoneTaskEngine:
                                 "budget_approved": True,
                                 "campaign_strategy": "defined",
                             },
-                            "acceptance_criteria": [
-                                {
-                                    "criteria": "Campaign launched and performing to targets"
-                                }
-                            ],
+                            "acceptance_criteria": [{"criteria": "Campaign launched and performing to targets"}],
                         },
                         {
                             "title": "Sales Process Optimization",
@@ -669,9 +579,7 @@ class MilestoneTaskEngine:
                             "complexity_level": "medium",
                             "estimated_hours": Decimal("25.0"),
                             "requirements": {"crm_system": "configured"},
-                            "acceptance_criteria": [
-                                {"criteria": "Sales conversion improved by 15%"}
-                            ],
+                            "acceptance_criteria": [{"criteria": "Sales conversion improved by 15%"}],
                         },
                     ],
                 },
@@ -699,11 +607,7 @@ class MilestoneTaskEngine:
                             "complexity_level": "medium",
                             "estimated_hours": Decimal("30.0"),
                             "requirements": {"analytics_dashboard": "implemented"},
-                            "acceptance_criteria": [
-                                {
-                                    "criteria": "Performance improved by measurable metrics"
-                                }
-                            ],
+                            "acceptance_criteria": [{"criteria": "Performance improved by measurable metrics"}],
                         }
                     ],
                 },
@@ -734,11 +638,7 @@ class MilestoneTaskEngine:
                             "complexity_level": "high",
                             "estimated_hours": Decimal("35.0"),
                             "requirements": {"requirements_gathered": True},
-                            "acceptance_criteria": [
-                                {
-                                    "criteria": "Architecture design approved by technical team"
-                                }
-                            ],
+                            "acceptance_criteria": [{"criteria": "Architecture design approved by technical team"}],
                         }
                     ],
                 }
@@ -757,9 +657,7 @@ class MilestoneTaskEngine:
                     "complexity_level": "high",
                     "estimated_hours": Decimal("60.0"),
                     "requirements": {"specs_defined": True, "design_approved": True},
-                    "acceptance_criteria": [
-                        {"criteria": "Feature implemented and tested"}
-                    ],
+                    "acceptance_criteria": [{"criteria": "Feature implemented and tested"}],
                 }
             ],
             "marketing": [
@@ -770,9 +668,7 @@ class MilestoneTaskEngine:
                     "complexity_level": "medium",
                     "estimated_hours": Decimal("25.0"),
                     "requirements": {"brand_guidelines": "established"},
-                    "acceptance_criteria": [
-                        {"criteria": "Campaign content published and promoted"}
-                    ],
+                    "acceptance_criteria": [{"criteria": "Campaign content published and promoted"}],
                 }
             ],
             "sales": [
@@ -783,9 +679,7 @@ class MilestoneTaskEngine:
                     "complexity_level": "medium",
                     "estimated_hours": Decimal("20.0"),
                     "requirements": {"crm_configured": True},
-                    "acceptance_criteria": [
-                        {"criteria": "Sales pipeline established with clear stages"}
-                    ],
+                    "acceptance_criteria": [{"criteria": "Sales pipeline established with clear stages"}],
                 }
             ],
         }
@@ -796,9 +690,7 @@ class MilestoneTaskEngine:
     # - Dependency management
     # - Progress tracking integration
 
-    async def _create_milestone_from_plan(
-        self, goal_id: str, milestone_data: Dict[str, Any]
-    ) -> str:
+    async def _create_milestone_from_plan(self, goal_id: str, milestone_data: Dict[str, Any]) -> str:
         """Create milestone in database from plan data"""
         milestone_id = str(uuid.uuid4())
 
@@ -824,9 +716,7 @@ class MilestoneTaskEngine:
 
         return milestone_id
 
-    async def _create_task_from_plan(
-        self, goal_id: str, milestone_id: str, task_data: Dict[str, Any]
-    ) -> str:
+    async def _create_task_from_plan(self, goal_id: str, milestone_id: str, task_data: Dict[str, Any]) -> str:
         """Create task in database from plan data"""
         task_id = str(uuid.uuid4())
 
@@ -858,9 +748,7 @@ class MilestoneTaskEngine:
         return task_id
 
     # Placeholder implementations for additional helper methods
-    def _assess_goal_complexity(
-        self, goal: Dict[str, Any], milestone_count: int
-    ) -> str:
+    def _assess_goal_complexity(self, goal: Dict[str, Any], milestone_count: int) -> str:
         """Assess the complexity of a goal based on various factors"""
         # Simplified implementation
         if milestone_count > 15 or (goal.get("target_value", 0) > 100000):

@@ -2,30 +2,30 @@
 Knowledge Management System for FuzeAgent
 Handles document upload, storage, processing, and RAG integration
 """
+
+import asyncio
+import logging
+import mimetypes
 import os
 import uuid
-import mimetypes
-from typing import List, Optional, Dict, Any, BinaryIO
 from datetime import datetime
 from pathlib import Path
-import logging
-import asyncio
+from typing import Any, BinaryIO, Dict, List, Optional
 from urllib.parse import urlparse
-import requests
-from pydantic import BaseModel, Field
+
+import markdown
 
 # Document processing imports
 import PyPDF2
-from docx import Document as DocxDocument
-import markdown
+import requests
 from bs4 import BeautifulSoup
+from docx import Document as DocxDocument
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 # Storage configuration
-KNOWLEDGE_STORAGE_PATH = os.environ.get(
-    "KNOWLEDGE_STORAGE_PATH", "/app/knowledge_storage"
-)
+KNOWLEDGE_STORAGE_PATH = os.environ.get("KNOWLEDGE_STORAGE_PATH", "/app/knowledge_storage")
 MAX_FILE_SIZE = int(os.environ.get("MAX_FILE_SIZE", "50000000"))  # 50MB default
 SUPPORTED_TYPES = [".pdf", ".docx", ".doc", ".txt", ".md", ".html", ".json"]
 
@@ -67,13 +67,9 @@ class KnowledgeManager:
         (self.storage_path / "agents").mkdir(exist_ok=True)
         (self.storage_path / "temp").mkdir(exist_ok=True)
 
-        logger.info(
-            f"Knowledge Manager initialized with storage path: {self.storage_path}"
-        )
+        logger.info(f"Knowledge Manager initialized with storage path: {self.storage_path}")
 
-    def _get_storage_path(
-        self, organization_id: str = None, team_id: str = None, agent_id: str = None
-    ) -> Path:
+    def _get_storage_path(self, organization_id: str = None, team_id: str = None, agent_id: str = None) -> Path:
         """Get the appropriate storage path based on scope"""
         if agent_id:
             return self.storage_path / "agents" / agent_id
@@ -184,9 +180,7 @@ class KnowledgeManager:
             # Read and save file content
             content = file_content.read()
             if len(content) > MAX_FILE_SIZE:
-                raise ValueError(
-                    f"File size exceeds maximum allowed size of {MAX_FILE_SIZE} bytes"
-                )
+                raise ValueError(f"File size exceeds maximum allowed size of {MAX_FILE_SIZE} bytes")
 
             with open(file_path, "wb") as f:
                 f.write(content)
@@ -205,9 +199,7 @@ class KnowledgeManager:
                 status="active",
                 upload_date=datetime.now(),
                 last_modified=datetime.now(),
-                content_preview=extracted_text[:500] + "..."
-                if len(extracted_text) > 500
-                else extracted_text,
+                content_preview=extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text,
                 tags=tags or [],
                 organization_id=organization_id,
                 team_id=team_id,
@@ -280,9 +272,7 @@ class KnowledgeManager:
             # Create metadata
             metadata = DocumentMetadata(
                 id=doc_id,
-                title=title or soup.find("title").get_text()
-                if soup.find("title")
-                else url,
+                title=title or soup.find("title").get_text() if soup.find("title") else url,
                 filename=f"url_{doc_id}.html",
                 type="link",
                 mime_type="text/html",
@@ -290,9 +280,7 @@ class KnowledgeManager:
                 status="active",
                 upload_date=datetime.now(),
                 last_modified=datetime.now(),
-                content_preview=extracted_text[:500] + "..."
-                if len(extracted_text) > 500
-                else extracted_text,
+                content_preview=extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text,
                 tags=tags or [],
                 source_url=url,
                 organization_id=organization_id,
@@ -332,9 +320,7 @@ class KnowledgeManager:
             logger.error(f"Error uploading URL {url}: {e}")
             raise
 
-    async def get_documents(
-        self, organization_id: str = None, team_id: str = None, agent_id: str = None
-    ) -> List[DocumentMetadata]:
+    async def get_documents(self, organization_id: str = None, team_id: str = None, agent_id: str = None) -> List[DocumentMetadata]:
         """Get list of documents for a scope"""
 
         storage_path = self._get_storage_path(organization_id, team_id, agent_id)
@@ -367,9 +353,7 @@ class KnowledgeManager:
         """Get full content of a document"""
 
         try:
-            metadata = await self.get_document_metadata(
-                doc_id, organization_id, team_id, agent_id
-            )
+            metadata = await self.get_document_metadata(doc_id, organization_id, team_id, agent_id)
             if not metadata:
                 return None
 
@@ -407,9 +391,7 @@ class KnowledgeManager:
     ) -> Optional[DocumentMetadata]:
         """Update document metadata"""
 
-        metadata = await self.get_document_metadata(
-            doc_id, organization_id, team_id, agent_id
-        )
+        metadata = await self.get_document_metadata(doc_id, organization_id, team_id, agent_id)
         if not metadata:
             return None
 
@@ -472,11 +454,7 @@ class KnowledgeManager:
 
         for doc in documents:
             # Search in title, content preview, and tags
-            if (
-                query_lower in doc.title.lower()
-                or (doc.content_preview and query_lower in doc.content_preview.lower())
-                or any(query_lower in tag.lower() for tag in doc.tags)
-            ):
+            if query_lower in doc.title.lower() or (doc.content_preview and query_lower in doc.content_preview.lower()) or any(query_lower in tag.lower() for tag in doc.tags):
                 results.append(doc)
 
                 if len(results) >= limit:
@@ -487,9 +465,7 @@ class KnowledgeManager:
     async def _save_metadata(self, metadata: DocumentMetadata):
         """Save document metadata to file"""
 
-        storage_path = self._get_storage_path(
-            metadata.organization_id, metadata.team_id, metadata.agent_id
-        )
+        storage_path = self._get_storage_path(metadata.organization_id, metadata.team_id, metadata.agent_id)
         metadata_file = storage_path / f"{metadata.id}.metadata.json"
 
         with open(metadata_file, "w", encoding="utf-8") as f:

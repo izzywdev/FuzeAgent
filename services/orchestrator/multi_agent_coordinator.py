@@ -18,10 +18,10 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Set, Tuple
-from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .database import DatabaseManager
 from .task_execution_engine import TaskExecutionEngine, TaskStatus
@@ -216,20 +216,14 @@ class MultiAgentCoordinator:
             if required_agents:
                 selected_agents = required_agents
             else:
-                selected_agents = await self._select_agents_for_task(
-                    task_data, required_skills, complexity_analysis
-                )
+                selected_agents = await self._select_agents_for_task(task_data, required_skills, complexity_analysis)
 
             if len(selected_agents) < 2:
-                logger.warning(
-                    f"Not enough agents available for coordination: {len(selected_agents)}"
-                )
+                logger.warning(f"Not enough agents available for coordination: {len(selected_agents)}")
                 return None
 
             # Determine coordinator agent (first agent or most experienced)
-            coordinator_agent_id = await self._select_coordinator(
-                selected_agents, task_data
-            )
+            coordinator_agent_id = await self._select_coordinator(selected_agents, task_data)
 
             # Create coordination session
             session_id = str(uuid.uuid4())
@@ -244,18 +238,14 @@ class MultiAgentCoordinator:
 
             self.active_sessions[session_id] = session
 
-            logger.info(
-                f"Created coordination session {session_id} with {len(selected_agents)} agents"
-            )
+            logger.info(f"Created coordination session {session_id} with {len(selected_agents)} agents")
             return session_id
 
         except Exception as e:
             logger.error(f"Failed to initiate coordination for task {task_id}: {e}")
             raise
 
-    async def get_coordination_status(
-        self, session_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_coordination_status(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a coordination session"""
         session = self.active_sessions.get(session_id)
         if not session:
@@ -280,12 +270,8 @@ class MultiAgentCoordinator:
             "subtasks": subtask_statuses,
             "communications_count": len(session.communications),
             "started_at": session.started_at.isoformat(),
-            "completed_at": session.completed_at.isoformat()
-            if session.completed_at
-            else None,
-            "estimated_completion": session.plan.estimated_completion.isoformat()
-            if session.plan
-            else None,
+            "completed_at": session.completed_at.isoformat() if session.completed_at else None,
+            "estimated_completion": session.plan.estimated_completion.isoformat() if session.plan else None,
         }
 
     async def send_agent_communication(
@@ -317,9 +303,7 @@ class MultiAgentCoordinator:
         # Store in database
         await self._store_communication(communication)
 
-        logger.info(
-            f"Agent communication {communication_id}: {from_agent_id} -> {to_agent_id}"
-        )
+        logger.info(f"Agent communication {communication_id}: {from_agent_id} -> {to_agent_id}")
         return communication_id
 
     async def cancel_coordination(self, session_id: str) -> bool:
@@ -358,9 +342,7 @@ class MultiAgentCoordinator:
                     try:
                         await self._process_coordination_session(session)
                     except Exception as e:
-                        logger.error(
-                            f"Error processing coordination session {session_id}: {e}"
-                        )
+                        logger.error(f"Error processing coordination session {session_id}: {e}")
 
                 await asyncio.sleep(5)  # Check every 5 seconds
 
@@ -379,9 +361,7 @@ class MultiAgentCoordinator:
                     for comm in session.communications:
                         if not comm.response_id and comm.message_type == "request":
                             # Check if communication has timed out
-                            if (
-                                datetime.now() - comm.timestamp
-                            ).total_seconds() > self.communication_timeout:
+                            if (datetime.now() - comm.timestamp).total_seconds() > self.communication_timeout:
                                 await self._handle_communication_timeout(session, comm)
 
                 await asyncio.sleep(10)  # Check every 10 seconds
@@ -448,19 +428,13 @@ class MultiAgentCoordinator:
             subtasks = await self._decompose_task(task_data, session.coordination_mode)
 
             # Assign agents to subtasks
-            assignments = await self._assign_agents_to_subtasks(
-                subtasks, list(session.participating_agents)
-            )
+            assignments = await self._assign_agents_to_subtasks(subtasks, list(session.participating_agents))
 
             # Create dependencies
-            dependencies = await self._create_task_dependencies(
-                subtasks, session.coordination_mode
-            )
+            dependencies = await self._create_task_dependencies(subtasks, session.coordination_mode)
 
             # Estimate completion time
-            estimated_completion = await self._estimate_coordination_completion(
-                subtasks, assignments, dependencies
-            )
+            estimated_completion = await self._estimate_coordination_completion(subtasks, assignments, dependencies)
 
             # Create coordination plan
             plan = CoordinationPlan(
@@ -485,9 +459,7 @@ class MultiAgentCoordinator:
                 # Start subtask execution
                 await self.task_execution_engine.start_task_execution(subtask_id)
 
-            logger.info(
-                f"Created coordination plan for session {session.session_id} with {len(subtasks)} subtasks"
-            )
+            logger.info(f"Created coordination plan for session {session.session_id} with {len(subtasks)} subtasks")
 
         except Exception as e:
             logger.error(f"Error planning coordination {session.session_id}: {e}")
@@ -501,9 +473,7 @@ class MultiAgentCoordinator:
             failed_subtasks = 0
 
             for subtask_id in session.subtasks.keys():
-                status = await self.task_execution_engine.get_execution_status(
-                    subtask_id
-                )
+                status = await self.task_execution_engine.get_execution_status(subtask_id)
                 if status:
                     if status.get("status") == "completed":
                         completed_subtasks += 1
@@ -528,9 +498,7 @@ class MultiAgentCoordinator:
             # Collect results from all subtasks
             results = {}
             for subtask_id, agent_id in session.subtasks.items():
-                status = await self.task_execution_engine.get_execution_status(
-                    subtask_id
-                )
+                status = await self.task_execution_engine.get_execution_status(subtask_id)
                 if status:
                     results[subtask_id] = {
                         "agent_id": agent_id,
@@ -547,9 +515,7 @@ class MultiAgentCoordinator:
             session.result = coordination_result
 
             # Update root task status
-            await DatabaseManager.update_task_status(
-                session.root_task_id, "completed", coordination_result
-            )
+            await DatabaseManager.update_task_status(session.root_task_id, "completed", coordination_result)
 
             logger.info(f"Completed coordination session {session.session_id}")
 
@@ -560,9 +526,7 @@ class MultiAgentCoordinator:
             logger.error(f"Error reviewing coordination {session.session_id}: {e}")
             session.status = CoordinationStatus.FAILED
 
-    async def _analyze_task_complexity(
-        self, task_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _analyze_task_complexity(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze task complexity to determine if coordination is needed"""
 
         description = task_data.get("description", "")
@@ -608,9 +572,7 @@ class MultiAgentCoordinator:
 
                 # Check skill match
                 if required_skills:
-                    skill_match = any(
-                        skill in agent_skills for skill in required_skills
-                    )
+                    skill_match = any(skill in agent_skills for skill in required_skills)
                 else:
                     skill_match = True
 
@@ -621,18 +583,14 @@ class MultiAgentCoordinator:
         max_agents = complexity_analysis.get("estimated_agents_needed", 3)
         return suitable_agents[:max_agents]
 
-    async def _select_coordinator(
-        self, agents: List[str], task_data: Dict[str, Any]
-    ) -> str:
+    async def _select_coordinator(self, agents: List[str], task_data: Dict[str, Any]) -> str:
         """Select the coordinator agent from available agents"""
 
         # For now, select the first agent as coordinator
         # In production, this would consider agent experience, current load, etc.
         return agents[0]
 
-    async def _decompose_task(
-        self, task_data: Dict[str, Any], mode: CoordinationMode
-    ) -> List[Dict[str, Any]]:
+    async def _decompose_task(self, task_data: Dict[str, Any], mode: CoordinationMode) -> List[Dict[str, Any]]:
         """Decompose a complex task into subtasks"""
 
         # Simple task decomposition based on common patterns
@@ -714,9 +672,7 @@ class MultiAgentCoordinator:
 
         return subtasks
 
-    async def _assign_agents_to_subtasks(
-        self, subtasks: List[Dict[str, Any]], agents: List[str]
-    ) -> Dict[str, str]:
+    async def _assign_agents_to_subtasks(self, subtasks: List[Dict[str, Any]], agents: List[str]) -> Dict[str, str]:
         """Assign agents to subtasks based on capabilities"""
 
         assignments = {}
@@ -758,9 +714,7 @@ class MultiAgentCoordinator:
 
         return assignments
 
-    async def _create_task_dependencies(
-        self, subtasks: List[Dict[str, Any]], mode: CoordinationMode
-    ) -> List[TaskDependency]:
+    async def _create_task_dependencies(self, subtasks: List[Dict[str, Any]], mode: CoordinationMode) -> List[TaskDependency]:
         """Create dependencies between subtasks"""
 
         dependencies = []
@@ -779,9 +733,7 @@ class MultiAgentCoordinator:
         elif mode == CoordinationMode.HIERARCHICAL:
             # Analysis task should complete before implementation
             analysis_tasks = [t for t in subtasks if "analysis" in t["type"]]
-            implementation_tasks = [
-                t for t in subtasks if "implementation" in t["type"]
-            ]
+            implementation_tasks = [t for t in subtasks if "implementation" in t["type"]]
 
             for impl_task in implementation_tasks:
                 for analysis_task in analysis_tasks:
@@ -815,9 +767,7 @@ class MultiAgentCoordinator:
 
         return datetime.now() + timedelta(hours=max_hours)
 
-    async def _create_subtask(
-        self, subtask_data: Dict[str, Any], assignments: Dict[str, str]
-    ) -> str:
+    async def _create_subtask(self, subtask_data: Dict[str, Any], assignments: Dict[str, str]) -> str:
         """Create a subtask in the database"""
 
         subtask_id = str(uuid.uuid4())
@@ -839,9 +789,7 @@ class MultiAgentCoordinator:
 
         return subtask_id
 
-    def _find_session_by_agents(
-        self, agent_ids: List[str]
-    ) -> Optional[CoordinationSession]:
+    def _find_session_by_agents(self, agent_ids: List[str]) -> Optional[CoordinationSession]:
         """Find coordination session that includes the specified agents"""
         for session in self.active_sessions.values():
             if any(agent_id in session.participating_agents for agent_id in agent_ids):
@@ -852,17 +800,11 @@ class MultiAgentCoordinator:
         """Store agent communication in database"""
         # This would store the communication in the database
         # For now, just log it
-        logger.info(
-            f"Agent communication: {communication.from_agent_id} -> {communication.to_agent_id}: {communication.content}"
-        )
+        logger.info(f"Agent communication: {communication.from_agent_id} -> {communication.to_agent_id}: {communication.content}")
 
-    async def _handle_communication_timeout(
-        self, session: CoordinationSession, communication: AgentCommunication
-    ):
+    async def _handle_communication_timeout(self, session: CoordinationSession, communication: AgentCommunication):
         """Handle communication timeout"""
-        logger.warning(
-            f"Communication timeout in session {session.session_id}: {communication.communication_id}"
-        )
+        logger.warning(f"Communication timeout in session {session.session_id}: {communication.communication_id}")
 
         # Could implement retry logic or escalation here
 
@@ -875,21 +817,15 @@ class MultiAgentCoordinator:
 
     async def _handle_coordination_failures(self, session: CoordinationSession):
         """Handle failures in coordination"""
-        logger.warning(
-            f"Handling failures in coordination session {session.session_id}"
-        )
+        logger.warning(f"Handling failures in coordination session {session.session_id}")
 
         # Could implement retry logic, reassignment, or escalation
         session.status = CoordinationStatus.FAILED
 
-    async def _aggregate_coordination_results(
-        self, results: Dict[str, Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def _aggregate_coordination_results(self, results: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
         """Aggregate results from all coordinated subtasks"""
 
-        successful_subtasks = [
-            r for r in results.values() if r["status"] == "completed"
-        ]
+        successful_subtasks = [r for r in results.values() if r["status"] == "completed"]
 
         return {
             "coordination_completed": True,

@@ -10,18 +10,18 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
 from .organization_rag_manager import (
-    OrganizationRAGManager,
-    KnowledgeCategory,
     ContentType,
+    KnowledgeCategory,
+    OrganizationRAGManager,
     SourceType,
     VisibilityLevel,
 )
@@ -133,15 +133,11 @@ class KnowledgePropagationEngine:
         logger.info("Initializing KnowledgePropagationEngine")
 
         try:
-            self.pool = await asyncpg.create_pool(
-                self.database_url, min_size=2, max_size=10, command_timeout=60
-            )
+            self.pool = await asyncpg.create_pool(self.database_url, min_size=2, max_size=10, command_timeout=60)
 
             # Start background propagation processing
             self._running = True
-            self._propagation_task = asyncio.create_task(
-                self._background_propagation_processor()
-            )
+            self._propagation_task = asyncio.create_task(self._background_propagation_processor())
 
             logger.info("KnowledgePropagationEngine initialized successfully")
 
@@ -165,9 +161,7 @@ class KnowledgePropagationEngine:
 
         logger.info("KnowledgePropagationEngine closed")
 
-    async def trigger_agent_to_team_propagation(
-        self, agent_id: str, task_id: str, task_outcome: Dict[str, Any]
-    ) -> List[str]:
+    async def trigger_agent_to_team_propagation(self, agent_id: str, task_id: str, task_outcome: Dict[str, Any]) -> List[str]:
         """Trigger knowledge propagation from agent to team level after task completion"""
 
         propagation_ids = []
@@ -203,9 +197,7 @@ class KnowledgePropagationEngine:
             memory_groups = self._group_memories_for_propagation(recent_memories)
 
             for group_type, memories in memory_groups.items():
-                if len(memories) >= 1 and self._meets_propagation_criteria(
-                    memories, task_outcome
-                ):
+                if len(memories) >= 1 and self._meets_propagation_criteria(memories, task_outcome):
                     # Create propagation task
                     propagation_id = await self._create_propagation_task(
                         source_type="agent",
@@ -225,14 +217,10 @@ class KnowledgePropagationEngine:
 
                     propagation_ids.append(propagation_id)
 
-        logger.info(
-            f"Created {len(propagation_ids)} propagation tasks for agent {agent_id} → team {team_id}"
-        )
+        logger.info(f"Created {len(propagation_ids)} propagation tasks for agent {agent_id} → team {team_id}")
         return propagation_ids
 
-    async def trigger_team_to_org_propagation(
-        self, team_id: str, knowledge_threshold_check: bool = True
-    ) -> List[str]:
+    async def trigger_team_to_org_propagation(self, team_id: str, knowledge_threshold_check: bool = True) -> List[str]:
         """Trigger knowledge propagation from team to organization level"""
 
         propagation_ids = []
@@ -276,9 +264,7 @@ class KnowledgePropagationEngine:
 
             for knowledge in team_knowledge:
                 # Check if similar knowledge already exists at org level
-                if not await self._check_for_similar_org_knowledge(
-                    knowledge, str(org_id)
-                ):
+                if not await self._check_for_similar_org_knowledge(knowledge, str(org_id)):
                     # Create propagation task
                     propagation_id = await self._create_propagation_task(
                         source_type="team",
@@ -298,9 +284,7 @@ class KnowledgePropagationEngine:
 
                     propagation_ids.append(propagation_id)
 
-        logger.info(
-            f"Created {len(propagation_ids)} propagation tasks for team {team_id} → organization {org_id}"
-        )
+        logger.info(f"Created {len(propagation_ids)} propagation tasks for team {team_id} → organization {org_id}")
         return propagation_ids
 
     async def trigger_cross_team_sharing(
@@ -356,9 +340,7 @@ class KnowledgePropagationEngine:
             for target_team_id in target_teams:
                 for knowledge in source_knowledge:
                     # Check if target team would benefit from this knowledge
-                    relevance = await self._calculate_cross_team_relevance(
-                        knowledge, source_team_id, target_team_id
-                    )
+                    relevance = await self._calculate_cross_team_relevance(knowledge, source_team_id, target_team_id)
 
                     if relevance >= 0.5:
                         propagation_id = await self._create_propagation_task(
@@ -372,9 +354,7 @@ class KnowledgePropagationEngine:
                             confidence_score=relevance,
                             metadata={
                                 "cross_team_relevance": relevance,
-                                "source_effectiveness": knowledge[
-                                    "effectiveness_score"
-                                ],
+                                "source_effectiveness": knowledge["effectiveness_score"],
                             },
                         )
 
@@ -471,20 +451,14 @@ class KnowledgePropagationEngine:
         """Get comprehensive propagation statistics"""
 
         async with self.pool.acquire() as conn:
-            where_conditions = [
-                "propagated_at >= NOW() - INTERVAL '%s days'" % days_back
-            ]
+            where_conditions = ["propagated_at >= NOW() - INTERVAL '%s days'" % days_back]
             params = []
 
             if organization_id:
-                where_conditions.append(
-                    "target_id = $1 AND target_type = 'organization'"
-                )
+                where_conditions.append("target_id = $1 AND target_type = 'organization'")
                 params.append(organization_id)
             elif team_id:
-                where_conditions.append(
-                    "(target_id = $1 OR source_id = $1) AND ('team' = ANY(ARRAY[target_type, source_type]))"
-                )
+                where_conditions.append("(target_id = $1 OR source_id = $1) AND ('team' = ANY(ARRAY[target_type, source_type]))")
                 params.append(team_id)
 
             where_clause = "WHERE " + " AND ".join(where_conditions)
@@ -551,15 +525,10 @@ class KnowledgePropagationEngine:
         while self._running:
             try:
                 # Process a batch of propagations
-                results = await self.process_pending_propagations(
-                    self.propagation_batch_size
-                )
+                results = await self.process_pending_propagations(self.propagation_batch_size)
 
                 if results["processed"] > 0:
-                    logger.info(
-                        f"Processed {results['processed']} propagations: "
-                        f"{results['completed']} completed, {results['failed']} failed"
-                    )
+                    logger.info(f"Processed {results['processed']} propagations: " f"{results['completed']} completed, {results['failed']} failed")
 
                 # Sleep between processing cycles
                 await asyncio.sleep(30)  # Process every 30 seconds
@@ -619,9 +588,7 @@ class KnowledgePropagationEngine:
             elif task.source_type == "team" and task.target_type == "team":
                 return await self._execute_team_to_team_propagation(task)
             else:
-                logger.warning(
-                    f"Unsupported propagation type: {task.source_type} → {task.target_type}"
-                )
+                logger.warning(f"Unsupported propagation type: {task.source_type} → {task.target_type}")
                 return False
 
         except Exception as e:
@@ -670,9 +637,7 @@ class KnowledgePropagationEngine:
                 title=f"[Team Contribution] {team_knowledge['title']}",
                 content=team_knowledge["content"],
                 content_type=ContentType(team_knowledge["content_type"]),
-                knowledge_category=KnowledgeCategory(
-                    team_knowledge["knowledge_category"]
-                ),
+                knowledge_category=KnowledgeCategory(team_knowledge["knowledge_category"]),
                 source_type=SourceType.TEAM_AGGREGATION,
                 source_team_id=task.source_id,
                 relevance_score=team_knowledge["effectiveness_score"],
@@ -709,30 +674,24 @@ class KnowledgePropagationEngine:
                 return False
 
             # Create adapted knowledge for target team
-            adapted_knowledge_id = (
-                await self.team_knowledge_manager.create_team_knowledge(
-                    team_id=task.target_id,
-                    title=f"[Shared] {source_knowledge['title']}",
-                    content=source_knowledge["content"],
-                    content_type=ContentType(source_knowledge["content_type"]),
-                    knowledge_category=KnowledgeCategory(
-                        source_knowledge["knowledge_category"]
-                    ),
-                    source_type=SourceType.TEAM_AGGREGATION,
-                    contributing_agents=[],
-                    source_knowledge_ids=[team_knowledge_id],
-                    aggregation_method="cross_team_sharing",
-                    team_relevance_score=task.confidence_score,
-                    metadata={
-                        "source_team_id": task.source_id,
-                        "cross_team_propagation": True,
-                        "original_effectiveness": source_knowledge[
-                            "effectiveness_score"
-                        ],
-                        "propagation_task_id": task.id,
-                    },
-                    tags=source_knowledge["tags"] + ["cross_team_shared"],
-                )
+            adapted_knowledge_id = await self.team_knowledge_manager.create_team_knowledge(
+                team_id=task.target_id,
+                title=f"[Shared] {source_knowledge['title']}",
+                content=source_knowledge["content"],
+                content_type=ContentType(source_knowledge["content_type"]),
+                knowledge_category=KnowledgeCategory(source_knowledge["knowledge_category"]),
+                source_type=SourceType.TEAM_AGGREGATION,
+                contributing_agents=[],
+                source_knowledge_ids=[team_knowledge_id],
+                aggregation_method="cross_team_sharing",
+                team_relevance_score=task.confidence_score,
+                metadata={
+                    "source_team_id": task.source_id,
+                    "cross_team_propagation": True,
+                    "original_effectiveness": source_knowledge["effectiveness_score"],
+                    "propagation_task_id": task.id,
+                },
+                tags=source_knowledge["tags"] + ["cross_team_shared"],
             )
 
             return adapted_knowledge_id is not None
@@ -749,9 +708,7 @@ class KnowledgePropagationEngine:
 
         return groups
 
-    def _meets_propagation_criteria(
-        self, memories: List, task_outcome: Dict[str, Any]
-    ) -> bool:
+    def _meets_propagation_criteria(self, memories: List, task_outcome: Dict[str, Any]) -> bool:
         """Determine if memories meet criteria for propagation"""
 
         # Check success rate
@@ -760,20 +717,14 @@ class KnowledgePropagationEngine:
             return False
 
         # Check confidence scores
-        avg_confidence = sum(mem["confidence_score"] for mem in memories) / len(
-            memories
-        )
+        avg_confidence = sum(mem["confidence_score"] for mem in memories) / len(memories)
         if avg_confidence < 0.6:
             return False
 
         # Check memory age (don't propagate very old memories)
-        recent_memories = [
-            mem for mem in memories if (datetime.now() - mem["created_at"]).days <= 7
-        ]
+        recent_memories = [mem for mem in memories if (datetime.now() - mem["created_at"]).days <= 7]
 
-        return (
-            len(recent_memories) >= len(memories) * 0.5
-        )  # At least 50% should be recent
+        return len(recent_memories) >= len(memories) * 0.5  # At least 50% should be recent
 
     def _calculate_group_confidence(self, memories: List) -> float:
         """Calculate confidence score for a group of memories"""
@@ -787,17 +738,11 @@ class KnowledgePropagationEngine:
         weights = [1.0 / (1 + i * 0.1) for i in range(len(memories))]
 
         weighted_confidence = sum(s * w for s, w in zip(scores, weights)) / sum(weights)
-        avg_success = (
-            sum(success_correlations) / len(success_correlations)
-            if success_correlations
-            else 0.0
-        )
+        avg_success = sum(success_correlations) / len(success_correlations) if success_correlations else 0.0
 
         return min(1.0, weighted_confidence * 0.7 + avg_success * 0.3)
 
-    async def _check_for_similar_org_knowledge(
-        self, team_knowledge: Dict, org_id: str
-    ) -> bool:
+    async def _check_for_similar_org_knowledge(self, team_knowledge: Dict, org_id: str) -> bool:
         """Check if similar knowledge already exists at organization level"""
 
         if not team_knowledge.get("embedding"):
@@ -818,9 +763,7 @@ class KnowledgePropagationEngine:
 
         return False
 
-    async def _calculate_cross_team_relevance(
-        self, knowledge: Dict, source_team_id: str, target_team_id: str
-    ) -> float:
+    async def _calculate_cross_team_relevance(self, knowledge: Dict, source_team_id: str, target_team_id: str) -> float:
         """Calculate how relevant knowledge from one team is for another team"""
 
         async with self.pool.acquire() as conn:
@@ -843,9 +786,7 @@ class KnowledgePropagationEngine:
             relevance_factors = []
 
             # Factor 1: Team type similarity
-            type_similarity = (
-                1.0 if source_team["team_type"] == target_team["team_type"] else 0.3
-            )
+            type_similarity = 1.0 if source_team["team_type"] == target_team["team_type"] else 0.3
             relevance_factors.append(type_similarity)
 
             # Factor 2: Knowledge category relevance to target team
@@ -861,12 +802,8 @@ class KnowledgePropagationEngine:
                 target_team_id,
             )
 
-            target_categories = [
-                cat["knowledge_category"] for cat in target_team_categories
-            ]
-            category_relevance = (
-                1.0 if knowledge["knowledge_category"] in target_categories else 0.4
-            )
+            target_categories = [cat["knowledge_category"] for cat in target_team_categories]
+            category_relevance = 1.0 if knowledge["knowledge_category"] in target_categories else 0.4
             relevance_factors.append(category_relevance)
 
             # Factor 3: Effectiveness score of source knowledge
@@ -934,17 +871,13 @@ class KnowledgePropagationEngine:
             target_type=row["target_type"],
             target_id=str(row["target_id"]),
             knowledge_type=row["knowledge_type"],
-            knowledge_content_id=str(row["knowledge_content_id"])
-            if row["knowledge_content_id"]
-            else "",
+            knowledge_content_id=str(row["knowledge_content_id"]) if row["knowledge_content_id"] else "",
             propagation_method=row["propagation_method"],
             propagation_trigger=PropagationTrigger(row["propagation_trigger"]),
             confidence_score=row["confidence_score"],
             propagation_status=PropagationStatus(row["propagation_status"]),
             acceptance_status=AcceptanceStatus(row["acceptance_status"]),
-            metadata=json.loads(row["metadata"])
-            if isinstance(row["metadata"], str)
-            else row["metadata"],
+            metadata=json.loads(row["metadata"]) if isinstance(row["metadata"], str) else row["metadata"],
             created_at=row["propagated_at"],
             processed_at=row["processed_at"],
             completed_at=row["completed_at"],

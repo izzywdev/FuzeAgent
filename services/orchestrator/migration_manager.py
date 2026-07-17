@@ -4,14 +4,15 @@ Database Migration Manager for FuzeAgent
 Handles schema migrations, data seeding, and version tracking.
 """
 
-import asyncpg
+import importlib.util
+import logging
 import os
 import re
-import importlib.util
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-import logging
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import asyncpg
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -53,9 +54,7 @@ class MigrationManager:
 
     def __init__(self, database_url: str, migrations_dir: str = None):
         self.database_url = database_url
-        self.migrations_dir = migrations_dir or str(
-            Path(__file__).parent / "migrations"
-        )
+        self.migrations_dir = migrations_dir or str(Path(__file__).parent / "migrations")
 
     async def _get_connection(self) -> asyncpg.Connection:
         """Get database connection"""
@@ -63,8 +62,7 @@ class MigrationManager:
 
     async def _ensure_migrations_table(self, conn: asyncpg.Connection):
         """Create migrations tracking table if it doesn't exist"""
-        await conn.execute(
-            """
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 version VARCHAR(50) PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
@@ -72,17 +70,14 @@ class MigrationManager:
                 checksum VARCHAR(64),
                 execution_time_ms INTEGER
             )
-        """
-        )
+        """)
         logger.info("Ensured schema_migrations table exists")
 
     async def get_applied_migrations(self) -> List[str]:
         """Get list of applied migration versions"""
         async with await self._get_connection() as conn:
             await self._ensure_migrations_table(conn)
-            rows = await conn.fetch(
-                "SELECT version FROM schema_migrations ORDER BY version"
-            )
+            rows = await conn.fetch("SELECT version FROM schema_migrations ORDER BY version")
             return [row["version"] for row in rows]
 
     def discover_migrations(self) -> List[Migration]:
@@ -106,17 +101,13 @@ class MigrationManager:
                 version, name = match.groups()
                 migrations.append(Migration(version, name, str(file_path)))
             else:
-                logger.warning(
-                    f"Skipping migration file with invalid name format: {file_path.name}"
-                )
+                logger.warning(f"Skipping migration file with invalid name format: {file_path.name}")
 
         return sorted(migrations)
 
     async def load_migration_module(self, migration: Migration):
         """Load a migration module dynamically"""
-        spec = importlib.util.spec_from_file_location(
-            f"migration_{migration.version}", migration.file_path
-        )
+        spec = importlib.util.spec_from_file_location(f"migration_{migration.version}", migration.file_path)
         if spec is None or spec.loader is None:
             raise MigrationError(f"Could not load migration {migration}")
 
@@ -124,9 +115,7 @@ class MigrationManager:
         spec.loader.exec_module(module)
         return module
 
-    async def apply_migration(
-        self, migration: Migration, conn: asyncpg.Connection
-    ) -> int:
+    async def apply_migration(self, migration: Migration, conn: asyncpg.Connection) -> int:
         """Apply a single migration"""
         logger.info(f"Applying migration: {migration}")
 
@@ -135,9 +124,7 @@ class MigrationManager:
             module = await self.load_migration_module(migration)
 
             if not hasattr(module, "upgrade"):
-                raise MigrationError(
-                    f"Migration {migration} missing 'upgrade' function"
-                )
+                raise MigrationError(f"Migration {migration} missing 'upgrade' function")
 
             # Start timing
             start_time = datetime.now()
@@ -147,9 +134,7 @@ class MigrationManager:
                 await module.upgrade(conn)
 
                 # Record migration as applied
-                execution_time = int(
-                    (datetime.now() - start_time).total_seconds() * 1000
-                )
+                execution_time = int((datetime.now() - start_time).total_seconds() * 1000)
                 await conn.execute(
                     """
                     INSERT INTO schema_migrations (version, name, applied_at, execution_time_ms)
@@ -161,9 +146,7 @@ class MigrationManager:
                     execution_time,
                 )
 
-            logger.info(
-                f"Successfully applied migration: {migration} ({execution_time}ms)"
-            )
+            logger.info(f"Successfully applied migration: {migration} ({execution_time}ms)")
             return execution_time
 
         except Exception as e:
@@ -179,9 +162,7 @@ class MigrationManager:
             module = await self.load_migration_module(migration)
 
             if not hasattr(module, "downgrade"):
-                raise MigrationError(
-                    f"Migration {migration} missing 'downgrade' function"
-                )
+                raise MigrationError(f"Migration {migration} missing 'downgrade' function")
 
             # Rollback migration in transaction
             async with conn.transaction():
@@ -211,12 +192,7 @@ class MigrationManager:
             available_migrations = self.discover_migrations()
 
             # Filter pending migrations
-            pending_migrations = [
-                m
-                for m in available_migrations
-                if m.version not in applied_versions
-                and (target_version is None or m.version <= target_version)
-            ]
+            pending_migrations = [m for m in available_migrations if m.version not in applied_versions and (target_version is None or m.version <= target_version)]
 
             if not pending_migrations:
                 logger.info("No pending migrations found")
@@ -230,9 +206,7 @@ class MigrationManager:
                 applied_migrations.append(migration.version)
                 total_time += execution_time
 
-            logger.info(
-                f"Applied {len(applied_migrations)} migrations in {total_time}ms"
-            )
+            logger.info(f"Applied {len(applied_migrations)} migrations in {total_time}ms")
             return applied_migrations
 
     async def migrate_down(self, target_version: str) -> List[str]:
@@ -247,9 +221,7 @@ class MigrationManager:
             available_migrations = {m.version: m for m in self.discover_migrations()}
 
             # Find migrations to rollback (in reverse order)
-            rollback_versions = [
-                v for v in reversed(applied_versions) if v > target_version
-            ]
+            rollback_versions = [v for v in reversed(applied_versions) if v > target_version]
 
             if not rollback_versions:
                 logger.info(f"No migrations to rollback to version {target_version}")
@@ -276,21 +248,17 @@ class MigrationManager:
             applied_versions = set(await self.get_applied_migrations())
             available_migrations = self.discover_migrations()
 
-            pending_migrations = [
-                m for m in available_migrations if m.version not in applied_versions
-            ]
+            pending_migrations = [m for m in available_migrations if m.version not in applied_versions]
 
             # Get last applied migration info
             last_applied = None
             if applied_versions:
-                last_applied_row = await conn.fetchrow(
-                    """
+                last_applied_row = await conn.fetchrow("""
                     SELECT version, name, applied_at, execution_time_ms
                     FROM schema_migrations
                     ORDER BY version DESC
                     LIMIT 1
-                """
-                )
+                """)
                 if last_applied_row:
                     last_applied = dict(last_applied_row)
 
@@ -299,9 +267,7 @@ class MigrationManager:
                 "applied_count": len(applied_versions),
                 "pending_count": len(pending_migrations),
                 "last_applied": last_applied,
-                "pending_migrations": [
-                    {"version": m.version, "name": m.name} for m in pending_migrations
-                ],
+                "pending_migrations": [{"version": m.version, "name": m.name} for m in pending_migrations],
             }
 
     async def reset_database(self):
@@ -310,18 +276,14 @@ class MigrationManager:
 
         async with await self._get_connection() as conn:
             # Get all table names
-            tables = await conn.fetch(
-                """
+            tables = await conn.fetch("""
                 SELECT tablename FROM pg_tables
                 WHERE schemaname = 'public'
-            """
-            )
+            """)
 
             # Drop all tables
             for table in tables:
-                await conn.execute(
-                    f'DROP TABLE IF EXISTS "{table["tablename"]}" CASCADE'
-                )
+                await conn.execute(f'DROP TABLE IF EXISTS "{table["tablename"]}" CASCADE')
                 logger.info(f"Dropped table: {table['tablename']}")
 
             logger.info("Database reset complete")

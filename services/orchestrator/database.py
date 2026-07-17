@@ -1,13 +1,12 @@
-import asyncpg
-import os
 import json
+import os
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"
-)
+import asyncpg
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
 
 
 @asynccontextmanager
@@ -34,9 +33,7 @@ class DatabaseManager:
 
     # Organization Operations
     @staticmethod
-    async def create_organization(
-        name: str, description: str = None, settings: dict = None
-    ) -> str:
+    async def create_organization(name: str, description: str = None, settings: dict = None) -> str:
         """Create a new organization"""
         async with get_db_connection() as conn:
             org_id = await conn.fetchval(
@@ -55,8 +52,7 @@ class DatabaseManager:
     async def get_organizations() -> List[Dict[str, Any]]:
         """Get all organizations with team and agent counts"""
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                """
+            rows = await conn.fetch("""
                 SELECT
                     o.*,
                     COUNT(DISTINCT t.id) as team_count,
@@ -66,8 +62,7 @@ class DatabaseManager:
                 LEFT JOIN agents a ON t.id = a.team_id
                 GROUP BY o.id
                 ORDER BY o.created_at DESC
-                """
-            )
+                """)
             return [dict(row) for row in rows]
 
     @staticmethod
@@ -124,9 +119,7 @@ class DatabaseManager:
     async def delete_organization(org_id: str) -> bool:
         """Delete organization (cascades to teams and agents)"""
         async with get_db_connection() as conn:
-            result = await conn.execute(
-                "DELETE FROM organizations WHERE id = $1", org_id
-            )
+            result = await conn.execute("DELETE FROM organizations WHERE id = $1", org_id)
             return result != "DELETE 0"
 
     # Team Operations
@@ -175,8 +168,7 @@ class DatabaseManager:
                     organization_id,
                 )
             else:
-                rows = await conn.fetch(
-                    """
+                rows = await conn.fetch("""
                     SELECT
                         t.*,
                         o.name as organization_name,
@@ -186,8 +178,7 @@ class DatabaseManager:
                     LEFT JOIN agents a ON t.id = a.team_id
                     GROUP BY t.id, o.name
                     ORDER BY t.created_at DESC
-                    """
-                )
+                    """)
             return [dict(row) for row in rows]
 
     @staticmethod
@@ -294,8 +285,7 @@ class DatabaseManager:
                     team_id,
                 )
             else:
-                rows = await conn.fetch(
-                    """
+                rows = await conn.fetch("""
                     SELECT
                         a.*,
                         t.name as team_name,
@@ -305,8 +295,7 @@ class DatabaseManager:
                     JOIN teams t ON a.team_id = t.id
                     JOIN organizations o ON t.organization_id = o.id
                     ORDER BY a.created_at DESC
-                    """
-                )
+                    """)
             return [dict(row) for row in rows]
 
     @staticmethod
@@ -340,9 +329,7 @@ class DatabaseManager:
             )
 
     @staticmethod
-    async def insert_task(
-        title: str, description: str, assigned_to: str = None, created_by: str = None
-    ) -> str:
+    async def insert_task(title: str, description: str, assigned_to: str = None, created_by: str = None) -> str:
         """Insert a new task"""
         async with get_db_connection() as conn:
             task_id = await conn.fetchval(
@@ -362,14 +349,12 @@ class DatabaseManager:
     async def get_tasks():
         """Get all tasks"""
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                """
+            rows = await conn.fetch("""
                 SELECT t.*, a.name as assigned_agent_name
                 FROM tasks t
                 LEFT JOIN agents a ON t.assigned_to = a.id
                 ORDER BY t.created_at DESC
-                """
-            )
+                """)
             return [dict(row) for row in rows]
 
     @staticmethod
@@ -388,6 +373,4 @@ class DatabaseManager:
                     task_id,
                 )
             else:
-                await conn.execute(
-                    "UPDATE tasks SET status = $1 WHERE id = $2", status, task_id
-                )
+                await conn.execute("UPDATE tasks SET status = $1 WHERE id = $2", status, task_id)

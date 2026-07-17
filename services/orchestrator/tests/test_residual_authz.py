@@ -106,18 +106,14 @@ def test_published_agents_with_valid_token_is_not_401(published_client):
 
 def test_published_cors_does_not_reflect_wildcard_with_credentials(published_client):
     # An origin NOT on the allowlist must not be echoed back as allowed.
-    r = published_client.get(
-        "/health", headers={"Origin": "https://evil.example.com"}
-    )
+    r = published_client.get("/health", headers={"Origin": "https://evil.example.com"})
     allow_origin = r.headers.get("access-control-allow-origin")
     assert allow_origin != "*"
     assert allow_origin != "https://evil.example.com"
 
 
 def test_published_cors_allows_configured_origin(published_client):
-    r = published_client.get(
-        "/health", headers={"Origin": "http://localhost:3000"}
-    )
+    r = published_client.get("/health", headers={"Origin": "http://localhost:3000"})
     assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
 
@@ -146,14 +142,12 @@ def build_bola_app() -> FastAPI:
 
     # ---- file-operations approve / rollback ----
     @app.post("/tasks/{task_id}/file-operations/{batch_id}/approve")
-    async def approve(task_id: str, batch_id: str,
-                      user: CurrentUser = Depends(require_user)):
+    async def approve(task_id: str, batch_id: str, user: CurrentUser = Depends(require_user)):
         await _authorize_task_org(task_id, user)
         return {"task_id": task_id, "batch_id": batch_id, "approved": True}
 
     @app.post("/tasks/{task_id}/file-operations/{batch_id}/rollback")
-    async def rollback(task_id: str, batch_id: str,
-                       user: CurrentUser = Depends(require_user)):
+    async def rollback(task_id: str, batch_id: str, user: CurrentUser = Depends(require_user)):
         await _authorize_task_org(task_id, user)
         return {"task_id": task_id, "batch_id": batch_id, "status": "rolled_back"}
 
@@ -164,9 +158,7 @@ def build_bola_app() -> FastAPI:
         return {"agent_id": agent_id}
 
     @app.post("/a2a/agents/{sender_agent_id}/message")
-    async def send_message(sender_agent_id: str,
-                           message_data: dict = Body(...),
-                           user: CurrentUser = Depends(require_user)):
+    async def send_message(sender_agent_id: str, message_data: dict = Body(...), user: CurrentUser = Depends(require_user)):
         await _authorize_agent_org(sender_agent_id, user)
         return {"status": "sent"}
 
@@ -181,8 +173,7 @@ def build_bola_app() -> FastAPI:
         return {"agent_id": agent_id, "messages": []}
 
     @app.put("/a2a/tasks/{task_id}/status")
-    async def task_status(task_id: str, status_data: dict = Body(...),
-                          user: CurrentUser = Depends(require_user)):
+    async def task_status(task_id: str, status_data: dict = Body(...), user: CurrentUser = Depends(require_user)):
         await _authorize_task_org(task_id, user)
         return {"task_id": task_id, "status": "updated"}
 
@@ -196,39 +187,33 @@ def bola_client():
 
 # ---- file-operations ----
 
+
 def test_approve_requires_token(bola_client):
     assert bola_client.post("/tasks/t1/file-operations/b1/approve").status_code == 401
 
 
 def test_approve_non_owner_is_403(bola_client):
-    r = bola_client.post(
-        "/tasks/t1/file-operations/b1/approve", headers=auth_header(organizations=[ORG_B])
-    )
+    r = bola_client.post("/tasks/t1/file-operations/b1/approve", headers=auth_header(organizations=[ORG_B]))
     assert r.status_code == 403
 
 
 def test_approve_owner_is_200(bola_client):
-    r = bola_client.post(
-        "/tasks/t1/file-operations/b1/approve", headers=auth_header(organizations=[ORG_A])
-    )
+    r = bola_client.post("/tasks/t1/file-operations/b1/approve", headers=auth_header(organizations=[ORG_A]))
     assert r.status_code == 200
 
 
 def test_rollback_non_owner_is_403(bola_client):
-    r = bola_client.post(
-        "/tasks/t1/file-operations/b1/rollback", headers=auth_header(organizations=[ORG_B])
-    )
+    r = bola_client.post("/tasks/t1/file-operations/b1/rollback", headers=auth_header(organizations=[ORG_B]))
     assert r.status_code == 403
 
 
 def test_rollback_owner_is_200(bola_client):
-    r = bola_client.post(
-        "/tasks/t1/file-operations/b1/rollback", headers=auth_header(organizations=[ORG_A])
-    )
+    r = bola_client.post("/tasks/t1/file-operations/b1/rollback", headers=auth_header(organizations=[ORG_A]))
     assert r.status_code == 200
 
 
 # ---- A2A ----
+
 
 @pytest.mark.parametrize(
     "method,path",
@@ -367,9 +352,7 @@ def test_ws_with_valid_token_query_param_connects(ws_client):
 
 def test_ws_with_valid_token_subprotocol_connects(ws_client):
     token = make_token()
-    with ws_client.websocket_connect(
-        "/ws", subprotocols=["bearer", token]
-    ) as ws:
+    with ws_client.websocket_connect("/ws", subprotocols=["bearer", token]) as ws:
         data = ws.receive_json()
         assert data["hello"] == "user-1"
 
@@ -377,16 +360,12 @@ def test_ws_with_valid_token_subprotocol_connects(ws_client):
 def test_ws_org_non_member_is_rejected(ws_client):
     token = make_token(organizations=[ORG_B])
     with pytest.raises(WebSocketDisconnect):
-        with ws_client.websocket_connect(
-            f"/ws/organization/{ORG_A}/updates?token={token}"
-        ):
+        with ws_client.websocket_connect(f"/ws/organization/{ORG_A}/updates?token={token}"):
             pass
 
 
 def test_ws_org_member_connects(ws_client):
     token = make_token(organizations=[ORG_A])
-    with ws_client.websocket_connect(
-        f"/ws/organization/{ORG_A}/updates?token={token}"
-    ) as ws:
+    with ws_client.websocket_connect(f"/ws/organization/{ORG_A}/updates?token={token}") as ws:
         data = ws.receive_json()
         assert data["org"] == ORG_A

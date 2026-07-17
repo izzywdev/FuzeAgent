@@ -11,21 +11,21 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
+from .knowledge_propagation_engine import KnowledgePropagationEngine, PropagationTrigger
 from .organization_rag_manager import (
-    OrganizationRAGManager,
-    KnowledgeCategory,
     ContentType,
+    KnowledgeCategory,
+    OrganizationRAGManager,
     SourceType,
 )
 from .team_knowledge_manager import TeamKnowledgeManager
-from .knowledge_propagation_engine import KnowledgePropagationEngine, PropagationTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +105,7 @@ class TaskKnowledgeExtractor:
         logger.info("Initializing TaskKnowledgeExtractor")
 
         try:
-            self.pool = await asyncpg.create_pool(
-                self.database_url, min_size=1, max_size=5, command_timeout=60
-            )
+            self.pool = await asyncpg.create_pool(self.database_url, min_size=1, max_size=5, command_timeout=60)
 
             logger.info("TaskKnowledgeExtractor initialized successfully")
 
@@ -121,16 +119,12 @@ class TaskKnowledgeExtractor:
             await self.pool.close()
         logger.info("TaskKnowledgeExtractor closed")
 
-    async def extract_knowledge_from_task(
-        self, task_id: str, agent_id: str, execution_result: Dict[str, Any]
-    ) -> List[str]:
+    async def extract_knowledge_from_task(self, task_id: str, agent_id: str, execution_result: Dict[str, Any]) -> List[str]:
         """Extract knowledge from a completed task and store it"""
 
         try:
             # Build extraction context
-            context = await self._build_extraction_context(
-                task_id, agent_id, execution_result
-            )
+            context = await self._build_extraction_context(task_id, agent_id, execution_result)
 
             if not context:
                 logger.warning(f"Could not build extraction context for task {task_id}")
@@ -138,9 +132,7 @@ class TaskKnowledgeExtractor:
 
             # Skip extraction for very short or trivial tasks
             if context.total_duration_minutes < self.min_task_duration_minutes:
-                logger.debug(
-                    f"Skipping extraction for short task {task_id} ({context.total_duration_minutes:.1f}m)"
-                )
+                logger.debug(f"Skipping extraction for short task {task_id} ({context.total_duration_minutes:.1f}m)")
                 return []
 
             # Extract knowledge items
@@ -160,41 +152,33 @@ class TaskKnowledgeExtractor:
 
             # Trigger knowledge propagation if we have valuable knowledge
             if stored_knowledge_ids:
-                propagation_ids = (
-                    await self.propagation_engine.trigger_agent_to_team_propagation(
-                        agent_id=context.agent_id,
-                        task_id=context.task_id,
-                        task_outcome={
-                            "success": context.success,
-                            "task_type": context.task_data.get("task_type", "unknown"),
-                            "complexity": self._assess_task_complexity(context),
-                            "duration_minutes": context.total_duration_minutes,
-                            "knowledge_extracted": len(stored_knowledge_ids),
-                            "iteration_count": context.iteration_count,
-                        },
-                    )
+                propagation_ids = await self.propagation_engine.trigger_agent_to_team_propagation(
+                    agent_id=context.agent_id,
+                    task_id=context.task_id,
+                    task_outcome={
+                        "success": context.success,
+                        "task_type": context.task_data.get("task_type", "unknown"),
+                        "complexity": self._assess_task_complexity(context),
+                        "duration_minutes": context.total_duration_minutes,
+                        "knowledge_extracted": len(stored_knowledge_ids),
+                        "iteration_count": context.iteration_count,
+                    },
                 )
 
                 self.propagations_triggered += len(propagation_ids)
-                logger.info(
-                    f"Triggered {len(propagation_ids)} knowledge propagations for task {task_id}"
-                )
+                logger.info(f"Triggered {len(propagation_ids)} knowledge propagations for task {task_id}")
 
             self.extractions_performed += 1
             self.knowledge_items_created += len(stored_knowledge_ids)
 
-            logger.info(
-                f"Extracted {len(stored_knowledge_ids)} knowledge items from task {task_id}"
-            )
+            logger.info(f"Extracted {len(stored_knowledge_ids)} knowledge items from task {task_id}")
             return stored_knowledge_ids
 
         except Exception as e:
             logger.error(f"Error extracting knowledge from task {task_id}: {e}")
             return []
 
-    async def _build_extraction_context(
-        self, task_id: str, agent_id: str, execution_result: Dict[str, Any]
-    ) -> Optional[ExtractionContext]:
+    async def _build_extraction_context(self, task_id: str, agent_id: str, execution_result: Dict[str, Any]) -> Optional[ExtractionContext]:
         """Build context for knowledge extraction"""
 
         async with self.pool.acquire() as conn:
@@ -250,9 +234,7 @@ class TaskKnowledgeExtractor:
             completed_at = execution_result.get("completed_at")
             if completed_at:
                 if isinstance(completed_at, str):
-                    completed_at = datetime.fromisoformat(
-                        completed_at.replace("Z", "+00:00")
-                    )
+                    completed_at = datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
                 duration = (completed_at - started_at).total_seconds() / 60.0
             else:
                 duration = 0.0
@@ -266,17 +248,13 @@ class TaskKnowledgeExtractor:
                 execution_result=execution_result,
                 conversation_history=[dict(conv) for conv in conversation_history],
                 code_changes=[dict(code) for code in code_changes],
-                performance_metrics={
-                    pm["metric_type"]: pm for pm in performance_metrics
-                },
+                performance_metrics={pm["metric_type"]: pm for pm in performance_metrics},
                 iteration_count=execution_result.get("iterations", 0),
                 total_duration_minutes=duration,
                 success=execution_result.get("status") == "completed",
             )
 
-    async def _extract_knowledge_items(
-        self, context: ExtractionContext
-    ) -> List[TaskKnowledgeExtract]:
+    async def _extract_knowledge_items(self, context: ExtractionContext) -> List[TaskKnowledgeExtract]:
         """Extract specific knowledge items from the task context"""
 
         knowledge_extracts = []
@@ -291,9 +269,7 @@ class TaskKnowledgeExtractor:
 
         return knowledge_extracts
 
-    async def _extract_code_patterns(
-        self, context: ExtractionContext
-    ) -> List[TaskKnowledgeExtract]:
+    async def _extract_code_patterns(self, context: ExtractionContext) -> List[TaskKnowledgeExtract]:
         """Extract reusable code patterns and best practices"""
 
         extracts = []
@@ -306,22 +282,15 @@ class TaskKnowledgeExtractor:
                 # Look for reusable patterns
                 patterns_found = []
                 for pattern_name, pattern_info in self.code_patterns.items():
-                    if any(
-                        keyword in content.lower()
-                        for keyword in pattern_info["keywords"]
-                    ):
+                    if any(keyword in content.lower() for keyword in pattern_info["keywords"]):
                         patterns_found.append(pattern_name)
 
                 if patterns_found and len(content) > 100:  # Substantial code
                     # Create knowledge extract
                     title = f"Code Pattern: {', '.join(patterns_found)} ({language})"
-                    extract_content = self._create_code_pattern_content(
-                        content, patterns_found, context
-                    )
+                    extract_content = self._create_code_pattern_content(content, patterns_found, context)
 
-                    confidence = self._calculate_code_pattern_confidence(
-                        content, patterns_found, context
-                    )
+                    confidence = self._calculate_code_pattern_confidence(content, patterns_found, context)
 
                     if confidence >= self.min_extraction_confidence:
                         extract = TaskKnowledgeExtract(
@@ -338,9 +307,7 @@ class TaskKnowledgeExtractor:
                                 "task_success": context.success,
                                 "lines_of_code": len(content.split("\n")),
                             },
-                            success_indicators=self._extract_success_indicators(
-                                context
-                            ),
+                            success_indicators=self._extract_success_indicators(context),
                             failure_patterns=[],
                         )
 
@@ -348,17 +315,13 @@ class TaskKnowledgeExtractor:
 
         return extracts
 
-    async def _extract_problem_solutions(
-        self, context: ExtractionContext
-    ) -> List[TaskKnowledgeExtract]:
+    async def _extract_problem_solutions(self, context: ExtractionContext) -> List[TaskKnowledgeExtract]:
         """Extract problem-solution pairs from the task"""
 
         extracts = []
 
         # Analyze conversation for problem descriptions and solutions
-        problem_solution_pairs = self._identify_problem_solution_pairs(
-            context.conversation_history
-        )
+        problem_solution_pairs = self._identify_problem_solution_pairs(context.conversation_history)
 
         for problem, solution in problem_solution_pairs:
             if len(problem) > 50 and len(solution) > 50:  # Substantial content
@@ -368,9 +331,7 @@ class TaskKnowledgeExtractor:
                 # Determine category based on content
                 category = self._categorize_problem_solution(problem, solution)
 
-                confidence = self._calculate_solution_confidence(
-                    problem, solution, context
-                )
+                confidence = self._calculate_solution_confidence(problem, solution, context)
 
                 if confidence >= self.min_extraction_confidence:
                     extract = TaskKnowledgeExtract(
@@ -393,17 +354,13 @@ class TaskKnowledgeExtractor:
 
         return extracts
 
-    async def _extract_debugging_insights(
-        self, context: ExtractionContext
-    ) -> List[TaskKnowledgeExtract]:
+    async def _extract_debugging_insights(self, context: ExtractionContext) -> List[TaskKnowledgeExtract]:
         """Extract debugging approaches and insights"""
 
         extracts = []
 
         # Look for error messages and resolution patterns
-        debugging_sessions = self._identify_debugging_sessions(
-            context.conversation_history
-        )
+        debugging_sessions = self._identify_debugging_sessions(context.conversation_history)
 
         for session in debugging_sessions:
             if session["resolution"] and context.success:
@@ -433,9 +390,7 @@ class TaskKnowledgeExtractor:
 
         return extracts
 
-    async def _extract_process_knowledge(
-        self, context: ExtractionContext
-    ) -> List[TaskKnowledgeExtract]:
+    async def _extract_process_knowledge(self, context: ExtractionContext) -> List[TaskKnowledgeExtract]:
         """Extract process and workflow knowledge"""
 
         extracts = []
@@ -472,9 +427,7 @@ class TaskKnowledgeExtractor:
 
         return extracts
 
-    async def _extract_error_patterns(
-        self, context: ExtractionContext
-    ) -> List[TaskKnowledgeExtract]:
+    async def _extract_error_patterns(self, context: ExtractionContext) -> List[TaskKnowledgeExtract]:
         """Extract error patterns and avoidance strategies"""
 
         extracts = []
@@ -511,9 +464,7 @@ class TaskKnowledgeExtractor:
 
         return extracts
 
-    async def _extract_optimization_insights(
-        self, context: ExtractionContext
-    ) -> List[TaskKnowledgeExtract]:
+    async def _extract_optimization_insights(self, context: ExtractionContext) -> List[TaskKnowledgeExtract]:
         """Extract performance optimization insights"""
 
         extracts = []
@@ -521,9 +472,7 @@ class TaskKnowledgeExtractor:
         # Look for performance improvements in metrics
         if "execution_time_minutes" in context.performance_metrics:
             perf_data = context.performance_metrics["execution_time_minutes"]
-            if (
-                perf_data["metric_value"] < 30 and context.success
-            ):  # Efficient completion
+            if perf_data["metric_value"] < 30 and context.success:  # Efficient completion
                 title = "Performance Optimization: Efficient Task Execution"
                 content = self._create_optimization_content(context)
 
@@ -539,11 +488,8 @@ class TaskKnowledgeExtractor:
                         tags=["optimization", "performance", "efficiency"],
                         metadata={
                             "execution_time": perf_data["metric_value"],
-                            "iteration_efficiency": context.iteration_count
-                            / context.total_duration_minutes,
-                            "optimization_techniques": self._identify_optimization_techniques(
-                                context
-                            ),
+                            "iteration_efficiency": context.iteration_count / context.total_duration_minutes,
+                            "optimization_techniques": self._identify_optimization_techniques(context),
                         },
                         success_indicators=self._extract_success_indicators(context),
                         failure_patterns=[],
@@ -553,9 +499,7 @@ class TaskKnowledgeExtractor:
 
         return extracts
 
-    async def _store_knowledge_extract(
-        self, context: ExtractionContext, extract: TaskKnowledgeExtract
-    ) -> Optional[str]:
+    async def _store_knowledge_extract(self, context: ExtractionContext, extract: TaskKnowledgeExtract) -> Optional[str]:
         """Store a knowledge extract in the appropriate knowledge base"""
 
         try:
@@ -716,18 +660,14 @@ class TaskKnowledgeExtractor:
     # Additional helper methods would be implemented here...
     # (The file is getting quite long, so I'll implement key methods and indicate where others would go)
 
-    def _identify_problem_solution_pairs(
-        self, conversation_history: List[Dict]
-    ) -> List[Tuple[str, str]]:
+    def _identify_problem_solution_pairs(self, conversation_history: List[Dict]) -> List[Tuple[str, str]]:
         """Identify problem-solution pairs in conversation history"""
         pairs = []
         # Implementation would analyze conversation flow to identify problems and their solutions
         # This is a simplified placeholder
         return pairs
 
-    def _categorize_problem_solution(
-        self, problem: str, solution: str
-    ) -> KnowledgeCategory:
+    def _categorize_problem_solution(self, problem: str, solution: str) -> KnowledgeCategory:
         """Categorize a problem-solution pair"""
         # Simple categorization based on keywords
         combined_text = (problem + " " + solution).lower()
@@ -743,9 +683,7 @@ class TaskKnowledgeExtractor:
         else:
             return KnowledgeCategory.DEVELOPMENT
 
-    def _calculate_code_pattern_confidence(
-        self, content: str, patterns: List[str], context: ExtractionContext
-    ) -> float:
+    def _calculate_code_pattern_confidence(self, content: str, patterns: List[str], context: ExtractionContext) -> float:
         """Calculate confidence score for code pattern extraction"""
         base_confidence = 0.5
 
@@ -763,9 +701,7 @@ class TaskKnowledgeExtractor:
 
         return min(1.0, base_confidence)
 
-    def _calculate_solution_confidence(
-        self, problem: str, solution: str, context: ExtractionContext
-    ) -> float:
+    def _calculate_solution_confidence(self, problem: str, solution: str, context: ExtractionContext) -> float:
         """Calculate confidence score for solution extraction"""
         base_confidence = 0.4
 
@@ -777,9 +713,7 @@ class TaskKnowledgeExtractor:
 
         return min(1.0, base_confidence)
 
-    def _calculate_debugging_confidence(
-        self, session: Dict, context: ExtractionContext
-    ) -> float:
+    def _calculate_debugging_confidence(self, session: Dict, context: ExtractionContext) -> float:
         """Calculate confidence for debugging insights"""
         base_confidence = 0.6 if context.success else 0.3
 
@@ -798,9 +732,7 @@ class TaskKnowledgeExtractor:
 
         return base_confidence
 
-    def _calculate_error_pattern_confidence(
-        self, pattern: Dict, context: ExtractionContext
-    ) -> float:
+    def _calculate_error_pattern_confidence(self, pattern: Dict, context: ExtractionContext) -> float:
         """Calculate confidence for error pattern extraction"""
         base_confidence = 0.4
 
@@ -829,9 +761,7 @@ class TaskKnowledgeExtractor:
         return min(1.0, base_confidence)
 
     # Content creation methods (simplified implementations)
-    def _create_code_pattern_content(
-        self, content: str, patterns: List[str], context: ExtractionContext
-    ) -> str:
+    def _create_code_pattern_content(self, content: str, patterns: List[str], context: ExtractionContext) -> str:
         """Create formatted content for code pattern knowledge"""
         return f"**Code Pattern: {', '.join(patterns)}**\n\n{content[:2000]}..."
 
@@ -843,9 +773,7 @@ class TaskKnowledgeExtractor:
         """Create formatted content for process knowledge"""
         return f"**Task Type:** {context.task_data.get('task_type', 'Unknown')}\n**Iterations:** {context.iteration_count}\n**Duration:** {context.total_duration_minutes:.1f} minutes\n**Success:** {'Yes' if context.success else 'No'}"
 
-    def _create_error_pattern_content(
-        self, pattern: Dict, context: ExtractionContext
-    ) -> str:
+    def _create_error_pattern_content(self, pattern: Dict, context: ExtractionContext) -> str:
         """Create formatted content for error pattern knowledge"""
         return f"**Error Type:** {pattern['error_type']}\n**Frequency:** {pattern['frequency']}\n**Prevention:** {', '.join(pattern.get('prevention', []))}"
 
@@ -854,9 +782,7 @@ class TaskKnowledgeExtractor:
         return f"**Optimization achieved in {context.total_duration_minutes:.1f} minutes with {context.iteration_count} iterations**"
 
     # Placeholder methods for more complex analysis functions
-    def _identify_debugging_sessions(
-        self, conversation_history: List[Dict]
-    ) -> List[Dict]:
+    def _identify_debugging_sessions(self, conversation_history: List[Dict]) -> List[Dict]:
         """Identify debugging sessions in conversation history"""
         return []  # Simplified implementation
 
@@ -864,9 +790,7 @@ class TaskKnowledgeExtractor:
         """Identify error patterns in conversation history"""
         return []  # Simplified implementation
 
-    def _identify_optimization_techniques(
-        self, context: ExtractionContext
-    ) -> List[str]:
+    def _identify_optimization_techniques(self, context: ExtractionContext) -> List[str]:
         """Identify optimization techniques used"""
         return []  # Simplified implementation
 

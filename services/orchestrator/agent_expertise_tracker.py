@@ -8,9 +8,9 @@ and expertise development across the FuzeAgent system.
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 from .database import get_db_connection
 
@@ -58,18 +58,11 @@ class AgentExpertiseTracker:
         self.cache_ttl = 300  # 5 minutes
         self.last_cache_update = {}
 
-    async def get_agent_performance_metrics(
-        self, agent_id: str
-    ) -> Optional[AgentPerformanceMetrics]:
+    async def get_agent_performance_metrics(self, agent_id: str) -> Optional[AgentPerformanceMetrics]:
         """Get comprehensive performance metrics for an agent"""
 
         # Check cache first
-        if (
-            agent_id in self.metrics_cache
-            and agent_id in self.last_cache_update
-            and (datetime.now() - self.last_cache_update[agent_id]).total_seconds()
-            < self.cache_ttl
-        ):
+        if agent_id in self.metrics_cache and agent_id in self.last_cache_update and (datetime.now() - self.last_cache_update[agent_id]).total_seconds() < self.cache_ttl:
             return self.metrics_cache[agent_id]
 
         try:
@@ -139,9 +132,7 @@ class AgentExpertiseTracker:
                     declining_skills_count=expertise_stats["declining_skills"] or 0,
                     memory_usage_stats={
                         "total_memories": memory_stats["total_memories"] or 0,
-                        "avg_confidence": float(memory_stats["avg_confidence"])
-                        if memory_stats["avg_confidence"]
-                        else 0.0,
+                        "avg_confidence": float(memory_stats["avg_confidence"]) if memory_stats["avg_confidence"] else 0.0,
                         "total_usage": memory_stats["total_usage"] or 0,
                         "memory_types_used": memory_stats["memory_types_used"] or 0,
                     },
@@ -159,18 +150,11 @@ class AgentExpertiseTracker:
             logger.error(f"Error getting performance metrics for agent {agent_id}: {e}")
             return None
 
-    async def generate_expertise_insights(
-        self, agent_id: str
-    ) -> List[ExpertiseInsight]:
+    async def generate_expertise_insights(self, agent_id: str) -> List[ExpertiseInsight]:
         """Generate insights about agent expertise development"""
 
         # Check cache first
-        if (
-            agent_id in self.insights_cache
-            and agent_id in self.last_cache_update
-            and (datetime.now() - self.last_cache_update[agent_id]).total_seconds()
-            < self.cache_ttl
-        ):
+        if agent_id in self.insights_cache and agent_id in self.last_cache_update and (datetime.now() - self.last_cache_update[agent_id]).total_seconds() < self.cache_ttl:
             return self.insights_cache[agent_id]
 
         insights = []
@@ -178,9 +162,7 @@ class AgentExpertiseTracker:
         try:
             async with get_db_connection() as conn:
                 # Analyze learning velocity patterns
-                learning_insights = await self._analyze_learning_velocity(
-                    agent_id, conn
-                )
+                learning_insights = await self._analyze_learning_velocity(agent_id, conn)
                 insights.extend(learning_insights)
 
                 # Analyze skill development patterns
@@ -206,8 +188,7 @@ class AgentExpertiseTracker:
         try:
             async with get_db_connection() as conn:
                 # Overall system stats
-                system_stats = await conn.fetchrow(
-                    """
+                system_stats = await conn.fetchrow("""
                     SELECT 
                         COUNT(DISTINCT a.id) as total_agents,
                         COUNT(DISTINCT ae.skill_area) as total_skill_areas,
@@ -216,24 +197,20 @@ class AgentExpertiseTracker:
                         COUNT(CASE WHEN ae.performance_trend = 'declining' THEN 1 END) as declining_agents
                     FROM agents a
                     LEFT JOIN agent_expertise ae ON a.id = ae.agent_id
-                """
-                )
+                """)
 
                 # Memory system stats
-                memory_stats = await conn.fetchrow(
-                    """
+                memory_stats = await conn.fetchrow("""
                     SELECT 
                         COUNT(*) as total_memories,
                         AVG(confidence_score) as avg_confidence,
                         SUM(usage_count) as total_usage,
                         COUNT(DISTINCT agent_id) as agents_with_memory
                     FROM agent_memory
-                """
-                )
+                """)
 
                 # Top performing skill areas
-                top_skill_areas = await conn.fetch(
-                    """
+                top_skill_areas = await conn.fetch("""
                     SELECT 
                         skill_area,
                         COUNT(*) as agent_count,
@@ -243,19 +220,16 @@ class AgentExpertiseTracker:
                     GROUP BY skill_area
                     ORDER BY avg_expertise DESC, avg_success_rate DESC
                     LIMIT 10
-                """
-                )
+                """)
 
                 # Recent activity
-                recent_activity = await conn.fetchrow(
-                    """
+                recent_activity = await conn.fetchrow("""
                     SELECT 
                         COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as memories_24h,
                         COUNT(CASE WHEN created_at > NOW() - INTERVAL '7 days' THEN 1 END) as memories_7d,
                         COUNT(DISTINCT CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN agent_id END) as active_agents_24h
                     FROM agent_memory
-                """
-                )
+                """)
 
                 return {
                     "system_stats": dict(system_stats) if system_stats else {},
@@ -294,9 +268,7 @@ class AgentExpertiseTracker:
                 return "insufficient_data"
 
             # Calculate trend
-            success_rates = [
-                float(row["daily_success_rate"]) for row in recent_outcomes
-            ]
+            success_rates = [float(row["daily_success_rate"]) for row in recent_outcomes]
 
             # Simple linear trend calculation
             if len(success_rates) >= 3:
@@ -316,9 +288,7 @@ class AgentExpertiseTracker:
             logger.error(f"Error calculating recent trend: {e}")
             return "unknown"
 
-    async def _analyze_learning_velocity(
-        self, agent_id: str, conn
-    ) -> List[ExpertiseInsight]:
+    async def _analyze_learning_velocity(self, agent_id: str, conn) -> List[ExpertiseInsight]:
         """Analyze learning velocity patterns"""
 
         insights = []
@@ -385,9 +355,7 @@ class AgentExpertiseTracker:
 
         return insights
 
-    async def _analyze_skill_development(
-        self, agent_id: str, conn
-    ) -> List[ExpertiseInsight]:
+    async def _analyze_skill_development(self, agent_id: str, conn) -> List[ExpertiseInsight]:
         """Analyze skill development patterns"""
 
         insights = []
@@ -458,9 +426,7 @@ class AgentExpertiseTracker:
 
         return insights
 
-    async def _analyze_memory_patterns(
-        self, agent_id: str, conn
-    ) -> List[ExpertiseInsight]:
+    async def _analyze_memory_patterns(self, agent_id: str, conn) -> List[ExpertiseInsight]:
         """Analyze memory usage and effectiveness patterns"""
 
         insights = []
@@ -481,14 +447,9 @@ class AgentExpertiseTracker:
             )
 
             if memory_effectiveness and memory_effectiveness["total_memories"] > 50:
-                high_usage_ratio = (
-                    memory_effectiveness["high_usage_memories"]
-                    / memory_effectiveness["total_memories"]
-                )
+                high_usage_ratio = memory_effectiveness["high_usage_memories"] / memory_effectiveness["total_memories"]
 
-                if (
-                    high_usage_ratio > 0.2
-                ):  # More than 20% of memories are highly reused
+                if high_usage_ratio > 0.2:  # More than 20% of memories are highly reused
                     insights.append(
                         ExpertiseInsight(
                             agent_id=agent_id,
@@ -497,13 +458,9 @@ class AgentExpertiseTracker:
                             description=f"Excellent memory reuse patterns - {high_usage_ratio:.1%} of memories are frequently accessed",
                             confidence=0.8,
                             evidence={
-                                "total_memories": memory_effectiveness[
-                                    "total_memories"
-                                ],
+                                "total_memories": memory_effectiveness["total_memories"],
                                 "high_usage_ratio": high_usage_ratio,
-                                "avg_confidence": float(
-                                    memory_effectiveness["avg_confidence"]
-                                ),
+                                "avg_confidence": float(memory_effectiveness["avg_confidence"]),
                             },
                             timestamp=datetime.now(),
                         )

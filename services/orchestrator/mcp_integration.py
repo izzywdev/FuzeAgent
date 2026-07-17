@@ -16,9 +16,9 @@ import json
 import logging
 import os
 import uuid
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Union
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional, Union
 
 from .database import DatabaseManager
 
@@ -242,9 +242,7 @@ class FuzeAgentMCPServer:
             ),
         ]
 
-    async def handle_tool_call(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def handle_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle MCP tool calls"""
         try:
             if tool_name == "get_organization_structure":
@@ -343,9 +341,7 @@ class FuzeAgentMCPServer:
                     "status": agent["status"],
                     "capabilities": agent.get("config", {}).get("tools", []),
                     "current_task": agent.get("current_task_id"),
-                    "created_at": agent["created_at"].isoformat()
-                    if agent["created_at"]
-                    else None,
+                    "created_at": agent["created_at"].isoformat() if agent["created_at"] else None,
                 }
                 for agent in agents
             ],
@@ -375,9 +371,7 @@ class FuzeAgentMCPServer:
                     "id": task["id"],
                     "title": task["title"],
                     "status": task["status"],
-                    "created_at": task["created_at"].isoformat()
-                    if task["created_at"]
-                    else None,
+                    "created_at": task["created_at"].isoformat() if task["created_at"] else None,
                 }
                 for task in tasks
                 if task["status"] in ["pending", "executing"]
@@ -387,9 +381,7 @@ class FuzeAgentMCPServer:
                     "id": task["id"],
                     "title": task["title"],
                     "status": task["status"],
-                    "completed_at": task["updated_at"].isoformat()
-                    if task["updated_at"]
-                    else None,
+                    "completed_at": task["updated_at"].isoformat() if task["updated_at"] else None,
                 }
                 for task in tasks
                 if task["status"] in ["completed", "failed"]
@@ -407,11 +399,7 @@ class FuzeAgentMCPServer:
             return {"error": f"Task {task_id} not found"}
 
         # Get agent data
-        agent = (
-            await DatabaseManager.get_agent(task["assigned_to"])
-            if task["assigned_to"]
-            else None
-        )
+        agent = await DatabaseManager.get_agent(task["assigned_to"]) if task["assigned_to"] else None
 
         context = {
             "task_id": task_id,
@@ -419,17 +407,17 @@ class FuzeAgentMCPServer:
             "description": task["description"],
             "status": task["status"],
             "priority": task.get("priority", "medium"),
-            "created_at": task["created_at"].isoformat()
-            if task["created_at"]
-            else None,
-            "assigned_agent": {
-                "id": agent["id"],
-                "name": agent["name"],
-                "role": agent["role"],
-                "type": agent["type"],
-            }
-            if agent
-            else None,
+            "created_at": task["created_at"].isoformat() if task["created_at"] else None,
+            "assigned_agent": (
+                {
+                    "id": agent["id"],
+                    "name": agent["name"],
+                    "role": agent["role"],
+                    "type": agent["type"],
+                }
+                if agent
+                else None
+            ),
         }
 
         if include_history:
@@ -439,12 +427,8 @@ class FuzeAgentMCPServer:
                 {
                     "iteration": iter["iteration_number"],
                     "step": iter["step"],
-                    "started_at": iter["started_at"].isoformat()
-                    if iter["started_at"]
-                    else None,
-                    "completed_at": iter["completed_at"].isoformat()
-                    if iter["completed_at"]
-                    else None,
+                    "started_at": iter["started_at"].isoformat() if iter["started_at"] else None,
+                    "completed_at": iter["completed_at"].isoformat() if iter["completed_at"] else None,
                     "success": iter["success"],
                     "human_question": iter["human_question"],
                     "human_response": iter["human_response"],
@@ -592,9 +576,7 @@ class MCPClaudeIntegration:
     def __init__(self, mcp_server: FuzeAgentMCPServer):
         self.mcp_server = mcp_server
 
-    async def setup_claude_session_mcp(
-        self, session_id: str, agent_id: str, task_id: str
-    ) -> Dict[str, str]:
+    async def setup_claude_session_mcp(self, session_id: str, agent_id: str, task_id: str) -> Dict[str, str]:
         """Set up MCP tools for a Claude SDK session"""
 
         # Generate MCP server configuration for the session
@@ -620,26 +602,18 @@ class MCPClaudeIntegration:
         # For now, return the configuration
         return mcp_config
 
-    async def get_session_context(
-        self, session_id: str, agent_id: str, task_id: str
-    ) -> Dict[str, Any]:
+    async def get_session_context(self, session_id: str, agent_id: str, task_id: str) -> Dict[str, Any]:
         """Get comprehensive context for a Claude SDK session"""
 
         # Get agent context
-        agent_context = await self.mcp_server.handle_tool_call(
-            "get_agent_status", {"agent_id": agent_id}
-        )
+        agent_context = await self.mcp_server.handle_tool_call("get_agent_status", {"agent_id": agent_id})
 
         # Get task context
-        task_context = await self.mcp_server.handle_tool_call(
-            "get_task_context", {"task_id": task_id}
-        )
+        task_context = await self.mcp_server.handle_tool_call("get_task_context", {"task_id": task_id})
 
         # Get team context
         if agent_context.get("team_id"):
-            team_context = await self.mcp_server.handle_tool_call(
-                "get_team_agents", {"team_id": agent_context["team_id"]}
-            )
+            team_context = await self.mcp_server.handle_tool_call("get_team_agents", {"team_id": agent_context["team_id"]})
         else:
             team_context = {"agents": []}
 
@@ -649,7 +623,5 @@ class MCPClaudeIntegration:
             "task_context": task_context,
             "team_context": team_context,
             "available_tools": [tool.name for tool in self.mcp_server.tools],
-            "available_resources": [
-                resource.uri for resource in self.mcp_server.resources
-            ],
+            "available_resources": [resource.uri for resource in self.mcp_server.resources],
         }

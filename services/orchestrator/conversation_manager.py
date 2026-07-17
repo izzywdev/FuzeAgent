@@ -10,10 +10,10 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from .database import get_db_connection
 
@@ -107,9 +107,7 @@ class ConversationManager:
         # Track active session
         self.active_sessions[session_id] = session
 
-        logger.info(
-            f"Started conversation session {session_id} for agent {agent_id}, task {task_id}"
-        )
+        logger.info(f"Started conversation session {session_id} for agent {agent_id}, task {task_id}")
         return session_id
 
     async def end_conversation_session(self, session_id: str) -> bool:
@@ -274,9 +272,7 @@ class ConversationManager:
         logger.info(f"Stored human interaction {interaction_id} for task {task_id}")
         return str(interaction_id)
 
-    async def update_human_response(
-        self, interaction_id: str, human_response: str
-    ) -> bool:
+    async def update_human_response(self, interaction_id: str, human_response: str) -> bool:
         """Update human response to an interaction"""
 
         async with get_db_connection() as conn:
@@ -325,9 +321,7 @@ class ConversationManager:
                 json.dumps(context) if context else {},
             )
 
-        logger.debug(
-            f"Stored performance metric {metric_id}: {metric_type}={metric_value}"
-        )
+        logger.debug(f"Stored performance metric {metric_id}: {metric_type}={metric_value}")
         return str(metric_id)
 
     async def get_conversation_history(
@@ -417,15 +411,11 @@ class ConversationManager:
             "total_tokens": stats["total_tokens"] or 0,
             "avg_response_time_ms": float(stats["avg_response_time"] or 0),
             "max_iteration": stats["max_iteration"] or 0,
-            "message_types": {
-                row["message_type"]: row["count"] for row in type_breakdown
-            },
+            "message_types": {row["message_type"]: row["count"] for row in type_breakdown},
             "human_interactions": {
                 "total": human_interactions["total_interactions"] or 0,
                 "responded": human_interactions["responded_interactions"] or 0,
-                "avg_response_time_seconds": float(
-                    human_interactions["avg_response_time"] or 0
-                ),
+                "avg_response_time_seconds": float(human_interactions["avg_response_time"] or 0),
             },
         }
 
@@ -501,9 +491,7 @@ class ConversationManager:
 
         if time_range_hours:
             param_count += 1
-            conditions.append(
-                f"measured_at >= NOW() - INTERVAL '{time_range_hours} hours'"
-            )
+            conditions.append(f"measured_at >= NOW() - INTERVAL '{time_range_hours} hours'")
 
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -545,9 +533,7 @@ class ConversationManager:
 
         return str(session_id)
 
-    async def _update_conversation_session(
-        self, session_id: str, session: ConversationSession
-    ):
+    async def _update_conversation_session(self, session_id: str, session: ConversationSession):
         """Update conversation session in database"""
 
         async with get_db_connection() as conn:

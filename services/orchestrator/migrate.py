@@ -11,18 +11,16 @@ Usage:
     python migrate.py reset                     # Reset database (DANGER!)
 """
 
+import argparse
 import asyncio
-import sys
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
-import argparse
 
-from migration_manager import MigrationManager, migrate, rollback, status, reset
+from migration_manager import MigrationManager, migrate, reset, rollback, status
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://postgres:password@localhost:5434/ai_context"
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5434/ai_context")
 
 
 def create_migration_template(name: str) -> str:
@@ -71,9 +69,7 @@ async def main():
         help="Migration command to run",
     )
     parser.add_argument("target", nargs="?", help="Target version or migration name")
-    parser.add_argument(
-        "--database-url", default=DATABASE_URL, help="Database connection URL"
-    )
+    parser.add_argument("--database-url", default=DATABASE_URL, help="Database connection URL")
 
     args = parser.parse_args()
 
@@ -89,9 +85,7 @@ async def main():
 
             if migration_status["last_applied"]:
                 last = migration_status["last_applied"]
-                print(
-                    f"   Last applied: {last['version']}_{last['name']} ({last['applied_at']})"
-                )
+                print(f"   Last applied: {last['version']}_{last['name']} ({last['applied_at']})")
 
             if migration_status["pending_migrations"]:
                 print(f"\n⏳ Pending migrations:")

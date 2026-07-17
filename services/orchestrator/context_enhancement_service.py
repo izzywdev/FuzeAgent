@@ -9,17 +9,17 @@ task type, agent capabilities, and historical success patterns.
 import asyncio
 import json
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
 from .organization_rag_manager import (
-    OrganizationRAGManager,
-    KnowledgeCategory,
     ContentType,
+    KnowledgeCategory,
     KnowledgeSearchResult,
+    OrganizationRAGManager,
 )
 from .team_knowledge_manager import TeamKnowledgeManager, TeamKnowledgeSearchResult
 
@@ -94,9 +94,7 @@ class ContextEnhancementService:
         logger.info("Initializing ContextEnhancementService")
 
         try:
-            self.pool = await asyncpg.create_pool(
-                self.database_url, min_size=1, max_size=5, command_timeout=60
-            )
+            self.pool = await asyncpg.create_pool(self.database_url, min_size=1, max_size=5, command_timeout=60)
 
             logger.info("ContextEnhancementService initialized successfully")
 
@@ -135,31 +133,19 @@ class ContextEnhancementService:
                 agent_info["team_id"],
             )
 
-            team_knowledge = await self._gather_team_knowledge(
-                agent_info["team_id"], search_queries
-            )
+            team_knowledge = await self._gather_team_knowledge(agent_info["team_id"], search_queries)
 
-            similar_tasks = await self._find_similar_task_insights(
-                agent_info["organization_id"], task_data, agent_id
-            )
+            similar_tasks = await self._find_similar_task_insights(agent_info["organization_id"], task_data, agent_id)
 
             # Extract patterns and recommendations
-            success_patterns = await self._extract_success_patterns(
-                org_knowledge + team_knowledge + similar_tasks
-            )
+            success_patterns = await self._extract_success_patterns(org_knowledge + team_knowledge + similar_tasks)
 
-            pitfalls = await self._extract_common_pitfalls(
-                agent_info["organization_id"], task_data
-            )
+            pitfalls = await self._extract_common_pitfalls(agent_info["organization_id"], task_data)
 
-            recommendations = await self._generate_recommendations(
-                task_data, org_knowledge, team_knowledge, similar_tasks
-            )
+            recommendations = await self._generate_recommendations(task_data, org_knowledge, team_knowledge, similar_tasks)
 
             # Create context summary
-            context_summary = self._create_context_summary(
-                task_data, org_knowledge, team_knowledge, success_patterns
-            )
+            context_summary = self._create_context_summary(task_data, org_knowledge, team_knowledge, success_patterns)
 
             # Build enhanced context
             enhanced_context = EnhancedContext(
@@ -183,10 +169,7 @@ class ContextEnhancementService:
                         "team": len(team_knowledge),
                         "similar_tasks": len(similar_tasks),
                     },
-                    "total_relevance_score": sum(
-                        item.relevance_score
-                        for item in org_knowledge + team_knowledge + similar_tasks
-                    ),
+                    "total_relevance_score": sum(item.relevance_score for item in org_knowledge + team_knowledge + similar_tasks),
                     "enhancement_version": "1.0",
                 },
             )
@@ -196,11 +179,7 @@ class ContextEnhancementService:
 
             self.enhancements_created += 1
 
-            logger.info(
-                f"Enhanced context for agent {agent_id}: "
-                f"{len(org_knowledge)} org + {len(team_knowledge)} team + "
-                f"{len(similar_tasks)} similar task insights"
-            )
+            logger.info(f"Enhanced context for agent {agent_id}: " f"{len(org_knowledge)} org + {len(team_knowledge)} team + " f"{len(similar_tasks)} similar task insights")
 
             return enhanced_context
 
@@ -241,11 +220,7 @@ class ContextEnhancementService:
 
             # Get iteration-specific guidance
             if current_iteration > 3:
-                guidance_items.extend(
-                    await self._get_iteration_guidance(
-                        agent_info["organization_id"], current_iteration
-                    )
-                )
+                guidance_items.extend(await self._get_iteration_guidance(agent_info["organization_id"], current_iteration))
 
             # Get context-specific suggestions
             suggestions = await self._get_contextual_suggestions(
@@ -284,9 +259,7 @@ class ContextEnhancementService:
             elif knowledge_source == "team":
                 # Update team knowledge effectiveness
                 async with self.pool.acquire() as conn:
-                    agent_id = (
-                        agent_feedback.get("agent_id") if agent_feedback else None
-                    )
+                    agent_id = agent_feedback.get("agent_id") if agent_feedback else None
                     if agent_id:
                         await self.team_knowledge_manager.update_knowledge_effectiveness(
                             team_knowledge_id=knowledge_id,
@@ -324,9 +297,7 @@ class ContextEnhancementService:
         try:
             async with self.pool.acquire() as conn:
                 # Basic enhancement statistics
-                where_conditions = [
-                    "created_at >= NOW() - INTERVAL '%s days'" % days_back
-                ]
+                where_conditions = ["created_at >= NOW() - INTERVAL '%s days'" % days_back]
                 params = []
 
                 if organization_id:
@@ -334,9 +305,7 @@ class ContextEnhancementService:
                     params.append(organization_id)
 
                 if team_id:
-                    where_conditions.append(
-                        "team_id = $2" if organization_id else "team_id = $1"
-                    )
+                    where_conditions.append("team_id = $2" if organization_id else "team_id = $1")
                     params.append(team_id)
 
                 # This is a placeholder - in practice you'd have a table to track enhancements
@@ -376,9 +345,7 @@ class ContextEnhancementService:
 
             return dict(agent_info) if agent_info else None
 
-    def _build_search_queries(
-        self, task_data: Dict[str, Any], agent_info: Dict[str, Any]
-    ) -> List[str]:
+    def _build_search_queries(self, task_data: Dict[str, Any], agent_info: Dict[str, Any]) -> List[str]:
         """Build search queries based on task data and agent information"""
 
         queries = []
@@ -433,9 +400,7 @@ class ContextEnhancementService:
                     enhancement = ContextEnhancement(
                         knowledge_id=result.knowledge.id,
                         title=result.knowledge.title,
-                        content=result.knowledge.content[:1000] + "..."
-                        if len(result.knowledge.content) > 1000
-                        else result.knowledge.content,
+                        content=result.knowledge.content[:1000] + "..." if len(result.knowledge.content) > 1000 else result.knowledge.content,
                         source_type="organization",
                         category=result.knowledge.knowledge_category.value,
                         relevance_score=result.combined_score,
@@ -451,18 +416,14 @@ class ContextEnhancementService:
         # Sort by relevance and remove duplicates
         seen_ids = set()
         unique_knowledge = []
-        for item in sorted(
-            org_knowledge, key=lambda x: x.relevance_score, reverse=True
-        ):
+        for item in sorted(org_knowledge, key=lambda x: x.relevance_score, reverse=True):
             if item.knowledge_id not in seen_ids:
                 unique_knowledge.append(item)
                 seen_ids.add(item.knowledge_id)
 
         return unique_knowledge[: self.max_org_knowledge_items]
 
-    async def _gather_team_knowledge(
-        self, team_id: str, search_queries: List[str]
-    ) -> List[ContextEnhancement]:
+    async def _gather_team_knowledge(self, team_id: str, search_queries: List[str]) -> List[ContextEnhancement]:
         """Gather relevant team knowledge"""
 
         team_knowledge = []
@@ -480,9 +441,7 @@ class ContextEnhancementService:
                     enhancement = ContextEnhancement(
                         knowledge_id=result.team_knowledge.id,
                         title=result.team_knowledge.title,
-                        content=result.team_knowledge.content[:1000] + "..."
-                        if len(result.team_knowledge.content) > 1000
-                        else result.team_knowledge.content,
+                        content=result.team_knowledge.content[:1000] + "..." if len(result.team_knowledge.content) > 1000 else result.team_knowledge.content,
                         source_type="team",
                         category=result.team_knowledge.knowledge_category.value,
                         relevance_score=result.combined_score,
@@ -498,18 +457,14 @@ class ContextEnhancementService:
         # Sort and deduplicate
         seen_ids = set()
         unique_knowledge = []
-        for item in sorted(
-            team_knowledge, key=lambda x: x.relevance_score, reverse=True
-        ):
+        for item in sorted(team_knowledge, key=lambda x: x.relevance_score, reverse=True):
             if item.knowledge_id not in seen_ids:
                 unique_knowledge.append(item)
                 seen_ids.add(item.knowledge_id)
 
         return unique_knowledge[: self.max_team_knowledge_items]
 
-    async def _find_similar_task_insights(
-        self, organization_id: str, task_data: Dict[str, Any], agent_id: str
-    ) -> List[ContextEnhancement]:
+    async def _find_similar_task_insights(self, organization_id: str, task_data: Dict[str, Any], agent_id: str) -> List[ContextEnhancement]:
         """Find insights from similar completed tasks"""
 
         similar_tasks = []
@@ -540,13 +495,9 @@ class ContextEnhancementService:
 
                 for task in similar_task_data:
                     # Extract insights from the task result
-                    task_result = (
-                        task["result"] if isinstance(task["result"], dict) else {}
-                    )
+                    task_result = task["result"] if isinstance(task["result"], dict) else {}
 
-                    insights_content = self._extract_task_insights(
-                        dict(task), task_result
-                    )
+                    insights_content = self._extract_task_insights(dict(task), task_result)
 
                     if insights_content:
                         enhancement = ContextEnhancement(
@@ -574,9 +525,7 @@ class ContextEnhancementService:
 
         return similar_tasks
 
-    async def _extract_success_patterns(
-        self, all_knowledge: List[ContextEnhancement]
-    ) -> List[str]:
+    async def _extract_success_patterns(self, all_knowledge: List[ContextEnhancement]) -> List[str]:
         """Extract success patterns from knowledge items"""
 
         patterns = []
@@ -597,9 +546,7 @@ class ContextEnhancementService:
 
         return list(set(patterns))  # Remove duplicates
 
-    async def _extract_common_pitfalls(
-        self, organization_id: str, task_data: Dict[str, Any]
-    ) -> List[str]:
+    async def _extract_common_pitfalls(self, organization_id: str, task_data: Dict[str, Any]) -> List[str]:
         """Extract common pitfalls for this type of task"""
 
         pitfalls = []
@@ -620,11 +567,7 @@ class ContextEnhancementService:
 
                 # Extract pitfalls from error pattern content
                 content_lower = result.knowledge.content.lower()
-                if (
-                    "avoid" in content_lower
-                    or "pitfall" in content_lower
-                    or "common mistake" in content_lower
-                ):
+                if "avoid" in content_lower or "pitfall" in content_lower or "common mistake" in content_lower:
                     pitfalls.append(result.knowledge.title)
 
         except Exception as e:
@@ -652,20 +595,14 @@ class ContextEnhancementService:
                 recommendations.append(f"Consider development approach: {item.title}")
 
         # Recommendations from effective team knowledge
-        effective_team = [
-            item
-            for item in team_knowledge
-            if item.usage_stats.get("adoption_rate", 0) > 0.5
-        ]
+        effective_team = [item for item in team_knowledge if item.usage_stats.get("adoption_rate", 0) > 0.5]
         for item in effective_team[:2]:
             recommendations.append(f"Team recommendation: {item.title}")
 
         # Recommendations from similar successful tasks
         for task in similar_tasks:
             if task.relevance_score > 0.6:
-                recommendations.append(
-                    f"Based on similar task: Consider approach used in '{task.title}'"
-                )
+                recommendations.append(f"Based on similar task: Consider approach used in '{task.title}'")
 
         return recommendations[:8]  # Limit recommendations
 
@@ -683,19 +620,13 @@ class ContextEnhancementService:
         summary_parts.append(f"Enhanced context for: {task_data.get('title', 'Task')}")
 
         if org_knowledge:
-            summary_parts.append(
-                f"• {len(org_knowledge)} organizational knowledge items available"
-            )
+            summary_parts.append(f"• {len(org_knowledge)} organizational knowledge items available")
 
         if team_knowledge:
-            summary_parts.append(
-                f"• {len(team_knowledge)} team-specific insights included"
-            )
+            summary_parts.append(f"• {len(team_knowledge)} team-specific insights included")
 
         if success_patterns:
-            summary_parts.append(
-                f"• {len(success_patterns)} success patterns identified"
-            )
+            summary_parts.append(f"• {len(success_patterns)} success patterns identified")
             summary_parts.append(f"Key patterns: {', '.join(success_patterns[:3])}")
 
         return "\n".join(summary_parts)
@@ -718,9 +649,7 @@ class ContextEnhancementService:
 
         return "\n".join(insights)
 
-    async def _get_iteration_guidance(
-        self, organization_id: str, iteration_count: int
-    ) -> List[str]:
+    async def _get_iteration_guidance(self, organization_id: str, iteration_count: int) -> List[str]:
         """Get guidance for high iteration count situations"""
 
         guidance = []
@@ -740,18 +669,14 @@ class ContextEnhancementService:
 
         return guidance
 
-    async def _get_contextual_suggestions(
-        self, organization_id: str, team_id: str, current_context: Dict[str, Any]
-    ) -> List[str]:
+    async def _get_contextual_suggestions(self, organization_id: str, team_id: str, current_context: Dict[str, Any]) -> List[str]:
         """Get suggestions based on current execution context"""
 
         suggestions = []
 
         # Context-specific suggestions based on current state
         if current_context.get("error_count", 0) > 2:
-            suggestions.append(
-                "Consider reviewing error patterns in organizational knowledge"
-            )
+            suggestions.append("Consider reviewing error patterns in organizational knowledge")
 
         if current_context.get("execution_time_minutes", 0) > 60:
             suggestions.append("Look for optimization guidance from team knowledge")

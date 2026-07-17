@@ -13,15 +13,16 @@ Supports:
 - Cost optimization
 """
 
+import base64
 import json
 import logging
+import os
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any, Union
-from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Union
+
 from cryptography.fernet import Fernet
-import os
-import base64
 
 from .database import DatabaseManager
 
@@ -292,27 +293,19 @@ class ModelConfigurationManager:
             )
 
             # Store in database
-            await DatabaseManager.store_provider_credentials(
-                organization_id, credentials.__dict__
-            )
+            await DatabaseManager.store_provider_credentials(organization_id, credentials.__dict__)
 
-            logger.info(
-                f"Stored credentials for {provider} in organization {organization_id}"
-            )
+            logger.info(f"Stored credentials for {provider} in organization {organization_id}")
             return True
 
         except Exception as e:
             logger.error(f"Error storing provider credentials: {e}")
             return False
 
-    async def get_provider_credentials(
-        self, organization_id: str, provider: ModelProvider
-    ) -> Optional[str]:
+    async def get_provider_credentials(self, organization_id: str, provider: ModelProvider) -> Optional[str]:
         """Get decrypted API key for a provider"""
         try:
-            credentials_data = await DatabaseManager.get_provider_credentials(
-                organization_id, provider.value
-            )
+            credentials_data = await DatabaseManager.get_provider_credentials(organization_id, provider.value)
 
             if not credentials_data:
                 return None
@@ -322,9 +315,7 @@ class ModelConfigurationManager:
             decrypted_key = self.fernet.decrypt(encrypted_key.encode()).decode()
 
             # Update last used timestamp
-            await DatabaseManager.update_credentials_last_used(
-                organization_id, provider.value
-            )
+            await DatabaseManager.update_credentials_last_used(organization_id, provider.value)
 
             return decrypted_key
 
@@ -332,9 +323,7 @@ class ModelConfigurationManager:
             logger.error(f"Error retrieving provider credentials: {e}")
             return None
 
-    async def configure_agent_model(
-        self, agent_id: str, model_config: AgentModelConfig
-    ) -> bool:
+    async def configure_agent_model(self, agent_id: str, model_config: AgentModelConfig) -> bool:
         """Configure model settings for an agent"""
         try:
             # Validate primary model exists
@@ -347,9 +336,7 @@ class ModelConfigurationManager:
                     raise ValueError(f"Unknown fallback model: {model_id}")
 
             # Store configuration
-            await DatabaseManager.store_agent_model_config(
-                agent_id, model_config.__dict__
-            )
+            await DatabaseManager.store_agent_model_config(agent_id, model_config.__dict__)
 
             logger.info(f"Configured model settings for agent {agent_id}")
             return True
@@ -390,32 +377,20 @@ class ModelConfigurationManager:
 
             # Check if primary model supports required capabilities
             primary_model = self.available_models.get(agent_config.primary_model)
-            if primary_model and all(
-                cap in primary_model.capabilities for cap in task_capabilities
-            ):
+            if primary_model and all(cap in primary_model.capabilities for cap in task_capabilities):
                 # Check cost limit if specified
-                if (
-                    cost_limit is None
-                    or self._estimate_task_cost(primary_model, 1000) <= cost_limit
-                ):
+                if cost_limit is None or self._estimate_task_cost(primary_model, 1000) <= cost_limit:
                     return agent_config.primary_model
 
             # Try fallback models
             for model_id in agent_config.fallback_models:
                 model = self.available_models.get(model_id)
-                if model and all(
-                    cap in model.capabilities for cap in task_capabilities
-                ):
-                    if (
-                        cost_limit is None
-                        or self._estimate_task_cost(model, 1000) <= cost_limit
-                    ):
+                if model and all(cap in model.capabilities for cap in task_capabilities):
+                    if cost_limit is None or self._estimate_task_cost(model, 1000) <= cost_limit:
                         return model_id
 
             # No suitable model found
-            logger.warning(
-                f"No suitable model found for agent {agent_id} with capabilities {task_capabilities}"
-            )
+            logger.warning(f"No suitable model found for agent {agent_id} with capabilities {task_capabilities}")
             return None
 
         except Exception as e:
@@ -448,16 +423,11 @@ class ModelConfigurationManager:
                 continue
 
             # Filter by capabilities if specified
-            if capabilities and not all(
-                cap in model.capabilities for cap in capabilities
-            ):
+            if capabilities and not all(cap in model.capabilities for cap in capabilities):
                 continue
 
             # Check if organization has credentials for this provider
-            has_credentials = (
-                await self.get_provider_credentials(organization_id, model.provider)
-                is not None
-            )
+            has_credentials = await self.get_provider_credentials(organization_id, model.provider) is not None
 
             model_info = {
                 "model_id": model_id,
@@ -482,14 +452,10 @@ class ModelConfigurationManager:
 
         return available
 
-    async def get_organization_model_usage(
-        self, organization_id: str, days: int = 30
-    ) -> Dict[str, Any]:
+    async def get_organization_model_usage(self, organization_id: str, days: int = 30) -> Dict[str, Any]:
         """Get model usage statistics for an organization"""
         try:
-            usage_data = await DatabaseManager.get_model_usage_stats(
-                organization_id, days
-            )
+            usage_data = await DatabaseManager.get_model_usage_stats(organization_id, days)
 
             return {
                 "organization_id": organization_id,
@@ -506,9 +472,7 @@ class ModelConfigurationManager:
             logger.error(f"Error getting model usage: {e}")
             return {}
 
-    async def estimate_task_cost(
-        self, agent_id: str, task_description: str, estimated_complexity: str = "medium"
-    ) -> Dict[str, Any]:
+    async def estimate_task_cost(self, agent_id: str, task_description: str, estimated_complexity: str = "medium") -> Dict[str, Any]:
         """Estimate cost for a task execution"""
         try:
             agent_config = await self.get_agent_model_config(agent_id)
@@ -537,10 +501,8 @@ class ModelConfigurationManager:
                 "estimated_cost_usd": round(estimated_cost, 4),
                 "complexity": estimated_complexity,
                 "cost_breakdown": {
-                    "input_cost": (estimated_tokens * 0.7 / 1000)
-                    * model.cost_per_input_token,
-                    "output_cost": (estimated_tokens * 0.3 / 1000)
-                    * model.cost_per_output_token,
+                    "input_cost": (estimated_tokens * 0.7 / 1000) * model.cost_per_input_token,
+                    "output_cost": (estimated_tokens * 0.3 / 1000) * model.cost_per_output_token,
                 },
             }
 

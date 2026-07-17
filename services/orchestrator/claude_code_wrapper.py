@@ -1,17 +1,17 @@
-from crewai.tools import BaseTool
-from typing import Type, Any, Optional, Dict, List
-from pydantic import BaseModel, Field
+import asyncio
+import json
+import os
 import subprocess
 import tempfile
-import os
-import json
-import asyncio
 import time
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Type
 
 # Import Anthropic SDK for real Claude integration
 import anthropic
 from anthropic import Anthropic
+from crewai.tools import BaseTool
+from pydantic import BaseModel, Field
 
 # Import conversation manager for full chat tracking
 from .conversation_manager import ConversationManager, MessageType
@@ -23,15 +23,9 @@ class ClaudeCodeInput(BaseModel):
     task: str = Field(description="Coding task to complete")
     language: str = Field(default="python", description="Programming language")
     context: str = Field(default="", description="Additional context or requirements")
-    include_tests: bool = Field(
-        default=True, description="Whether to include unit tests"
-    )
-    include_docs: bool = Field(
-        default=True, description="Whether to include documentation"
-    )
-    file_path: Optional[str] = Field(
-        default=None, description="Optional file path for code context"
-    )
+    include_tests: bool = Field(default=True, description="Whether to include unit tests")
+    include_docs: bool = Field(default=True, description="Whether to include documentation")
+    file_path: Optional[str] = Field(default=None, description="Optional file path for code context")
 
 
 class ClaudeCodeWrapper(BaseTool):
@@ -97,9 +91,7 @@ class ClaudeCodeWrapper(BaseTool):
                 try:
                     # Note: In a full implementation, we'd make this method async
                     # For now, we'll skip the Git context in the sync version
-                    repo_context = (
-                        "Repository context: Available (Git manager configured)"
-                    )
+                    repo_context = "Repository context: Available (Git manager configured)"
                 except Exception as e:
                     repo_context = f"Repository context unavailable: {str(e)}"
 
@@ -107,11 +99,7 @@ class ClaudeCodeWrapper(BaseTool):
             existing_code = ""
             if file_path:
                 # Use workspace-relative path if available
-                full_path = (
-                    os.path.join(self.workspace_path, file_path)
-                    if not os.path.isabs(file_path)
-                    else file_path
-                )
+                full_path = os.path.join(self.workspace_path, file_path) if not os.path.isabs(file_path) else file_path
                 if os.path.exists(full_path):
                     with open(full_path, "r") as f:
                         existing_code = f.read()
@@ -136,9 +124,7 @@ class ClaudeCodeWrapper(BaseTool):
             )
 
             # Parse the response and extract code files
-            result = self._parse_response(
-                response.content[0].text, language, include_tests, include_docs
-            )
+            result = self._parse_response(response.content[0].text, language, include_tests, include_docs)
 
             # Save files to workspace if available, otherwise use temp directory
             if self.workspace_path and os.path.exists(self.workspace_path):
@@ -148,13 +134,7 @@ class ClaudeCodeWrapper(BaseTool):
                     saved_files = self._save_files(result["files"], tmpdir)
 
             # Update repository context with changed files
-            self.repository_context["files_changed"].extend(
-                [
-                    f["filename"]
-                    for f in result["files"]
-                    if f["type"] == "implementation"
-                ]
-            )
+            self.repository_context["files_changed"].extend([f["filename"] for f in result["files"] if f["type"] == "implementation"])
 
             # Run tests if generated and in workspace
             test_results = None
@@ -278,9 +258,7 @@ Please ensure the code is production-ready and follows industry standards.
 """
         return prompt
 
-    def _parse_response(
-        self, response: str, language: str, include_tests: bool, include_docs: bool
-    ) -> Dict[str, Any]:
+    def _parse_response(self, response: str, language: str, include_tests: bool, include_docs: bool) -> Dict[str, Any]:
         """Parse Claude's response and extract code files"""
 
         files = []
@@ -347,9 +325,7 @@ Please ensure the code is production-ready and follows industry standards.
             "commit_message": commit_message,
         }
 
-    def _extract_code_block(
-        self, text: str, section: str, language: str
-    ) -> Optional[str]:
+    def _extract_code_block(self, text: str, section: str, language: str) -> Optional[str]:
         """Extract code block from a specific section"""
 
         section_start = text.find(section)
@@ -465,9 +441,7 @@ Please ensure the code is production-ready and follows industry standards.
                 "success": False,
             }
 
-    def _build_repository_context(
-        self, branch_status: Dict[str, Any], commit_history: List[Any]
-    ) -> str:
+    def _build_repository_context(self, branch_status: Dict[str, Any], commit_history: List[Any]) -> str:
         """Build repository context string for the prompt"""
         context_parts = ["**Repository Context**:"]
 
@@ -480,9 +454,7 @@ Please ensure the code is production-ready and follows industry standards.
             context_parts.append(f"- Current Branch: `{current_branch}`")
             if feature_branch:
                 context_parts.append(f"- Feature Branch: `{feature_branch}`")
-            context_parts.append(
-                f"- Uncommitted Changes: {'Yes' if has_changes else 'No'}"
-            )
+            context_parts.append(f"- Uncommitted Changes: {'Yes' if has_changes else 'No'}")
             context_parts.append(f"- Remote Status: {remote_status}")
 
         if commit_history:
@@ -490,15 +462,11 @@ Please ensure the code is production-ready and follows industry standards.
             for i, commit in enumerate(commit_history[:3]):
                 context_parts.append(f"  {i+1}. `{commit.hash[:8]}` - {commit.message}")
                 if commit.files_changed:
-                    context_parts.append(
-                        f"     Files: {', '.join(commit.files_changed[:5])}"
-                    )
+                    context_parts.append(f"     Files: {', '.join(commit.files_changed[:5])}")
 
         if self.repository_context.get("files_changed"):
             changed_files = list(set(self.repository_context["files_changed"]))
-            context_parts.append(
-                f"- Files Modified This Session: {', '.join(changed_files)}"
-            )
+            context_parts.append(f"- Files Modified This Session: {', '.join(changed_files)}")
 
         return "\n".join(context_parts) + "\n"
 
@@ -518,9 +486,7 @@ Please ensure the code is production-ready and follows industry standards.
 
         return saved_files
 
-    async def commit_and_push_changes(
-        self, commit_message: str, files: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+    async def commit_and_push_changes(self, commit_message: str, files: Optional[List[str]] = None) -> Dict[str, Any]:
         """Commit and push changes using Git manager"""
         if not self.git_manager:
             return {"success": False, "error": "No Git manager available"}
@@ -564,17 +530,15 @@ Please ensure the code is production-ready and follows industry standards.
         if not self.agent_id or not self.task_id:
             raise ValueError("Agent ID and Task ID required for conversation tracking")
 
-        self.conversation_session_id = (
-            await self.conversation_manager.start_conversation_session(
-                agent_id=self.agent_id,
-                task_id=self.task_id,
-                sandbox_id=sandbox_id,
-                metadata={
-                    "workspace_path": self.workspace_path,
-                    "model": self.model,
-                    "git_enabled": bool(self.git_manager),
-                },
-            )
+        self.conversation_session_id = await self.conversation_manager.start_conversation_session(
+            agent_id=self.agent_id,
+            task_id=self.task_id,
+            sandbox_id=sandbox_id,
+            metadata={
+                "workspace_path": self.workspace_path,
+                "model": self.model,
+                "git_enabled": bool(self.git_manager),
+            },
         )
         return self.conversation_session_id
 
@@ -583,9 +547,7 @@ Please ensure the code is production-ready and follows industry standards.
         if not self.conversation_session_id:
             return False
 
-        success = await self.conversation_manager.end_conversation_session(
-            self.conversation_session_id
-        )
+        success = await self.conversation_manager.end_conversation_session(self.conversation_session_id)
         self.conversation_session_id = None
         return success
 
@@ -615,19 +577,13 @@ Please ensure the code is production-ready and follows industry standards.
             if self.git_manager:
                 try:
                     branch_status = await self.git_manager.get_branch_status()
-                    self.repository_context["current_branch"] = branch_status.get(
-                        "current_branch"
-                    )
+                    self.repository_context["current_branch"] = branch_status.get("current_branch")
 
                     commit_history = await self.git_manager.get_commit_history(limit=3)
                     if commit_history:
-                        self.repository_context["last_commit"] = commit_history[
-                            0
-                        ].message
+                        self.repository_context["last_commit"] = commit_history[0].message
 
-                    repo_context = self._build_repository_context(
-                        branch_status, commit_history
-                    )
+                    repo_context = self._build_repository_context(branch_status, commit_history)
                 except Exception as e:
                     repo_context = f"Repository context unavailable: {str(e)}"
 
@@ -635,11 +591,7 @@ Please ensure the code is production-ready and follows industry standards.
             existing_code = ""
             if file_path:
                 # Use workspace-relative path if available
-                full_path = (
-                    os.path.join(self.workspace_path, file_path)
-                    if not os.path.isabs(file_path)
-                    else file_path
-                )
+                full_path = os.path.join(self.workspace_path, file_path) if not os.path.isabs(file_path) else file_path
                 if os.path.exists(full_path):
                     with open(full_path, "r") as f:
                         existing_code = f.read()
@@ -665,9 +617,7 @@ Please ensure the code is production-ready and follows industry standards.
                     model=self.model,
                     temperature=0.3,
                     metadata={
-                        "task_description": task[:200] + "..."
-                        if len(task) > 200
-                        else task,
+                        "task_description": task[:200] + "..." if len(task) > 200 else task,
                         "language": language,
                         "include_tests": include_tests,
                         "include_docs": include_docs,
@@ -689,11 +639,7 @@ Please ensure the code is production-ready and follows industry standards.
 
             # Extract response content and token usage
             response_content = response.content[0].text
-            token_count = (
-                getattr(response.usage, "output_tokens", None)
-                if hasattr(response, "usage")
-                else None
-            )
+            token_count = getattr(response.usage, "output_tokens", None) if hasattr(response, "usage") else None
 
             # Store Claude response in conversation history
             if self.conversation_session_id and self.task_id:
@@ -712,9 +658,7 @@ Please ensure the code is production-ready and follows industry standards.
                 )
 
             # Parse the response and extract code files
-            result = self._parse_response(
-                response_content, language, include_tests, include_docs
-            )
+            result = self._parse_response(response_content, language, include_tests, include_docs)
 
             # Save files to workspace if available
             saved_files = []
@@ -734,13 +678,7 @@ Please ensure the code is production-ready and follows industry standards.
                         )
 
             # Update repository context with changed files
-            self.repository_context["files_changed"].extend(
-                [
-                    f["filename"]
-                    for f in result["files"]
-                    if f["type"] == "implementation"
-                ]
-            )
+            self.repository_context["files_changed"].extend([f["filename"] for f in result["files"] if f["type"] == "implementation"])
 
             # Run tests if generated and in workspace
             test_results = None
@@ -758,9 +696,7 @@ Please ensure the code is production-ready and follows industry standards.
                                 "message_type": MessageType.TEST_RESULT,
                                 "content": json.dumps(test_results),
                                 "metadata": {
-                                    "test_framework": "pytest"
-                                    if language == "python"
-                                    else "jest",
+                                    "test_framework": "pytest" if language == "python" else "jest",
                                     "workspace_path": self.workspace_path,
                                 },
                             },
@@ -789,24 +725,18 @@ Please ensure the code is production-ready and follows industry standards.
                         session_id=self.conversation_session_id,
                         message={
                             "task_id": self.task_id,
-                            "iteration_number": self.repository_context[
-                                "iteration_count"
-                            ],
+                            "iteration_number": self.repository_context["iteration_count"],
                             "message_type": MessageType.ERROR_MESSAGE,
                             "content": str(e),
                             "metadata": {
                                 "error_type": type(e).__name__,
-                                "task_description": task[:200] + "..."
-                                if len(task) > 200
-                                else task,
+                                "task_description": task[:200] + "..." if len(task) > 200 else task,
                             },
                         },
                     )
                 except Exception as conv_error:
                     # Don't let conversation storage errors break the main flow
-                    print(
-                        f"Warning: Failed to store error in conversation: {conv_error}"
-                    )
+                    print(f"Warning: Failed to store error in conversation: {conv_error}")
 
             return {
                 "status": "error",

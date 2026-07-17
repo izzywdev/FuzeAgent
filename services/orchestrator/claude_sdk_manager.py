@@ -12,13 +12,13 @@ import os
 import re
 import subprocess
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any, Callable, AsyncGenerator
-from dataclasses import dataclass
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
-from .file_operations_engine import FileOperationsEngine, OperationBatch
 from .conversation_manager import ConversationManager, MessageType
+from .file_operations_engine import FileOperationsEngine, OperationBatch
 
 logger = logging.getLogger(__name__)
 
@@ -152,9 +152,7 @@ class ClaudeSDKManager:
 
         try:
             # Start Claude Code process
-            await self._start_claude_process(
-                session, task_description, additional_context
-            )
+            await self._start_claude_process(session, task_description, additional_context)
 
             # Start output monitoring
             asyncio.create_task(self._monitor_session(session))
@@ -203,9 +201,7 @@ class ClaudeSDKManager:
             logger.error(f"Error sending input to session {session_id}: {e}")
             return False
 
-    async def approve_file_operations(
-        self, session_id: str, batch_id: str, approved: bool
-    ) -> bool:
+    async def approve_file_operations(self, session_id: str, batch_id: str, approved: bool) -> bool:
         """Approve or reject file operations from Claude SDK"""
 
         # Apply file operations
@@ -234,20 +230,18 @@ class ClaudeSDKManager:
             "task_id": session.task_id,
             "agent_id": session.agent_id,
             "state": session.state.value,
-            "current_interaction": {
-                "id": session.current_interaction.interaction_id,
-                "type": session.current_interaction.interaction_type.value,
-                "prompt": session.current_interaction.prompt,
-                "options": session.current_interaction.options,
-            }
-            if session.current_interaction
-            else None,
-            "started_at": session.started_at.isoformat()
-            if session.started_at
-            else None,
-            "last_activity": session.last_activity.isoformat()
-            if session.last_activity
-            else None,
+            "current_interaction": (
+                {
+                    "id": session.current_interaction.interaction_id,
+                    "type": session.current_interaction.interaction_type.value,
+                    "prompt": session.current_interaction.prompt,
+                    "options": session.current_interaction.options,
+                }
+                if session.current_interaction
+                else None
+            ),
+            "started_at": session.started_at.isoformat() if session.started_at else None,
+            "last_activity": session.last_activity.isoformat() if session.last_activity else None,
             "workspace_path": session.workspace_path,
         }
 
@@ -350,9 +344,7 @@ class ClaudeSDKManager:
             while session.process and session.process.returncode is None:
                 # Read output with timeout
                 try:
-                    output_data = await asyncio.wait_for(
-                        session.process.stdout.read(1024), timeout=0.1
-                    )
+                    output_data = await asyncio.wait_for(session.process.stdout.read(1024), timeout=0.1)
 
                     if output_data:
                         output_text = output_data.decode("utf-8", errors="replace")
@@ -376,9 +368,7 @@ class ClaudeSDKManager:
             # Process completed
             if session.process and session.process.returncode == 0:
                 session.state = ClaudeSDKState.COMPLETED
-                logger.info(
-                    f"Claude SDK session {session.session_id} completed successfully"
-                )
+                logger.info(f"Claude SDK session {session.session_id} completed successfully")
             else:
                 session.state = ClaudeSDKState.ERROR
                 logger.error(f"Claude SDK session {session.session_id} failed")
@@ -413,9 +403,7 @@ class ClaudeSDKManager:
             if callback:
                 asyncio.create_task(callback(session, interaction))
 
-            logger.info(
-                f"Detected interaction in session {session.session_id}: {interaction.interaction_type}"
-            )
+            logger.info(f"Detected interaction in session {session.session_id}: {interaction.interaction_type}")
 
         # Check for file operations
         await self._check_for_file_operations(session, output_text)
@@ -442,9 +430,7 @@ class ClaudeSDKManager:
 
         return None
 
-    async def _check_for_file_operations(
-        self, session: ClaudeSDKSession, output_text: str
-    ):
+    async def _check_for_file_operations(self, session: ClaudeSDKSession, output_text: str):
         """Check if output contains file operation requests"""
 
         # Look for structured file operations (JSON format)
@@ -456,9 +442,7 @@ class ClaudeSDKManager:
                     operations_data = json.loads(json_block)
                     if "operations" in operations_data:
                         # Process file operations
-                        batch = await self.file_ops_engine.process_claude_response(
-                            operations_data, session.task_id, session.agent_id
-                        )
+                        batch = await self.file_ops_engine.process_claude_response(operations_data, session.task_id, session.agent_id)
 
                         if batch.requires_approval:
                             session.state = ClaudeSDKState.WAITING_FOR_APPROVAL
@@ -470,13 +454,9 @@ class ClaudeSDKManager:
                             )
                         else:
                             # Auto-approved operations
-                            await self.file_ops_engine.apply_operations_if_approved(
-                                batch.batch_id
-                            )
+                            await self.file_ops_engine.apply_operations_if_approved(batch.batch_id)
 
-                        logger.info(
-                            f"Detected file operations in session {session.session_id}"
-                        )
+                        logger.info(f"Detected file operations in session {session.session_id}")
 
                 except json.JSONDecodeError:
                     continue
@@ -492,9 +472,7 @@ class ClaudeSDKManager:
 
         timeout_seconds = self.process_timeout
         if session.current_interaction:
-            timeout_seconds = (
-                session.current_interaction.timeout_seconds or self.interaction_timeout
-            )
+            timeout_seconds = session.current_interaction.timeout_seconds or self.interaction_timeout
 
         time_since_activity = (datetime.now() - session.last_activity).total_seconds()
         return time_since_activity > timeout_seconds

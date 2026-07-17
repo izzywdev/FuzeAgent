@@ -10,11 +10,11 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, date
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
-from decimal import Decimal, ROUND_HALF_UP
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
@@ -271,26 +271,16 @@ class PricingBillingService:
         # Calculate billing periods
         if billing_cycle == BillingCycle.MONTHLY:
             period_start = date.today()
-            period_end = (
-                period_start.replace(month=period_start.month + 1)
-                if period_start.month < 12
-                else period_start.replace(year=period_start.year + 1, month=1)
-            )
+            period_end = period_start.replace(month=period_start.month + 1) if period_start.month < 12 else period_start.replace(year=period_start.year + 1, month=1)
         elif billing_cycle == BillingCycle.ANNUAL:
             period_start = date.today()
             period_end = period_start.replace(year=period_start.year + 1)
         else:
             # Quarterly or custom - default to monthly for now
             period_start = date.today()
-            period_end = (
-                period_start.replace(month=period_start.month + 1)
-                if period_start.month < 12
-                else period_start.replace(year=period_start.year + 1, month=1)
-            )
+            period_end = period_start.replace(month=period_start.month + 1) if period_start.month < 12 else period_start.replace(year=period_start.year + 1, month=1)
 
-        trial_end = (
-            date.today() + timedelta(days=trial_days) if trial_days > 0 else None
-        )
+        trial_end = date.today() + timedelta(days=trial_days) if trial_days > 0 else None
 
         try:
             async with self.db_pool.acquire() as conn:
@@ -306,9 +296,7 @@ class PricingBillingService:
                     subscription_id,
                     organization_id,
                     tier.value,
-                    SubscriptionStatus.TRIAL.value
-                    if trial_end
-                    else SubscriptionStatus.ACTIVE.value,
+                    SubscriptionStatus.TRIAL.value if trial_end else SubscriptionStatus.ACTIVE.value,
                     billing_cycle.value,
                     period_start,
                     period_end,
@@ -322,9 +310,7 @@ class PricingBillingService:
                     json.dumps({"created_via": "api"}),
                 )
 
-            logger.info(
-                f"Created subscription {subscription_id} for organization {organization_id}"
-            )
+            logger.info(f"Created subscription {subscription_id} for organization {organization_id}")
             return subscription_id
 
         except Exception as e:
@@ -355,9 +341,7 @@ class PricingBillingService:
                 )
 
             if not subscription:
-                logger.warning(
-                    f"No active subscription found for organization {organization_id}"
-                )
+                logger.warning(f"No active subscription found for organization {organization_id}")
                 return False
 
             billing_period = f"{subscription['current_period_start']}_{subscription['current_period_end']}"
@@ -384,9 +368,7 @@ class PricingBillingService:
                 )
 
             # Check for usage limits and send alerts if needed
-            await self._check_usage_limits(
-                organization_id, subscription["id"], metric_type
-            )
+            await self._check_usage_limits(organization_id, subscription["id"], metric_type)
 
             return True
 
@@ -394,9 +376,7 @@ class PricingBillingService:
             logger.error(f"Error tracking usage: {e}")
             return False
 
-    async def calculate_monthly_bill(
-        self, organization_id: str, billing_period_start: date, billing_period_end: date
-    ) -> Dict[str, Any]:
+    async def calculate_monthly_bill(self, organization_id: str, billing_period_start: date, billing_period_end: date) -> Dict[str, Any]:
         """Calculate the monthly bill for an organization"""
 
         try:
@@ -435,10 +415,7 @@ class PricingBillingService:
                     billing_period,
                 )
 
-            usage_by_metric = {
-                record["metric_type"]: Decimal(str(record["total_usage"]))
-                for record in usage_records
-            }
+            usage_by_metric = {record["metric_type"]: Decimal(str(record["total_usage"])) for record in usage_records}
 
             # Calculate base subscription fee
             if subscription["billing_cycle"] == "monthly":
@@ -453,19 +430,13 @@ class PricingBillingService:
             for metric, usage in usage_by_metric.items():
                 if metric == UsageMetricType.AGENT_HOURS.value:
                     included = tier_config.agent_hours_included
-                    overage_rate = tier_config.overage_rates.get(
-                        "agent_hours", Decimal("0.50")
-                    )
+                    overage_rate = tier_config.overage_rates.get("agent_hours", Decimal("0.50"))
                 elif metric == UsageMetricType.API_CALLS.value:
                     included = tier_config.api_calls_included
-                    overage_rate = tier_config.overage_rates.get(
-                        "api_calls", Decimal("0.001")
-                    )
+                    overage_rate = tier_config.overage_rates.get("api_calls", Decimal("0.001"))
                 elif metric == UsageMetricType.STORAGE_GB.value:
                     included = tier_config.storage_gb_included
-                    overage_rate = tier_config.overage_rates.get(
-                        "storage_gb", Decimal("2.00")
-                    )
+                    overage_rate = tier_config.overage_rates.get("storage_gb", Decimal("2.00"))
                 else:
                     continue  # Skip metrics without overage billing
 
@@ -484,9 +455,7 @@ class PricingBillingService:
             # Calculate taxes (simplified - 8% for now)
             subtotal = base_amount + total_overage
             tax_rate = Decimal("0.08")
-            tax_amount = (subtotal * tax_rate).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
+            tax_amount = (subtotal * tax_rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             total_amount = subtotal + tax_amount
 
             return {
@@ -498,9 +467,7 @@ class PricingBillingService:
                 },
                 "tier": subscription["tier"],
                 "base_subscription": float(base_amount),
-                "usage_summary": {
-                    metric: float(usage) for metric, usage in usage_by_metric.items()
-                },
+                "usage_summary": {metric: float(usage) for metric, usage in usage_by_metric.items()},
                 "overage_charges": overage_charges,
                 "subtotal": float(subtotal),
                 "tax_amount": float(tax_amount),
@@ -512,16 +479,12 @@ class PricingBillingService:
             logger.error(f"Error calculating bill for {organization_id}: {e}")
             return {"error": str(e)}
 
-    async def generate_invoice(
-        self, organization_id: str, billing_calculation: Dict[str, Any]
-    ) -> str:
+    async def generate_invoice(self, organization_id: str, billing_calculation: Dict[str, Any]) -> str:
         """Generate an invoice from billing calculation"""
 
         try:
             invoice_id = str(uuid.uuid4())
-            invoice_number = (
-                f"INV-{datetime.now().strftime('%Y%m%d')}-{invoice_id[:8].upper()}"
-            )
+            invoice_number = f"INV-{datetime.now().strftime('%Y%m%d')}-{invoice_id[:8].upper()}"
 
             # Create line items
             line_items = []
@@ -537,9 +500,7 @@ class PricingBillingService:
             )
 
             # Overage line items
-            for metric, details in billing_calculation.get(
-                "overage_charges", {}
-            ).items():
+            for metric, details in billing_calculation.get("overage_charges", {}).items():
                 line_items.append(
                     {
                         "description": f"{metric.replace('_', ' ').title()} Overage ({details['overage']} units)",
@@ -579,18 +540,14 @@ class PricingBillingService:
                     datetime.utcnow(),
                 )
 
-            logger.info(
-                f"Generated invoice {invoice_number} for organization {organization_id}"
-            )
+            logger.info(f"Generated invoice {invoice_number} for organization {organization_id}")
             return invoice_id
 
         except Exception as e:
             logger.error(f"Error generating invoice: {e}")
             raise
 
-    async def get_subscription_details(
-        self, organization_id: str
-    ) -> Optional[Dict[str, Any]]:
+    async def get_subscription_details(self, organization_id: str) -> Optional[Dict[str, Any]]:
         """Get detailed subscription information for an organization"""
 
         try:
@@ -624,10 +581,7 @@ class PricingBillingService:
                     billing_period,
                 )
 
-            usage_summary = {
-                record["metric_type"]: float(record["total_usage"])
-                for record in current_usage
-            }
+            usage_summary = {record["metric_type"]: float(record["total_usage"]) for record in current_usage}
 
             return {
                 "subscription": dict(subscription),
@@ -646,9 +600,7 @@ class PricingBillingService:
             logger.error(f"Error getting subscription details: {e}")
             return None
 
-    async def _check_usage_limits(
-        self, organization_id: str, subscription_id: str, metric_type: UsageMetricType
-    ):
+    async def _check_usage_limits(self, organization_id: str, subscription_id: str, metric_type: UsageMetricType):
         """Check if usage is approaching limits and send alerts"""
 
         try:
@@ -699,9 +651,7 @@ class PricingBillingService:
 
                 if usage_percent >= 80:
                     # Would send alert to organization
-                    logger.info(
-                        f"Usage alert: {organization_id} at {usage_percent:.1f}% of {metric_type.value} limit"
-                    )
+                    logger.info(f"Usage alert: {organization_id} at {usage_percent:.1f}% of {metric_type.value} limit")
 
         except Exception as e:
             logger.error(f"Error checking usage limits: {e}")
@@ -732,14 +682,10 @@ class PricingBillingService:
                 )
 
             if result == "UPDATE 1":
-                logger.info(
-                    f"Upgraded subscription for {organization_id} to {new_tier.value}"
-                )
+                logger.info(f"Upgraded subscription for {organization_id} to {new_tier.value}")
                 return True
             else:
-                logger.warning(
-                    f"No subscription found to upgrade for {organization_id}"
-                )
+                logger.warning(f"No subscription found to upgrade for {organization_id}")
                 return False
 
         except Exception as e:

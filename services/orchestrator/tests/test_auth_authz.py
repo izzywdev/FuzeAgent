@@ -85,8 +85,7 @@ def build_app() -> FastAPI:
         return {"status": "ok"}
 
     @app.post("/sandboxes/{sandbox_id}/execute")
-    async def execute(sandbox_id: str, body: ExecBody,
-                      user: CurrentUser = Depends(require_user)):
+    async def execute(sandbox_id: str, body: ExecBody, user: CurrentUser = Depends(require_user)):
         return {"sandbox_id": sandbox_id, "command": body.command, "user": user.id}
 
     @app.post("/organizations/{org_id}/credentials")

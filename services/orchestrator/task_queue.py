@@ -1,16 +1,16 @@
 import asyncio
-import aio_pika
 import json
 import os
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
+import aio_pika
+
 from .database import DatabaseManager
 
 
 class TaskQueue:
     def __init__(self):
-        self.rabbitmq_url = os.getenv(
-            "RABBITMQ_URL", "amqp://admin:password@rabbitmq:5672/"
-        )
+        self.rabbitmq_url = os.getenv("RABBITMQ_URL", "amqp://admin:password@rabbitmq:5672/")
         self.connection = None
         self.channel = None
         self.task_execution_engine = None  # Will be set by orchestrator

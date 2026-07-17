@@ -15,10 +15,10 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import asyncpg
 
@@ -142,9 +142,7 @@ class CrossProductCoordinator:
                 )
 
             self.product_registry[product_info.product_id] = product_info
-            logger.info(
-                f"Registered product: {product_info.name} ({product_info.product_id})"
-            )
+            logger.info(f"Registered product: {product_info.name} ({product_info.product_id})")
             return True
 
         except Exception as e:
@@ -189,12 +187,8 @@ class CrossProductCoordinator:
             resource_requirements=resource_requirements or {},
             impact_assessment=impact_assessment,
             proposed_timeline=timeline or {},
-            stakeholders=await self._identify_stakeholders(
-                requesting_product, target_products
-            ),
-            dependencies=await self._identify_dependencies(
-                requesting_product, target_products
-            ),
+            stakeholders=await self._identify_stakeholders(requesting_product, target_products),
+            dependencies=await self._identify_dependencies(requesting_product, target_products),
             resolution_plan=None,
             created_at=now,
             updated_at=now,
@@ -213,9 +207,7 @@ class CrossProductCoordinator:
         logger.info(f"Created coordination request {request_id}: {title}")
         return request_id
 
-    async def resolve_coordination_request(
-        self, request_id: str, resolution_plan: Dict[str, Any], resolver_id: str
-    ) -> bool:
+    async def resolve_coordination_request(self, request_id: str, resolution_plan: Dict[str, Any], resolver_id: str) -> bool:
         """Resolve a coordination request with a specific plan"""
 
         try:
@@ -292,12 +284,8 @@ class CrossProductCoordinator:
                 return {
                     "product_id": product_id,
                     "active_requests": len(active_requests),
-                    "pending_requests": [
-                        r for r in active_requests if r["status"] == "pending"
-                    ],
-                    "in_progress_requests": [
-                        r for r in active_requests if r["status"] == "in_progress"
-                    ],
+                    "pending_requests": [r for r in active_requests if r["status"] == "pending"],
+                    "in_progress_requests": [r for r in active_requests if r["status"] == "in_progress"],
                     "recent_resolved": list(recent_resolved),
                     "resource_utilization": resource_usage,
                     "last_updated": datetime.utcnow().isoformat(),
@@ -354,9 +342,7 @@ class CrossProductCoordinator:
 
         return impact
 
-    async def _identify_stakeholders(
-        self, requesting_product: str, target_products: List[str]
-    ) -> List[str]:
+    async def _identify_stakeholders(self, requesting_product: str, target_products: List[str]) -> List[str]:
         """Identify stakeholders for a coordination request"""
         stakeholders = set()
 
@@ -369,22 +355,18 @@ class CrossProductCoordinator:
         # Add relevant agents based on coordination type
         try:
             async with self.db_pool.acquire() as conn:
-                agents = await conn.fetch(
-                    """
+                agents = await conn.fetch("""
                     SELECT id FROM agents
                     WHERE type IN ('executive', 'manager')
                     AND status = 'active'
-                """
-                )
+                """)
                 stakeholders.update([str(agent["id"]) for agent in agents])
         except Exception as e:
             logger.error(f"Error identifying stakeholders: {e}")
 
         return list(stakeholders)
 
-    async def _identify_dependencies(
-        self, requesting_product: str, target_products: List[str]
-    ) -> List[str]:
+    async def _identify_dependencies(self, requesting_product: str, target_products: List[str]) -> List[str]:
         """Identify dependencies for coordination"""
         dependencies = []
 
@@ -434,13 +416,9 @@ class CrossProductCoordinator:
     async def _notify_stakeholders(self, request: CoordinationRequest):
         """Notify stakeholders about new coordination request"""
         # This would integrate with notification system
-        logger.info(
-            f"Notifying {len(request.stakeholders)} stakeholders about coordination request {request.id}"
-        )
+        logger.info(f"Notifying {len(request.stakeholders)} stakeholders about coordination request {request.id}")
 
-    async def _execute_coordination_plan(
-        self, request: CoordinationRequest, plan: Dict[str, Any]
-    ) -> bool:
+    async def _execute_coordination_plan(self, request: CoordinationRequest, plan: Dict[str, Any]) -> bool:
         """Execute the coordination resolution plan"""
         try:
             # This would contain the actual coordination logic
@@ -455,9 +433,7 @@ class CrossProductCoordinator:
             logger.error(f"Error executing coordination plan: {e}")
             return False
 
-    async def _check_resource_conflicts(
-        self, resource_requirements: Dict[str, Any]
-    ) -> List[str]:
+    async def _check_resource_conflicts(self, resource_requirements: Dict[str, Any]) -> List[str]:
         """Check for resource conflicts"""
         conflicts = []
 
@@ -476,9 +452,7 @@ class CrossProductCoordinator:
             "api_rate_limit": "15%",
         }
 
-    async def _load_coordination_request(
-        self, request_id: str
-    ) -> Optional[CoordinationRequest]:
+    async def _load_coordination_request(self, request_id: str) -> Optional[CoordinationRequest]:
         """Load coordination request from database"""
         try:
             async with self.db_pool.acquire() as conn:
@@ -511,9 +485,7 @@ class CrossProductCoordinator:
                 """,
                     request.id,
                     request.status.value,
-                    json.dumps(request.resolution_plan)
-                    if request.resolution_plan
-                    else None,
+                    json.dumps(request.resolution_plan) if request.resolution_plan else None,
                     request.resolved_at,
                     request.updated_at,
                 )

@@ -2,18 +2,20 @@
 Container Management System for FuzeAgent
 Handles Docker container lifecycle for AI agents
 """
-import docker
+
 import asyncio
+import json
 import logging
 import os
-import json
-from typing import Dict, List, Optional, Any, AsyncGenerator
-from datetime import datetime, timedelta
-from pydantic import BaseModel, Field
-import aiofiles
 import threading
 import time
-from docker.errors import DockerException, NotFound, APIError
+from datetime import datetime, timedelta
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+import aiofiles
+import docker
+from docker.errors import APIError, DockerException, NotFound
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +114,7 @@ class ContainerManager:
         if not self.docker_client:
             raise RuntimeError("Docker client not available")
 
-    async def create_agent_container(
-        self, agent_id: str, config: ContainerConfig = None
-    ) -> ContainerStatus:
+    async def create_agent_container(self, agent_id: str, config: ContainerConfig = None) -> ContainerStatus:
         """Create a new agent container"""
         self._check_docker_available()
 
@@ -129,9 +129,7 @@ class ContainerManager:
             try:
                 existing = self.docker_client.containers.get(config.name)
                 if existing.status in ["running", "restarting"]:
-                    logger.warning(
-                        f"Container {config.name} already exists and is running"
-                    )
+                    logger.warning(f"Container {config.name} already exists and is running")
                     return await self._get_container_status(existing)
                 else:
                     # Remove stopped container
@@ -157,9 +155,7 @@ class ContainerManager:
             if config.ports:
                 container_args["ports"] = {}
                 for container_port, host_port in config.ports.items():
-                    container_args["ports"][container_port] = (
-                        host_port if host_port > 0 else None
-                    )
+                    container_args["ports"][container_port] = host_port if host_port > 0 else None
 
             # Add volumes
             if config.volumes:
@@ -228,9 +224,7 @@ class ContainerManager:
                 try:
                     from websocket_manager import notify_container_status_change
 
-                    await notify_container_status_change(
-                        agent_id=agent_id, container_status="started"
-                    )
+                    await notify_container_status_change(agent_id=agent_id, container_status="started")
                 except Exception as e:
                     logger.error(f"Error sending container notification: {e}")
 
@@ -275,9 +269,7 @@ class ContainerManager:
             logger.error(f"Error stopping container {container_name}: {e}")
             raise
 
-    async def restart_container(
-        self, agent_id: str, timeout: int = 30
-    ) -> ContainerStatus:
+    async def restart_container(self, agent_id: str, timeout: int = 30) -> ContainerStatus:
         """Restart an agent container"""
         self._check_docker_available()
 
@@ -344,9 +336,7 @@ class ContainerManager:
         self._check_docker_available()
 
         try:
-            containers = self.docker_client.containers.list(
-                all=True, filters={"label": "fuzeagent.type=ai-agent"}
-            )
+            containers = self.docker_client.containers.list(all=True, filters={"label": "fuzeagent.type=ai-agent"})
 
             statuses = []
             for container in containers:
@@ -405,22 +395,12 @@ class ContainerManager:
                         message = " ".join(parts[1:])
 
                         # Parse timestamp
-                        timestamp = datetime.fromisoformat(
-                            timestamp_str.replace("Z", "+00:00")
-                        )
+                        timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
 
-                        entries.append(
-                            LogEntry(
-                                timestamp=timestamp, stream=stream, message=message
-                            )
-                        )
+                        entries.append(LogEntry(timestamp=timestamp, stream=stream, message=message))
                 except Exception as parse_error:
                     # If parsing fails, create a simple entry
-                    entries.append(
-                        LogEntry(
-                            timestamp=datetime.now(), stream="stdout", message=line
-                        )
-                    )
+                    entries.append(LogEntry(timestamp=datetime.now(), stream="stdout", message=line))
 
             return entries
 
@@ -430,9 +410,7 @@ class ContainerManager:
             logger.error(f"Error getting container logs {container_name}: {e}")
             raise
 
-    async def stream_container_logs(
-        self, agent_id: str
-    ) -> AsyncGenerator[LogEntry, None]:
+    async def stream_container_logs(self, agent_id: str) -> AsyncGenerator[LogEntry, None]:
         """Stream container logs in real-time"""
         self._check_docker_available()
 
@@ -442,9 +420,7 @@ class ContainerManager:
             container = self.docker_client.containers.get(container_name)
 
             # Create log stream
-            log_stream = container.logs(
-                stream=True, follow=True, timestamps=True, stdout=True, stderr=True
-            )
+            log_stream = container.logs(stream=True, follow=True, timestamps=True, stdout=True, stderr=True)
 
             for log_line in log_stream:
                 try:
@@ -459,18 +435,12 @@ class ContainerManager:
                         stream = "stdout"
                         message = " ".join(parts[1:])
 
-                        timestamp = datetime.fromisoformat(
-                            timestamp_str.replace("Z", "+00:00")
-                        )
+                        timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
 
-                        yield LogEntry(
-                            timestamp=timestamp, stream=stream, message=message
-                        )
+                        yield LogEntry(timestamp=timestamp, stream=stream, message=message)
                 except Exception as parse_error:
                     logger.warning(f"Error parsing log line: {parse_error}")
-                    yield LogEntry(
-                        timestamp=datetime.now(), stream="stdout", message=line
-                    )
+                    yield LogEntry(timestamp=datetime.now(), stream="stdout", message=line)
 
         except NotFound:
             raise RuntimeError(f"Container {container_name} not found")
@@ -478,9 +448,7 @@ class ContainerManager:
             logger.error(f"Error streaming container logs {container_name}: {e}")
             raise
 
-    async def execute_command(
-        self, agent_id: str, command: str, working_dir: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def execute_command(self, agent_id: str, command: str, working_dir: Optional[str] = None) -> Dict[str, Any]:
         """Execute a command in the container"""
         self._check_docker_available()
 
@@ -493,9 +461,7 @@ class ContainerManager:
                 raise RuntimeError(f"Container {container_name} is not running")
 
             # Execute command
-            exec_result = container.exec_run(
-                command, workdir=working_dir, detach=False, stdout=True, stderr=True
-            )
+            exec_result = container.exec_run(command, workdir=working_dir, detach=False, stdout=True, stderr=True)
 
             return {
                 "exit_code": exec_result.exit_code,
@@ -521,25 +487,19 @@ class ContainerManager:
             network_settings = attrs.get("NetworkSettings", {})
 
             # Parse timestamps
-            created = datetime.fromisoformat(
-                attrs.get("Created", "").replace("Z", "+00:00")
-            )
+            created = datetime.fromisoformat(attrs.get("Created", "").replace("Z", "+00:00"))
             started = None
             finished = None
 
             if state.get("StartedAt"):
                 try:
-                    started = datetime.fromisoformat(
-                        state["StartedAt"].replace("Z", "+00:00")
-                    )
+                    started = datetime.fromisoformat(state["StartedAt"].replace("Z", "+00:00"))
                 except:
                     pass
 
             if state.get("FinishedAt"):
                 try:
-                    finished = datetime.fromisoformat(
-                        state["FinishedAt"].replace("Z", "+00:00")
-                    )
+                    finished = datetime.fromisoformat(state["FinishedAt"].replace("Z", "+00:00"))
                 except:
                     pass
 
@@ -553,21 +513,11 @@ class ContainerManager:
 
                 # Calculate CPU usage percentage
                 if "cpu_stats" in stats and "precpu_stats" in stats:
-                    cpu_delta = (
-                        stats["cpu_stats"]["cpu_usage"]["total_usage"]
-                        - stats["precpu_stats"]["cpu_usage"]["total_usage"]
-                    )
-                    system_delta = (
-                        stats["cpu_stats"]["system_cpu_usage"]
-                        - stats["precpu_stats"]["system_cpu_usage"]
-                    )
+                    cpu_delta = stats["cpu_stats"]["cpu_usage"]["total_usage"] - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+                    system_delta = stats["cpu_stats"]["system_cpu_usage"] - stats["precpu_stats"]["system_cpu_usage"]
 
                     if system_delta > 0:
-                        cpu_usage = (
-                            (cpu_delta / system_delta)
-                            * len(stats["cpu_stats"]["cpu_usage"]["percpu_usage"])
-                            * 100
-                        )
+                        cpu_usage = (cpu_delta / system_delta) * len(stats["cpu_stats"]["cpu_usage"]["percpu_usage"]) * 100
 
                 # Get memory usage
                 if "memory_stats" in stats:
@@ -583,9 +533,7 @@ class ContainerManager:
                 for container_port, host_bindings in network_settings["Ports"].items():
                     if host_bindings:
                         for binding in host_bindings:
-                            ports[
-                                container_port
-                            ] = f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"
+                            ports[container_port] = f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"
 
             # Get health status
             health = None

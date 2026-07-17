@@ -16,20 +16,20 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
-from .database import get_db_connection, DatabaseManager
-from .sandbox_manager import AgentSandboxManager, Sandbox
-from .git_workflow_manager import GitWorkflowManager
 from .claude_code_wrapper import ClaudeCodeWrapper
-from .conversation_manager import ConversationManager, InteractionType
-from .file_operations_engine import FileOperationsEngine
 from .claude_sdk_manager import ClaudeSDKManager, ClaudeSDKSession
-from .task_knowledge_extractor import TaskKnowledgeExtractor
 from .context_enhancement_service import ContextEnhancementService
+from .conversation_manager import ConversationManager, InteractionType
+from .database import DatabaseManager, get_db_connection
+from .file_operations_engine import FileOperationsEngine
+from .git_workflow_manager import GitWorkflowManager
+from .sandbox_manager import AgentSandboxManager, Sandbox
+from .task_knowledge_extractor import TaskKnowledgeExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -258,13 +258,9 @@ class TaskExecutionEngine:
             "current_iteration": execution.current_iteration,
             "iterations_count": len(execution.iterations),
             "started_at": execution.started_at.isoformat(),
-            "completed_at": execution.completed_at.isoformat()
-            if execution.completed_at
-            else None,
+            "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
             "sandbox_id": execution.sandbox.sandbox_id if execution.sandbox else None,
-            "git_branch": execution.git_manager.feature_branch
-            if execution.git_manager
-            else None,
+            "git_branch": execution.git_manager.feature_branch if execution.git_manager else None,
             "result": execution.result,
             "error": execution.error,
             "active_execution": True,
@@ -285,9 +281,7 @@ class TaskExecutionEngine:
                 "iteration_number": it.iteration_number,
                 "step": it.step.value if hasattr(it.step, "value") else str(it.step),
                 "started_at": it.started_at.isoformat(),
-                "completed_at": it.completed_at.isoformat()
-                if it.completed_at
-                else None,
+                "completed_at": it.completed_at.isoformat() if it.completed_at else None,
                 "success": it.success,
                 "error_message": it.error_message,
                 "human_question": it.human_question,
@@ -310,9 +304,7 @@ class TaskExecutionEngine:
         execution.error = "Task cancelled by user"
 
         # Update database
-        await self._update_task_status(
-            task_id, TaskStatus.CANCELLED, error="Task cancelled by user"
-        )
+        await self._update_task_status(task_id, TaskStatus.CANCELLED, error="Task cancelled by user")
 
         # Schedule cleanup
         asyncio.create_task(self._cleanup_execution(task_id))
@@ -327,11 +319,7 @@ class TaskExecutionEngine:
         while self.running:
             try:
                 # Find tasks ready for execution
-                pending_tasks = [
-                    task_id
-                    for task_id, execution in self.active_executions.items()
-                    if execution.status in [TaskStatus.PENDING, TaskStatus.EXECUTING]
-                ]
+                pending_tasks = [task_id for task_id, execution in self.active_executions.items() if execution.status in [TaskStatus.PENDING, TaskStatus.EXECUTING]]
 
                 # Process each pending task
                 for task_id in pending_tasks:
@@ -377,9 +365,7 @@ class TaskExecutionEngine:
             logger.error(f"Error executing step {next_step} for task {task_id}: {e}")
             await self._handle_execution_error(task_id, str(e))
 
-    def _determine_next_step(
-        self, execution: ExecutionContext
-    ) -> Optional[ExecutionStep]:
+    def _determine_next_step(self, execution: ExecutionContext) -> Optional[ExecutionStep]:
         """Determine the next execution step"""
 
         if execution.status == TaskStatus.PENDING:
@@ -393,36 +379,21 @@ class TaskExecutionEngine:
         # Continue based on last completed step
         if last_iteration.step == ExecutionStep.ANALYZE_TASK and last_iteration.success:
             return ExecutionStep.SETUP_SANDBOX
-        elif (
-            last_iteration.step == ExecutionStep.SETUP_SANDBOX
-            and last_iteration.success
-        ):
+        elif last_iteration.step == ExecutionStep.SETUP_SANDBOX and last_iteration.success:
             return ExecutionStep.SETUP_GIT
         elif last_iteration.step == ExecutionStep.SETUP_GIT and last_iteration.success:
             return ExecutionStep.EXECUTE_ITERATION
-        elif (
-            last_iteration.step == ExecutionStep.EXECUTE_ITERATION
-            and last_iteration.success
-        ):
+        elif last_iteration.step == ExecutionStep.EXECUTE_ITERATION and last_iteration.success:
             # Check if we need human input
             if last_iteration.human_question:
                 return ExecutionStep.HUMAN_INTERACTION
             else:
                 return ExecutionStep.REVIEW_CHANGES
-        elif (
-            last_iteration.step == ExecutionStep.HUMAN_INTERACTION
-            and last_iteration.human_response
-        ):
+        elif last_iteration.step == ExecutionStep.HUMAN_INTERACTION and last_iteration.human_response:
             return ExecutionStep.EXECUTE_ITERATION
-        elif (
-            last_iteration.step == ExecutionStep.REVIEW_CHANGES
-            and last_iteration.success
-        ):
+        elif last_iteration.step == ExecutionStep.REVIEW_CHANGES and last_iteration.success:
             return ExecutionStep.COMMIT_CHANGES
-        elif (
-            last_iteration.step == ExecutionStep.COMMIT_CHANGES
-            and last_iteration.success
-        ):
+        elif last_iteration.step == ExecutionStep.COMMIT_CHANGES and last_iteration.success:
             # Check if task is complete
             if self._is_task_complete(execution):
                 return ExecutionStep.FINALIZE_TASK
@@ -479,9 +450,7 @@ class TaskExecutionEngine:
             # Store iteration in database
             await self._store_task_iteration(execution.task_id, iteration)
 
-    async def _step_analyze_task(
-        self, execution: ExecutionContext, iteration: TaskIteration
-    ):
+    async def _step_analyze_task(self, execution: ExecutionContext, iteration: TaskIteration):
         """Analyze the task and prepare execution plan"""
         execution.status = TaskStatus.ANALYZING
         await self._update_task_status(execution.task_id, TaskStatus.ANALYZING)
@@ -506,26 +475,15 @@ class TaskExecutionEngine:
                     task_data=execution.task_data,
                     base_context=iteration.input_data,
                 )
-                logger.info(
-                    f"Enhanced context for task {execution.task_id}: "
-                    f"{len(enhanced_context.organizational_knowledge)} org + "
-                    f"{len(enhanced_context.team_knowledge)} team + "
-                    f"{len(enhanced_context.similar_task_insights)} similar task insights"
-                )
+                logger.info(f"Enhanced context for task {execution.task_id}: " f"{len(enhanced_context.organizational_knowledge)} org + " f"{len(enhanced_context.team_knowledge)} team + " f"{len(enhanced_context.similar_task_insights)} similar task insights")
             except Exception as e:
-                logger.error(
-                    f"Error enhancing context for task {execution.task_id}: {e}"
-                )
+                logger.error(f"Error enhancing context for task {execution.task_id}: {e}")
 
         # Simple analysis for now - in a full implementation this would use AI
         iteration.output_data = {
             "analysis_complete": True,
             "requires_sandbox": execution.agent_data.get("type") == "developer",
-            "requires_git": bool(
-                execution.agent_data.get("repository_settings", {}).get(
-                    "repository_url"
-                )
-            ),
+            "requires_git": bool(execution.agent_data.get("repository_settings", {}).get("repository_url")),
             "enhanced_context": enhanced_context,
             "estimated_complexity": "medium",
             "estimated_iterations": 5,
@@ -533,9 +491,7 @@ class TaskExecutionEngine:
 
         logger.info(f"Task analysis complete for {execution.task_id}")
 
-    async def _step_setup_sandbox(
-        self, execution: ExecutionContext, iteration: TaskIteration
-    ):
+    async def _step_setup_sandbox(self, execution: ExecutionContext, iteration: TaskIteration):
         """Set up sandbox environment for the agent"""
         execution.status = TaskStatus.SETTING_UP
         await self._update_task_status(execution.task_id, TaskStatus.SETTING_UP)
@@ -567,13 +523,9 @@ class TaskExecutionEngine:
             "container_id": sandbox.container_id,
         }
 
-        logger.info(
-            f"Sandbox setup complete for {execution.task_id}: {sandbox.sandbox_id}"
-        )
+        logger.info(f"Sandbox setup complete for {execution.task_id}: {sandbox.sandbox_id}")
 
-    async def _step_setup_git(
-        self, execution: ExecutionContext, iteration: TaskIteration
-    ):
+    async def _step_setup_git(self, execution: ExecutionContext, iteration: TaskIteration):
         """Set up Git workflow for the task"""
         repository_settings = execution.agent_data.get("repository_settings", {})
 
@@ -620,9 +572,7 @@ class TaskExecutionEngine:
         self.claude_sdk_managers[execution.task_id] = claude_sdk_manager
 
         # Start conversation session
-        await execution.claude_wrapper.start_conversation_session(
-            execution.sandbox.sandbox_id
-        )
+        await execution.claude_wrapper.start_conversation_session(execution.sandbox.sandbox_id)
 
         iteration.input_data = {
             "repository_url": repository_settings.get("repository_url"),
@@ -637,9 +587,7 @@ class TaskExecutionEngine:
 
         logger.info(f"Git setup complete for {execution.task_id}: {feature_branch}")
 
-    async def _step_execute_iteration(
-        self, execution: ExecutionContext, iteration: TaskIteration
-    ):
+    async def _step_execute_iteration(self, execution: ExecutionContext, iteration: TaskIteration):
         """Execute a development iteration using Claude SDK Manager"""
         execution.status = TaskStatus.EXECUTING
         await self._update_task_status(execution.task_id, TaskStatus.EXECUTING)
@@ -651,9 +599,7 @@ class TaskExecutionEngine:
             "task_description": task_description,
             "task_title": task_title,
             "iteration_number": iteration.iteration_number,
-            "workspace_path": execution.sandbox.workspace_path
-            if execution.sandbox
-            else None,
+            "workspace_path": execution.sandbox.workspace_path if execution.sandbox else None,
         }
 
         try:
@@ -680,39 +626,25 @@ Work incrementally and ask for clarification if needed.
 """
 
                 # Start Claude SDK session
-                execution.claude_session_id = (
-                    await execution.claude_sdk_manager.start_session(
-                        task_id=execution.task_id,
-                        agent_id=execution.agent_id,
-                        workspace_path=execution.git_manager.workspace_path
-                        if execution.git_manager
-                        else execution.sandbox.workspace_path,
-                        task_description=task_prompt,
-                        additional_context=context_info,
-                    )
+                execution.claude_session_id = await execution.claude_sdk_manager.start_session(
+                    task_id=execution.task_id,
+                    agent_id=execution.agent_id,
+                    workspace_path=execution.git_manager.workspace_path if execution.git_manager else execution.sandbox.workspace_path,
+                    task_description=task_prompt,
+                    additional_context=context_info,
                 )
 
-                logger.info(
-                    f"Started Claude SDK session: {execution.claude_session_id}"
-                )
+                logger.info(f"Started Claude SDK session: {execution.claude_session_id}")
 
             # Register interaction callback for human-in-the-loop
             if execution.claude_sdk_manager and execution.claude_session_id:
                 execution.claude_sdk_manager.register_interaction_callback(
                     execution.claude_session_id,
-                    lambda session, interaction: self._handle_claude_interaction(
-                        execution, session, interaction
-                    ),
+                    lambda session, interaction: self._handle_claude_interaction(execution, session, interaction),
                 )
 
             # Monitor session status
-            session_status = (
-                await execution.claude_sdk_manager.get_session_status(
-                    execution.claude_session_id
-                )
-                if execution.claude_session_id
-                else None
-            )
+            session_status = await execution.claude_sdk_manager.get_session_status(execution.claude_session_id) if execution.claude_session_id else None
 
             if session_status:
                 current_interaction = session_status.get("current_interaction")
@@ -722,9 +654,7 @@ Work incrementally and ask for clarification if needed.
                     if interaction_type in ["user_input", "confirmation"]:
                         iteration.human_question = current_interaction.get("prompt")
                         execution.status = TaskStatus.WAITING_FOR_HUMAN
-                        await self._update_task_status(
-                            execution.task_id, TaskStatus.WAITING_FOR_HUMAN
-                        )
+                        await self._update_task_status(execution.task_id, TaskStatus.WAITING_FOR_HUMAN)
 
                         iteration.output_data = {
                             "claude_session_status": session_status.get("state"),
@@ -733,21 +663,15 @@ Work incrementally and ask for clarification if needed.
                             "human_question_asked": True,
                         }
 
-                        logger.info(
-                            f"Claude SDK requesting human input for task {execution.task_id}"
-                        )
+                        logger.info(f"Claude SDK requesting human input for task {execution.task_id}")
                         return
 
                     elif interaction_type == "file_approval":
                         # File operations pending approval
-                        batch_id = current_interaction.get("metadata", {}).get(
-                            "batch_id"
-                        )
+                        batch_id = current_interaction.get("metadata", {}).get("batch_id")
                         if batch_id and execution.file_operations_engine:
                             # Get diff preview for human review
-                            diffs = await execution.file_operations_engine.get_file_diff_preview(
-                                batch_id
-                            )
+                            diffs = await execution.file_operations_engine.get_file_diff_preview(batch_id)
 
                             iteration.human_question = f"""Claude wants to make the following file changes:
                             
@@ -759,9 +683,7 @@ File changes preview:
 Approve these changes? (yes/no)"""
 
                             execution.status = TaskStatus.WAITING_FOR_HUMAN
-                            await self._update_task_status(
-                                execution.task_id, TaskStatus.WAITING_FOR_HUMAN
-                            )
+                            await self._update_task_status(execution.task_id, TaskStatus.WAITING_FOR_HUMAN)
 
                             iteration.output_data = {
                                 "claude_session_status": session_status.get("state"),
@@ -771,9 +693,7 @@ Approve these changes? (yes/no)"""
                                 "human_question_asked": True,
                             }
 
-                            logger.info(
-                                f"Claude SDK requesting file approval for task {execution.task_id}"
-                            )
+                            logger.info(f"Claude SDK requesting file approval for task {execution.task_id}")
                             return
 
                 # No interaction needed - continue execution
@@ -800,13 +720,9 @@ Approve these changes? (yes/no)"""
             iteration.output_data = {"error": str(e), "development_complete": False}
             raise
 
-        logger.info(
-            f"Development iteration {iteration.iteration_number} processed for {execution.task_id}"
-        )
+        logger.info(f"Development iteration {iteration.iteration_number} processed for {execution.task_id}")
 
-    async def _step_review_changes(
-        self, execution: ExecutionContext, iteration: TaskIteration
-    ):
+    async def _step_review_changes(self, execution: ExecutionContext, iteration: TaskIteration):
         """Review the changes made in the iteration"""
         execution.status = TaskStatus.REVIEWING
         await self._update_task_status(execution.task_id, TaskStatus.REVIEWING)
@@ -826,9 +742,7 @@ Approve these changes? (yes/no)"""
 
         logger.info(f"Code review complete for {execution.task_id}")
 
-    async def _step_commit_changes(
-        self, execution: ExecutionContext, iteration: TaskIteration
-    ):
+    async def _step_commit_changes(self, execution: ExecutionContext, iteration: TaskIteration):
         """Commit changes to Git"""
         execution.status = TaskStatus.COMMITTING
         await self._update_task_status(execution.task_id, TaskStatus.COMMITTING)
@@ -839,9 +753,7 @@ Approve these changes? (yes/no)"""
 
         # Commit changes
         commit_message = f"Iteration {iteration.iteration_number}: {execution.task_data.get('title', 'Task update')}"
-        commit_hash = await execution.git_manager.commit_changes(
-            message=commit_message, iteration_number=iteration.iteration_number
-        )
+        commit_hash = await execution.git_manager.commit_changes(message=commit_message, iteration_number=iteration.iteration_number)
 
         iteration.output_data = {
             "commit_hash": commit_hash,
@@ -851,9 +763,7 @@ Approve these changes? (yes/no)"""
 
         logger.info(f"Changes committed for {execution.task_id}: {commit_hash}")
 
-    async def _step_human_interaction(
-        self, execution: ExecutionContext, iteration: TaskIteration
-    ):
+    async def _step_human_interaction(self, execution: ExecutionContext, iteration: TaskIteration):
         """Handle human interaction step"""
         # This step waits for human response - the actual waiting is handled
         # by the status being WAITING_FOR_HUMAN
@@ -862,9 +772,7 @@ Approve these changes? (yes/no)"""
             "question": iteration.human_question,
         }
 
-    async def _step_finalize_task(
-        self, execution: ExecutionContext, iteration: TaskIteration
-    ):
+    async def _step_finalize_task(self, execution: ExecutionContext, iteration: TaskIteration):
         """Finalize the task execution"""
         execution.status = TaskStatus.COMPLETED
         execution.completed_at = datetime.now()
@@ -889,15 +797,11 @@ Approve these changes? (yes/no)"""
             "completed_at": execution.completed_at.isoformat(),
             "pull_request_url": pr_url,
             "sandbox_id": execution.sandbox.sandbox_id if execution.sandbox else None,
-            "git_branch": execution.git_manager.feature_branch
-            if execution.git_manager
-            else None,
+            "git_branch": execution.git_manager.feature_branch if execution.git_manager else None,
         }
 
         # Update database
-        await self._update_task_status(
-            execution.task_id, TaskStatus.COMPLETED, result=execution.result
-        )
+        await self._update_task_status(execution.task_id, TaskStatus.COMPLETED, result=execution.result)
 
         iteration.output_data = execution.result
 
@@ -914,30 +818,22 @@ Approve these changes? (yes/no)"""
         # Extract knowledge from completed task
         if self.knowledge_extractor:
             try:
-                extracted_knowledge_ids = (
-                    await self.knowledge_extractor.extract_knowledge_from_task(
-                        task_id=execution.task_id,
-                        agent_id=execution.agent_id,
-                        execution_result=execution.result,
-                    )
+                extracted_knowledge_ids = await self.knowledge_extractor.extract_knowledge_from_task(
+                    task_id=execution.task_id,
+                    agent_id=execution.agent_id,
+                    execution_result=execution.result,
                 )
                 if extracted_knowledge_ids:
-                    logger.info(
-                        f"Extracted {len(extracted_knowledge_ids)} knowledge items from task {execution.task_id}"
-                    )
+                    logger.info(f"Extracted {len(extracted_knowledge_ids)} knowledge items from task {execution.task_id}")
             except Exception as e:
-                logger.error(
-                    f"Error extracting knowledge from task {execution.task_id}: {e}"
-                )
+                logger.error(f"Error extracting knowledge from task {execution.task_id}: {e}")
 
         logger.info(f"✅ Task execution completed: {execution.task_id}")
 
         # End Claude SDK session
         if execution.claude_sdk_manager and execution.claude_session_id:
             try:
-                await execution.claude_sdk_manager.terminate_session(
-                    execution.claude_session_id
-                )
+                await execution.claude_sdk_manager.terminate_session(execution.claude_session_id)
             except Exception as e:
                 logger.error(f"Error terminating Claude SDK session: {e}")
 
@@ -973,9 +869,7 @@ Approve these changes? (yes/no)"""
         # Cleanup Claude SDK session
         if execution.claude_sdk_manager and execution.claude_session_id:
             try:
-                await execution.claude_sdk_manager.terminate_session(
-                    execution.claude_session_id
-                )
+                await execution.claude_sdk_manager.terminate_session(execution.claude_session_id)
             except Exception as e:
                 logger.error(f"Error terminating Claude SDK session for {task_id}: {e}")
 
@@ -1009,14 +903,10 @@ Approve these changes? (yes/no)"""
                     # Check for timeouts
                     if execution.status == TaskStatus.WAITING_FOR_HUMAN:
                         # Check human response timeout
-                        last_iteration = (
-                            execution.iterations[-1] if execution.iterations else None
-                        )
+                        last_iteration = execution.iterations[-1] if execution.iterations else None
                         if last_iteration and last_iteration.started_at:
                             time_waiting = current_time - last_iteration.started_at
-                            if time_waiting > timedelta(
-                                seconds=self.human_response_timeout
-                            ):
+                            if time_waiting > timedelta(seconds=self.human_response_timeout):
                                 await self._handle_execution_error(
                                     task_id,
                                     "Human response timeout - no response received within 24 hours",
@@ -1024,9 +914,7 @@ Approve these changes? (yes/no)"""
                     else:
                         # Check general execution timeout
                         execution_time = current_time - execution.started_at
-                        if execution_time > timedelta(
-                            seconds=self.iteration_timeout * self.max_iterations
-                        ):
+                        if execution_time > timedelta(seconds=self.iteration_timeout * self.max_iterations):
                             await self._handle_execution_error(
                                 task_id,
                                 f"Execution timeout - exceeded maximum time limit",
@@ -1052,18 +940,9 @@ Approve these changes? (yes/no)"""
         while self.running:
             try:
                 current_time = datetime.now()
-                cutoff_time = current_time - timedelta(
-                    hours=1
-                )  # Keep completed tasks for 1 hour
+                cutoff_time = current_time - timedelta(hours=1)  # Keep completed tasks for 1 hour
 
-                completed_tasks = [
-                    task_id
-                    for task_id, execution in self.active_executions.items()
-                    if execution.status
-                    in [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED]
-                    and execution.completed_at
-                    and execution.completed_at < cutoff_time
-                ]
+                completed_tasks = [task_id for task_id, execution in self.active_executions.items() if execution.status in [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED] and execution.completed_at and execution.completed_at < cutoff_time]
 
                 for task_id in completed_tasks:
                     await self._cleanup_execution(task_id)
@@ -1096,9 +975,7 @@ Approve these changes? (yes/no)"""
         error: Optional[str] = None,
     ):
         """Update task status in database"""
-        await DatabaseManager.update_task_status(
-            task_id=task_id, status=status.value, result=result
-        )
+        await DatabaseManager.update_task_status(task_id=task_id, status=status.value, result=result)
 
     async def _store_task_iteration(self, task_id: str, iteration: TaskIteration):
         """Store task iteration in database"""
@@ -1145,12 +1022,8 @@ Approve these changes? (yes/no)"""
                         step=ExecutionStep(row["step"]),
                         started_at=row["started_at"],
                         completed_at=row["completed_at"],
-                        input_data=json.loads(row["input_data"])
-                        if row["input_data"]
-                        else {},
-                        output_data=json.loads(row["output_data"])
-                        if row["output_data"]
-                        else None,
+                        input_data=json.loads(row["input_data"]) if row["input_data"] else {},
+                        output_data=json.loads(row["output_data"]) if row["output_data"] else None,
                         success=row["success"],
                         error_message=row["error_message"],
                         human_question=row["human_question"],
@@ -1167,9 +1040,7 @@ Approve these changes? (yes/no)"""
                 return
 
             # Calculate execution time
-            execution_time = (
-                execution.completed_at - execution.started_at
-            ).total_seconds() / 60  # minutes
+            execution_time = (execution.completed_at - execution.started_at).total_seconds() / 60  # minutes
 
             # Store metrics
             await self.conversation_manager.store_performance_metric(
@@ -1201,13 +1072,9 @@ Approve these changes? (yes/no)"""
         except Exception as e:
             logger.error(f"Error storing completion metrics: {e}")
 
-    async def _handle_claude_interaction(
-        self, execution: ExecutionContext, session: ClaudeSDKSession, interaction
-    ):
+    async def _handle_claude_interaction(self, execution: ExecutionContext, session: ClaudeSDKSession, interaction):
         """Handle interaction from Claude SDK"""
-        logger.info(
-            f"Claude interaction for task {execution.task_id}: {interaction.interaction_type}"
-        )
+        logger.info(f"Claude interaction for task {execution.task_id}: {interaction.interaction_type}")
 
         # This will be processed in the next iteration of _step_execute_iteration
         # The interaction handling is done there to maintain the execution flow
@@ -1256,41 +1123,23 @@ Approve these changes? (yes/no)"""
                     "true",
                 ]
 
-                if (
-                    batch_id
-                    and execution.claude_sdk_manager
-                    and execution.claude_session_id
-                ):
-                    success = (
-                        await execution.claude_sdk_manager.approve_file_operations(
-                            execution.claude_session_id, batch_id, approved
-                        )
-                    )
+                if batch_id and execution.claude_sdk_manager and execution.claude_session_id:
+                    success = await execution.claude_sdk_manager.approve_file_operations(execution.claude_session_id, batch_id, approved)
 
                     if success:
-                        logger.info(
-                            f"File operations {'approved' if approved else 'rejected'} for task {task_id}"
-                        )
+                        logger.info(f"File operations {'approved' if approved else 'rejected'} for task {task_id}")
                     else:
-                        logger.error(
-                            f"Failed to process file approval for task {task_id}"
-                        )
+                        logger.error(f"Failed to process file approval for task {task_id}")
 
             else:
                 # Handle general user input
                 if execution.claude_sdk_manager and execution.claude_session_id:
-                    success = await execution.claude_sdk_manager.send_input(
-                        execution.claude_session_id, response
-                    )
+                    success = await execution.claude_sdk_manager.send_input(execution.claude_session_id, response)
 
                     if success:
-                        logger.info(
-                            f"Human response sent to Claude SDK for task {task_id}"
-                        )
+                        logger.info(f"Human response sent to Claude SDK for task {task_id}")
                     else:
-                        logger.error(
-                            f"Failed to send human response to Claude SDK for task {task_id}"
-                        )
+                        logger.error(f"Failed to send human response to Claude SDK for task {task_id}")
 
             # Update database
             await self._store_task_iteration(task_id, current_iteration)

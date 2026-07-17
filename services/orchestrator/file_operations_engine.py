@@ -17,11 +17,11 @@ import os
 import shutil
 import tempfile
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -120,9 +120,7 @@ class FileOperationsEngine:
         # Initialize backup directory
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
-    async def process_claude_response(
-        self, claude_response: Dict[str, Any], task_id: str, agent_id: str
-    ) -> OperationBatch:
+    async def process_claude_response(self, claude_response: Dict[str, Any], task_id: str, agent_id: str) -> OperationBatch:
         """
         Process a Claude Code SDK response and create file operations.
 
@@ -152,12 +150,8 @@ class FileOperationsEngine:
                 task_id=task_id,
                 agent_id=agent_id,
                 operations=operations,
-                description=operations_data.get(
-                    "explanation", "Claude Code file operations"
-                ),
-                requires_approval=operations_data.get(
-                    "human_verification_required", True
-                ),
+                description=operations_data.get("explanation", "Claude Code file operations"),
+                requires_approval=operations_data.get("human_verification_required", True),
                 created_at=datetime.now(),
                 rollback_info={},
             )
@@ -170,9 +164,7 @@ class FileOperationsEngine:
             # Store pending batch
             self.pending_operations[batch.batch_id] = batch
 
-            logger.info(
-                f"Created operation batch {batch.batch_id} with {len(operations)} operations"
-            )
+            logger.info(f"Created operation batch {batch.batch_id} with {len(operations)} operations")
             return batch
 
         except Exception as e:
@@ -252,18 +244,14 @@ class FileOperationsEngine:
             try:
                 if operation.operation == OperationType.CREATE_FILE:
                     # For new files, show the entire content
-                    diffs[operation.path] = (
-                        f"New file: {operation.path}\n" + operation.content
-                    )
+                    diffs[operation.path] = f"New file: {operation.path}\n" + operation.content
 
                 elif operation.operation == OperationType.MODIFY_FILE:
                     # Generate diff for existing file
                     original_path = self.workspace_path / operation.path
                     if original_path.exists():
                         original_content = original_path.read_text()
-                        new_content = await self._apply_changes_to_content(
-                            original_content, operation.changes
-                        )
+                        new_content = await self._apply_changes_to_content(original_content, operation.changes)
 
                         diff = difflib.unified_diff(
                             original_content.splitlines(keepends=True),
@@ -339,9 +327,7 @@ class FileOperationsEngine:
             extension = self._get_extension_for_language(lang) if lang else "txt"
             filename = f"generated_file_{i}.{extension}"
 
-            operations.append(
-                {"operation": "create_file", "path": filename, "content": code.strip()}
-            )
+            operations.append({"operation": "create_file", "path": filename, "content": code.strip()})
 
         return {
             "operations": operations,
@@ -486,14 +472,10 @@ class FileOperationsEngine:
 
         elif operation.operation == OperationType.MODIFY_FILE:
             if not file_path.exists():
-                raise FileNotFoundError(
-                    f"Cannot modify non-existent file: {operation.path}"
-                )
+                raise FileNotFoundError(f"Cannot modify non-existent file: {operation.path}")
 
             original_content = file_path.read_text()
-            new_content = await self._apply_changes_to_content(
-                original_content, operation.changes
-            )
+            new_content = await self._apply_changes_to_content(original_content, operation.changes)
             file_path.write_text(new_content)
             logger.info(f"Modified file: {operation.path}")
 
@@ -506,13 +488,9 @@ class FileOperationsEngine:
             new_path = self.workspace_path / operation.metadata["new_path"]
             new_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(file_path), str(new_path))
-            logger.info(
-                f"Moved file: {operation.path} -> {operation.metadata['new_path']}"
-            )
+            logger.info(f"Moved file: {operation.path} -> {operation.metadata['new_path']}")
 
-    async def _apply_changes_to_content(
-        self, original: str, changes: List[FileChange]
-    ) -> str:
+    async def _apply_changes_to_content(self, original: str, changes: List[FileChange]) -> str:
         """Apply a list of changes to file content"""
 
         lines = original.splitlines(keepends=True)
@@ -568,9 +546,7 @@ class FileOperationsEngine:
 
         return backup_path
 
-    async def _rollback_operation(
-        self, operation: FileOperation, rollback_info: Dict[str, Any]
-    ):
+    async def _rollback_operation(self, operation: FileOperation, rollback_info: Dict[str, Any]):
         """Rollback a single operation"""
 
         backup_path = rollback_info.get(operation.operation_id)

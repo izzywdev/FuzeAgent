@@ -1,13 +1,15 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-from contextlib import asynccontextmanager
-import uuid
 import json
+import os
+import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, List, Optional
-import os
-from agent_templates import template_manager, AgentCategory
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+from agent_templates import AgentCategory, template_manager
 
 # Simple in-memory storage for demonstration
 agents_db = {}
@@ -159,9 +161,7 @@ async def get_agent_status(agent_id: str):
         raise HTTPException(status_code=404, detail="Agent not found")
 
     agent = agents_db[agent_id]
-    agent_tasks = [
-        task for task in tasks_db.values() if task["assigned_to"] == agent_id
-    ]
+    agent_tasks = [task for task in tasks_db.values() if task["assigned_to"] == agent_id]
 
     return {
         **agent,
@@ -212,9 +212,7 @@ async def update_task(task_id: str, update_data: dict):
 async def store_interaction(interaction_data: dict):
     """Store agent interaction (simplified)"""
     interaction_id = str(uuid.uuid4())
-    print(
-        f"📝 Stored interaction for {interaction_data.get('agent_id')}: {interaction_data.get('content', '')[:50]}..."
-    )
+    print(f"📝 Stored interaction for {interaction_data.get('agent_id')}: {interaction_data.get('content', '')[:50]}...")
     return {"interaction_id": interaction_id}
 
 
@@ -283,18 +281,12 @@ async def create_agent_from_template(request: dict):
 
     try:
         # Validate overrides
-        validation_errors = template_manager.validate_template_overrides(
-            template_id, overrides
-        )
+        validation_errors = template_manager.validate_template_overrides(template_id, overrides)
         if validation_errors:
-            raise HTTPException(
-                status_code=400, detail={"validation_errors": validation_errors}
-            )
+            raise HTTPException(status_code=400, detail={"validation_errors": validation_errors})
 
         # Create agent configuration from template
-        agent_config = template_manager.create_agent_from_template(
-            template_id, overrides
-        )
+        agent_config = template_manager.create_agent_from_template(template_id, overrides)
 
         # Create the agent using existing create_agent logic
         agent_id = str(uuid.uuid4())
@@ -324,9 +316,7 @@ async def create_agent_from_template(request: dict):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error creating agent from template: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error creating agent from template: {str(e)}")
 
 
 # Demo endpoint to create sample agents
@@ -421,9 +411,7 @@ async def get_agent_tasks(agent_id: str):
     if agent_id not in agents_db:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    agent_tasks = [
-        task for task in tasks_db.values() if task["assigned_to"] == agent_id
-    ]
+    agent_tasks = [task for task in tasks_db.values() if task["assigned_to"] == agent_id]
     return agent_tasks
 
 

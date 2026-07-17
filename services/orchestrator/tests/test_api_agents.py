@@ -84,9 +84,7 @@ class TestAgentsAPI:
         assert data["template_id"] == template_data["template_id"]
         assert data["team_id"] == team_id
 
-    def test_create_agent_from_template_invalid_template(
-        self, client: TestClient, setup_org_and_team
-    ):
+    def test_create_agent_from_template_invalid_template(self, client: TestClient, setup_org_and_team):
         """Test creating agent from non-existent template"""
         team_id = setup_org_and_team["team_id"]
 

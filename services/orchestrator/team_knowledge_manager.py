@@ -9,20 +9,20 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
 from .organization_rag_manager import (
-    OrganizationRAGManager,
-    KnowledgeCategory,
     ContentType,
+    KnowledgeCategory,
+    KnowledgeSearchResult,
+    OrganizationRAGManager,
     SourceType,
     VisibilityLevel,
-    KnowledgeSearchResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,9 +72,7 @@ class TeamKnowledgeManager:
     from organization knowledge and agent contributions.
     """
 
-    def __init__(
-        self, database_url: str, organization_rag_manager: OrganizationRAGManager
-    ):
+    def __init__(self, database_url: str, organization_rag_manager: OrganizationRAGManager):
         self.database_url = database_url
         self.org_rag_manager = organization_rag_manager
         self.pool: Optional[asyncpg.Pool] = None
@@ -98,9 +96,7 @@ class TeamKnowledgeManager:
         logger.info("Initializing TeamKnowledgeManager")
 
         try:
-            self.pool = await asyncpg.create_pool(
-                self.database_url, min_size=2, max_size=10, command_timeout=60
-            )
+            self.pool = await asyncpg.create_pool(self.database_url, min_size=2, max_size=10, command_timeout=60)
 
             logger.info("TeamKnowledgeManager initialized successfully")
 
@@ -248,14 +244,10 @@ class TeamKnowledgeManager:
                 return None
 
             # Analyze memories for commonalities
-            analysis_result = await self._analyze_memories_for_aggregation(
-                agent_memories
-            )
+            analysis_result = await self._analyze_memories_for_aggregation(agent_memories)
 
             if analysis_result["aggregation_value"] < self.min_team_relevance:
-                logger.debug(
-                    f"Agent memories don't meet team relevance threshold: {analysis_result['aggregation_value']}"
-                )
+                logger.debug(f"Agent memories don't meet team relevance threshold: {analysis_result['aggregation_value']}")
                 return None
 
             # Create aggregated knowledge
@@ -286,9 +278,7 @@ class TeamKnowledgeManager:
 
             self.aggregations_performed += 1
 
-            logger.info(
-                f"Aggregated {len(agent_memory_ids)} agent memories into team knowledge {team_knowledge_id}"
-            )
+            logger.info(f"Aggregated {len(agent_memory_ids)} agent memories into team knowledge {team_knowledge_id}")
             return team_knowledge_id
 
     async def get_team_knowledge_context(
@@ -321,9 +311,7 @@ class TeamKnowledgeManager:
                 {
                     "id": result.team_knowledge.id,
                     "title": result.team_knowledge.title,
-                    "content": result.team_knowledge.content[:500] + "..."
-                    if len(result.team_knowledge.content) > 500
-                    else result.team_knowledge.content,
+                    "content": result.team_knowledge.content[:500] + "..." if len(result.team_knowledge.content) > 500 else result.team_knowledge.content,
                     "category": result.team_knowledge.knowledge_category.value,
                     "relevance_score": result.combined_score,
                     "usage_stats": {
@@ -368,9 +356,7 @@ class TeamKnowledgeManager:
 
             # Update effectiveness with exponential moving average
             current_effectiveness = knowledge["effectiveness_score"]
-            new_effectiveness = (
-                current_effectiveness * 0.8 + (success_weight + feedback_weight) * 0.2
-            )
+            new_effectiveness = current_effectiveness * 0.8 + (success_weight + feedback_weight) * 0.2
             new_effectiveness = max(0.0, min(1.0, new_effectiveness))
 
             # Update agent adoption tracking
@@ -405,9 +391,7 @@ class TeamKnowledgeManager:
                 contributing_agents,
             )
 
-            logger.debug(
-                f"Updated knowledge {team_knowledge_id} effectiveness: {new_effectiveness:.2f}, adoption: {adoption_rate:.2f}"
-            )
+            logger.debug(f"Updated knowledge {team_knowledge_id} effectiveness: {new_effectiveness:.2f}, adoption: {adoption_rate:.2f}")
 
     async def get_team_knowledge_stats(self, team_id: str) -> Dict[str, Any]:
         """Get comprehensive team knowledge statistics"""
@@ -521,16 +505,9 @@ class TeamKnowledgeManager:
             team_knowledge = self._row_to_team_knowledge(row)
 
             # Calculate team fit score based on adoption and effectiveness
-            team_fit_score = (
-                team_knowledge.agent_adoption_rate * 0.4
-                + team_knowledge.effectiveness_score * 0.6
-            )
+            team_fit_score = team_knowledge.agent_adoption_rate * 0.4 + team_knowledge.effectiveness_score * 0.6
 
-            combined_score = (
-                float(row["similarity_score"]) * 0.4
-                + team_knowledge.team_relevance_score * 0.3
-                + team_fit_score * 0.3
-            )
+            combined_score = float(row["similarity_score"]) * 0.4 + team_knowledge.team_relevance_score * 0.3 + team_fit_score * 0.3
 
             search_results.append(
                 TeamKnowledgeSearchResult(
@@ -582,9 +559,7 @@ class TeamKnowledgeManager:
         team_results = []
         for org_result in org_results:
             # Calculate team relevance based on source and usage
-            team_relevance = await self._calculate_team_relevance(
-                conn, team_id, org_result.knowledge
-            )
+            team_relevance = await self._calculate_team_relevance(conn, team_id, org_result.knowledge)
 
             if team_relevance >= self.min_team_relevance:
                 # Create pseudo team knowledge for consistent interface
@@ -612,9 +587,7 @@ class TeamKnowledgeManager:
                     last_accessed=org_result.knowledge.last_accessed,
                 )
 
-                combined_score = (
-                    org_result.similarity_score * 0.5 + team_relevance * 0.5
-                )
+                combined_score = org_result.similarity_score * 0.5 + team_relevance * 0.5
 
                 team_results.append(
                     TeamKnowledgeSearchResult(
@@ -628,9 +601,7 @@ class TeamKnowledgeManager:
 
         return team_results[:limit]
 
-    async def _calculate_team_relevance(
-        self, conn, team_id: str, org_knowledge
-    ) -> float:
+    async def _calculate_team_relevance(self, conn, team_id: str, org_knowledge) -> float:
         """Calculate how relevant organization knowledge is for a specific team"""
 
         relevance_factors = []
@@ -640,9 +611,7 @@ class TeamKnowledgeManager:
             relevance_factors.append(1.0)
         elif org_knowledge.source_team_id:
             # Check if source team is similar to current team
-            team_similarity = await self._calculate_team_similarity(
-                conn, team_id, org_knowledge.source_team_id
-            )
+            team_similarity = await self._calculate_team_similarity(conn, team_id, org_knowledge.source_team_id)
             relevance_factors.append(team_similarity)
         else:
             relevance_factors.append(0.3)  # No team context
@@ -683,9 +652,7 @@ class TeamKnowledgeManager:
 
         return min(1.0, max(0.0, team_relevance))
 
-    async def _calculate_team_similarity(
-        self, conn, team_id1: str, team_id2: str
-    ) -> float:
+    async def _calculate_team_similarity(self, conn, team_id1: str, team_id2: str) -> float:
         """Calculate similarity between two teams based on their work patterns"""
 
         # Simple implementation based on team type and settings
@@ -712,10 +679,7 @@ class TeamKnowledgeManager:
 
         common_keys = set(settings1.keys()) & set(settings2.keys())
         if common_keys:
-            settings_similarity = sum(
-                1.0 if settings1.get(key) == settings2.get(key) else 0.0
-                for key in common_keys
-            ) / len(common_keys)
+            settings_similarity = sum(1.0 if settings1.get(key) == settings2.get(key) else 0.0 for key in common_keys) / len(common_keys)
         else:
             settings_similarity = 0.5
 
@@ -766,9 +730,7 @@ class TeamKnowledgeManager:
             agent_adoption_rate=row["agent_adoption_rate"],
             effectiveness_score=row["effectiveness_score"],
             visibility_level=VisibilityLevel(row["visibility_level"]),
-            metadata=json.loads(row["metadata"])
-            if isinstance(row["metadata"], str)
-            else row["metadata"],
+            metadata=json.loads(row["metadata"]) if isinstance(row["metadata"], str) else row["metadata"],
             tags=row["tags"] or [],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
@@ -793,9 +755,7 @@ class TeamKnowledgeManager:
 
         return " ".join(query_parts)
 
-    async def _analyze_memories_for_aggregation(
-        self, agent_memories: List
-    ) -> Dict[str, Any]:
+    async def _analyze_memories_for_aggregation(self, agent_memories: List) -> Dict[str, Any]:
         """Analyze agent memories to determine if they should be aggregated"""
 
         if not agent_memories:
@@ -805,28 +765,19 @@ class TeamKnowledgeManager:
         # In practice, this could use more sophisticated NLP
 
         # Calculate average confidence and success correlation
-        avg_confidence = sum(mem["confidence_score"] for mem in agent_memories) / len(
-            agent_memories
-        )
-        avg_success = sum(
-            mem.get("success_correlation", 0.0) for mem in agent_memories
-        ) / len(agent_memories)
+        avg_confidence = sum(mem["confidence_score"] for mem in agent_memories) / len(agent_memories)
+        avg_success = sum(mem.get("success_correlation", 0.0) for mem in agent_memories) / len(agent_memories)
 
         # Find common themes
         all_content = " ".join(mem["content"] for mem in agent_memories)
 
         # Determine primary category
         categories = [mem.get("memory_type", "general") for mem in agent_memories]
-        primary_category = (
-            max(set(categories), key=categories.count) if categories else "general"
-        )
+        primary_category = max(set(categories), key=categories.count) if categories else "general"
 
         # Create aggregated content (simplified)
         title = f"Team Knowledge: {primary_category.replace('_', ' ').title()}"
-        content = (
-            f"Aggregated knowledge from {len(agent_memories)} agent experiences:\n\n"
-            + all_content[:1000]
-        )
+        content = f"Aggregated knowledge from {len(agent_memories)} agent experiences:\n\n" + all_content[:1000]
 
         # Map memory type to knowledge category
         category_mapping = {
@@ -837,14 +788,10 @@ class TeamKnowledgeManager:
             "testing": KnowledgeCategory.TESTING,
         }
 
-        knowledge_category = category_mapping.get(
-            primary_category, KnowledgeCategory.DEVELOPMENT
-        )
+        knowledge_category = category_mapping.get(primary_category, KnowledgeCategory.DEVELOPMENT)
 
         # Determine content type
-        content_type = (
-            ContentType.CODE if "code" in primary_category else ContentType.TEXT
-        )
+        content_type = ContentType.CODE if "code" in primary_category else ContentType.TEXT
 
         # Calculate aggregation value
         aggregation_value = min(1.0, (avg_confidence + avg_success) / 2.0)

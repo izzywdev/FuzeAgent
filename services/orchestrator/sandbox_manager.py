@@ -6,15 +6,16 @@ Each agent gets its own sandboxed container with resource limits and security co
 """
 
 import asyncio
-import docker
 import json
 import logging
 import os
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import docker
 
 from .database import get_db_connection
 
@@ -115,9 +116,7 @@ class AgentSandboxManager:
         # Load existing sandboxes from database
         await self._load_existing_sandboxes()
 
-        logger.info(
-            f"AgentSandboxManager started with {len(self.active_sandboxes)} active sandboxes"
-        )
+        logger.info(f"AgentSandboxManager started with {len(self.active_sandboxes)} active sandboxes")
 
     async def stop(self):
         """Stop the sandbox manager"""
@@ -167,9 +166,7 @@ class AgentSandboxManager:
                 template_config = {**template_config, **custom_settings}
 
             # Create sandbox configuration
-            config = await self._build_sandbox_config(
-                agent_id, task_id, template_config, repository_settings
-            )
+            config = await self._build_sandbox_config(agent_id, task_id, template_config, repository_settings)
 
             # Create sandbox record
             sandbox = Sandbox(
@@ -194,9 +191,7 @@ class AgentSandboxManager:
             sandbox.status = SandboxStatus.RUNNING
 
             # Update database
-            await self._update_sandbox_status(
-                sandbox.id, SandboxStatus.RUNNING, container.id
-            )
+            await self._update_sandbox_status(sandbox.id, SandboxStatus.RUNNING, container.id)
 
             # Store in memory
             self.active_sandboxes[sandbox_id] = sandbox
@@ -235,9 +230,7 @@ class AgentSandboxManager:
                 except docker.errors.NotFound:
                     logger.warning(f"Container {sandbox.container_id} not found")
                 except Exception as e:
-                    logger.error(
-                        f"Error removing container {sandbox.container_id}: {e}"
-                    )
+                    logger.error(f"Error removing container {sandbox.container_id}: {e}")
 
             # Remove workspace volume
             try:
@@ -253,9 +246,7 @@ class AgentSandboxManager:
             # Update database
             sandbox.status = SandboxStatus.DESTROYED
             sandbox.destroyed_at = datetime.now()
-            await self._update_sandbox_status(
-                sandbox.id, SandboxStatus.DESTROYED, destroyed_at=sandbox.destroyed_at
-            )
+            await self._update_sandbox_status(sandbox.id, SandboxStatus.DESTROYED, destroyed_at=sandbox.destroyed_at)
 
             # Remove from active sandboxes
             del self.active_sandboxes[sandbox_id]
@@ -271,9 +262,7 @@ class AgentSandboxManager:
         """Get sandbox by ID"""
         return self.active_sandboxes.get(sandbox_id)
 
-    async def list_sandboxes(
-        self, agent_id: Optional[str] = None, status: Optional[SandboxStatus] = None
-    ) -> List[Sandbox]:
+    async def list_sandboxes(self, agent_id: Optional[str] = None, status: Optional[SandboxStatus] = None) -> List[Sandbox]:
         """List sandboxes with optional filtering"""
 
         sandboxes = list(self.active_sandboxes.values())
@@ -286,9 +275,7 @@ class AgentSandboxManager:
 
         return sandboxes
 
-    async def execute_command(
-        self, sandbox_id: str, command: str, working_dir: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def execute_command(self, sandbox_id: str, command: str, working_dir: Optional[str] = None) -> Dict[str, Any]:
         """Execute a command in a sandbox"""
 
         sandbox = self.active_sandboxes.get(sandbox_id)
@@ -408,9 +395,7 @@ class AgentSandboxManager:
         # Create and start container
         container = self.docker_client.containers.run(**container_config)
 
-        logger.info(
-            f"Container {container.id} created for sandbox {sandbox.sandbox_id}"
-        )
+        logger.info(f"Container {container.id} created for sandbox {sandbox.sandbox_id}")
         return container
 
     def _parse_memory_limit(self, memory_str: str) -> str:
@@ -479,13 +464,11 @@ class AgentSandboxManager:
     async def _load_existing_sandboxes(self):
         """Load existing sandboxes from database on startup"""
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                """
+            rows = await conn.fetch("""
                 SELECT * FROM agent_sandboxes
                 WHERE status IN ('running', 'paused')
                 AND destroyed_at IS NULL
-            """
-            )
+            """)
 
             for row in rows:
                 try:
@@ -493,9 +476,7 @@ class AgentSandboxManager:
                     container = None
                     if row["container_id"] and self.docker_client:
                         try:
-                            container = self.docker_client.containers.get(
-                                row["container_id"]
-                            )
+                            container = self.docker_client.containers.get(row["container_id"])
                         except docker.errors.NotFound:
                             # Container no longer exists, mark as destroyed
                             await self._update_sandbox_status(
@@ -541,11 +522,7 @@ class AgentSandboxManager:
         """Clean up expired sandboxes"""
         cutoff_time = datetime.now() - timedelta(hours=24)
 
-        expired_sandboxes = [
-            sandbox
-            for sandbox in self.active_sandboxes.values()
-            if sandbox.created_at < cutoff_time
-        ]
+        expired_sandboxes = [sandbox for sandbox in self.active_sandboxes.values() if sandbox.created_at < cutoff_time]
 
         for sandbox in expired_sandboxes:
             try:

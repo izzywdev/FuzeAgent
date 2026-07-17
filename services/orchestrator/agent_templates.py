@@ -3,8 +3,8 @@ Agent Templates System for FuzeAgent
 Defines standardized agent configurations with specialized prompts and capabilities
 """
 
-from typing import Dict, List, Any
 from enum import Enum
+from typing import Any, Dict, List
 
 
 class AgentCategory(Enum):
@@ -83,12 +83,7 @@ class AgentTemplate:
                 "skills": self.skills,
                 "model": overrides.get("model", self.default_model),
                 "temperature": overrides.get("temperature", self.default_temperature),
-                **{
-                    k: v
-                    for k, v in overrides.items()
-                    if k
-                    not in ["name", "role", "goal", "backstory", "model", "temperature"]
-                },
+                **{k: v for k, v in overrides.items() if k not in ["name", "role", "goal", "backstory", "model", "temperature"]},
             },
         }
 
@@ -642,25 +637,19 @@ class AgentTemplateManager:
         """Get all available template categories"""
         return [category.value for category in AgentCategory]
 
-    def create_agent_from_template(
-        self, template_id: str, overrides: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+    def create_agent_from_template(self, template_id: str, overrides: Dict[str, Any] = None) -> Dict[str, Any]:
         """Create agent configuration from template with overrides"""
         template = self.get_template(template_id)
         return template.create_agent_config(overrides)
 
-    def validate_template_overrides(
-        self, template_id: str, overrides: Dict[str, Any]
-    ) -> List[str]:
+    def validate_template_overrides(self, template_id: str, overrides: Dict[str, Any]) -> List[str]:
         """Validate that overrides are allowed for the template"""
         template = self.get_template(template_id)
         errors = []
 
         for field in overrides.keys():
             if field not in template.customizable_fields and field not in ["role"]:
-                errors.append(
-                    f"Field '{field}' is not customizable for template '{template_id}'"
-                )
+                errors.append(f"Field '{field}' is not customizable for template '{template_id}'")
 
         return errors
 

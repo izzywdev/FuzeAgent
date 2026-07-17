@@ -2,29 +2,29 @@
 Unit tests for Goals Management Services
 """
 
-import pytest
 import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.orchestrator.goals_management_service import (
-    GoalsManagementService,
-    GoalType,
-    GoalStatus,
-    OrganizationGoal,
-)
-from services.orchestrator.milestone_task_engine import MilestoneTaskEngine
+import pytest
 from services.orchestrator.goal_conversation_service import (
-    GoalConversationService,
     ConversationType,
+    GoalConversationService,
     MessageType,
 )
 from services.orchestrator.goal_tracking_service import (
+    AlertSeverity,
     GoalTrackingService,
     RiskLevel,
-    AlertSeverity,
 )
+from services.orchestrator.goals_management_service import (
+    GoalsManagementService,
+    GoalStatus,
+    GoalType,
+    OrganizationGoal,
+)
+from services.orchestrator.milestone_task_engine import MilestoneTaskEngine
 
 
 class TestGoalsManagementService:
@@ -77,9 +77,7 @@ class TestGoalsManagementService:
         assert len(goal_id) > 0
 
         # Verify database calls were made
-        assert (
-            mock_conn.execute.call_count >= 2
-        )  # Goal creation + metrics + progress tracking
+        assert mock_conn.execute.call_count >= 2  # Goal creation + metrics + progress tracking
 
     @pytest.mark.asyncio
     async def test_get_goal(self, service, mock_pool):
@@ -204,9 +202,7 @@ class TestMilestoneTaskEngine:
         mock_conn.fetchrow.return_value = goal_data
         mock_conn.execute.return_value = "milestone-123"
 
-        execution_plan = await engine.generate_goal_execution_plan(
-            goal_id="goal-123", planning_context={"focus": "revenue"}
-        )
+        execution_plan = await engine.generate_goal_execution_plan(goal_id="goal-123", planning_context={"focus": "revenue"})
 
         assert execution_plan is not None
         assert "goal_id" in execution_plan
@@ -260,9 +256,7 @@ class TestMilestoneTaskEngine:
         mock_conn.fetchrow.return_value = goal_data
         mock_conn.execute.return_value = str(uuid.uuid4())
 
-        functional_tasks = await engine.generate_cross_functional_tasks(
-            goal_id="goal-123", target_functions=["development", "marketing", "sales"]
-        )
+        functional_tasks = await engine.generate_cross_functional_tasks(goal_id="goal-123", target_functions=["development", "marketing", "sales"])
 
         assert isinstance(functional_tasks, dict)
         assert "development" in functional_tasks
@@ -433,9 +427,7 @@ class TestGoalTrackingService:
 
         # Verify database operations
         mock_conn.fetchrow.assert_called_once()  # Get current goal state
-        assert (
-            mock_conn.execute.call_count >= 1
-        )  # Record progress + possible goal update
+        assert mock_conn.execute.call_count >= 1  # Record progress + possible goal update
 
     @pytest.mark.asyncio
     async def test_assess_goal_deadline_risk(self, service, mock_pool):
@@ -525,9 +517,7 @@ class TestGoalTrackingService:
         ]
         mock_conn.fetch.return_value = progress_history
 
-        report = await service.generate_progress_report(
-            goal_id="goal-123", report_period_days=30
-        )
+        report = await service.generate_progress_report(goal_id="goal-123", report_period_days=30)
 
         assert isinstance(report, dict)
         assert report["goal_id"] == "goal-123"
@@ -554,19 +544,11 @@ class TestServiceIntegration:
         # This would require actual database setup for full integration testing
         # For now, we'll test the service interfaces work together
 
-        goals_service = GoalsManagementService(
-            "postgresql://test:test@localhost:5432/test"
-        )
-        milestone_engine = MilestoneTaskEngine(
-            "postgresql://test:test@localhost:5432/test"
-        )
+        goals_service = GoalsManagementService("postgresql://test:test@localhost:5432/test")
+        milestone_engine = MilestoneTaskEngine("postgresql://test:test@localhost:5432/test")
 
         # Mock the services
-        with patch.object(
-            goals_service, "create_goal"
-        ) as mock_create_goal, patch.object(
-            milestone_engine, "generate_goal_execution_plan"
-        ) as mock_generate_plan:
+        with patch.object(goals_service, "create_goal") as mock_create_goal, patch.object(milestone_engine, "generate_goal_execution_plan") as mock_generate_plan:
             mock_create_goal.return_value = "goal-123"
             mock_generate_plan.return_value = {
                 "goal_id": "goal-123",
@@ -582,9 +564,7 @@ class TestServiceIntegration:
                 goal_type=GoalType.BUSINESS,
             )
 
-            execution_plan = await milestone_engine.generate_goal_execution_plan(
-                goal_id=goal_id
-            )
+            execution_plan = await milestone_engine.generate_goal_execution_plan(goal_id=goal_id)
 
             # Verify integration
             assert goal_id == "goal-123"

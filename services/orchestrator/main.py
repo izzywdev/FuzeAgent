@@ -1,43 +1,46 @@
+import asyncio
+import logging
+import os
+from contextlib import asynccontextmanager
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
 from fastapi import (
-    FastAPI,
-    WebSocket,
-    HTTPException,
-    Query,
-    Path,
     Body,
-    UploadFile,
+    FastAPI,
     File,
     Form,
+    HTTPException,
+    Path,
+    Query,
+    UploadFile,
+    WebSocket,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
-import asyncio
-import os
-import logging
-from datetime import datetime, date
-from decimal import Decimal
-from contextlib import asynccontextmanager
+
+from hierarchy_endpoints import router as hierarchy_router
+
 from .agent_manager import AgentManager
-from .task_queue import TaskQueue
+from .container_manager import ContainerConfig, ContainerStatus, container_manager
 from .context_service import ContextService
+from .database import get_db_connection
+from .knowledge_manager import DocumentMetadata, knowledge_manager
+from .rag_integration import RAGContext, rag_system
 from .sandbox_manager import AgentSandboxManager
 from .task_execution_engine import TaskExecutionEngine
-from .database import get_db_connection
-from .knowledge_manager import knowledge_manager, DocumentMetadata
-from .container_manager import container_manager, ContainerStatus, ContainerConfig
-from .rag_integration import rag_system, RAGContext
+from .task_queue import TaskQueue
 from .websocket_manager import (
-    websocket_manager,
-    WebSocketUpdate,
     UpdateType,
+    WebSocketUpdate,
     notify_agent_status_change,
-    notify_task_progress,
     notify_container_status_change,
     notify_knowledge_update,
+    notify_task_progress,
+    websocket_manager,
 )
-from hierarchy_endpoints import router as hierarchy_router
 
 logger = logging.getLogger(__name__)
 
@@ -47,26 +50,16 @@ class AgentCreateRequest(BaseModel):
     name: str = Field(..., description="Agent name")
     role: str = Field(..., description="Agent role (e.g., 'Senior React Developer')")
     type: str = Field(..., description="Agent type (e.g., 'developer', 'executive')")
-    config: Dict[str, Any] = Field(
-        default_factory=dict, description="Agent configuration"
-    )
-    repository_settings: Dict[str, Any] = Field(
-        default_factory=dict, description="Repository settings"
-    )
-    sandbox_settings: Dict[str, Any] = Field(
-        default_factory=dict, description="Sandbox settings"
-    )
+    config: Dict[str, Any] = Field(default_factory=dict, description="Agent configuration")
+    repository_settings: Dict[str, Any] = Field(default_factory=dict, description="Repository settings")
+    sandbox_settings: Dict[str, Any] = Field(default_factory=dict, description="Sandbox settings")
 
 
 class TaskCreateRequest(BaseModel):
     title: str = Field(..., description="Task title")
     description: str = Field(..., description="Task description")
-    priority: str = Field(
-        default="medium", description="Task priority (low, medium, high)"
-    )
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional task metadata"
-    )
+    priority: str = Field(default="medium", description="Task priority (low, medium, high)")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional task metadata")
 
 
 class HumanResponseRequest(BaseModel):
@@ -75,9 +68,7 @@ class HumanResponseRequest(BaseModel):
 
 class FileOperationApprovalRequest(BaseModel):
     approved: bool = Field(..., description="Whether to approve the file operations")
-    reason: Optional[str] = Field(
-        None, description="Optional reason for approval/rejection"
-    )
+    reason: Optional[str] = Field(None, description="Optional reason for approval/rejection")
 
 
 class ClaudeSessionInputRequest(BaseModel):
@@ -89,12 +80,8 @@ class CoordinationRequest(BaseModel):
         default="collaborative",
         description="Coordination mode (sequential, parallel, hierarchical, collaborative)",
     )
-    required_agents: Optional[List[str]] = Field(
-        None, description="Specific agents to include"
-    )
-    required_skills: Optional[List[str]] = Field(
-        None, description="Required skills for the task"
-    )
+    required_agents: Optional[List[str]] = Field(None, description="Specific agents to include")
+    required_skills: Optional[List[str]] = Field(None, description="Required skills for the task")
 
 
 class AgentCommunicationRequest(BaseModel):
@@ -103,16 +90,12 @@ class AgentCommunicationRequest(BaseModel):
         description="Message type (request, response, notification, question)",
     )
     content: str = Field(..., description="Message content")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class MCPToolRequest(BaseModel):
     tool_name: str = Field(..., description="Name of the MCP tool to call")
-    arguments: Dict[str, Any] = Field(
-        default_factory=dict, description="Tool arguments"
-    )
+    arguments: Dict[str, Any] = Field(default_factory=dict, description="Tool arguments")
 
 
 class AgentMCPSetupRequest(BaseModel):
@@ -139,46 +122,24 @@ class ChatMessageRequest(BaseModel):
 
 # Model Configuration Models
 class ProviderCredentialsRequest(BaseModel):
-    provider: str = Field(
-        ..., description="Model provider (anthropic, openai, google, etc.)"
-    )
+    provider: str = Field(..., description="Model provider (anthropic, openai, google, etc.)")
     api_key: str = Field(..., description="API key for the provider")
     endpoint_url: Optional[str] = Field(None, description="Custom endpoint URL")
-    additional_config: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional provider configuration"
-    )
+    additional_config: Dict[str, Any] = Field(default_factory=dict, description="Additional provider configuration")
 
 
 class AgentModelConfigRequest(BaseModel):
     primary_model: str = Field(..., description="Primary model ID")
-    fallback_models: List[str] = Field(
-        default_factory=list, description="Fallback model IDs"
-    )
-    temperature: float = Field(
-        default=0.7, ge=0.0, le=2.0, description="Model temperature"
-    )
-    max_tokens: int = Field(
-        default=4096, ge=1, le=200000, description="Maximum output tokens"
-    )
+    fallback_models: List[str] = Field(default_factory=list, description="Fallback model IDs")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Model temperature")
+    max_tokens: int = Field(default=4096, ge=1, le=200000, description="Maximum output tokens")
     top_p: float = Field(default=1.0, ge=0.0, le=1.0, description="Top-p sampling")
-    frequency_penalty: float = Field(
-        default=0.0, ge=-2.0, le=2.0, description="Frequency penalty"
-    )
-    presence_penalty: float = Field(
-        default=0.0, ge=-2.0, le=2.0, description="Presence penalty"
-    )
-    custom_instructions: str = Field(
-        default="", description="Custom instructions for the agent"
-    )
-    use_function_calling: bool = Field(
-        default=True, description="Enable function calling"
-    )
-    streaming_enabled: bool = Field(
-        default=True, description="Enable response streaming"
-    )
-    cost_limit_per_task: Optional[float] = Field(
-        None, ge=0.0, description="Cost limit per task in USD"
-    )
+    frequency_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Frequency penalty")
+    presence_penalty: float = Field(default=0.0, ge=-2.0, le=2.0, description="Presence penalty")
+    custom_instructions: str = Field(default="", description="Custom instructions for the agent")
+    use_function_calling: bool = Field(default=True, description="Enable function calling")
+    streaming_enabled: bool = Field(default=True, description="Enable response streaming")
+    cost_limit_per_task: Optional[float] = Field(None, ge=0.0, description="Cost limit per task in USD")
 
 
 class TaskCostEstimateRequest(BaseModel):
@@ -217,40 +178,22 @@ class GoalCreateRequest(BaseModel):
         default="business",
         description="Goal type (business, technical, growth, operational)",
     )
-    target_value: Optional[Decimal] = Field(
-        None, description="Target value (e.g., 100000 for $100K)"
-    )
-    target_unit: Optional[str] = Field(
-        None, description="Target unit (e.g., 'USD', 'users', '%')"
-    )
+    target_value: Optional[Decimal] = Field(None, description="Target value (e.g., 100000 for $100K)")
+    target_unit: Optional[str] = Field(None, description="Target unit (e.g., 'USD', 'users', '%')")
     target_deadline: Optional[date] = Field(None, description="Target completion date")
-    priority_level: int = Field(
-        default=5, ge=1, le=10, description="Priority level (1-10)"
-    )
-    success_criteria: Optional[Dict[str, Any]] = Field(
-        default=None, description="Success criteria"
-    )
-    assigned_teams: Optional[List[str]] = Field(
-        default=None, description="Assigned team IDs"
-    )
+    priority_level: int = Field(default=5, ge=1, le=10, description="Priority level (1-10)")
+    success_criteria: Optional[Dict[str, Any]] = Field(default=None, description="Success criteria")
+    assigned_teams: Optional[List[str]] = Field(default=None, description="Assigned team IDs")
     goal_owner_agent_id: Optional[str] = Field(None, description="Goal owner agent ID")
-    stakeholder_agents: Optional[List[str]] = Field(
-        default=None, description="Stakeholder agent IDs"
-    )
+    stakeholder_agents: Optional[List[str]] = Field(default=None, description="Stakeholder agent IDs")
     tags: Optional[List[str]] = Field(default=None, description="Goal tags")
-    metadata: Optional[Dict[str, Any]] = Field(
-        default=None, description="Additional metadata"
-    )
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
 
 
 class GoalUpdateRequest(BaseModel):
-    progress_percentage: Optional[Decimal] = Field(
-        None, ge=0, le=100, description="Progress percentage"
-    )
+    progress_percentage: Optional[Decimal] = Field(None, ge=0, le=100, description="Progress percentage")
     current_value: Optional[Decimal] = Field(None, description="Current value")
-    completion_confidence: Optional[Decimal] = Field(
-        None, ge=0, le=1, description="Completion confidence"
-    )
+    completion_confidence: Optional[Decimal] = Field(None, ge=0, le=1, description="Completion confidence")
     notes: Optional[str] = Field(None, description="Progress notes")
 
 
@@ -259,23 +202,13 @@ class MilestoneCreateRequest(BaseModel):
     description: str = Field(..., description="Milestone description")
     target_date: date = Field(..., description="Target completion date")
     milestone_type: str = Field(default="deliverable", description="Milestone type")
-    success_criteria: Optional[Dict[str, Any]] = Field(
-        default=None, description="Success criteria"
-    )
-    deliverables: Optional[List[Dict[str, Any]]] = Field(
-        default=None, description="Expected deliverables"
-    )
-    dependencies: Optional[List[Dict[str, Any]]] = Field(
-        default=None, description="Dependencies"
-    )
-    assigned_teams: Optional[List[str]] = Field(
-        default=None, description="Assigned teams"
-    )
+    success_criteria: Optional[Dict[str, Any]] = Field(default=None, description="Success criteria")
+    deliverables: Optional[List[Dict[str, Any]]] = Field(default=None, description="Expected deliverables")
+    dependencies: Optional[List[Dict[str, Any]]] = Field(default=None, description="Dependencies")
+    assigned_teams: Optional[List[str]] = Field(default=None, description="Assigned teams")
     responsible_agent_id: Optional[str] = Field(None, description="Responsible agent")
     priority_level: int = Field(default=5, ge=1, le=10, description="Priority level")
-    weight_in_goal: Optional[Decimal] = Field(
-        None, ge=0, le=100, description="Weight in goal (%)"
-    )
+    weight_in_goal: Optional[Decimal] = Field(None, ge=0, le=100, description="Weight in goal (%)")
 
 
 class TaskFromMilestoneRequest(BaseModel):
@@ -288,59 +221,39 @@ class TaskFromMilestoneRequest(BaseModel):
     assigned_team_id: Optional[str] = Field(None, description="Assigned team ID")
     assigned_agent_id: Optional[str] = Field(None, description="Assigned agent ID")
     priority: int = Field(default=5, ge=1, le=10, description="Priority")
-    requirements: Optional[Dict[str, Any]] = Field(
-        default=None, description="Requirements"
-    )
-    acceptance_criteria: Optional[List[Dict[str, Any]]] = Field(
-        default=None, description="Acceptance criteria"
-    )
-    dependencies: Optional[List[Dict[str, Any]]] = Field(
-        default=None, description="Dependencies"
-    )
+    requirements: Optional[Dict[str, Any]] = Field(default=None, description="Requirements")
+    acceptance_criteria: Optional[List[Dict[str, Any]]] = Field(default=None, description="Acceptance criteria")
+    dependencies: Optional[List[Dict[str, Any]]] = Field(default=None, description="Dependencies")
 
 
 class GoalConversationCreateRequest(BaseModel):
     conversation_type: str = Field(default="planning", description="Conversation type")
     conversation_title: str = Field(..., description="Conversation title")
-    initial_context: Optional[Dict[str, Any]] = Field(
-        default=None, description="Initial context"
-    )
-    participants: Optional[List[Dict[str, Any]]] = Field(
-        default=None, description="Participants"
-    )
+    initial_context: Optional[Dict[str, Any]] = Field(default=None, description="Initial context")
+    participants: Optional[List[Dict[str, Any]]] = Field(default=None, description="Participants")
 
 
 class ConversationMessageRequest(BaseModel):
     message_type: str = Field(default="human", description="Message type")
     sender_name: str = Field(..., description="Sender name")
     content: str = Field(..., description="Message content")
-    metadata: Optional[Dict[str, Any]] = Field(
-        default=None, description="Message metadata"
-    )
-    references: Optional[List[str]] = Field(
-        default=None, description="Referenced message IDs"
-    )
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Message metadata")
+    references: Optional[List[str]] = Field(default=None, description="Referenced message IDs")
 
 
 class ProgressUpdateRequest(BaseModel):
-    progress_percentage: Optional[Decimal] = Field(
-        None, ge=0, le=100, description="Progress percentage"
-    )
+    progress_percentage: Optional[Decimal] = Field(None, ge=0, le=100, description="Progress percentage")
     current_value: Optional[Decimal] = Field(None, description="Current value")
     milestone_id: Optional[str] = Field(None, description="Associated milestone ID")
     notes: Optional[str] = Field(None, description="Progress notes")
-    confidence_score: Optional[Decimal] = Field(
-        None, ge=0, le=1, description="Confidence score"
-    )
+    confidence_score: Optional[Decimal] = Field(None, ge=0, le=1, description="Confidence score")
     trigger_alerts: bool = Field(default=True, description="Whether to trigger alerts")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    database_url = os.getenv(
-        "DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context"
-    )
+    database_url = os.getenv("DATABASE_URL", "postgresql://postgres:password@postgres:5432/ai_context")
 
     app.state.agent_manager = AgentManager(database_url)
     app.state.task_queue = TaskQueue()
@@ -360,19 +273,17 @@ async def lifespan(app: FastAPI):
     # Initialize multi-agent coordinator
     from .multi_agent_coordinator import integrate_multi_agent_coordination
 
-    app.state.multi_agent_coordinator = integrate_multi_agent_coordination(
-        app.state.task_execution_engine
-    )
+    app.state.multi_agent_coordinator = integrate_multi_agent_coordination(app.state.task_execution_engine)
     await app.state.multi_agent_coordinator.start()
 
     # Initialize knowledge management system
     try:
-        from .organization_rag_manager import OrganizationRAGManager
-        from .team_knowledge_manager import TeamKnowledgeManager
-        from .knowledge_propagation_engine import KnowledgePropagationEngine
-        from .knowledge_notification_service import KnowledgeNotificationService
-        from .task_knowledge_extractor import TaskKnowledgeExtractor
         from .context_enhancement_service import ContextEnhancementService
+        from .knowledge_notification_service import KnowledgeNotificationService
+        from .knowledge_propagation_engine import KnowledgePropagationEngine
+        from .organization_rag_manager import OrganizationRAGManager
+        from .task_knowledge_extractor import TaskKnowledgeExtractor
+        from .team_knowledge_manager import TeamKnowledgeManager
 
         app.state.org_rag_manager = OrganizationRAGManager(database_url)
         await app.state.org_rag_manager.initialize()
@@ -380,9 +291,7 @@ async def lifespan(app: FastAPI):
         app.state.team_knowledge_manager = TeamKnowledgeManager(database_url)
         await app.state.team_knowledge_manager.initialize()
 
-        app.state.knowledge_propagation_engine = KnowledgePropagationEngine(
-            database_url, app.state.org_rag_manager, app.state.team_knowledge_manager
-        )
+        app.state.knowledge_propagation_engine = KnowledgePropagationEngine(database_url, app.state.org_rag_manager, app.state.team_knowledge_manager)
         await app.state.knowledge_propagation_engine.initialize()
 
         app.state.notification_service = KnowledgeNotificationService(database_url)
@@ -396,9 +305,7 @@ async def lifespan(app: FastAPI):
         )
         await app.state.task_knowledge_extractor.initialize()
 
-        app.state.context_enhancement_service = ContextEnhancementService(
-            database_url, app.state.org_rag_manager, app.state.team_knowledge_manager
-        )
+        app.state.context_enhancement_service = ContextEnhancementService(database_url, app.state.org_rag_manager, app.state.team_knowledge_manager)
         await app.state.context_enhancement_service.initialize()
 
         # Initialize knowledge analytics service
@@ -414,10 +321,10 @@ async def lifespan(app: FastAPI):
 
     # Initialize goals management system
     try:
-        from .goals_management_service import GoalsManagementService
-        from .milestone_task_engine import MilestoneTaskEngine
         from .goal_conversation_service import GoalConversationService
         from .goal_tracking_service import GoalTrackingService
+        from .goals_management_service import GoalsManagementService
+        from .milestone_task_engine import MilestoneTaskEngine
 
         app.state.goals_service = GoalsManagementService(database_url)
         await app.state.goals_service.initialize()
@@ -658,9 +565,7 @@ async def task_websocket_endpoint(websocket: WebSocket, task_id: str):
             # Get task execution status
             try:
                 status = await app.state.task_queue.get_execution_status(task_id)
-                await websocket.send_json(
-                    {"type": "status_update", "task_id": task_id, "data": status}
-                )
+                await websocket.send_json({"type": "status_update", "task_id": task_id, "data": status})
 
                 # If task is completed or failed, send final update and close
                 if status.get("status") in ["completed", "failed", "cancelled"]:
@@ -674,9 +579,7 @@ async def task_websocket_endpoint(websocket: WebSocket, task_id: str):
                     break
 
             except Exception as e:
-                await websocket.send_json(
-                    {"type": "error", "task_id": task_id, "error": str(e)}
-                )
+                await websocket.send_json({"type": "error", "task_id": task_id, "error": str(e)})
 
             await asyncio.sleep(2)  # Update every 2 seconds
 
@@ -695,9 +598,7 @@ async def conversation_websocket_endpoint(websocket: WebSocket, task_id: str):
         # Get execution context
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution:
-            await websocket.send_json(
-                {"type": "error", "message": f"Task {task_id} not found or not active"}
-            )
+            await websocket.send_json({"type": "error", "message": f"Task {task_id} not found or not active"})
             await websocket.close()
             return
 
@@ -723,9 +624,7 @@ async def conversation_websocket_endpoint(websocket: WebSocket, task_id: str):
         claude_sdk_manager = execution.claude_sdk_manager
         if claude_sdk_manager:
             try:
-                async for output_chunk in claude_sdk_manager.stream_output(
-                    execution.claude_session_id
-                ):
+                async for output_chunk in claude_sdk_manager.stream_output(execution.claude_session_id):
                     await websocket.send_json(
                         {
                             "type": "claude_output",
@@ -767,9 +666,7 @@ async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str)
         # Get execution context
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution:
-            await websocket.send_json(
-                {"type": "error", "message": f"Task {task_id} not found or not active"}
-            )
+            await websocket.send_json({"type": "error", "message": f"Task {task_id} not found or not active"})
             await websocket.close()
             return
 
@@ -799,9 +696,7 @@ async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str)
                     # Send pending operations
                     for batch in pending_operations:
                         # Get diff preview
-                        diffs = await file_ops_engine.get_file_diff_preview(
-                            batch.batch_id
-                        )
+                        diffs = await file_ops_engine.get_file_diff_preview(batch.batch_id)
 
                         await websocket.send_json(
                             {
@@ -825,9 +720,7 @@ async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str)
                                 "batch_id": batch.batch_id,
                                 "description": batch.description,
                                 "operations_count": len(batch.operations),
-                                "applied_at": batch.applied_at.isoformat()
-                                if batch.applied_at
-                                else None,
+                                "applied_at": batch.applied_at.isoformat() if batch.applied_at else None,
                                 "timestamp": batch.created_at.isoformat(),
                             }
                         )
@@ -882,9 +775,7 @@ async def create_agent(agent_config: AgentCreateRequest):
                 "type": agent_config.get("type"),
                 "repository_settings": agent_config.get("repository_settings", {}),
                 "sandbox_settings": agent_config.get("sandbox_settings", {}),
-                "created_at": agent.created_at
-                if hasattr(agent, "created_at")
-                else None,
+                "created_at": agent.created_at if hasattr(agent, "created_at") else None,
             },
         }
     except Exception as e:
@@ -950,9 +841,7 @@ async def get_agent_tasks(agent_id: str):
             },
         ]
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get agent tasks: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get agent tasks: {str(e)}")
 
 
 @app.get("/teams")
@@ -1066,9 +955,7 @@ async def list_agent_templates():
             },
         ]
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list agent templates: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list agent templates: {str(e)}")
 
 
 @app.get("/tasks")
@@ -1097,9 +984,7 @@ async def create_agent_from_template(request: dict):
         # Get template configuration
         template_config = await app.state.agent_manager.get_template_config(template_id)
         if not template_config:
-            raise HTTPException(
-                status_code=404, detail=f"Template {template_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Template {template_id} not found")
 
         # Build agent configuration
         agent_config = {
@@ -1112,9 +997,7 @@ async def create_agent_from_template(request: dict):
             "repository_settings": request.get("repository_settings", {}),
             "sandbox_settings": {
                 "base_image": f"fuzeagent/dev-{template_id.split('_')[0]}:latest",
-                "resource_limits": template_config.get(
-                    "resource_limits", {"memory": "2Gi", "cpu": "1.0", "disk": "10Gi"}
-                ),
+                "resource_limits": template_config.get("resource_limits", {"memory": "2Gi", "cpu": "1.0", "disk": "10Gi"}),
                 "auto_cleanup": "24h",
             },
         }
@@ -1130,9 +1013,7 @@ async def create_agent_from_template(request: dict):
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create agent from template: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create agent from template: {str(e)}")
 
 
 @app.get("/templates")
@@ -1148,18 +1029,14 @@ async def get_agent_templates():
     description="Begin autonomous execution of a task using Claude SDK integration",
     response_model=TaskResponse,
 )
-async def start_task_execution(
-    task_id: str = Path(..., description="Task ID to execute")
-):
+async def start_task_execution(task_id: str = Path(..., description="Task ID to execute")):
     """Start autonomous execution of a task"""
     try:
         # This will be handled by the TaskExecutionEngine
         result = await app.state.task_queue.start_autonomous_execution(task_id)
         return {"task_id": task_id, "status": "execution_started", "result": result}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to start task execution: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to start task execution: {str(e)}")
 
 
 @app.get("/tasks/{task_id}/status")
@@ -1169,9 +1046,7 @@ async def get_task_execution_status(task_id: str):
         status = await app.state.task_queue.get_execution_status(task_id)
         return status
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get task status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get task status: {str(e)}")
 
 
 @app.get("/tasks/{task_id}/iterations")
@@ -1181,9 +1056,7 @@ async def get_task_iterations(task_id: str):
         iterations = await app.state.task_queue.get_task_iterations(task_id)
         return {"task_id": task_id, "iterations": iterations}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get task iterations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get task iterations: {str(e)}")
 
 
 @app.get("/agents/{agent_id}/sandbox")
@@ -1193,9 +1066,7 @@ async def get_agent_sandbox(agent_id: str):
         sandbox_info = await app.state.agent_manager.get_agent_sandbox(agent_id)
         return sandbox_info
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get agent sandbox: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get agent sandbox: {str(e)}")
 
 
 # Additional endpoints for UI support
@@ -1350,9 +1221,7 @@ async def get_conversation_messages(agent_id: str, conversation_id: str):
     summary="Send Message to Agent",
     description="Send a message to an agent in a conversation",
 )
-async def send_message_to_agent(
-    agent_id: str, conversation_id: str, request: ChatMessageRequest
-):
+async def send_message_to_agent(agent_id: str, conversation_id: str, request: ChatMessageRequest):
     """Send a message to an agent in a conversation"""
     try:
         async with get_db_connection() as conn:
@@ -1428,9 +1297,7 @@ async def submit_human_response(
             )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to submit human response: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to submit human response: {str(e)}")
 
 
 @app.post("/tasks/{task_id}/cancel")
@@ -1473,8 +1340,7 @@ async def get_task_messages(task_id: str):
                     {
                         "type": "human_response",
                         "content": iteration["human_response"],
-                        "timestamp": iteration["completed_at"]
-                        or iteration["started_at"],
+                        "timestamp": iteration["completed_at"] or iteration["started_at"],
                         "iteration": iteration["iteration_number"],
                     }
                 )
@@ -1482,9 +1348,7 @@ async def get_task_messages(task_id: str):
         return {"task_id": task_id, "messages": messages}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get task messages: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get task messages: {str(e)}")
 
 
 # Sandbox management endpoints
@@ -1501,9 +1365,7 @@ async def list_sandboxes(agent_id: str = None, status: str = None):
             except ValueError:
                 raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
-        sandboxes = await app.state.sandbox_manager.list_sandboxes(
-            agent_id=agent_id, status=sandbox_status
-        )
+        sandboxes = await app.state.sandbox_manager.list_sandboxes(agent_id=agent_id, status=sandbox_status)
 
         return {
             "sandboxes": [
@@ -1521,9 +1383,7 @@ async def list_sandboxes(agent_id: str = None, status: str = None):
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list sandboxes: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list sandboxes: {str(e)}")
 
 
 @app.post("/sandboxes/{sandbox_id}/execute")
@@ -1536,16 +1396,12 @@ async def execute_command_in_sandbox(sandbox_id: str, command_data: dict):
         if not command:
             raise HTTPException(status_code=400, detail="Command is required")
 
-        result = await app.state.sandbox_manager.execute_command(
-            sandbox_id=sandbox_id, command=command, working_dir=working_dir
-        )
+        result = await app.state.sandbox_manager.execute_command(sandbox_id=sandbox_id, command=command, working_dir=working_dir)
 
         return result
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to execute command: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to execute command: {str(e)}")
 
 
 @app.delete("/sandboxes/{sandbox_id}")
@@ -1556,9 +1412,7 @@ async def destroy_sandbox(sandbox_id: str):
         return {"status": "destroyed", "sandbox_id": sandbox_id}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to destroy sandbox: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to destroy sandbox: {str(e)}")
 
 
 # Agent registration and communication endpoints
@@ -1574,9 +1428,7 @@ async def register_agent(agent_id: str, registration_data: dict):
             "registered_at": datetime.now().isoformat(),
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to register agent: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to register agent: {str(e)}")
 
 
 @app.get("/agents/{agent_id}/next-task")
@@ -1598,9 +1450,7 @@ async def get_next_task_for_agent(agent_id: str):
             return None, 204
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get next task: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get next task: {str(e)}")
 
 
 @app.post("/agents/{agent_id}/error")
@@ -1614,9 +1464,7 @@ async def report_agent_error(agent_id: str, error_data: dict):
         return {"status": "error_logged", "agent_id": agent_id}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to log agent error: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to log agent error: {str(e)}")
 
 
 # Conversation management endpoints
@@ -1624,65 +1472,47 @@ async def report_agent_error(agent_id: str, error_data: dict):
 async def get_task_conversation(task_id: str, iteration: int = None, limit: int = 100):
     """Get conversation history for a task"""
     try:
-        conversation_history = await app.state.task_execution_engine.conversation_manager.get_conversation_history(
-            task_id=task_id, iteration_number=iteration, limit=limit
-        )
+        conversation_history = await app.state.task_execution_engine.conversation_manager.get_conversation_history(task_id=task_id, iteration_number=iteration, limit=limit)
 
         return {"task_id": task_id, "conversation": conversation_history}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get conversation: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get conversation: {str(e)}")
 
 
 @app.get("/tasks/{task_id}/conversation/summary")
 async def get_conversation_summary(task_id: str):
     """Get conversation summary with statistics"""
     try:
-        summary = await app.state.task_execution_engine.conversation_manager.get_conversation_summary(
-            task_id
-        )
+        summary = await app.state.task_execution_engine.conversation_manager.get_conversation_summary(task_id)
         return summary
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get conversation summary: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get conversation summary: {str(e)}")
 
 
 @app.get("/tasks/{task_id}/code-generations")
-async def get_task_code_generations(
-    task_id: str, iteration: int = None, file_type: str = None
-):
+async def get_task_code_generations(task_id: str, iteration: int = None, file_type: str = None):
     """Get code generations for a task"""
     try:
-        code_generations = await app.state.task_execution_engine.conversation_manager.get_code_generations(
-            task_id=task_id, iteration_number=iteration, file_type=file_type
-        )
+        code_generations = await app.state.task_execution_engine.conversation_manager.get_code_generations(task_id=task_id, iteration_number=iteration, file_type=file_type)
 
         return {"task_id": task_id, "code_generations": code_generations}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get code generations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get code generations: {str(e)}")
 
 
 @app.get("/agents/{agent_id}/performance")
 async def get_agent_performance(agent_id: str, hours: int = 24):
     """Get agent performance metrics"""
     try:
-        metrics = await app.state.task_execution_engine.conversation_manager.get_agent_performance_metrics(
-            agent_id=agent_id, time_range_hours=hours
-        )
+        metrics = await app.state.task_execution_engine.conversation_manager.get_agent_performance_metrics(agent_id=agent_id, time_range_hours=hours)
 
         return {"agent_id": agent_id, "time_range_hours": hours, "metrics": metrics}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get agent performance: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get agent performance: {str(e)}")
 
 
 # File Operations Endpoints
@@ -1694,17 +1524,13 @@ async def get_agent_performance(agent_id: str, hours: int = 24):
 )
 async def get_task_file_operations(
     task_id: str = Path(..., description="Task ID"),
-    status: Optional[str] = Query(
-        None, description="Filter by status (pending, applied)"
-    ),
+    status: Optional[str] = Query(None, description="Filter by status (pending, applied)"),
 ):
     """Get file operations for a task"""
     try:
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution or not execution.file_operations_engine:
-            raise HTTPException(
-                status_code=404, detail="Task not found or no file operations available"
-            )
+            raise HTTPException(status_code=404, detail="Task not found or no file operations available")
 
         file_ops_engine = execution.file_operations_engine
 
@@ -1731,18 +1557,14 @@ async def get_task_file_operations(
                     "approval_status": batch.approval_status.value,
                     "operations_count": len(batch.operations),
                     "created_at": batch.created_at.isoformat(),
-                    "applied_at": batch.applied_at.isoformat()
-                    if batch.applied_at
-                    else None,
+                    "applied_at": batch.applied_at.isoformat() if batch.applied_at else None,
                 }
             )
 
         return {"task_id": task_id, "operations": operations_data}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get file operations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get file operations: {str(e)}")
 
 
 @app.get("/tasks/{task_id}/file-operations/{batch_id}/preview")
@@ -1751,9 +1573,7 @@ async def get_file_operations_preview(task_id: str, batch_id: str):
     try:
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution or not execution.file_operations_engine:
-            raise HTTPException(
-                status_code=404, detail="Task not found or no file operations available"
-            )
+            raise HTTPException(status_code=404, detail="Task not found or no file operations available")
 
         file_ops_engine = execution.file_operations_engine
         diffs = await file_ops_engine.get_file_diff_preview(batch_id)
@@ -1761,9 +1581,7 @@ async def get_file_operations_preview(task_id: str, batch_id: str):
         return {"task_id": task_id, "batch_id": batch_id, "file_diffs": diffs}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get file preview: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get file preview: {str(e)}")
 
 
 @app.post(
@@ -1783,9 +1601,7 @@ async def approve_file_operations(
 
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution or not execution.file_operations_engine:
-            raise HTTPException(
-                status_code=404, detail="Task not found or no file operations available"
-            )
+            raise HTTPException(status_code=404, detail="Task not found or no file operations available")
 
         file_ops_engine = execution.file_operations_engine
         success = await file_ops_engine.approve_operations(batch_id, approved)
@@ -1793,9 +1609,7 @@ async def approve_file_operations(
         if success:
             # Also notify Claude SDK if there's an active session
             if execution.claude_sdk_manager and execution.claude_session_id:
-                await execution.claude_sdk_manager.approve_file_operations(
-                    execution.claude_session_id, batch_id, approved
-                )
+                await execution.claude_sdk_manager.approve_file_operations(execution.claude_session_id, batch_id, approved)
 
             return {
                 "task_id": task_id,
@@ -1807,9 +1621,7 @@ async def approve_file_operations(
             raise HTTPException(status_code=400, detail="Failed to process approval")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to approve file operations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to approve file operations: {str(e)}")
 
 
 @app.post("/tasks/{task_id}/file-operations/{batch_id}/rollback")
@@ -1818,9 +1630,7 @@ async def rollback_file_operations(task_id: str, batch_id: str):
     try:
         execution = app.state.task_execution_engine.active_executions.get(task_id)
         if not execution or not execution.file_operations_engine:
-            raise HTTPException(
-                status_code=404, detail="Task not found or no file operations available"
-            )
+            raise HTTPException(status_code=404, detail="Task not found or no file operations available")
 
         file_ops_engine = execution.file_operations_engine
         success = await file_ops_engine.rollback_operations(batch_id)
@@ -1831,9 +1641,7 @@ async def rollback_file_operations(task_id: str, batch_id: str):
             raise HTTPException(status_code=400, detail="Failed to rollback operations")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to rollback file operations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to rollback file operations: {str(e)}")
 
 
 # Claude SDK Session Management Endpoints
@@ -1842,24 +1650,14 @@ async def get_claude_session_status(task_id: str):
     """Get Claude SDK session status for a task"""
     try:
         execution = app.state.task_execution_engine.active_executions.get(task_id)
-        if (
-            not execution
-            or not execution.claude_sdk_manager
-            or not execution.claude_session_id
-        ):
-            raise HTTPException(
-                status_code=404, detail="No active Claude SDK session for this task"
-            )
+        if not execution or not execution.claude_sdk_manager or not execution.claude_session_id:
+            raise HTTPException(status_code=404, detail="No active Claude SDK session for this task")
 
-        status = await execution.claude_sdk_manager.get_session_status(
-            execution.claude_session_id
-        )
+        status = await execution.claude_sdk_manager.get_session_status(execution.claude_session_id)
         return status
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get Claude session status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get Claude session status: {str(e)}")
 
 
 @app.post("/tasks/{task_id}/claude-session/input")
@@ -1871,30 +1669,18 @@ async def send_claude_session_input(task_id: str, input_data: dict):
             raise HTTPException(status_code=400, detail="Input cannot be empty")
 
         execution = app.state.task_execution_engine.active_executions.get(task_id)
-        if (
-            not execution
-            or not execution.claude_sdk_manager
-            or not execution.claude_session_id
-        ):
-            raise HTTPException(
-                status_code=404, detail="No active Claude SDK session for this task"
-            )
+        if not execution or not execution.claude_sdk_manager or not execution.claude_session_id:
+            raise HTTPException(status_code=404, detail="No active Claude SDK session for this task")
 
-        success = await execution.claude_sdk_manager.send_input(
-            execution.claude_session_id, user_input
-        )
+        success = await execution.claude_sdk_manager.send_input(execution.claude_session_id, user_input)
 
         if success:
             return {"task_id": task_id, "status": "input_sent", "input": user_input}
         else:
-            raise HTTPException(
-                status_code=400, detail="Failed to send input to Claude session"
-            )
+            raise HTTPException(status_code=400, detail="Failed to send input to Claude session")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to send Claude session input: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to send Claude session input: {str(e)}")
 
 
 # MCP Integration Endpoints
@@ -1917,9 +1703,7 @@ async def get_mcp_tools():
         return {"tools": tools}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get MCP tools: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get MCP tools: {str(e)}")
 
 
 @app.post(
@@ -1945,9 +1729,7 @@ async def call_mcp_tool(tool_request: MCPToolRequest = Body(...)):
         return result
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to call MCP tool: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to call MCP tool: {str(e)}")
 
 
 @app.get("/mcp/resources")
@@ -1970,9 +1752,7 @@ async def get_mcp_resources():
         return {"resources": resources}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get MCP resources: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get MCP resources: {str(e)}")
 
 
 @app.get("/mcp/resource")
@@ -1990,9 +1770,7 @@ async def get_mcp_resource(uri: str):
         return resource
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get MCP resource: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get MCP resource: {str(e)}")
 
 
 @app.get("/tasks/{task_id}/mcp-context")
@@ -2009,16 +1787,12 @@ async def get_task_mcp_context(task_id: str):
         mcp_integration = MCPClaudeIntegration(mcp_server)
 
         session_id = execution.claude_session_id or f"session-{task_id}"
-        context = await mcp_integration.get_session_context(
-            session_id=session_id, agent_id=execution.agent_id, task_id=task_id
-        )
+        context = await mcp_integration.get_session_context(session_id=session_id, agent_id=execution.agent_id, task_id=task_id)
 
         return context
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get MCP context: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get MCP context: {str(e)}")
 
 
 @app.post(
@@ -2078,9 +1852,7 @@ async def initiate_task_coordination(
     try:
         from .multi_agent_coordinator import CoordinationMode
 
-        coordination_mode = coordination_request.get(
-            "coordination_mode", "collaborative"
-        )
+        coordination_mode = coordination_request.get("coordination_mode", "collaborative")
         required_agents = coordination_request.get("required_agents")
         required_skills = coordination_request.get("required_skills")
 
@@ -2094,13 +1866,9 @@ async def initiate_task_coordination(
             )
 
         # Get multi-agent coordinator
-        coordinator = getattr(
-            app.state.task_execution_engine, "multi_agent_coordinator", None
-        )
+        coordinator = getattr(app.state.task_execution_engine, "multi_agent_coordinator", None)
         if not coordinator:
-            raise HTTPException(
-                status_code=503, detail="Multi-agent coordination not available"
-            )
+            raise HTTPException(status_code=503, detail="Multi-agent coordination not available")
 
         # Initiate coordination
         session_id = await coordinator.initiate_coordination(
@@ -2125,69 +1893,49 @@ async def initiate_task_coordination(
             }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to initiate coordination: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to initiate coordination: {str(e)}")
 
 
 @app.get("/coordination/{session_id}")
 async def get_coordination_status(session_id: str):
     """Get status of a coordination session"""
     try:
-        coordinator = getattr(
-            app.state.task_execution_engine, "multi_agent_coordinator", None
-        )
+        coordinator = getattr(app.state.task_execution_engine, "multi_agent_coordinator", None)
         if not coordinator:
-            raise HTTPException(
-                status_code=503, detail="Multi-agent coordination not available"
-            )
+            raise HTTPException(status_code=503, detail="Multi-agent coordination not available")
 
         status = await coordinator.get_coordination_status(session_id)
 
         if status:
             return status
         else:
-            raise HTTPException(
-                status_code=404, detail="Coordination session not found"
-            )
+            raise HTTPException(status_code=404, detail="Coordination session not found")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get coordination status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get coordination status: {str(e)}")
 
 
 @app.post("/coordination/{session_id}/cancel")
 async def cancel_coordination(session_id: str):
     """Cancel a coordination session"""
     try:
-        coordinator = getattr(
-            app.state.task_execution_engine, "multi_agent_coordinator", None
-        )
+        coordinator = getattr(app.state.task_execution_engine, "multi_agent_coordinator", None)
         if not coordinator:
-            raise HTTPException(
-                status_code=503, detail="Multi-agent coordination not available"
-            )
+            raise HTTPException(status_code=503, detail="Multi-agent coordination not available")
 
         success = await coordinator.cancel_coordination(session_id)
 
         if success:
             return {"coordination_session_id": session_id, "status": "cancelled"}
         else:
-            raise HTTPException(
-                status_code=404, detail="Coordination session not found"
-            )
+            raise HTTPException(status_code=404, detail="Coordination session not found")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to cancel coordination: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to cancel coordination: {str(e)}")
 
 
 @app.post("/agents/{from_agent_id}/communicate/{to_agent_id}")
-async def send_agent_communication(
-    from_agent_id: str, to_agent_id: str, communication_data: dict
-):
+async def send_agent_communication(from_agent_id: str, to_agent_id: str, communication_data: dict):
     """Send communication between agents"""
     try:
         message_type = communication_data.get("message_type", "notification")
@@ -2197,13 +1945,9 @@ async def send_agent_communication(
         if not content:
             raise HTTPException(status_code=400, detail="Content cannot be empty")
 
-        coordinator = getattr(
-            app.state.task_execution_engine, "multi_agent_coordinator", None
-        )
+        coordinator = getattr(app.state.task_execution_engine, "multi_agent_coordinator", None)
         if not coordinator:
-            raise HTTPException(
-                status_code=503, detail="Multi-agent coordination not available"
-            )
+            raise HTTPException(status_code=503, detail="Multi-agent coordination not available")
 
         communication_id = await coordinator.send_agent_communication(
             from_agent_id=from_agent_id,
@@ -2221,22 +1965,16 @@ async def send_agent_communication(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to send agent communication: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to send agent communication: {str(e)}")
 
 
 @app.get("/coordination/active")
 async def get_active_coordinations():
     """Get all active coordination sessions"""
     try:
-        coordinator = getattr(
-            app.state.task_execution_engine, "multi_agent_coordinator", None
-        )
+        coordinator = getattr(app.state.task_execution_engine, "multi_agent_coordinator", None)
         if not coordinator:
-            raise HTTPException(
-                status_code=503, detail="Multi-agent coordination not available"
-            )
+            raise HTTPException(status_code=503, detail="Multi-agent coordination not available")
 
         active_sessions = []
         for session_id in coordinator.active_sessions.keys():
@@ -2247,9 +1985,7 @@ async def get_active_coordinations():
         return {"active_coordinations": active_sessions, "count": len(active_sessions)}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get active coordinations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get active coordinations: {str(e)}")
 
 
 # WebSocket for coordination updates
@@ -2258,13 +1994,9 @@ async def coordination_websocket_endpoint(websocket: WebSocket, session_id: str)
     """WebSocket endpoint for real-time coordination updates"""
     await websocket.accept()
     try:
-        coordinator = getattr(
-            app.state.task_execution_engine, "multi_agent_coordinator", None
-        )
+        coordinator = getattr(app.state.task_execution_engine, "multi_agent_coordinator", None)
         if not coordinator:
-            await websocket.send_json(
-                {"type": "error", "message": "Multi-agent coordination not available"}
-            )
+            await websocket.send_json({"type": "error", "message": "Multi-agent coordination not available"})
             await websocket.close()
             return
 
@@ -2332,15 +2064,13 @@ async def store_provider_credentials(
 ):
     """Store encrypted API credentials for a model provider at organization level"""
     try:
-        from .model_configuration import model_config_manager, ModelProvider
+        from .model_configuration import ModelProvider, model_config_manager
 
         # Validate provider
         try:
             provider_enum = ModelProvider(provider)
         except ValueError:
-            raise HTTPException(
-                status_code=400, detail=f"Unsupported provider: {provider}"
-            )
+            raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
 
         success = await model_config_manager.store_provider_credentials(
             organization_id=organization_id,
@@ -2361,9 +2091,7 @@ async def store_provider_credentials(
             raise HTTPException(status_code=500, detail="Failed to store credentials")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to store provider credentials: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to store provider credentials: {str(e)}")
 
 
 @app.get(
@@ -2375,16 +2103,14 @@ async def store_provider_credentials(
 async def get_available_models(
     organization_id: str = Path(..., description="Organization ID"),
     provider: Optional[str] = Query(None, description="Filter by provider"),
-    capabilities: Optional[str] = Query(
-        None, description="Filter by capabilities (comma-separated)"
-    ),
+    capabilities: Optional[str] = Query(None, description="Filter by capabilities (comma-separated)"),
 ):
     """Get available AI models with provider credential validation"""
     try:
         from .model_configuration import (
-            model_config_manager,
-            ModelProvider,
             ModelCapability,
+            ModelProvider,
+            model_config_manager,
         )
 
         provider_filter = None
@@ -2392,20 +2118,14 @@ async def get_available_models(
             try:
                 provider_filter = ModelProvider(provider)
             except ValueError:
-                raise HTTPException(
-                    status_code=400, detail=f"Invalid provider: {provider}"
-                )
+                raise HTTPException(status_code=400, detail=f"Invalid provider: {provider}")
 
         capabilities_filter = None
         if capabilities:
             try:
-                capabilities_filter = [
-                    ModelCapability(cap.strip()) for cap in capabilities.split(",")
-                ]
+                capabilities_filter = [ModelCapability(cap.strip()) for cap in capabilities.split(",")]
             except ValueError as e:
-                raise HTTPException(
-                    status_code=400, detail=f"Invalid capability: {str(e)}"
-                )
+                raise HTTPException(status_code=400, detail=f"Invalid capability: {str(e)}")
 
         models = await model_config_manager.get_available_models(
             organization_id=organization_id,
@@ -2420,9 +2140,7 @@ async def get_available_models(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get available models: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get available models: {str(e)}")
 
 
 @app.post(
@@ -2437,7 +2155,7 @@ async def configure_agent_model(
 ):
     """Configure model settings for an AI agent"""
     try:
-        from .model_configuration import model_config_manager, AgentModelConfig
+        from .model_configuration import AgentModelConfig, model_config_manager
 
         agent_config = AgentModelConfig(
             agent_id=agent_id,
@@ -2454,9 +2172,7 @@ async def configure_agent_model(
             cost_limit_per_task=config.cost_limit_per_task,
         )
 
-        success = await model_config_manager.configure_agent_model(
-            agent_id, agent_config
-        )
+        success = await model_config_manager.configure_agent_model(agent_id, agent_config)
 
         if success:
             return {
@@ -2466,14 +2182,10 @@ async def configure_agent_model(
                 "fallback_models": config.fallback_models,
             }
         else:
-            raise HTTPException(
-                status_code=500, detail="Failed to configure agent model"
-            )
+            raise HTTPException(status_code=500, detail="Failed to configure agent model")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to configure agent model: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to configure agent model: {str(e)}")
 
 
 @app.get(
@@ -2482,9 +2194,7 @@ async def configure_agent_model(
     summary="Get Agent Model Configuration",
     description="Get current model configuration for an agent",
 )
-async def get_agent_model_configuration(
-    agent_id: str = Path(..., description="Agent ID")
-):
+async def get_agent_model_configuration(agent_id: str = Path(..., description="Agent ID")):
     """Get model configuration for an AI agent"""
     try:
         from .model_configuration import model_config_manager
@@ -2511,14 +2221,10 @@ async def get_agent_model_configuration(
                 },
             }
         else:
-            raise HTTPException(
-                status_code=404, detail="Agent model configuration not found"
-            )
+            raise HTTPException(status_code=404, detail="Agent model configuration not found")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get agent model configuration: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get agent model configuration: {str(e)}")
 
 
 @app.post(
@@ -2544,9 +2250,7 @@ async def estimate_task_cost(
         return estimate
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to estimate task cost: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to estimate task cost: {str(e)}")
 
 
 @app.get(
@@ -2563,16 +2267,12 @@ async def get_organization_model_usage(
     try:
         from .model_configuration import model_config_manager
 
-        usage = await model_config_manager.get_organization_model_usage(
-            organization_id=organization_id, days=days
-        )
+        usage = await model_config_manager.get_organization_model_usage(organization_id=organization_id, days=days)
 
         return usage
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get model usage: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get model usage: {str(e)}")
 
 
 @app.get(
@@ -2583,28 +2283,20 @@ async def get_organization_model_usage(
 )
 async def get_model_recommendations(
     agent_id: str = Path(..., description="Agent ID"),
-    capabilities: str = Query(
-        ..., description="Required capabilities (comma-separated)"
-    ),
-    cost_limit: Optional[float] = Query(
-        None, ge=0.0, description="Maximum cost limit in USD"
-    ),
+    capabilities: str = Query(..., description="Required capabilities (comma-separated)"),
+    cost_limit: Optional[float] = Query(None, ge=0.0, description="Maximum cost limit in USD"),
 ):
     """Get model recommendations based on task capabilities and cost constraints"""
     try:
-        from .model_configuration import model_config_manager, ModelCapability
+        from .model_configuration import ModelCapability, model_config_manager
 
         # Parse capabilities
         try:
-            capability_list = [
-                ModelCapability(cap.strip()) for cap in capabilities.split(",")
-            ]
+            capability_list = [ModelCapability(cap.strip()) for cap in capabilities.split(",")]
         except ValueError as e:
             raise HTTPException(status_code=400, detail=f"Invalid capability: {str(e)}")
 
-        recommended_model = await model_config_manager.get_model_for_task(
-            agent_id=agent_id, task_capabilities=capability_list, cost_limit=cost_limit
-        )
+        recommended_model = await model_config_manager.get_model_for_task(agent_id=agent_id, task_capabilities=capability_list, cost_limit=cost_limit)
 
         if recommended_model:
             return {
@@ -2621,9 +2313,7 @@ async def get_model_recommendations(
             }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get model recommendations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get model recommendations: {str(e)}")
 
 
 # Knowledge Management and Notification Endpoints
@@ -2636,17 +2326,11 @@ async def get_model_recommendations(
     description="Get notifications about knowledge updates, conflicts, and opportunities",
 )
 async def get_knowledge_notifications(
-    recipient_type: str = Path(
-        ..., description="Recipient type (agent, team, organization)"
-    ),
+    recipient_type: str = Path(..., description="Recipient type (agent, team, organization)"),
     recipient_id: str = Path(..., description="Recipient ID"),
     limit: int = Query(20, ge=1, le=100, description="Maximum notifications to return"),
-    status_filter: Optional[str] = Query(
-        None, description="Filter by status (unread, read, acknowledged)"
-    ),
-    notification_type_filter: Optional[str] = Query(
-        None, description="Filter by type (comma-separated)"
-    ),
+    status_filter: Optional[str] = Query(None, description="Filter by status (unread, read, acknowledged)"),
+    notification_type_filter: Optional[str] = Query(None, description="Filter by type (comma-separated)"),
 ):
     """Get knowledge notifications for a recipient"""
     try:
@@ -2669,35 +2353,26 @@ async def get_knowledge_notifications(
         status_filters = None
         if status_filter:
             try:
-                status_filters = [
-                    NotificationStatus(s.strip()) for s in status_filter.split(",")
-                ]
+                status_filters = [NotificationStatus(s.strip()) for s in status_filter.split(",")]
             except ValueError as e:
-                raise HTTPException(
-                    status_code=400, detail=f"Invalid status filter: {str(e)}"
-                )
+                raise HTTPException(status_code=400, detail=f"Invalid status filter: {str(e)}")
 
         type_filters = None
         if notification_type_filter:
             try:
-                type_filters = [
-                    NotificationType(t.strip())
-                    for t in notification_type_filter.split(",")
-                ]
+                type_filters = [NotificationType(t.strip()) for t in notification_type_filter.split(",")]
             except ValueError as e:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid notification type filter: {str(e)}",
                 )
 
-        notifications = (
-            await app.state.notification_service.get_notifications_for_recipient(
-                recipient_type=recipient_type,
-                recipient_id=recipient_id,
-                limit=limit,
-                status_filter=status_filters,
-                notification_type_filter=type_filters,
-            )
+        notifications = await app.state.notification_service.get_notifications_for_recipient(
+            recipient_type=recipient_type,
+            recipient_id=recipient_id,
+            limit=limit,
+            status_filter=status_filters,
+            notification_type_filter=type_filters,
         )
 
         return {
@@ -2725,9 +2400,7 @@ async def get_knowledge_notifications(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get knowledge notifications: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get knowledge notifications: {str(e)}")
 
 
 @app.put(
@@ -2739,9 +2412,7 @@ async def get_knowledge_notifications(
 async def update_notification_status(
     notification_id: str = Path(..., description="Notification ID"),
     status: str = Body(..., description="New notification status"),
-    action_taken: Optional[Dict[str, Any]] = Body(
-        None, description="Optional action taken metadata"
-    ),
+    action_taken: Optional[Dict[str, Any]] = Body(None, description="Optional action taken metadata"),
 ):
     """Update notification status and optional action taken"""
     try:
@@ -2769,9 +2440,7 @@ async def update_notification_status(
             raise HTTPException(status_code=404, detail="Notification not found")
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to update notification status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update notification status: {str(e)}")
 
 
 @app.get(
@@ -2781,23 +2450,17 @@ async def update_notification_status(
     description="Get comprehensive notification statistics and analytics",
 )
 async def get_notification_statistics(
-    organization_id: Optional[str] = Query(
-        None, description="Filter by organization ID"
-    ),
+    organization_id: Optional[str] = Query(None, description="Filter by organization ID"),
     days_back: int = Query(30, ge=1, le=365, description="Days of history to analyze"),
 ):
     """Get notification statistics and analytics"""
     try:
-        stats = await app.state.notification_service.get_notification_statistics(
-            organization_id=organization_id, days_back=days_back
-        )
+        stats = await app.state.notification_service.get_notification_statistics(organization_id=organization_id, days_back=days_back)
 
         return stats
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get notification statistics: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get notification statistics: {str(e)}")
 
 
 @app.post(
@@ -2815,9 +2478,7 @@ async def add_organizational_knowledge(
     source_agent_id: Optional[str] = Body(None, description="Source agent ID"),
     source_team_id: Optional[str] = Body(None, description="Source team ID"),
     tags: List[str] = Body(default_factory=list, description="Knowledge tags"),
-    metadata: Dict[str, Any] = Body(
-        default_factory=dict, description="Additional metadata"
-    ),
+    metadata: Dict[str, Any] = Body(default_factory=dict, description="Additional metadata"),
 ):
     """Add knowledge to organization-level knowledge base"""
     try:
@@ -2860,9 +2521,7 @@ async def add_organizational_knowledge(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to add organizational knowledge: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to add organizational knowledge: {str(e)}")
 
 
 @app.get(
@@ -2875,12 +2534,8 @@ async def search_organizational_knowledge(
     organization_id: str = Path(..., description="Organization ID"),
     query: str = Query(..., description="Search query"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results to return"),
-    min_similarity: float = Query(
-        0.3, ge=0.0, le=1.0, description="Minimum similarity threshold"
-    ),
-    categories: Optional[str] = Query(
-        None, description="Filter by categories (comma-separated)"
-    ),
+    min_similarity: float = Query(0.3, ge=0.0, le=1.0, description="Minimum similarity threshold"),
+    categories: Optional[str] = Query(None, description="Filter by categories (comma-separated)"),
 ):
     """Search organization-level knowledge base"""
     try:
@@ -2890,13 +2545,9 @@ async def search_organizational_knowledge(
         category_filters = None
         if categories:
             try:
-                category_filters = [
-                    KnowledgeCategory(cat.strip()) for cat in categories.split(",")
-                ]
+                category_filters = [KnowledgeCategory(cat.strip()) for cat in categories.split(",")]
             except ValueError as e:
-                raise HTTPException(
-                    status_code=400, detail=f"Invalid category: {str(e)}"
-                )
+                raise HTTPException(status_code=400, detail=f"Invalid category: {str(e)}")
 
         search_results = await app.state.org_rag_manager.search_knowledge(
             organization_id=organization_id,
@@ -2912,9 +2563,7 @@ async def search_organizational_knowledge(
                 {
                     "knowledge_id": result.knowledge.id,
                     "title": result.knowledge.title,
-                    "content_preview": result.knowledge.content[:200] + "..."
-                    if len(result.knowledge.content) > 200
-                    else result.knowledge.content,
+                    "content_preview": result.knowledge.content[:200] + "..." if len(result.knowledge.content) > 200 else result.knowledge.content,
                     "category": result.knowledge.knowledge_category.value,
                     "content_type": result.knowledge.content_type.value,
                     "similarity_score": result.similarity_score,
@@ -2949,13 +2598,9 @@ async def search_organizational_knowledge(
 )
 async def get_enhanced_context_for_agent(
     agent_id: str = Path(..., description="Agent ID"),
-    task_description: str = Query(
-        ..., description="Task description for context enhancement"
-    ),
+    task_description: str = Query(..., description="Task description for context enhancement"),
     task_type: Optional[str] = Query(None, description="Task type"),
-    technologies: Optional[str] = Query(
-        None, description="Technologies involved (comma-separated)"
-    ),
+    technologies: Optional[str] = Query(None, description="Technologies involved (comma-separated)"),
 ):
     """Get enhanced context with relevant knowledge for agent task execution"""
     try:
@@ -2968,9 +2613,7 @@ async def get_enhanced_context_for_agent(
                 "postgresql://postgres:password@postgres:5432/ai_context",
             )
             # These would be initialized in the lifespan
-            if hasattr(app.state, "org_rag_manager") and hasattr(
-                app.state, "team_knowledge_manager"
-            ):
+            if hasattr(app.state, "org_rag_manager") and hasattr(app.state, "team_knowledge_manager"):
                 app.state.context_enhancement_service = ContextEnhancementService(
                     database_url=database_url,
                     org_rag_manager=app.state.org_rag_manager,
@@ -2990,23 +2633,15 @@ async def get_enhanced_context_for_agent(
             "technologies": technologies.split(",") if technologies else [],
         }
 
-        enhanced_context = (
-            await app.state.context_enhancement_service.enhance_agent_context(
-                agent_id=agent_id, task_data=task_data
-            )
-        )
+        enhanced_context = await app.state.context_enhancement_service.enhance_agent_context(agent_id=agent_id, task_data=task_data)
 
         return {
             "agent_id": agent_id,
             "task_description": task_description,
             "enhanced_context": {
-                "organizational_knowledge_count": len(
-                    enhanced_context.organizational_knowledge
-                ),
+                "organizational_knowledge_count": len(enhanced_context.organizational_knowledge),
                 "team_knowledge_count": len(enhanced_context.team_knowledge),
-                "similar_task_insights_count": len(
-                    enhanced_context.similar_task_insights
-                ),
+                "similar_task_insights_count": len(enhanced_context.similar_task_insights),
                 "success_patterns": enhanced_context.success_patterns,
                 "common_pitfalls": enhanced_context.common_pitfalls,
                 "recommended_approaches": enhanced_context.recommended_approaches,
@@ -3020,9 +2655,7 @@ async def get_enhanced_context_for_agent(
                     "category": item.category,
                     "relevance_score": item.relevance_score,
                     "confidence_score": item.confidence_score,
-                    "content_preview": item.content[:200] + "..."
-                    if len(item.content) > 200
-                    else item.content,
+                    "content_preview": item.content[:200] + "..." if len(item.content) > 200 else item.content,
                 }
                 for item in enhanced_context.organizational_knowledge
             ],
@@ -3033,18 +2666,14 @@ async def get_enhanced_context_for_agent(
                     "category": item.category,
                     "relevance_score": item.relevance_score,
                     "confidence_score": item.confidence_score,
-                    "content_preview": item.content[:200] + "..."
-                    if len(item.content) > 200
-                    else item.content,
+                    "content_preview": item.content[:200] + "..." if len(item.content) > 200 else item.content,
                 }
                 for item in enhanced_context.team_knowledge
             ],
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get enhanced context: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get enhanced context: {str(e)}")
 
 
 @app.get(
@@ -3055,17 +2684,13 @@ async def get_enhanced_context_for_agent(
 )
 async def get_organizational_knowledge_insights(
     organization_id: str = Path(..., description="Organization ID"),
-    analysis_period_days: int = Query(
-        30, ge=7, le=365, description="Analysis period in days"
-    ),
+    analysis_period_days: int = Query(30, ge=7, le=365, description="Analysis period in days"),
 ):
     """Get comprehensive organizational knowledge insights and analytics"""
     try:
-        insights = (
-            await app.state.knowledge_analytics_service.get_organizational_insights(
-                organization_id=organization_id,
-                analysis_period_days=analysis_period_days,
-            )
+        insights = await app.state.knowledge_analytics_service.get_organizational_insights(
+            organization_id=organization_id,
+            analysis_period_days=analysis_period_days,
         )
 
         return {
@@ -3087,9 +2712,7 @@ async def get_organizational_knowledge_insights(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get organizational insights: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get organizational insights: {str(e)}")
 
 
 @app.get(
@@ -3100,21 +2723,15 @@ async def get_organizational_knowledge_insights(
 )
 async def analyze_knowledge_effectiveness(
     organization_id: str = Path(..., description="Organization ID"),
-    knowledge_category: Optional[str] = Query(
-        None, description="Filter by knowledge category"
-    ),
-    min_usage_count: int = Query(
-        3, ge=1, description="Minimum usage count for analysis"
-    ),
+    knowledge_category: Optional[str] = Query(None, description="Filter by knowledge category"),
+    min_usage_count: int = Query(3, ge=1, description="Minimum usage count for analysis"),
 ):
     """Analyze effectiveness of knowledge items in the organization"""
     try:
-        effectiveness_metrics = (
-            await app.state.knowledge_analytics_service.analyze_knowledge_effectiveness(
-                organization_id=organization_id,
-                knowledge_category=knowledge_category,
-                min_usage_count=min_usage_count,
-            )
+        effectiveness_metrics = await app.state.knowledge_analytics_service.analyze_knowledge_effectiveness(
+            organization_id=organization_id,
+            knowledge_category=knowledge_category,
+            min_usage_count=min_usage_count,
         )
 
         results = []
@@ -3142,14 +2759,9 @@ async def analyze_knowledge_effectiveness(
             "effectiveness_analysis": results,
             "total_analyzed": len(results),
             "summary": {
-                "avg_effectiveness": sum(r["overall_effectiveness"] for r in results)
-                / max(len(results), 1),
-                "top_performers": sorted(
-                    results, key=lambda x: x["overall_effectiveness"], reverse=True
-                )[:5],
-                "needs_attention": [
-                    r for r in results if r["overall_effectiveness"] < 0.5
-                ],
+                "avg_effectiveness": sum(r["overall_effectiveness"] for r in results) / max(len(results), 1),
+                "top_performers": sorted(results, key=lambda x: x["overall_effectiveness"], reverse=True)[:5],
+                "needs_attention": [r for r in results if r["overall_effectiveness"] < 0.5],
             },
         }
 
@@ -3168,22 +2780,14 @@ async def analyze_knowledge_effectiveness(
 )
 async def get_agent_knowledge_profile(
     agent_id: str = Path(..., description="Agent ID"),
-    analysis_period_days: int = Query(
-        60, ge=7, le=365, description="Analysis period in days"
-    ),
+    analysis_period_days: int = Query(60, ge=7, le=365, description="Analysis period in days"),
 ):
     """Get detailed knowledge profile for an agent"""
     try:
-        profile = (
-            await app.state.knowledge_analytics_service.get_agent_knowledge_profile(
-                agent_id=agent_id, analysis_period_days=analysis_period_days
-            )
-        )
+        profile = await app.state.knowledge_analytics_service.get_agent_knowledge_profile(agent_id=agent_id, analysis_period_days=analysis_period_days)
 
         if not profile:
-            raise HTTPException(
-                status_code=404, detail="Agent not found or no knowledge data available"
-            )
+            raise HTTPException(status_code=404, detail="Agent not found or no knowledge data available")
 
         return {
             "agent_id": agent_id,
@@ -3204,9 +2808,7 @@ async def get_agent_knowledge_profile(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get agent knowledge profile: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get agent knowledge profile: {str(e)}")
 
 
 @app.get(
@@ -3224,9 +2826,7 @@ async def get_knowledge_optimization_recommendations(
 ):
     """Generate comprehensive knowledge optimization recommendations"""
     try:
-        recommendations = await app.state.knowledge_analytics_service.generate_knowledge_optimization_recommendations(
-            organization_id=organization_id, focus_area=focus_area
-        )
+        recommendations = await app.state.knowledge_analytics_service.generate_knowledge_optimization_recommendations(organization_id=organization_id, focus_area=focus_area)
 
         return {
             "organization_id": organization_id,
@@ -3250,17 +2850,11 @@ async def get_knowledge_optimization_recommendations(
 )
 async def get_knowledge_trends_analysis(
     organization_id: str = Path(..., description="Organization ID"),
-    trend_period_days: int = Query(
-        90, ge=30, le=365, description="Trend analysis period in days"
-    ),
+    trend_period_days: int = Query(90, ge=30, le=365, description="Trend analysis period in days"),
 ):
     """Get comprehensive knowledge trends analysis"""
     try:
-        trends = (
-            await app.state.knowledge_analytics_service.get_knowledge_trends_analysis(
-                organization_id=organization_id, trend_period_days=trend_period_days
-            )
-        )
+        trends = await app.state.knowledge_analytics_service.get_knowledge_trends_analysis(organization_id=organization_id, trend_period_days=trend_period_days)
 
         return {
             "organization_id": organization_id,
@@ -3269,9 +2863,7 @@ async def get_knowledge_trends_analysis(
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get knowledge trends: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get knowledge trends: {str(e)}")
 
 
 # Memory-Enhanced Agents Endpoints
@@ -3287,9 +2879,7 @@ async def deploy_memory_enabled_agent(
     agent_id: str = Path(..., description="Agent ID"),
     template_id: str = Body(..., description="Agent template ID"),
     task_id: Optional[str] = Body(None, description="Optional specific task ID"),
-    repository_settings: Optional[Dict[str, Any]] = Body(
-        None, description="Repository settings"
-    ),
+    repository_settings: Optional[Dict[str, Any]] = Body(None, description="Repository settings"),
 ):
     """Deploy a memory-enabled autonomous agent container"""
     try:
@@ -3306,9 +2896,7 @@ async def deploy_memory_enabled_agent(
             raise HTTPException(status_code=500, detail=result["error"])
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to deploy memory-enabled agent: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to deploy memory-enabled agent: {str(e)}")
 
 
 @app.get(
@@ -3324,9 +2912,7 @@ async def get_agent_memory_status(agent_id: str = Path(..., description="Agent I
         return status
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get agent memory status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get agent memory status: {str(e)}")
 
 
 @app.post(
@@ -3342,9 +2928,7 @@ async def assign_task_to_memory_agent(
 ):
     """Assign a task to a memory-enabled agent for autonomous execution"""
     try:
-        result = await app.state.agent_manager.assign_task_to_memory_agent(
-            agent_id=agent_id, task_id=task_id, task_data=task_data
-        )
+        result = await app.state.agent_manager.assign_task_to_memory_agent(agent_id=agent_id, task_id=task_id, task_data=task_data)
 
         if result["success"]:
             return result
@@ -3352,9 +2936,7 @@ async def assign_task_to_memory_agent(
             raise HTTPException(status_code=400, detail=result["error"])
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to assign task to memory agent: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to assign task to memory agent: {str(e)}")
 
 
 @app.delete(
@@ -3374,9 +2956,7 @@ async def stop_memory_enabled_agent(agent_id: str = Path(..., description="Agent
             raise HTTPException(status_code=400, detail=result["error"])
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to stop memory-enabled agent: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to stop memory-enabled agent: {str(e)}")
 
 
 @app.get(
@@ -3392,9 +2972,7 @@ async def get_system_expertise_dashboard():
         return dashboard
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get expertise dashboard: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get expertise dashboard: {str(e)}")
 
 
 @app.get(
@@ -3405,9 +2983,7 @@ async def get_system_expertise_dashboard():
 )
 async def get_pending_tasks_for_agent(
     agent_id: str = Path(..., description="Agent ID"),
-    limit: int = Query(
-        10, ge=1, le=50, description="Maximum number of tasks to return"
-    ),
+    limit: int = Query(10, ge=1, le=50, description="Maximum number of tasks to return"),
 ):
     """Get pending tasks that a memory-enabled agent can pick up"""
     try:
@@ -3434,9 +3010,7 @@ async def get_pending_tasks_for_agent(
             }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get pending tasks: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get pending tasks: {str(e)}")
 
 
 @app.put(
@@ -3450,9 +3024,7 @@ async def update_task_status(
     status: str = Body(..., description="New task status"),
     result: Optional[Dict[str, Any]] = Body(None, description="Task result data"),
     updated_by: Optional[str] = Body(None, description="ID of agent updating the task"),
-    container_instance_id: Optional[str] = Body(
-        None, description="Container instance ID"
-    ),
+    container_instance_id: Optional[str] = Body(None, description="Container instance ID"),
     updated_at: Optional[str] = Body(None, description="Update timestamp"),
 ):
     """Update task status - used by memory-enabled agents to report progress"""
@@ -3481,9 +3053,7 @@ async def update_task_status(
             return {"task_id": task_id, "status": status, "updated": True}
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to update task status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update task status: {str(e)}")
 
 
 @app.post(
@@ -3494,9 +3064,7 @@ async def update_task_status(
 )
 async def register_agent_capabilities(
     agent_id: str = Path(..., description="Agent ID"),
-    capabilities: Dict[str, Any] = Body(
-        ..., description="Agent capabilities and status"
-    ),
+    capabilities: Dict[str, Any] = Body(..., description="Agent capabilities and status"),
 ):
     """Register or update agent capabilities - used by memory-enabled agents on startup"""
     try:
@@ -3628,9 +3196,7 @@ async def report_agent_error(
 async def create_goal(
     organization_id: str = Path(..., description="Organization ID"),
     goal_data: GoalCreateRequest = Body(..., description="Goal creation data"),
-    created_by: Optional[str] = Query(
-        None, description="ID of user/agent creating the goal"
-    ),
+    created_by: Optional[str] = Query(None, description="ID of user/agent creating the goal"),
 ):
     """Create a new organizational goal"""
     try:
@@ -3671,9 +3237,7 @@ async def list_organization_goals(
     organization_id: str = Path(..., description="Organization ID"),
     status: Optional[List[str]] = Query(None, description="Filter by goal status"),
     goal_type: Optional[List[str]] = Query(None, description="Filter by goal type"),
-    limit: int = Query(
-        50, ge=1, le=100, description="Maximum number of goals to return"
-    ),
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of goals to return"),
 ):
     """List goals for an organization"""
     try:
@@ -3699,13 +3263,9 @@ async def list_organization_goals(
                     "goal_type": goal.goal_type.value,
                     "status": goal.status.value,
                     "progress_percentage": float(goal.progress_percentage),
-                    "target_value": float(goal.target_value)
-                    if goal.target_value
-                    else None,
+                    "target_value": float(goal.target_value) if goal.target_value else None,
                     "target_unit": goal.target_unit,
-                    "current_value": float(goal.current_value)
-                    if goal.current_value
-                    else None,
+                    "current_value": float(goal.current_value) if goal.current_value else None,
                     "target_deadline": goal.target_deadline.isoformat(),
                     "priority_level": goal.priority_level,
                     "completion_confidence": float(goal.completion_confidence),
@@ -3749,9 +3309,7 @@ async def get_goal(goal_id: str = Path(..., description="Goal ID")):
             "success_criteria": goal.success_criteria,
             "start_date": goal.start_date.isoformat(),
             "target_deadline": goal.target_deadline.isoformat(),
-            "actual_completion_date": goal.actual_completion_date.isoformat()
-            if goal.actual_completion_date
-            else None,
+            "actual_completion_date": goal.actual_completion_date.isoformat() if goal.actual_completion_date else None,
             "priority_level": goal.priority_level,
             "completion_confidence": float(goal.completion_confidence),
             "assigned_teams": goal.assigned_teams,
@@ -3803,9 +3361,7 @@ async def get_goal_overview(goal_id: str = Path(..., description="Goal ID")):
 async def update_goal_progress(
     goal_id: str = Path(..., description="Goal ID"),
     progress_data: GoalUpdateRequest = Body(..., description="Progress update data"),
-    recorded_by: Optional[str] = Query(
-        None, description="ID of user/agent recording progress"
-    ),
+    recorded_by: Optional[str] = Query(None, description="ID of user/agent recording progress"),
 ):
     """Update goal progress"""
     try:
@@ -3819,9 +3375,7 @@ async def update_goal_progress(
         )
 
         if not success:
-            raise HTTPException(
-                status_code=404, detail="Goal not found or no changes made"
-            )
+            raise HTTPException(status_code=404, detail="Goal not found or no changes made")
 
         return {"goal_id": goal_id, "status": "updated"}
 
@@ -3840,12 +3394,8 @@ async def update_goal_progress(
 )
 async def create_milestone(
     goal_id: str = Path(..., description="Goal ID"),
-    milestone_data: MilestoneCreateRequest = Body(
-        ..., description="Milestone creation data"
-    ),
-    created_by: Optional[str] = Query(
-        None, description="ID of user/agent creating milestone"
-    ),
+    milestone_data: MilestoneCreateRequest = Body(..., description="Milestone creation data"),
+    created_by: Optional[str] = Query(None, description="ID of user/agent creating milestone"),
 ):
     """Create milestone for goal"""
     try:
@@ -3881,9 +3431,7 @@ async def create_milestone(
 async def create_task_from_milestone(
     milestone_id: str = Path(..., description="Milestone ID"),
     task_data: TaskFromMilestoneRequest = Body(..., description="Task creation data"),
-    created_by: Optional[str] = Query(
-        None, description="ID of user/agent creating task"
-    ),
+    created_by: Optional[str] = Query(None, description="ID of user/agent creating task"),
 ):
     """Create task from milestone"""
     try:
@@ -3919,17 +3467,11 @@ async def create_task_from_milestone(
 )
 async def generate_execution_plan(
     goal_id: str = Path(..., description="Goal ID"),
-    planning_context: Optional[Dict[str, Any]] = Body(
-        None, description="Additional planning context"
-    ),
+    planning_context: Optional[Dict[str, Any]] = Body(None, description="Additional planning context"),
 ):
     """Generate execution plan with milestones and tasks"""
     try:
-        execution_plan = (
-            await app.state.milestone_task_engine.generate_goal_execution_plan(
-                goal_id=goal_id, planning_context=planning_context
-            )
-        )
+        execution_plan = await app.state.milestone_task_engine.generate_goal_execution_plan(goal_id=goal_id, planning_context=planning_context)
 
         return execution_plan
 
@@ -3951,11 +3493,7 @@ async def generate_monthly_milestones(
 ):
     """Generate monthly milestones for goal"""
     try:
-        milestone_ids = (
-            await app.state.milestone_task_engine.generate_monthly_milestones(
-                goal_id=goal_id, start_date=start_date, end_date=end_date
-            )
-        )
+        milestone_ids = await app.state.milestone_task_engine.generate_monthly_milestones(goal_id=goal_id, start_date=start_date, end_date=end_date)
 
         return {
             "goal_id": goal_id,
@@ -3977,17 +3515,11 @@ async def generate_monthly_milestones(
 )
 async def generate_weekly_tasks(
     milestone_id: str = Path(..., description="Milestone ID"),
-    focus_areas: Optional[List[str]] = Body(
-        None, description="Focus areas for task generation"
-    ),
+    focus_areas: Optional[List[str]] = Body(None, description="Focus areas for task generation"),
 ):
     """Generate weekly tasks for milestone"""
     try:
-        task_ids = (
-            await app.state.milestone_task_engine.generate_weekly_tasks_for_milestone(
-                milestone_id=milestone_id, focus_areas=focus_areas
-            )
-        )
+        task_ids = await app.state.milestone_task_engine.generate_weekly_tasks_for_milestone(milestone_id=milestone_id, focus_areas=focus_areas)
 
         return {
             "milestone_id": milestone_id,
@@ -4009,17 +3541,11 @@ async def generate_weekly_tasks(
 )
 async def generate_cross_functional_tasks(
     goal_id: str = Path(..., description="Goal ID"),
-    target_functions: Optional[List[str]] = Body(
-        None, description="Target business functions"
-    ),
+    target_functions: Optional[List[str]] = Body(None, description="Target business functions"),
 ):
     """Generate cross-functional tasks for goal"""
     try:
-        functional_tasks = (
-            await app.state.milestone_task_engine.generate_cross_functional_tasks(
-                goal_id=goal_id, target_functions=target_functions
-            )
-        )
+        functional_tasks = await app.state.milestone_task_engine.generate_cross_functional_tasks(goal_id=goal_id, target_functions=target_functions)
 
         return {
             "goal_id": goal_id,
@@ -4041,26 +3567,20 @@ async def generate_cross_functional_tasks(
 )
 async def create_goal_conversation(
     goal_id: str = Path(..., description="Goal ID"),
-    conversation_data: GoalConversationCreateRequest = Body(
-        ..., description="Conversation creation data"
-    ),
-    created_by: Optional[str] = Query(
-        None, description="ID of user/agent creating conversation"
-    ),
+    conversation_data: GoalConversationCreateRequest = Body(..., description="Conversation creation data"),
+    created_by: Optional[str] = Query(None, description="ID of user/agent creating conversation"),
 ):
     """Create goal conversation"""
     try:
         from .goal_conversation_service import ConversationType
 
-        conversation_id = (
-            await app.state.goal_conversation_service.create_goal_conversation(
-                goal_id=goal_id,
-                conversation_type=ConversationType(conversation_data.conversation_type),
-                conversation_title=conversation_data.conversation_title,
-                initial_context=conversation_data.initial_context,
-                participants=conversation_data.participants,
-                created_by=created_by,
-            )
+        conversation_id = await app.state.goal_conversation_service.create_goal_conversation(
+            goal_id=goal_id,
+            conversation_type=ConversationType(conversation_data.conversation_type),
+            conversation_title=conversation_data.conversation_title,
+            initial_context=conversation_data.initial_context,
+            participants=conversation_data.participants,
+            created_by=created_by,
         )
 
         return {"conversation_id": conversation_id, "status": "created"}
@@ -4076,14 +3596,10 @@ async def create_goal_conversation(
     summary="Get goal conversation",
     description="Get full conversation with messages, insights, and action items",
 )
-async def get_goal_conversation(
-    conversation_id: str = Path(..., description="Conversation ID")
-):
+async def get_goal_conversation(conversation_id: str = Path(..., description="Conversation ID")):
     """Get goal conversation"""
     try:
-        conversation = await app.state.goal_conversation_service.get_conversation(
-            conversation_id
-        )
+        conversation = await app.state.goal_conversation_service.get_conversation(conversation_id)
 
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
@@ -4112,16 +3628,14 @@ async def add_message_to_conversation(
     try:
         from .goal_conversation_service import MessageType
 
-        message_id = (
-            await app.state.goal_conversation_service.add_message_to_conversation(
-                conversation_id=conversation_id,
-                message_type=MessageType(message_data.message_type),
-                sender_id=sender_id,
-                sender_name=message_data.sender_name,
-                content=message_data.content,
-                metadata=message_data.metadata,
-                references=message_data.references,
-            )
+        message_id = await app.state.goal_conversation_service.add_message_to_conversation(
+            conversation_id=conversation_id,
+            message_type=MessageType(message_data.message_type),
+            sender_id=sender_id,
+            sender_name=message_data.sender_name,
+            content=message_data.content,
+            metadata=message_data.metadata,
+            references=message_data.references,
         )
 
         return {"message_id": message_id, "status": "added"}
@@ -4139,17 +3653,11 @@ async def add_message_to_conversation(
 )
 async def generate_planning_milestones(
     conversation_id: str = Path(..., description="Conversation ID"),
-    planning_context: Optional[Dict[str, Any]] = Body(
-        None, description="Additional planning context"
-    ),
+    planning_context: Optional[Dict[str, Any]] = Body(None, description="Additional planning context"),
 ):
     """Generate planning milestones from conversation"""
     try:
-        milestones = (
-            await app.state.goal_conversation_service.generate_planning_milestones(
-                conversation_id=conversation_id, planning_context=planning_context
-            )
-        )
+        milestones = await app.state.goal_conversation_service.generate_planning_milestones(conversation_id=conversation_id, planning_context=planning_context)
 
         return {
             "conversation_id": conversation_id,
@@ -4171,17 +3679,11 @@ async def generate_planning_milestones(
 )
 async def conduct_progress_review(
     conversation_id: str = Path(..., description="Conversation ID"),
-    review_period_days: int = Query(
-        30, ge=1, le=365, description="Review period in days"
-    ),
+    review_period_days: int = Query(30, ge=1, le=365, description="Review period in days"),
 ):
     """Conduct progress review"""
     try:
-        review_analysis = (
-            await app.state.goal_conversation_service.conduct_progress_review(
-                conversation_id=conversation_id, review_period_days=review_period_days
-            )
-        )
+        review_analysis = await app.state.goal_conversation_service.conduct_progress_review(conversation_id=conversation_id, review_period_days=review_period_days)
 
         return review_analysis
 
@@ -4198,15 +3700,11 @@ async def conduct_progress_review(
 )
 async def extract_action_items(
     conversation_id: str = Path(..., description="Conversation ID"),
-    auto_assign: bool = Query(
-        True, description="Whether to automatically assign action items"
-    ),
+    auto_assign: bool = Query(True, description="Whether to automatically assign action items"),
 ):
     """Extract action items from conversation"""
     try:
-        action_items = await app.state.goal_conversation_service.extract_action_items_from_conversation(
-            conversation_id=conversation_id, auto_assign=auto_assign
-        )
+        action_items = await app.state.goal_conversation_service.extract_action_items_from_conversation(conversation_id=conversation_id, auto_assign=auto_assign)
 
         return {
             "conversation_id": conversation_id,
@@ -4228,26 +3726,22 @@ async def extract_action_items(
 )
 async def get_goal_conversations(
     goal_id: str = Path(..., description="Goal ID"),
-    conversation_type: Optional[str] = Query(
-        None, description="Filter by conversation type"
-    ),
+    conversation_type: Optional[str] = Query(None, description="Filter by conversation type"),
     status: Optional[str] = Query(None, description="Filter by conversation status"),
     limit: int = Query(10, ge=1, le=50, description="Maximum number of conversations"),
 ):
     """Get conversations for a goal"""
     try:
-        from .goal_conversation_service import ConversationType, ConversationStatus
+        from .goal_conversation_service import ConversationStatus, ConversationType
 
         conv_type = ConversationType(conversation_type) if conversation_type else None
         conv_status = ConversationStatus(status) if status else None
 
-        conversations = (
-            await app.state.goal_conversation_service.get_goal_conversations(
-                goal_id=goal_id,
-                conversation_type=conv_type,
-                status=conv_status,
-                limit=limit,
-            )
+        conversations = await app.state.goal_conversation_service.get_goal_conversations(
+            goal_id=goal_id,
+            conversation_type=conv_type,
+            status=conv_status,
+            limit=limit,
         )
 
         return {
@@ -4269,12 +3763,8 @@ async def get_goal_conversations(
 )
 async def record_progress_tracking(
     goal_id: str = Path(..., description="Goal ID"),
-    progress_data: ProgressUpdateRequest = Body(
-        ..., description="Progress tracking data"
-    ),
-    recorded_by: Optional[str] = Query(
-        None, description="ID of user/agent recording progress"
-    ),
+    progress_data: ProgressUpdateRequest = Body(..., description="Progress tracking data"),
+    recorded_by: Optional[str] = Query(None, description="ID of user/agent recording progress"),
 ):
     """Record progress tracking update"""
     try:
@@ -4305,9 +3795,7 @@ async def record_progress_tracking(
 async def assess_deadline_risk(goal_id: str = Path(..., description="Goal ID")):
     """Assess deadline risk for goal"""
     try:
-        deadline_risk = await app.state.goal_tracking_service.assess_goal_deadline_risk(
-            goal_id
-        )
+        deadline_risk = await app.state.goal_tracking_service.assess_goal_deadline_risk(goal_id)
 
         return {
             "goal_id": deadline_risk.goal_id,
@@ -4333,15 +3821,11 @@ async def assess_deadline_risk(goal_id: str = Path(..., description="Goal ID")):
 )
 async def generate_progress_report(
     goal_id: str = Path(..., description="Goal ID"),
-    report_period_days: int = Query(
-        30, ge=1, le=365, description="Report period in days"
-    ),
+    report_period_days: int = Query(30, ge=1, le=365, description="Report period in days"),
 ):
     """Generate progress report for goal"""
     try:
-        report = await app.state.goal_tracking_service.generate_progress_report(
-            goal_id=goal_id, report_period_days=report_period_days
-        )
+        report = await app.state.goal_tracking_service.generate_progress_report(goal_id=goal_id, report_period_days=report_period_days)
 
         return report
 
@@ -4356,14 +3840,10 @@ async def generate_progress_report(
     summary="Get organization goals dashboard",
     description="Get comprehensive dashboard for all organization goals",
 )
-async def get_organization_goals_dashboard(
-    organization_id: str = Path(..., description="Organization ID")
-):
+async def get_organization_goals_dashboard(organization_id: str = Path(..., description="Organization ID")):
     """Get organization goals dashboard"""
     try:
-        dashboard = await app.state.goals_service.get_organization_goals_dashboard(
-            organization_id
-        )
+        dashboard = await app.state.goals_service.get_organization_goals_dashboard(organization_id)
         return dashboard
 
     except Exception as e:
@@ -4377,16 +3857,10 @@ async def get_organization_goals_dashboard(
     summary="Get tracking dashboard",
     description="Get comprehensive tracking dashboard with risk assessments",
 )
-async def get_tracking_dashboard(
-    organization_id: str = Path(..., description="Organization ID")
-):
+async def get_tracking_dashboard(organization_id: str = Path(..., description="Organization ID")):
     """Get organization tracking dashboard"""
     try:
-        dashboard = (
-            await app.state.goal_tracking_service.get_organization_tracking_dashboard(
-                organization_id
-            )
-        )
+        dashboard = await app.state.goal_tracking_service.get_organization_tracking_dashboard(organization_id)
         return dashboard
 
     except Exception as e:
@@ -4446,9 +3920,7 @@ async def add_organization_url(
 ):
     """Add URL content to organizational knowledge base"""
     try:
-        document = await knowledge_manager.upload_url(
-            url=url, title=title, organization_id=organization_id, tags=tags or []
-        )
+        document = await knowledge_manager.upload_url(url=url, title=title, organization_id=organization_id, tags=tags or [])
 
         return document
 
@@ -4463,14 +3935,10 @@ async def add_organization_url(
     summary="List Organizational Documents",
     response_model=List[DocumentMetadata],
 )
-async def list_organization_documents(
-    organization_id: str = Path(..., description="Organization ID")
-):
+async def list_organization_documents(organization_id: str = Path(..., description="Organization ID")):
     """Get list of organizational documents"""
     try:
-        documents = await knowledge_manager.get_documents(
-            organization_id=organization_id
-        )
+        documents = await knowledge_manager.get_documents(organization_id=organization_id)
         return documents
 
     except Exception as e:
@@ -4490,9 +3958,7 @@ async def get_organization_document(
 ):
     """Get organizational document metadata"""
     try:
-        document = await knowledge_manager.get_document_metadata(
-            doc_id=doc_id, organization_id=organization_id
-        )
+        document = await knowledge_manager.get_document_metadata(doc_id=doc_id, organization_id=organization_id)
 
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4517,9 +3983,7 @@ async def get_organization_document_content(
 ):
     """Get full content of organizational document"""
     try:
-        content = await knowledge_manager.get_document_content(
-            doc_id=doc_id, organization_id=organization_id
-        )
+        content = await knowledge_manager.get_document_content(doc_id=doc_id, organization_id=organization_id)
 
         if content is None:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4547,9 +4011,7 @@ async def update_organization_document(
 ):
     """Update organizational document metadata"""
     try:
-        document = await knowledge_manager.update_document(
-            doc_id=doc_id, title=title, tags=tags, organization_id=organization_id
-        )
+        document = await knowledge_manager.update_document(doc_id=doc_id, title=title, tags=tags, organization_id=organization_id)
 
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4574,9 +4036,7 @@ async def delete_organization_document(
 ):
     """Delete organizational document"""
     try:
-        success = await knowledge_manager.delete_document(
-            doc_id=doc_id, organization_id=organization_id
-        )
+        success = await knowledge_manager.delete_document(doc_id=doc_id, organization_id=organization_id)
 
         if not success:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4640,9 +4100,7 @@ async def add_team_url(
 ):
     """Add URL content to team knowledge base"""
     try:
-        document = await knowledge_manager.upload_url(
-            url=url, title=title, team_id=team_id, tags=tags or []
-        )
+        document = await knowledge_manager.upload_url(url=url, title=title, team_id=team_id, tags=tags or [])
 
         return document
 
@@ -4680,9 +4138,7 @@ async def get_team_document(
 ):
     """Get team document metadata"""
     try:
-        document = await knowledge_manager.get_document_metadata(
-            doc_id=doc_id, team_id=team_id
-        )
+        document = await knowledge_manager.get_document_metadata(doc_id=doc_id, team_id=team_id)
 
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4707,9 +4163,7 @@ async def get_team_document_content(
 ):
     """Get full content of team document"""
     try:
-        content = await knowledge_manager.get_document_content(
-            doc_id=doc_id, team_id=team_id
-        )
+        content = await knowledge_manager.get_document_content(doc_id=doc_id, team_id=team_id)
 
         if content is None:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4737,9 +4191,7 @@ async def update_team_document(
 ):
     """Update team document metadata"""
     try:
-        document = await knowledge_manager.update_document(
-            doc_id=doc_id, title=title, tags=tags, team_id=team_id
-        )
+        document = await knowledge_manager.update_document(doc_id=doc_id, title=title, tags=tags, team_id=team_id)
 
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4764,9 +4216,7 @@ async def delete_team_document(
 ):
     """Delete team document"""
     try:
-        success = await knowledge_manager.delete_document(
-            doc_id=doc_id, team_id=team_id
-        )
+        success = await knowledge_manager.delete_document(doc_id=doc_id, team_id=team_id)
 
         if not success:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4830,9 +4280,7 @@ async def add_agent_url(
 ):
     """Add URL content to agent knowledge base"""
     try:
-        document = await knowledge_manager.upload_url(
-            url=url, title=title, agent_id=agent_id, tags=tags or []
-        )
+        document = await knowledge_manager.upload_url(url=url, title=title, agent_id=agent_id, tags=tags or [])
 
         return document
 
@@ -4870,9 +4318,7 @@ async def get_agent_document(
 ):
     """Get agent document metadata"""
     try:
-        document = await knowledge_manager.get_document_metadata(
-            doc_id=doc_id, agent_id=agent_id
-        )
+        document = await knowledge_manager.get_document_metadata(doc_id=doc_id, agent_id=agent_id)
 
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4897,9 +4343,7 @@ async def get_agent_document_content(
 ):
     """Get full content of agent document"""
     try:
-        content = await knowledge_manager.get_document_content(
-            doc_id=doc_id, agent_id=agent_id
-        )
+        content = await knowledge_manager.get_document_content(doc_id=doc_id, agent_id=agent_id)
 
         if content is None:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4927,9 +4371,7 @@ async def update_agent_document(
 ):
     """Update agent document metadata"""
     try:
-        document = await knowledge_manager.update_document(
-            doc_id=doc_id, title=title, tags=tags, agent_id=agent_id
-        )
+        document = await knowledge_manager.update_document(doc_id=doc_id, title=title, tags=tags, agent_id=agent_id)
 
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -4954,9 +4396,7 @@ async def delete_agent_document(
 ):
     """Delete agent document"""
     try:
-        success = await knowledge_manager.delete_document(
-            doc_id=doc_id, agent_id=agent_id
-        )
+        success = await knowledge_manager.delete_document(doc_id=doc_id, agent_id=agent_id)
 
         if not success:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -5016,9 +4456,7 @@ async def search_knowledge(
 )
 async def create_agent_container(
     agent_id: str = Path(..., description="Agent ID"),
-    config: Optional[ContainerConfig] = Body(
-        None, description="Container configuration"
-    ),
+    config: Optional[ContainerConfig] = Body(None, description="Container configuration"),
 ):
     """Create a new container for an AI agent"""
     try:
@@ -5158,9 +4596,7 @@ async def list_agent_containers():
 async def get_agent_container_logs(
     agent_id: str = Path(..., description="Agent ID"),
     tail: int = Query(100, ge=1, le=10000, description="Number of log lines to return"),
-    since: Optional[str] = Query(
-        None, description="Show logs since timestamp (ISO format)"
-    ),
+    since: Optional[str] = Query(None, description="Show logs since timestamp (ISO format)"),
 ):
     """Get container logs for an agent"""
     try:
@@ -5171,9 +4607,7 @@ async def get_agent_container_logs(
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid timestamp format")
 
-        logs = await container_manager.get_container_logs(
-            agent_id=agent_id, tail=tail, since=since_dt
-        )
+        logs = await container_manager.get_container_logs(agent_id=agent_id, tail=tail, since=since_dt)
 
         return {"logs": logs}
 
@@ -5196,9 +4630,7 @@ async def execute_container_command(
 ):
     """Execute a command in the agent container"""
     try:
-        result = await container_manager.execute_command(
-            agent_id=agent_id, command=command, working_dir=working_dir
-        )
+        result = await container_manager.execute_command(agent_id=agent_id, command=command, working_dir=working_dir)
 
         return result
 
@@ -5332,9 +4764,7 @@ async def reindex_knowledge_base(
 ):
     """Reindex all documents in a scope for RAG"""
     try:
-        results = await rag_system.index_all_documents(
-            organization_id=organization_id, team_id=team_id, agent_id=agent_id
-        )
+        results = await rag_system.index_all_documents(organization_id=organization_id, team_id=team_id, agent_id=agent_id)
 
         return {
             "scope": {
@@ -5466,9 +4896,7 @@ async def websocket_real_time_updates(
                                     type=UpdateType.SYSTEM_NOTIFICATION,
                                     data={
                                         "message": "Subscriptions updated",
-                                        "subscriptions": list(
-                                            connection.scope.subscriptions
-                                        ),
+                                        "subscriptions": list(connection.scope.subscriptions),
                                     },
                                 )
                             )
@@ -5523,9 +4951,7 @@ async def websocket_agent_updates(websocket: WebSocket, agent_id: str):
 
 
 @app.websocket("/ws/agents/{agent_id}/conversations/{conversation_id}")
-async def websocket_agent_conversation(
-    websocket: WebSocket, agent_id: str, conversation_id: str
-):
+async def websocket_agent_conversation(websocket: WebSocket, agent_id: str, conversation_id: str):
     """WebSocket endpoint for real-time agent conversation"""
     import uuid
 
@@ -5637,10 +5063,7 @@ async def websocket_agent_conversation(
         logger.error(f"Conversation WebSocket error for {conversation_id}: {e}")
     finally:
         # Clean up connection
-        if (
-            hasattr(app.state, "active_conversations")
-            and conversation_id in app.state.active_conversations
-        ):
+        if hasattr(app.state, "active_conversations") and conversation_id in app.state.active_conversations:
             if websocket in app.state.active_conversations[conversation_id]:
                 app.state.active_conversations[conversation_id].remove(websocket)
 

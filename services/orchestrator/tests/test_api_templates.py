@@ -105,16 +105,12 @@ class TestAgentTemplatesAPI:
         for template in templates:
             # Check template level fields
             for field in required_template_fields:
-                assert (
-                    field in template
-                ), f"Template {template.get('template_id')} missing {field}"
+                assert field in template, f"Template {template.get('template_id')} missing {field}"
 
             # Check config fields
             config = template["config"]
             for field in required_config_fields:
-                assert (
-                    field in config
-                ), f"Template {template['template_id']} config missing {field}"
+                assert field in config, f"Template {template['template_id']} config missing {field}"
 
             # Validate data types
             assert isinstance(template["template_id"], str)
@@ -141,9 +137,7 @@ class TestAgentTemplatesAPI:
         ]
 
         for template_id in essential_templates:
-            assert (
-                template_id in template_ids
-            ), f"Essential template {template_id} not found"
+            assert template_id in template_ids, f"Essential template {template_id} not found"
 
     def test_creative_templates_exist(self, client: TestClient):
         """Test that creative templates exist"""
@@ -156,9 +150,7 @@ class TestAgentTemplatesAPI:
         creative_templates = ["ui_ux_designer", "content_writer", "graphic_designer"]
 
         for template_id in creative_templates:
-            assert (
-                template_id in template_ids
-            ), f"Creative template {template_id} not found"
+            assert template_id in template_ids, f"Creative template {template_id} not found"
 
     def test_claude_ai_developer_template(self, client: TestClient):
         """Test Claude AI Developer template specifically"""
@@ -224,9 +216,7 @@ class TestAgentTemplatesAPI:
         for template in templates:
             tools = template["config"]["tools"]
             for tool in tools:
-                assert (
-                    tool in valid_tools
-                ), f"Invalid tool '{tool}' in template {template['template_id']}"
+                assert tool in valid_tools, f"Invalid tool '{tool}' in template {template['template_id']}"
 
     def test_template_skills_validation(self, client: TestClient):
         """Test that template skills are reasonable"""
@@ -241,6 +231,4 @@ class TestAgentTemplatesAPI:
             # All skills should be strings
             for skill in skills:
                 assert isinstance(skill, str)
-                assert (
-                    len(skill) > 0
-                ), f"Empty skill in template {template['template_id']}"
+                assert len(skill) > 0, f"Empty skill in template {template['template_id']}"

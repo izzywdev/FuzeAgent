@@ -8,22 +8,22 @@ and semantic search capabilities for agent chat history and knowledge base.
 
 import asyncio
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-import logging
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 import numpy as np
-from sentence_transformers import SentenceTransformer
 import tiktoken
 
 # LangChain imports for conversation summarization
 from langchain.memory import ConversationSummaryBufferMemory
-from langchain.schema import BaseMessage, HumanMessage, AIMessage, SystemMessage
-from langchain_anthropic import ChatAnthropic
 from langchain.prompts import PromptTemplate
+from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_anthropic import ChatAnthropic
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 

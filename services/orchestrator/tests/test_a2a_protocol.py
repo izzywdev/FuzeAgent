@@ -2,8 +2,10 @@
 Test cases for A2A Protocol functionality
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from a2a_protocol import A2AProtocolManager, AgentCapability, TaskDelegation
 
 
@@ -37,9 +39,7 @@ class TestA2AProtocol:
         assert "capability_id" in result
 
         # Verify capability was stored
-        stored_capability = await manager.get_agent_capability(
-            agent_id, "python_development"
-        )
+        stored_capability = await manager.get_agent_capability(agent_id, "python_development")
         assert stored_capability is not None
         assert stored_capability["name"] == capability.name
 
@@ -216,9 +216,7 @@ class TestA2AProtocol:
 
         # Reject the delegation
         rejection_reason = "Task requirements are not feasible"
-        result = await manager.reject_task_delegation(
-            delegation_id, agent_id, rejection_reason
-        )
+        result = await manager.reject_task_delegation(delegation_id, agent_id, rejection_reason)
 
         assert result["success"] is True
         assert result["status"] == "rejected"
@@ -251,13 +249,9 @@ class TestA2AProtocol:
 
             if outcome == "completed":
                 await manager.accept_task_delegation(delegation_id, agent_id)
-                await manager.complete_task_delegation(
-                    delegation_id, {"result": f"Test {i} completed"}
-                )
+                await manager.complete_task_delegation(delegation_id, {"result": f"Test {i} completed"})
             elif outcome == "rejected":
-                await manager.reject_task_delegation(
-                    delegation_id, agent_id, "Test rejection"
-                )
+                await manager.reject_task_delegation(delegation_id, agent_id, "Test rejection")
 
         # Get collaboration history
         history = await manager.get_agent_collaboration_history(agent_id)
@@ -384,9 +378,7 @@ class TestA2AProtocol:
             "metadata": {"priority": "high", "domain": "database"},
         }
 
-        result = await manager.send_inter_agent_message(
-            from_agent_id=agent_id, to_agent_id=agent_id, message_data=message_data
-        )
+        result = await manager.send_inter_agent_message(from_agent_id=agent_id, to_agent_id=agent_id, message_data=message_data)
 
         assert result["success"] is True
         assert "message_id" in result
@@ -395,9 +387,7 @@ class TestA2AProtocol:
         messages = await manager.get_agent_messages(agent_id)
 
         assert len(messages) >= 1
-        sent_message = next(
-            m for m in messages if m["message_id"] == result["message_id"]
-        )
+        sent_message = next(m for m in messages if m["message_id"] == result["message_id"])
         assert sent_message["subject"] == message_data["subject"]
         assert sent_message["message_type"] == message_data["message_type"]
 
@@ -431,9 +421,7 @@ class TestA2AProtocol:
 
         # Verify all were stored
         pending = await manager.get_pending_delegations(agent_id)
-        concurrent_tasks = [
-            d for d in pending if d["task_id"].startswith("concurrent-")
-        ]
+        concurrent_tasks = [d for d in pending if d["task_id"].startswith("concurrent-")]
         assert len(concurrent_tasks) == 10
 
     async def test_error_handling_invalid_agent(self, a2a_manager):

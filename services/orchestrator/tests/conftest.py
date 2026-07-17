@@ -4,30 +4,29 @@ Pytest configuration and fixtures for FuzeAgent tests
 
 import asyncio
 import os
-import pytest
 import tempfile
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
 
 import asyncpg
-from fastapi.testclient import TestClient
+import pytest
 from faker import Faker
+from fastapi.testclient import TestClient
 
 # Set test environment
 os.environ["TESTING"] = "1"
-os.environ[
-    "DATABASE_URL"
-] = "postgresql://postgres:password@localhost:5434/ai_context_test"
+os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5434/ai_context_test"
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key"
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy1sb25n"
 
+from a2a_protocol import A2AProtocolManager
+from database import DatabaseManager
+
 # Import after setting environment variables
 from main_with_hierarchy import app
-from database import DatabaseManager
-from rag_manager import RAGManager
-from a2a_protocol import A2AProtocolManager
 from migration_manager import MigrationManager
+from rag_manager import RAGManager
 
 fake = Faker()
 
@@ -56,13 +55,11 @@ async def db_pool():
     # Clean up database before each test
     async with pool.acquire() as conn:
         # Drop all tables to start fresh
-        await conn.execute(
-            """
+        await conn.execute("""
             DROP SCHEMA IF EXISTS public CASCADE;
             CREATE SCHEMA public;
             CREATE EXTENSION IF NOT EXISTS vector;
-        """
-        )
+        """)
 
     yield pool
     await pool.close()
@@ -111,9 +108,7 @@ def mock_anthropic_client():
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.content = [MagicMock()]
-    mock_response.content[
-        0
-    ].text = """
+    mock_response.content[0].text = """
 ## Explanation
 This is a test implementation.
 
@@ -208,9 +203,7 @@ def sample_task():
 
 
 @pytest.fixture
-async def setup_test_data(
-    migration_manager, sample_organization, sample_team, sample_agent
-):
+async def setup_test_data(migration_manager, sample_organization, sample_team, sample_agent):
     """Setup test data in database"""
     # Create organization
     org_id = await DatabaseManager.create_organization(
@@ -292,9 +285,7 @@ def sample_milestone():
         "milestone_type": "checkpoint",
         "target_date": date.today() + timedelta(days=30),
         "success_criteria": {"setup_completed": True, "team_aligned": True},
-        "deliverables": [
-            {"type": "infrastructure", "description": "Basic setup completed"}
-        ],
+        "deliverables": [{"type": "infrastructure", "description": "Basic setup completed"}],
         "dependencies": [],
         "status": "planned",
         "progress_percentage": 0,
@@ -323,9 +314,7 @@ def sample_goal_task():
         "status": "pending",
         "priority": 8,
         "requirements": {"deliverable": "strategy_document"},
-        "acceptance_criteria": [
-            {"criteria": "Strategy document completed and approved"}
-        ],
+        "acceptance_criteria": [{"criteria": "Strategy document completed and approved"}],
     }
 
 
@@ -339,9 +328,7 @@ def sample_conversation():
         "conversation_title": "Strategic Planning: Path to $100K MRR",
         "conversation_summary": "Initial strategic planning conversation",
         "conversation_context": {"focus": "revenue_growth", "timeline": "6_months"},
-        "participants": [
-            {"type": "agent", "id": "izzy-ai", "name": "IzzyAI", "role": "CEO"}
-        ],
+        "participants": [{"type": "agent", "id": "izzy-ai", "name": "IzzyAI", "role": "CEO"}],
         "messages": [],
         "insights_generated": [],
         "action_items": [],
@@ -369,12 +356,8 @@ def mock_milestone_engine():
     """Mock Milestone Task Engine"""
     engine = AsyncMock()
     engine.generate_goal_execution_plan = AsyncMock()
-    engine.generate_monthly_milestones = AsyncMock(
-        return_value=["milestone-1", "milestone-2"]
-    )
-    engine.generate_weekly_tasks_for_milestone = AsyncMock(
-        return_value=["task-1", "task-2"]
-    )
+    engine.generate_monthly_milestones = AsyncMock(return_value=["milestone-1", "milestone-2"])
+    engine.generate_weekly_tasks_for_milestone = AsyncMock(return_value=["task-1", "task-2"])
     engine.generate_cross_functional_tasks = AsyncMock()
     return engine
 

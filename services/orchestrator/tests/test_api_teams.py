@@ -96,9 +96,7 @@ class TestTeamsAPI:
         response = client.get(f"/teams/{fake_id}")
         assert response.status_code == 404
 
-    def test_get_teams_filtered_by_organization(
-        self, client: TestClient, setup_organization
-    ):
+    def test_get_teams_filtered_by_organization(self, client: TestClient, setup_organization):
         """Test getting teams filtered by organization"""
         org_id = setup_organization
 
@@ -217,9 +215,7 @@ class TestTeamsAPI:
         assert len(agents) == 1
         assert agents[0]["team_id"] == team_id
 
-    def test_create_team_with_different_types(
-        self, client: TestClient, setup_organization
-    ):
+    def test_create_team_with_different_types(self, client: TestClient, setup_organization):
         """Test creating teams with different team types"""
         org_id = setup_organization
 
@@ -250,9 +246,7 @@ class TestTeamsAPI:
         teams = response.json()
         assert len(teams) == len(team_types)
 
-    def test_create_team_with_complex_settings(
-        self, client: TestClient, setup_organization
-    ):
+    def test_create_team_with_complex_settings(self, client: TestClient, setup_organization):
         """Test creating team with complex settings"""
         org_id = setup_organization
 
@@ -282,9 +276,7 @@ class TestTeamsAPI:
         assert "python" in data["settings"]["skills"]
         assert data["settings"]["tools"]["version_control"] == "git"
 
-    def test_team_organization_cascade_delete(
-        self, client: TestClient, setup_organization
-    ):
+    def test_team_organization_cascade_delete(self, client: TestClient, setup_organization):
         """Test team behavior when organization is deleted"""
         org_id = setup_organization
 

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any, Optional
-import json
-import httpx
 import asyncio
+import json
+from typing import Any, Dict, List, Optional
+
+import httpx
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/hierarchy", tags=["hierarchy"])
 
@@ -117,12 +118,7 @@ async def get_hierarchy_visualization():
                 )
 
                 # Filter agents for this team - note: need to check team_id in agents
-                agents = [
-                    a
-                    for a in all_agents
-                    if a.get("team_id") == team_id
-                    or (hasattr(a, "config") and a.config.get("team_id") == team_id)
-                ]
+                agents = [a for a in all_agents if a.get("team_id") == team_id or (hasattr(a, "config") and a.config.get("team_id") == team_id)]
                 # Fallback: if no team_id in agent data, we'll have limited agents
                 if not agents and all_agents:
                     # For now, include some agents if they don't have team assignments
@@ -146,9 +142,7 @@ async def get_hierarchy_visualization():
                     }
 
                     agent_type = agent.get("type", "developer")
-                    colors = agent_colors.get(
-                        agent_type, {"bg": "#6b7280", "border": "#4b5563"}
-                    )
+                    colors = agent_colors.get(agent_type, {"bg": "#6b7280", "border": "#4b5563"})
 
                     # Add agent node
                     nodes.append(
@@ -166,11 +160,7 @@ async def get_hierarchy_visualization():
                                 "organization_id": org_id,
                             },
                             "position": {
-                                "x": org_idx * 800
-                                + (team_idx % 3) * 250
-                                - 250
-                                + (agent_idx % 2) * 120
-                                - 60,
+                                "x": org_idx * 800 + (team_idx % 3) * 250 - 250 + (agent_idx % 2) * 120 - 60,
                                 "y": agent_y_offset + (agent_idx // 2) * 80,
                             },
                             "style": {
@@ -243,21 +233,15 @@ async def get_hierarchy_stats():
                 team_id = team["id"]
                 team_type = team.get("team_type", "general")
                 org_teams_by_type[team_type] = org_teams_by_type.get(team_type, 0) + 1
-                stats["team_types"][team_type] = (
-                    stats["team_types"].get(team_type, 0) + 1
-                )
+                stats["team_types"][team_type] = stats["team_types"].get(team_type, 0) + 1
 
                 agents = await DatabaseManager.get_agents(team_id)
                 org_agent_count += len(agents)
 
                 for agent in agents:
                     agent_type = agent.get("type", "developer")
-                    org_agents_by_type[agent_type] = (
-                        org_agents_by_type.get(agent_type, 0) + 1
-                    )
-                    stats["agent_types"][agent_type] = (
-                        stats["agent_types"].get(agent_type, 0) + 1
-                    )
+                    org_agents_by_type[agent_type] = org_agents_by_type.get(agent_type, 0) + 1
+                    stats["agent_types"][agent_type] = stats["agent_types"].get(agent_type, 0) + 1
 
             stats["by_organization"].append(
                 {
@@ -276,9 +260,7 @@ async def get_hierarchy_stats():
         return stats
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get hierarchy stats: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get hierarchy stats: {str(e)}")
 
 
 @router.get("/organization/{organization_id}/chart")
@@ -317,9 +299,7 @@ async def get_organization_chart(organization_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get organization chart: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get organization chart: {str(e)}")
 
 
 @router.get("/search")
@@ -327,9 +307,7 @@ async def search_hierarchy(q: str, entity_type: Optional[str] = None):
     """Search across organizations, teams, and agents"""
     try:
         if not q or len(q) < 2:
-            raise HTTPException(
-                status_code=400, detail="Query must be at least 2 characters"
-            )
+            raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
 
         results = {"organizations": [], "teams": [], "agents": [], "total_results": 0}
 
@@ -339,10 +317,7 @@ async def search_hierarchy(q: str, entity_type: Optional[str] = None):
         if not entity_type or entity_type == "organization":
             organizations = await DatabaseManager.get_organizations()
             for org in organizations:
-                if (
-                    query in org["name"].lower()
-                    or query in org.get("description", "").lower()
-                ):
+                if query in org["name"].lower() or query in org.get("description", "").lower():
                     results["organizations"].append(org)
 
         # Search teams
@@ -351,11 +326,7 @@ async def search_hierarchy(q: str, entity_type: Optional[str] = None):
             for org in organizations:
                 teams = await DatabaseManager.get_teams(org["id"])
                 for team in teams:
-                    if (
-                        query in team["name"].lower()
-                        or query in team.get("description", "").lower()
-                        or query in team.get("team_type", "").lower()
-                    ):
+                    if query in team["name"].lower() or query in team.get("description", "").lower() or query in team.get("team_type", "").lower():
                         team["organization_name"] = org["name"]
                         results["teams"].append(team)
 
@@ -367,20 +338,12 @@ async def search_hierarchy(q: str, entity_type: Optional[str] = None):
                 for team in teams:
                     agents = await DatabaseManager.get_agents(team["id"])
                     for agent in agents:
-                        if (
-                            query in agent["name"].lower()
-                            or query in agent.get("role", "").lower()
-                            or query in agent.get("type", "").lower()
-                        ):
+                        if query in agent["name"].lower() or query in agent.get("role", "").lower() or query in agent.get("type", "").lower():
                             agent["organization_name"] = org["name"]
                             agent["team_name"] = team["name"]
                             results["agents"].append(agent)
 
-        results["total_results"] = (
-            len(results["organizations"])
-            + len(results["teams"])
-            + len(results["agents"])
-        )
+        results["total_results"] = len(results["organizations"]) + len(results["teams"]) + len(results["agents"])
 
         return results
 

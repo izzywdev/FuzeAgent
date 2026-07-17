@@ -6,12 +6,14 @@ within the WCG ecosystem. Enables centralized coordination between FuzeAgent,
 FuzeFront, HubHit, DeployAI, and other WCG products.
 """
 
-from fastapi import APIRouter, HTTPException, Query, Path, Depends
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-from datetime import datetime, date
 import logging
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
 import asyncpg
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from pydantic import BaseModel, Field
+
 from .database import get_db_connection
 
 logger = logging.getLogger(__name__)
@@ -25,9 +27,7 @@ class ProductRegistration(BaseModel):
     version: str = Field(..., description="Current product version")
     endpoints: List[str] = Field(default=[], description="API endpoints exposed")
     dependencies: List[str] = Field(default=[], description="Product dependencies")
-    resource_requirements: Dict[str, Any] = Field(
-        default={}, description="Resource needs"
-    )
+    resource_requirements: Dict[str, Any] = Field(default={}, description="Resource needs")
     team_contacts: List[str] = Field(default=[], description="Team contact information")
     priority_level: int = Field(default=5, ge=1, le=10, description="Business priority")
     metadata: Dict[str, Any] = Field(default={}, description="Additional metadata")
@@ -35,20 +35,14 @@ class ProductRegistration(BaseModel):
 
 class CoordinationRequestCreate(BaseModel):
     requesting_product: str = Field(..., description="Product making the request")
-    target_products: List[str] = Field(
-        ..., description="Target products for coordination"
-    )
+    target_products: List[str] = Field(..., description="Target products for coordination")
     coordination_type: str = Field(..., description="Type of coordination needed")
     scope: str = Field(default="product_group", description="Coordination scope")
     priority: str = Field(default="medium", description="Request priority")
     title: str = Field(..., description="Brief title for the request")
     description: str = Field(..., description="Detailed description")
-    resource_requirements: Dict[str, Any] = Field(
-        default={}, description="Required resources"
-    )
-    proposed_timeline: Dict[str, Any] = Field(
-        default={}, description="Proposed timeline"
-    )
+    resource_requirements: Dict[str, Any] = Field(default={}, description="Required resources")
+    proposed_timeline: Dict[str, Any] = Field(default={}, description="Proposed timeline")
 
 
 class CoordinationResolution(BaseModel):
@@ -61,16 +55,12 @@ class ResourceAllocationCreate(BaseModel):
     product_id: str = Field(..., description="Product requesting allocation")
     resource_type: str = Field(..., description="Type of resource")
     resource_name: str = Field(..., description="Specific resource name")
-    allocation_details: Dict[str, Any] = Field(
-        default={}, description="Allocation specifics"
-    )
+    allocation_details: Dict[str, Any] = Field(default={}, description="Allocation specifics")
     valid_until: Optional[datetime] = Field(None, description="Allocation expiry")
 
 
 # Product Registration Endpoints
-@router.post(
-    "/products/register", summary="Register a new product in coordination system"
-)
+@router.post("/products/register", summary="Register a new product in coordination system")
 async def register_product(product: ProductRegistration):
     """Register a new product in the cross-product coordination system"""
     try:
@@ -108,9 +98,7 @@ async def register_product(product: ProductRegistration):
 
     except Exception as e:
         logger.error(f"Error registering product {product.id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to register product: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to register product: {str(e)}")
 
 
 @router.get("/products", summary="List all registered products")
@@ -139,9 +127,7 @@ async def list_products(
 
     except Exception as e:
         logger.error(f"Error listing products: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list products: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list products: {str(e)}")
 
 
 @router.get("/products/{product_id}", summary="Get specific product details")
@@ -157,9 +143,7 @@ async def get_product(product_id: str = Path(..., description="Product ID")):
             )
 
         if not product:
-            raise HTTPException(
-                status_code=404, detail=f"Product {product_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Product {product_id} not found")
 
         # Get active coordination requests involving this product
         async with get_db_connection() as conn:
@@ -176,9 +160,7 @@ async def get_product(product_id: str = Path(..., description="Product ID")):
 
         return {
             "product": dict(product),
-            "active_coordination_requests": [
-                dict(req) for req in coordination_requests
-            ],
+            "active_coordination_requests": [dict(req) for req in coordination_requests],
         }
 
     except HTTPException:
@@ -257,9 +239,7 @@ async def create_coordination_request(request: CoordinationRequestCreate):
         raise
     except Exception as e:
         logger.error(f"Error creating coordination request: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create coordination request: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create coordination request: {str(e)}")
 
 
 @router.get("/requests", summary="List coordination requests")
@@ -287,14 +267,10 @@ async def list_coordination_requests(
 
         if product_id:
             param_count += 1
-            where_conditions.append(
-                f"(requesting_product = ${param_count} OR ${param_count} = ANY(string_to_array(replace(replace(target_products::text, '[', ''), ']', ''), ',')))"
-            )
+            where_conditions.append(f"(requesting_product = ${param_count} OR ${param_count} = ANY(string_to_array(replace(replace(target_products::text, '[', ''), ']', ''), ',')))")
             params.append(product_id)
 
-        where_clause = (
-            " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
-        )
+        where_clause = " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
         param_count += 1
         params.append(limit)
 
@@ -324,15 +300,11 @@ async def list_coordination_requests(
 
     except Exception as e:
         logger.error(f"Error listing coordination requests: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list coordination requests: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list coordination requests: {str(e)}")
 
 
 @router.get("/requests/{request_id}", summary="Get coordination request details")
-async def get_coordination_request(
-    request_id: str = Path(..., description="Coordination request ID")
-):
+async def get_coordination_request(request_id: str = Path(..., description="Coordination request ID")):
     """Get detailed information about a specific coordination request"""
     try:
         async with get_db_connection() as conn:
@@ -344,9 +316,7 @@ async def get_coordination_request(
             )
 
         if not request:
-            raise HTTPException(
-                status_code=404, detail=f"Coordination request {request_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Coordination request {request_id} not found")
 
         # Get coordination history
         async with get_db_connection() as conn:
@@ -369,9 +339,7 @@ async def get_coordination_request(
         raise
     except Exception as e:
         logger.error(f"Error getting coordination request {request_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get coordination request: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get coordination request: {str(e)}")
 
 
 @router.put("/requests/{request_id}/resolve", summary="Resolve coordination request")
@@ -391,9 +359,7 @@ async def resolve_coordination_request(
             )
 
         if not existing_request:
-            raise HTTPException(
-                status_code=404, detail=f"Coordination request {request_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Coordination request {request_id} not found")
 
         if existing_request["status"] not in ["pending", "in_progress"]:
             raise HTTPException(
@@ -446,9 +412,7 @@ async def resolve_coordination_request(
         raise
     except Exception as e:
         logger.error(f"Error resolving coordination request {request_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to resolve coordination request: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to resolve coordination request: {str(e)}")
 
 
 # Resource Management Endpoints
@@ -488,9 +452,7 @@ async def allocate_resource(allocation: ResourceAllocationCreate):
         )
     except Exception as e:
         logger.error(f"Error allocating resource: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to allocate resource: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to allocate resource: {str(e)}")
 
 
 @router.get("/resources", summary="List resource allocations")
@@ -520,9 +482,7 @@ async def list_resource_allocations(
             where_conditions.append(f"status = ${param_count}")
             params.append(status)
 
-        where_clause = (
-            " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
-        )
+        where_clause = " WHERE " + " AND ".join(where_conditions) if where_conditions else ""
 
         query = f"""
             SELECT ra.*, pr.name as product_name
@@ -542,9 +502,7 @@ async def list_resource_allocations(
 
     except Exception as e:
         logger.error(f"Error listing resource allocations: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list resource allocations: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list resource allocations: {str(e)}")
 
 
 # Dashboard and Status Endpoints
@@ -554,41 +512,33 @@ async def get_coordination_status():
     try:
         async with get_db_connection() as conn:
             # Get request counts by status
-            request_stats = await conn.fetch(
-                """
+            request_stats = await conn.fetch("""
                 SELECT status, priority, COUNT(*) as count
                 FROM coordination_requests 
                 GROUP BY status, priority
                 ORDER BY status, priority
-            """
-            )
+            """)
 
             # Get product count
-            product_count = await conn.fetchval(
-                """
+            product_count = await conn.fetchval("""
                 SELECT COUNT(*) FROM product_registry
-            """
-            )
+            """)
 
             # Get resource allocation stats
-            resource_stats = await conn.fetch(
-                """
+            resource_stats = await conn.fetch("""
                 SELECT resource_type, status, COUNT(*) as count
                 FROM resource_allocations
                 GROUP BY resource_type, status
-            """
-            )
+            """)
 
             # Get recent activity
-            recent_activity = await conn.fetch(
-                """
+            recent_activity = await conn.fetch("""
                 SELECT ch.action, ch.timestamp, cr.title, cr.requesting_product
                 FROM coordination_history ch
                 JOIN coordination_requests cr ON ch.coordination_request_id = cr.id
                 ORDER BY ch.timestamp DESC
                 LIMIT 10
-            """
-            )
+            """)
 
         return {
             "system_status": "operational",
@@ -601,9 +551,7 @@ async def get_coordination_status():
 
     except Exception as e:
         logger.error(f"Error getting coordination status: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get coordination status: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get coordination status: {str(e)}")
 
 
 @router.get("/protocols", summary="List coordination protocols")
@@ -611,15 +559,13 @@ async def list_coordination_protocols():
     """List available coordination protocols and procedures"""
     try:
         async with get_db_connection() as conn:
-            protocols = await conn.fetch(
-                """
+            protocols = await conn.fetch("""
                 SELECT protocol_name, coordination_type, scope, procedure_steps,
                        required_approvals, sla_requirements, is_active, version
                 FROM coordination_protocols
                 WHERE is_active = true
                 ORDER BY protocol_name ASC
-            """
-            )
+            """)
 
         return {
             "coordination_protocols": [dict(protocol) for protocol in protocols],
@@ -628,6 +574,4 @@ async def list_coordination_protocols():
 
     except Exception as e:
         logger.error(f"Error listing coordination protocols: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list coordination protocols: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list coordination protocols: {str(e)}")

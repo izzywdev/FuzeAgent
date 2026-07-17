@@ -2,15 +2,17 @@
 WebSocket Manager for FuzeAgent
 Handles real-time updates for agents, tasks, containers, and system notifications
 """
+
 import asyncio
 import json
 import logging
-from typing import Dict, Set, Optional, Any, List, Callable
+import weakref
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field
+from typing import Any, Callable, Dict, List, Optional, Set
+
 from fastapi import WebSocket, WebSocketDisconnect
-import weakref
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +73,7 @@ class ConnectionScope(BaseModel):
 class WebSocketConnection:
     """Individual WebSocket connection"""
 
-    def __init__(
-        self, websocket: WebSocket, connection_id: str, scope: ConnectionScope
-    ):
+    def __init__(self, websocket: WebSocket, connection_id: str, scope: ConnectionScope):
         self.websocket = websocket
         self.connection_id = connection_id
         self.scope = scope
@@ -100,9 +100,7 @@ class WebSocketConnection:
             )
             return True
         except Exception as e:
-            logger.warning(
-                f"Failed to send update to connection {self.connection_id}: {e}"
-            )
+            logger.warning(f"Failed to send update to connection {self.connection_id}: {e}")
             self.connected = False
             return False
 
@@ -113,25 +111,13 @@ class WebSocketConnection:
             return False
 
         # Check scope filtering
-        if (
-            self.scope.agent_id
-            and update.agent_id
-            and self.scope.agent_id != update.agent_id
-        ):
+        if self.scope.agent_id and update.agent_id and self.scope.agent_id != update.agent_id:
             return False
 
-        if (
-            self.scope.team_id
-            and update.team_id
-            and self.scope.team_id != update.team_id
-        ):
+        if self.scope.team_id and update.team_id and self.scope.team_id != update.team_id:
             return False
 
-        if (
-            self.scope.organization_id
-            and update.organization_id
-            and self.scope.organization_id != update.organization_id
-        ):
+        if self.scope.organization_id and update.organization_id and self.scope.organization_id != update.organization_id:
             return False
 
         return True
@@ -211,9 +197,7 @@ class WebSocketManager:
                 self.org_connections[organization_id] = set()
             self.org_connections[organization_id].add(connection_id)
 
-        logger.info(
-            f"WebSocket connected: {connection_id} (scope: org={organization_id}, team={team_id}, agent={agent_id})"
-        )
+        logger.info(f"WebSocket connected: {connection_id} (scope: org={organization_id}, team={team_id}, agent={agent_id})")
 
         # Send connection confirmation
         await connection.send_update(
@@ -238,29 +222,18 @@ class WebSocketManager:
         connection.connected = False
 
         # Remove from indices
-        if (
-            connection.scope.agent_id
-            and connection.scope.agent_id in self.agent_connections
-        ):
+        if connection.scope.agent_id and connection.scope.agent_id in self.agent_connections:
             self.agent_connections[connection.scope.agent_id].discard(connection_id)
             if not self.agent_connections[connection.scope.agent_id]:
                 del self.agent_connections[connection.scope.agent_id]
 
-        if (
-            connection.scope.team_id
-            and connection.scope.team_id in self.team_connections
-        ):
+        if connection.scope.team_id and connection.scope.team_id in self.team_connections:
             self.team_connections[connection.scope.team_id].discard(connection_id)
             if not self.team_connections[connection.scope.team_id]:
                 del self.team_connections[connection.scope.team_id]
 
-        if (
-            connection.scope.organization_id
-            and connection.scope.organization_id in self.org_connections
-        ):
-            self.org_connections[connection.scope.organization_id].discard(
-                connection_id
-            )
+        if connection.scope.organization_id and connection.scope.organization_id in self.org_connections:
+            self.org_connections[connection.scope.organization_id].discard(connection_id)
             if not self.org_connections[connection.scope.organization_id]:
                 del self.org_connections[connection.scope.organization_id]
 
@@ -354,9 +327,7 @@ class WebSocketManager:
                     await self.disconnect(connection_id)
 
                 if stale_connections:
-                    logger.info(
-                        f"Cleaned up {len(stale_connections)} stale WebSocket connections"
-                    )
+                    logger.info(f"Cleaned up {len(stale_connections)} stale WebSocket connections")
 
             except Exception as e:
                 logger.error(f"Error in WebSocket cleanup task: {e}")
@@ -368,16 +339,7 @@ class WebSocketManager:
             "agent_connections": len(self.agent_connections),
             "team_connections": len(self.team_connections),
             "organization_connections": len(self.org_connections),
-            "connections_by_type": {
-                update_type.value: len(
-                    [
-                        conn
-                        for conn in self.connections.values()
-                        if update_type in conn.scope.subscriptions
-                    ]
-                )
-                for update_type in UpdateType
-            },
+            "connections_by_type": {update_type.value: len([conn for conn in self.connections.values() if update_type in conn.scope.subscriptions]) for update_type in UpdateType},
         }
 
 
@@ -386,9 +348,7 @@ websocket_manager = WebSocketManager()
 
 
 # Convenience functions for common update types
-async def notify_agent_status_change(
-    agent_id: str, status: str, additional_data: Dict = None
-):
+async def notify_agent_status_change(agent_id: str, status: str, additional_data: Dict = None):
     """Notify about agent status changes"""
     data = {"status": status}
     if additional_data:
@@ -405,9 +365,7 @@ async def notify_agent_status_change(
     )
 
 
-async def notify_task_progress(
-    task_id: str, agent_id: str, progress: int, message: str = None
-):
+async def notify_task_progress(task_id: str, agent_id: str, progress: int, message: str = None):
     """Notify about task progress updates"""
     await websocket_manager.send_to_agent(
         agent_id,
@@ -420,9 +378,7 @@ async def notify_task_progress(
     )
 
 
-async def notify_container_status_change(
-    agent_id: str, container_status: str, additional_data: Dict = None
-):
+async def notify_container_status_change(agent_id: str, container_status: str, additional_data: Dict = None):
     """Notify about container status changes"""
     data = {"container_status": container_status}
     if additional_data:
@@ -453,9 +409,7 @@ async def notify_knowledge_update(
         agent_id=agent_id,
         data={
             "document_title": document_title,
-            "message": f"Knowledge base updated: {document_title}"
-            if document_title
-            else "Knowledge base updated",
+            "message": f"Knowledge base updated: {document_title}" if document_title else "Knowledge base updated",
         },
     )
 

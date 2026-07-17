@@ -2,11 +2,12 @@
 Test cases for MCP Server functionality
 """
 
-import pytest
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
-import sys
 import os
+import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Add the MCP server path to sys.path for imports
 mcp_server_path = os.path.join(
@@ -18,7 +19,7 @@ mcp_server_path = os.path.join(
 )
 sys.path.insert(0, mcp_server_path)
 
-from server import FuzeAgentMCPServer, FuzeAgentClient
+from server import FuzeAgentClient, FuzeAgentMCPServer
 
 
 @pytest.mark.mcp
@@ -349,9 +350,7 @@ class TestMCPServer:
         with patch("server.FuzeAgentClient", return_value=mock_fuze_client):
             # Mock stdio server
             mock_server_instance = MagicMock()
-            mock_stdio_server.return_value.__aenter__.return_value = (
-                mock_server_instance
-            )
+            mock_stdio_server.return_value.__aenter__.return_value = mock_server_instance
 
             # Import and test the stdio server function
             from server import run_stdio_server

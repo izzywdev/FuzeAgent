@@ -2,21 +2,23 @@
 RAG (Retrieval-Augmented Generation) Integration for FuzeAgent
 Handles vector embeddings, similarity search, and context retrieval for AI agents
 """
-import os
-import json
-import uuid
-import logging
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+
 import asyncio
+import json
+import logging
+import os
+import uuid
+from datetime import datetime
 from pathlib import Path
-import numpy as np
-from sentence_transformers import SentenceTransformer
+from typing import Any, Dict, List, Optional, Tuple
+
 import chromadb
+import numpy as np
 from chromadb.config import Settings
 from pydantic import BaseModel, Field
+from sentence_transformers import SentenceTransformer
 
-from knowledge_manager import knowledge_manager, DocumentMetadata
+from knowledge_manager import DocumentMetadata, knowledge_manager
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +85,8 @@ class RAGIntegration:
 
             # Get or create collection
             try:
-                self.collection = self.chroma_client.get_collection(
-                    name=CHROMA_COLLECTION_NAME
-                )
-                logger.info(
-                    f"Connected to existing collection: {CHROMA_COLLECTION_NAME}"
-                )
+                self.collection = self.chroma_client.get_collection(name=CHROMA_COLLECTION_NAME)
+                logger.info(f"Connected to existing collection: {CHROMA_COLLECTION_NAME}")
             except Exception:
                 self.collection = self.chroma_client.create_collection(
                     name=CHROMA_COLLECTION_NAME,
@@ -191,9 +189,7 @@ class RAGIntegration:
                 metadatas=metadatas,
             )
 
-            logger.info(
-                f"Successfully indexed document {document.id} with {len(text_chunks)} chunks"
-            )
+            logger.info(f"Successfully indexed document {document.id} with {len(text_chunks)} chunks")
             return True
 
         except Exception as e:
@@ -212,9 +208,7 @@ class RAGIntegration:
 
             if existing["ids"]:
                 self.collection.delete(ids=existing["ids"])
-                logger.info(
-                    f"Removed {len(existing['ids'])} chunks for document {document_id}"
-                )
+                logger.info(f"Removed {len(existing['ids'])} chunks for document {document_id}")
 
             return True
 
@@ -289,17 +283,13 @@ class RAGIntegration:
             # Calculate total context length
             context_length = sum(len(chunk.content) for chunk in relevant_chunks)
 
-            logger.info(
-                f"Found {len(relevant_chunks)} relevant chunks for query: '{query[:50]}...'"
-            )
+            logger.info(f"Found {len(relevant_chunks)} relevant chunks for query: '{query[:50]}...'")
 
             return RAGContext(
                 query=query,
                 relevant_chunks=relevant_chunks,
                 similarity_scores=similarity_scores,
-                total_documents=len(
-                    set(chunk.document_id for chunk in relevant_chunks)
-                ),
+                total_documents=len(set(chunk.document_id for chunk in relevant_chunks)),
                 context_length=context_length,
             )
 
@@ -366,15 +356,11 @@ Based on the above context and your general knowledge, please respond to the fol
 
 If the context contains relevant information, please use it in your response. If not, respond based on your general knowledge."""
 
-        logger.info(
-            f"Enhanced prompt with {len(rag_context.relevant_chunks)} relevant chunks ({current_length} chars)"
-        )
+        logger.info(f"Enhanced prompt with {len(rag_context.relevant_chunks)} relevant chunks ({current_length} chars)")
 
         return enhanced_prompt
 
-    async def index_all_documents(
-        self, organization_id: str = None, team_id: str = None, agent_id: str = None
-    ) -> Dict[str, int]:
+    async def index_all_documents(self, organization_id: str = None, team_id: str = None, agent_id: str = None) -> Dict[str, int]:
         """Index all documents in a scope"""
         if not self.embedding_model or not self.collection:
             logger.error("RAG system not properly initialized")
@@ -382,9 +368,7 @@ If the context contains relevant information, please use it in your response. If
 
         try:
             # Get all documents in scope
-            documents = await knowledge_manager.get_documents(
-                organization_id=organization_id, team_id=team_id, agent_id=agent_id
-            )
+            documents = await knowledge_manager.get_documents(organization_id=organization_id, team_id=team_id, agent_id=agent_id)
 
             indexed = 0
             failed = 0
@@ -405,9 +389,7 @@ If the context contains relevant information, please use it in your response. If
                     logger.error(f"Error indexing document {document.id}: {e}")
                     failed += 1
 
-            logger.info(
-                f"Indexing complete: {indexed} indexed, {failed} failed, {skipped} skipped"
-            )
+            logger.info(f"Indexing complete: {indexed} indexed, {failed} failed, {skipped} skipped")
 
             return {"indexed": indexed, "failed": failed, "skipped": skipped}
 

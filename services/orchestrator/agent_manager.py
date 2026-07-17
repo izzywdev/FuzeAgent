@@ -1,14 +1,16 @@
-from crewai import Crew, Agent, Task
-from typing import Dict, List, Optional, Any
 import asyncio
-import docker
 import os
 import uuid
-from .claude_code_wrapper import ClaudeCodeWrapper
-from .database import get_db_connection, DatabaseManager
-from .sandbox_manager import AgentSandboxManager
-from .git_workflow_manager import GitWorkflowManager
+from typing import Any, Dict, List, Optional
+
+import docker
+from crewai import Agent, Crew, Task
+
 from .agent_expertise_tracker import AgentExpertiseTracker
+from .claude_code_wrapper import ClaudeCodeWrapper
+from .database import DatabaseManager, get_db_connection
+from .git_workflow_manager import GitWorkflowManager
+from .sandbox_manager import AgentSandboxManager
 
 
 class AgentManager:
@@ -19,6 +21,7 @@ class AgentManager:
             self.docker_client.ping()
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).warning(f"Docker not available, container features disabled: {e}")
             self.docker_client = None
         self.crews: Dict[str, Crew] = {}
@@ -39,13 +42,9 @@ class AgentManager:
                     "backstory": "Expert Python developer with deep knowledge of backend development, APIs, and testing frameworks",
                     "model": "claude-3-5-sonnet-20241022",
                     "temperature": 0.3,
-                    "tools": ["code_generation", "code_review", "testing", "debugging"]
+                    "tools": ["code_generation", "code_review", "testing", "debugging"],
                 },
-                "resource_limits": {
-                    "memory": "2Gi",
-                    "cpu": "1.0",
-                    "disk": "10Gi"
-                }
+                "resource_limits": {"memory": "2Gi", "cpu": "1.0", "disk": "10Gi"},
             },
             "typescript_developer": {
                 "role": "TypeScript Developer",
@@ -55,13 +54,9 @@ class AgentManager:
                     "backstory": "Senior TypeScript developer specializing in full-stack development and API design",
                     "model": "claude-3-5-sonnet-20241022",
                     "temperature": 0.3,
-                    "tools": ["code_generation", "code_review", "testing", "api_design"]
+                    "tools": ["code_generation", "code_review", "testing", "api_design"],
                 },
-                "resource_limits": {
-                    "memory": "2Gi",
-                    "cpu": "1.0",
-                    "disk": "10Gi"
-                }
+                "resource_limits": {"memory": "2Gi", "cpu": "1.0", "disk": "10Gi"},
             },
             "react_developer": {
                 "role": "React Developer",
@@ -71,13 +66,9 @@ class AgentManager:
                     "backstory": "Frontend specialist with expertise in React, TypeScript, and modern web technologies",
                     "model": "claude-3-5-sonnet-20241022",
                     "temperature": 0.4,
-                    "tools": ["ui_development", "component_design", "testing", "accessibility"]
+                    "tools": ["ui_development", "component_design", "testing", "accessibility"],
                 },
-                "resource_limits": {
-                    "memory": "3Gi",
-                    "cpu": "1.5",
-                    "disk": "15Gi"
-                }
+                "resource_limits": {"memory": "3Gi", "cpu": "1.5", "disk": "15Gi"},
             },
             "security_developer": {
                 "role": "Security Developer",
@@ -87,13 +78,9 @@ class AgentManager:
                     "backstory": "Cybersecurity expert specializing in secure application development and vulnerability assessment",
                     "model": "claude-3-5-sonnet-20241022",
                     "temperature": 0.2,
-                    "tools": ["security_audit", "code_review", "vulnerability_scanning", "secure_coding"]
+                    "tools": ["security_audit", "code_review", "vulnerability_scanning", "secure_coding"],
                 },
-                "resource_limits": {
-                    "memory": "2Gi",
-                    "cpu": "1.0",
-                    "disk": "10Gi"
-                }
+                "resource_limits": {"memory": "2Gi", "cpu": "1.0", "disk": "10Gi"},
             },
             "devops_engineer": {
                 "role": "DevOps Engineer",
@@ -103,27 +90,13 @@ class AgentManager:
                     "backstory": "DevOps specialist with expertise in Docker, Kubernetes, and cloud infrastructure",
                     "model": "claude-3-5-sonnet-20241022",
                     "temperature": 0.3,
-                    "tools": ["infrastructure", "deployment", "monitoring", "automation"]
+                    "tools": ["infrastructure", "deployment", "monitoring", "automation"],
                 },
-                "resource_limits": {
-                    "memory": "4Gi",
-                    "cpu": "2.0",
-                    "disk": "20Gi"
-                }
-            }
+                "resource_limits": {"memory": "4Gi", "cpu": "2.0", "disk": "20Gi"},
+            },
         }
 
-    async def create_agent(
-        self,
-        name: str,
-        role: str,
-        type: str,
-        config: dict,
-        team_id: Optional[str] = None,
-        template_id: Optional[str] = None,
-        repository_settings: Optional[Dict[str, Any]] = None,
-        sandbox_settings: Optional[Dict[str, Any]] = None
-    ) -> Agent:
+    async def create_agent(self, name: str, role: str, type: str, config: dict, team_id: Optional[str] = None, template_id: Optional[str] = None, repository_settings: Optional[Dict[str, Any]] = None, sandbox_settings: Optional[Dict[str, Any]] = None) -> Agent:
         """Create a new agent with repository and sandbox settings"""
 
         # Generate agent ID
@@ -135,11 +108,8 @@ class AgentManager:
             goal=config.get('goal', f"Perform {role} tasks efficiently"),
             backstory=config.get('backstory', f"Expert {role} with deep knowledge"),
             tools=self._get_tools_for_role(type, config.get('tools', [])),
-            llm_config={
-                "model": config.get('model', 'claude-sonnet-4-20250514'),
-                "temperature": config.get('temperature', 0.7)
-            },
-            verbose=True
+            llm_config={"model": config.get('model', 'claude-sonnet-4-20250514'), "temperature": config.get('temperature', 0.7)},
+            verbose=True,
         )
 
         # Set agent ID for reference
@@ -153,20 +123,11 @@ class AgentManager:
 
             # Set up Git workflow if repository settings provided
             if repository_settings and repository_settings.get('repository_url'):
-                git_manager = GitWorkflowManager(
-                    agent_id=agent_id,
-                    task_id="default",  # Will be updated when tasks are assigned
-                    repo_settings=repository_settings
-                )
+                git_manager = GitWorkflowManager(agent_id=agent_id, task_id="default", repo_settings=repository_settings)  # Will be updated when tasks are assigned
                 workspace_path = git_manager.workspace_path
 
             # Create enhanced Claude Code wrapper
-            claude_wrapper = ClaudeCodeWrapper(
-                workspace_path=workspace_path,
-                git_manager=git_manager,
-                agent_id=agent_id,
-                task_id="default"
-            )
+            claude_wrapper = ClaudeCodeWrapper(workspace_path=workspace_path, git_manager=git_manager, agent_id=agent_id, task_id="default")
             agent.tools.append(claude_wrapper)
 
         # Store agent
@@ -174,34 +135,13 @@ class AgentManager:
 
         # Register in database
         if team_id:
-            await DatabaseManager.insert_agent(
-                team_id=team_id,
-                name=name,
-                role=role,
-                type=type,
-                config={
-                    **config,
-                    "repository_settings": repository_settings or {},
-                    "sandbox_settings": sandbox_settings or {}
-                },
-                template_id=template_id
-            )
+            await DatabaseManager.insert_agent(team_id=team_id, name=name, role=role, type=type, config={**config, "repository_settings": repository_settings or {}, "sandbox_settings": sandbox_settings or {}}, template_id=template_id)
         else:
-            await self._register_agent_in_db(name, role, type, {
-                **config,
-                "repository_settings": repository_settings or {},
-                "sandbox_settings": sandbox_settings or {}
-            })
+            await self._register_agent_in_db(name, role, type, {**config, "repository_settings": repository_settings or {}, "sandbox_settings": sandbox_settings or {}})
 
         return agent
 
-    async def _spawn_agent_container(
-        self,
-        name: str,
-        role: str,
-        type: str,
-        config: dict
-    ):
+    async def _spawn_agent_container(self, name: str, role: str, type: str, config: dict):
         """Spawn a dedicated container for an agent"""
         if not self.docker_client:
             return
@@ -209,23 +149,13 @@ class AgentManager:
         container_config = {
             'image': f'ai-agent-{type}:latest',
             'name': f'agent-{name.lower().replace(" ", "-")}',
-            'environment': {
-                'AGENT_NAME': name,
-                'AGENT_ROLE': role,
-                'AGENT_TYPE': type,
-                'RABBITMQ_URL': 'amqp://admin:password@rabbitmq:5672/',
-                'CONTEXT_API_URL': 'http://orchestrator:8000',
-                'ANTHROPIC_API_KEY': os.environ['ANTHROPIC_API_KEY']
-            },
+            'environment': {'AGENT_NAME': name, 'AGENT_ROLE': role, 'AGENT_TYPE': type, 'RABBITMQ_URL': 'amqp://admin:password@rabbitmq:5672/', 'CONTEXT_API_URL': 'http://orchestrator:8000', 'ANTHROPIC_API_KEY': os.environ['ANTHROPIC_API_KEY']},
             'network': 'ai-team-network',
-            'restart_policy': {'Name': 'unless-stopped'}
+            'restart_policy': {'Name': 'unless-stopped'},
         }
 
         try:
-            container = self.docker_client.containers.run(
-                detach=True,
-                **container_config
-            )
+            container = self.docker_client.containers.run(detach=True, **container_config)
             print(f"Spawned container for {name}: {container.id}")
         except Exception as e:
             print(f"Error spawning container for {name}: {e}")
@@ -238,7 +168,7 @@ class AgentManager:
             'developer': ['code_generation', 'code_review', 'debugging'],
             'qa': ['test_generation', 'test_execution', 'bug_reporting'],
             'designer': ['mockup_generation', 'design_review', 'accessibility_check'],
-            'support': ['ticket_handling', 'knowledge_search', 'customer_response']
+            'support': ['ticket_handling', 'knowledge_search', 'customer_response'],
         }
 
         tools = base_tools.get(type, [])
@@ -261,10 +191,12 @@ class AgentManager:
                 INSERT INTO agents (name, role, type, status, config, repository_settings, sandbox_settings)
                 VALUES ($1, $2, $3, 'active', $4, $5, $6)
                 """,
-                name, role, type,
+                name,
+                role,
+                type,
                 {k: v for k, v in config.items() if k not in ['repository_settings', 'sandbox_settings']},
                 config.get('repository_settings', {}),
-                config.get('sandbox_settings', {})
+                config.get('sandbox_settings', {}),
             )
 
     async def list_agents(self) -> List[Dict]:
@@ -284,10 +216,7 @@ class AgentManager:
     async def get_updates(self) -> Dict:
         """Get real-time updates for WebSocket"""
         agents = await self.list_agents()
-        return {
-            "agents": agents,
-            "timestamp": asyncio.get_event_loop().time()
-        }
+        return {"agents": agents, "timestamp": asyncio.get_event_loop().time()}
 
     async def get_template_config(self, template_id: str) -> Optional[Dict[str, Any]]:
         """Get agent template configuration"""
@@ -303,28 +232,13 @@ class AgentManager:
             return {"error": "Sandbox manager not initialized"}
 
         sandboxes = await self.sandbox_manager.list_sandboxes(agent_id=agent_id)
-        return {
-            "agent_id": agent_id,
-            "sandboxes": [{
-                "sandbox_id": s.sandbox_id,
-                "status": s.status.value,
-                "workspace_path": s.workspace_path,
-                "created_at": s.created_at.isoformat(),
-                "resource_limits": s.resource_limits
-            } for s in sandboxes]
-        }
+        return {"agent_id": agent_id, "sandboxes": [{"sandbox_id": s.sandbox_id, "status": s.status.value, "workspace_path": s.workspace_path, "created_at": s.created_at.isoformat(), "resource_limits": s.resource_limits} for s in sandboxes]}
 
     async def set_sandbox_manager(self, sandbox_manager: AgentSandboxManager):
         """Set the sandbox manager reference"""
         self.sandbox_manager = sandbox_manager
 
-    async def deploy_memory_enabled_agent(
-        self,
-        agent_id: str,
-        template_id: str,
-        task_id: Optional[str] = None,
-        repository_settings: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    async def deploy_memory_enabled_agent(self, agent_id: str, template_id: str, task_id: Optional[str] = None, repository_settings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Deploy a memory-enabled autonomous agent container"""
 
         if not self.sandbox_manager:
@@ -345,42 +259,21 @@ class AgentManager:
                         "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", ""),
                         "MAX_CONCURRENT_TASKS": "3",
                         "TASK_POLL_INTERVAL": "10",
-                        "MEMORY_SYNC_INTERVAL": "60"
+                        "MEMORY_SYNC_INTERVAL": "60",
                     }
-                }
+                },
             )
 
             # Track the memory-enabled agent
-            self.memory_enabled_agents[agent_id] = {
-                "sandbox_id": sandbox.sandbox_id,
-                "container_id": sandbox.container_id,
-                "template_id": template_id,
-                "status": "initializing",
-                "deployed_at": asyncio.get_event_loop().time(),
-                "task_id": task_id
-            }
+            self.memory_enabled_agents[agent_id] = {"sandbox_id": sandbox.sandbox_id, "container_id": sandbox.container_id, "template_id": template_id, "status": "initializing", "deployed_at": asyncio.get_event_loop().time(), "task_id": task_id}
 
             # Update agent status in database
-            await self._update_agent_memory_status(agent_id, "memory_enabled", {
-                "sandbox_id": sandbox.sandbox_id,
-                "container_id": sandbox.container_id,
-                "memory_enabled": True
-            })
+            await self._update_agent_memory_status(agent_id, "memory_enabled", {"sandbox_id": sandbox.sandbox_id, "container_id": sandbox.container_id, "memory_enabled": True})
 
-            return {
-                "success": True,
-                "agent_id": agent_id,
-                "sandbox_id": sandbox.sandbox_id,
-                "container_id": sandbox.container_id,
-                "status": "deployed"
-            }
+            return {"success": True, "agent_id": agent_id, "sandbox_id": sandbox.sandbox_id, "container_id": sandbox.container_id, "status": "deployed"}
 
         except Exception as e:
-            return {
-                "success": False,
-                "agent_id": agent_id,
-                "error": str(e)
-            }
+            return {"success": False, "agent_id": agent_id, "error": str(e)}
 
     async def get_agent_memory_status(self, agent_id: str) -> Dict[str, Any]:
         """Get agent memory status and expertise summary"""
@@ -405,68 +298,47 @@ class AgentManager:
                 "performance_metrics": performance_metrics.__dict__ if performance_metrics else None,
                 "recent_insights": [insight.__dict__ for insight in insights[:5]],
                 "memory_enabled": bool(container_status),
-                "status": container_status.get("status", "unknown")
+                "status": container_status.get("status", "unknown"),
             }
 
         except Exception as e:
-            return {
-                "agent_id": agent_id,
-                "error": str(e),
-                "memory_enabled": False
-            }
+            return {"agent_id": agent_id, "error": str(e), "memory_enabled": False}
 
-    async def assign_task_to_memory_agent(
-        self,
-        agent_id: str,
-        task_id: str,
-        task_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def assign_task_to_memory_agent(self, agent_id: str, task_id: str, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """Assign a task to a memory-enabled agent"""
 
         if agent_id not in self.memory_enabled_agents:
-            return {
-                "success": False,
-                "error": f"Agent {agent_id} is not memory-enabled or not deployed"
-            }
+            return {"success": False, "error": f"Agent {agent_id} is not memory-enabled or not deployed"}
 
         try:
             # Store task in database with memory-enabled flag
             async with get_db_connection() as conn:
-                await conn.execute("""
+                await conn.execute(
+                    """
                     INSERT INTO tasks (
                         id, agent_id, title, description, type, complexity,
                         language, framework, requirements, status,
                         assigned_to_memory_agent, created_at
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', true, NOW())
                 """,
-                    task_id, agent_id,
+                    task_id,
+                    agent_id,
                     task_data.get('title', 'Untitled'),
                     task_data.get('description', ''),
                     task_data.get('type', 'development'),
                     task_data.get('complexity', 'medium'),
                     task_data.get('language'),
                     task_data.get('framework'),
-                    task_data.get('requirements', [])
+                    task_data.get('requirements', []),
                 )
 
             # The memory-enabled agent will automatically pick up the task
             # through its polling mechanism
 
-            return {
-                "success": True,
-                "task_id": task_id,
-                "agent_id": agent_id,
-                "status": "assigned_to_memory_agent",
-                "message": "Task assigned to memory-enabled agent - agent will pick it up automatically"
-            }
+            return {"success": True, "task_id": task_id, "agent_id": agent_id, "status": "assigned_to_memory_agent", "message": "Task assigned to memory-enabled agent - agent will pick it up automatically"}
 
         except Exception as e:
-            return {
-                "success": False,
-                "task_id": task_id,
-                "agent_id": agent_id,
-                "error": str(e)
-            }
+            return {"success": False, "task_id": task_id, "agent_id": agent_id, "error": str(e)}
 
     async def get_system_expertise_dashboard(self) -> Dict[str, Any]:
         """Get system-wide expertise and memory analytics dashboard"""
@@ -497,28 +369,19 @@ class AgentManager:
 
             return {
                 "system_expertise": expertise_summary,
-                "memory_enabled_agents": {
-                    "count": len(self.memory_enabled_agents),
-                    "agents": memory_agents_status
-                },
+                "memory_enabled_agents": {"count": len(self.memory_enabled_agents), "agents": memory_agents_status},
                 "recent_activity": [dict(task) for task in recent_tasks],
-                "dashboard_generated_at": asyncio.get_event_loop().time()
+                "dashboard_generated_at": asyncio.get_event_loop().time(),
             }
 
         except Exception as e:
-            return {
-                "error": str(e),
-                "dashboard_generated_at": asyncio.get_event_loop().time()
-            }
+            return {"error": str(e), "dashboard_generated_at": asyncio.get_event_loop().time()}
 
     async def stop_memory_enabled_agent(self, agent_id: str) -> Dict[str, Any]:
         """Stop a memory-enabled agent container"""
 
         if agent_id not in self.memory_enabled_agents:
-            return {
-                "success": False,
-                "error": f"Agent {agent_id} is not memory-enabled or not deployed"
-            }
+            return {"success": False, "error": f"Agent {agent_id} is not memory-enabled or not deployed"}
 
         try:
             container_info = self.memory_enabled_agents[agent_id]
@@ -529,26 +392,15 @@ class AgentManager:
                 await self.sandbox_manager.destroy_sandbox(sandbox_id)
 
             # Update agent status
-            await self._update_agent_memory_status(agent_id, "stopped", {
-                "memory_enabled": False,
-                "stopped_at": asyncio.get_event_loop().time()
-            })
+            await self._update_agent_memory_status(agent_id, "stopped", {"memory_enabled": False, "stopped_at": asyncio.get_event_loop().time()})
 
             # Remove from tracking
             del self.memory_enabled_agents[agent_id]
 
-            return {
-                "success": True,
-                "agent_id": agent_id,
-                "message": "Memory-enabled agent stopped successfully"
-            }
+            return {"success": True, "agent_id": agent_id, "message": "Memory-enabled agent stopped successfully"}
 
         except Exception as e:
-            return {
-                "success": False,
-                "agent_id": agent_id,
-                "error": str(e)
-            }
+            return {"success": False, "agent_id": agent_id, "error": str(e)}
 
     async def _update_agent_memory_status(self, agent_id: str, status: str, additional_data: Dict[str, Any]):
         """Update agent memory-related status in database"""
@@ -556,13 +408,18 @@ class AgentManager:
         try:
             async with get_db_connection() as conn:
                 # Update agent config with memory status
-                await conn.execute("""
+                await conn.execute(
+                    """
                     UPDATE agents
                     SET status = $2,
                         config = config || $3,
                         updated_at = NOW()
                     WHERE id = $1
-                """, agent_id, status, additional_data)
+                """,
+                    agent_id,
+                    status,
+                    additional_data,
+                )
 
         except Exception as e:
             print(f"Error updating agent memory status: {e}")

@@ -43,9 +43,7 @@ os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5434/ai_c
 os.environ["ORCHESTRATOR_URL"] = "http://localhost:8000"
 
 # Add repo root to sys.path so ``import hierarchy_endpoints`` resolves.
-_REPO_ROOT = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..")
-)
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
@@ -72,11 +70,11 @@ asyncpg.create_pool = AsyncMock(return_value=_mock_pool)  # type: ignore[attr-de
 import hierarchy_endpoints  # noqa: E402
 
 importlib.reload(hierarchy_endpoints)
-from hierarchy_endpoints import app  # noqa: E402
-
 from fastapi.testclient import TestClient  # noqa: E402
 from jose import jwt  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
+
+from hierarchy_endpoints import app  # noqa: E402
 
 SECRET = os.environ["JWT_SECRET"]
 
@@ -141,9 +139,7 @@ def test_hierarchy_ws_valid_token_subprotocol_connects(hier_client):
 def test_hierarchy_ws_valid_token_auth_header_connects(hier_client):
     """A valid bearer token in the Authorization header must allow the connection."""
     token = make_token()
-    with hier_client.websocket_connect(
-        "/ws", headers={"Authorization": f"Bearer {token}"}
-    ) as ws:
+    with hier_client.websocket_connect("/ws", headers={"Authorization": f"Bearer {token}"}) as ws:
         ws.send_text("ping")
         response = ws.receive_text()
     assert response == "pong"
