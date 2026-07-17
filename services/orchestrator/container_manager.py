@@ -227,8 +227,7 @@ class ContainerManager:
 
                 # Send WebSocket notification
                 try:
-                    from websocket_manager import \
-                        notify_container_status_change
+                    from websocket_manager import notify_container_status_change
 
                     await notify_container_status_change(
                         agent_id=agent_id, container_status="started"

@@ -18,8 +18,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from migration_manager import (MigrationManager, migrate, reset, rollback,
-                               status)
+from migration_manager import MigrationManager, migrate, reset, rollback, status
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql://postgres:password@localhost:5434/ai_context"

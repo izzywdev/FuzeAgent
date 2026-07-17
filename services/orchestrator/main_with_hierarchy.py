@@ -14,11 +14,25 @@ from agent_templates import AgentCategory, template_manager
 from database import DatabaseManager
 from hierarchy_endpoints import router as hierarchy_router
 from migration_manager import MigrationManager
-from models import (Agent, AgentCreate, AgentUpdate, AgentWithTeam,
-                    CreateAgentFromTemplate, CreateCustomAgent, Organization,
-                    OrganizationCreate, OrganizationUpdate,
-                    OrganizationWithTeams, Task, TaskCreate, TaskUpdate, Team,
-                    TeamCreate, TeamUpdate, TeamWithAgents)
+from models import (
+    Agent,
+    AgentCreate,
+    AgentUpdate,
+    AgentWithTeam,
+    CreateAgentFromTemplate,
+    CreateCustomAgent,
+    Organization,
+    OrganizationCreate,
+    OrganizationUpdate,
+    OrganizationWithTeams,
+    Task,
+    TaskCreate,
+    TaskUpdate,
+    Team,
+    TeamCreate,
+    TeamUpdate,
+    TeamWithAgents,
+)
 from rag_manager import RAGManager
 
 # Default IDs for initial setup

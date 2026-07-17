@@ -16,12 +16,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import asyncpg
 import numpy as np
 import tiktoken
-# LangChain imports for conversation summarization
-from langchain.memory import ConversationSummaryBufferMemory
 from langchain.prompts import PromptTemplate
-from langchain.schema import (AIMessage, BaseMessage, HumanMessage,
-                              SystemMessage)
+from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_anthropic import ChatAnthropic
+
+# LangChain imports for conversation summarization
+from langchain_community.memory import ConversationSummaryBufferMemory
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)

@@ -45,8 +45,7 @@ import auth as auth_module
 
 importlib.reload(auth_module)
 from auth import require_admin  # noqa: E402
-from auth import (CurrentUser, get_current_user, require_org_access,
-                  require_user)
+from auth import CurrentUser, get_current_user, require_org_access, require_user
 
 SECRET = os.environ["JWT_SECRET"]
 ORG_A = "11111111-1111-1111-1111-111111111111"

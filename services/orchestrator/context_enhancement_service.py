@@ -15,11 +15,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
-from .organization_rag_manager import (ContentType, KnowledgeCategory,
-                                       KnowledgeSearchResult,
-                                       OrganizationRAGManager)
-from .team_knowledge_manager import (TeamKnowledgeManager,
-                                     TeamKnowledgeSearchResult)
+from .organization_rag_manager import (
+    ContentType,
+    KnowledgeCategory,
+    KnowledgeSearchResult,
+    OrganizationRAGManager,
+)
+from .team_knowledge_manager import TeamKnowledgeManager, TeamKnowledgeSearchResult
 
 logger = logging.getLogger(__name__)
 

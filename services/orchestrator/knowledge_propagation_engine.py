@@ -18,9 +18,13 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
-from .organization_rag_manager import (ContentType, KnowledgeCategory,
-                                       OrganizationRAGManager, SourceType,
-                                       VisibilityLevel)
+from .organization_rag_manager import (
+    ContentType,
+    KnowledgeCategory,
+    OrganizationRAGManager,
+    SourceType,
+    VisibilityLevel,
+)
 from .team_knowledge_manager import TeamKnowledgeManager
 
 logger = logging.getLogger(__name__)

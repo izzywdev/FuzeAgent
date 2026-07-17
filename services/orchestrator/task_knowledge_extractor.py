@@ -18,10 +18,13 @@ from typing import Any, Dict, List, Optional, Tuple
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
-from .knowledge_propagation_engine import (KnowledgePropagationEngine,
-                                           PropagationTrigger)
-from .organization_rag_manager import (ContentType, KnowledgeCategory,
-                                       OrganizationRAGManager, SourceType)
+from .knowledge_propagation_engine import KnowledgePropagationEngine, PropagationTrigger
+from .organization_rag_manager import (
+    ContentType,
+    KnowledgeCategory,
+    OrganizationRAGManager,
+    SourceType,
+)
 from .team_knowledge_manager import TeamKnowledgeManager
 
 logger = logging.getLogger(__name__)
