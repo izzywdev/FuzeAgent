@@ -455,7 +455,7 @@ class AgentSandboxManager:
             if destroyed_at:
                 await conn.execute(
                     """
-                    UPDATE agent_sandboxes 
+                    UPDATE agent_sandboxes
                     SET status = $2, container_id = $3, destroyed_at = $4
                     WHERE id = $1
                 """,
@@ -467,7 +467,7 @@ class AgentSandboxManager:
             else:
                 await conn.execute(
                     """
-                    UPDATE agent_sandboxes 
+                    UPDATE agent_sandboxes
                     SET status = $2, container_id = $3
                     WHERE id = $1
                 """,
@@ -481,8 +481,8 @@ class AgentSandboxManager:
         async with get_db_connection() as conn:
             rows = await conn.fetch(
                 """
-                SELECT * FROM agent_sandboxes 
-                WHERE status IN ('running', 'paused') 
+                SELECT * FROM agent_sandboxes
+                WHERE status IN ('running', 'paused')
                 AND destroyed_at IS NULL
             """
             )

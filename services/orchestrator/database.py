@@ -57,7 +57,7 @@ class DatabaseManager:
         async with get_db_connection() as conn:
             rows = await conn.fetch(
                 """
-                SELECT 
+                SELECT
                     o.*,
                     COUNT(DISTINCT t.id) as team_count,
                     COUNT(DISTINCT a.id) as agent_count
@@ -76,7 +76,7 @@ class DatabaseManager:
         async with get_db_connection() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT 
+                SELECT
                     o.*,
                     COUNT(DISTINCT t.id) as team_count,
                     COUNT(DISTINCT a.id) as agent_count
@@ -112,7 +112,7 @@ class DatabaseManager:
             params.append(org_id)
 
             query = f"""
-                UPDATE organizations 
+                UPDATE organizations
                 SET {', '.join(set_clauses)}
                 WHERE id = ${param_count + 1}
             """
@@ -161,7 +161,7 @@ class DatabaseManager:
             if organization_id:
                 rows = await conn.fetch(
                     """
-                    SELECT 
+                    SELECT
                         t.*,
                         o.name as organization_name,
                         COUNT(a.id) as agent_count
@@ -177,7 +177,7 @@ class DatabaseManager:
             else:
                 rows = await conn.fetch(
                     """
-                    SELECT 
+                    SELECT
                         t.*,
                         o.name as organization_name,
                         COUNT(a.id) as agent_count
@@ -196,7 +196,7 @@ class DatabaseManager:
         async with get_db_connection() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT 
+                SELECT
                     t.*,
                     o.name as organization_name,
                     COUNT(a.id) as agent_count
@@ -232,7 +232,7 @@ class DatabaseManager:
             params.append(team_id)
 
             query = f"""
-                UPDATE teams 
+                UPDATE teams
                 SET {', '.join(set_clauses)}
                 WHERE id = ${param_count + 1}
             """
@@ -280,7 +280,7 @@ class DatabaseManager:
             if team_id:
                 rows = await conn.fetch(
                     """
-                    SELECT 
+                    SELECT
                         a.*,
                         t.name as team_name,
                         t.organization_id,
@@ -296,7 +296,7 @@ class DatabaseManager:
             else:
                 rows = await conn.fetch(
                     """
-                    SELECT 
+                    SELECT
                         a.*,
                         t.name as team_name,
                         t.organization_id,
@@ -315,7 +315,7 @@ class DatabaseManager:
         async with get_db_connection() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT 
+                SELECT
                     a.*,
                     t.name as team_name,
                     t.organization_id,
@@ -379,8 +379,8 @@ class DatabaseManager:
             if status == "completed":
                 await conn.execute(
                     """
-                    UPDATE tasks 
-                    SET status = $1, result = $2, completed_at = CURRENT_TIMESTAMP 
+                    UPDATE tasks
+                    SET status = $1, result = $2, completed_at = CURRENT_TIMESTAMP
                     WHERE id = $3
                     """,
                     status,

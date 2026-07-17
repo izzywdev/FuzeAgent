@@ -1,3 +1,4 @@
+# fmt: off
 """
 Goals Management Service for FuzeAgent
 

@@ -68,7 +68,7 @@ class MigrationRunner:
             # Record migration as applied
             await conn.execute(
                 """
-                INSERT INTO schema_migrations (version, filename) 
+                INSERT INTO schema_migrations (version, filename)
                 VALUES ($1, $2)
             """,
                 version,

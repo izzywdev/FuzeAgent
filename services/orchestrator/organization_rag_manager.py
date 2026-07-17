@@ -1,3 +1,4 @@
+# fmt: off
 """
 Organization RAG Manager for FuzeAgent
 

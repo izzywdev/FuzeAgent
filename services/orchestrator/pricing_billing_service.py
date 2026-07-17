@@ -347,7 +347,7 @@ class PricingBillingService:
                 subscription = await conn.fetchrow(
                     """
                     SELECT id, current_period_start, current_period_end
-                    FROM subscriptions 
+                    FROM subscriptions
                     WHERE organization_id = $1 AND status = 'active'
                     ORDER BY created_at DESC LIMIT 1
                 """,
@@ -404,9 +404,9 @@ class PricingBillingService:
             async with self.db_pool.acquire() as conn:
                 subscription = await conn.fetchrow(
                     """
-                    SELECT * FROM subscriptions 
-                    WHERE organization_id = $1 
-                    AND current_period_start <= $2 
+                    SELECT * FROM subscriptions
+                    WHERE organization_id = $1
+                    AND current_period_start <= $2
                     AND current_period_end >= $3
                     AND status IN ('active', 'trial')
                     ORDER BY created_at DESC LIMIT 1
@@ -597,8 +597,8 @@ class PricingBillingService:
             async with self.db_pool.acquire() as conn:
                 subscription = await conn.fetchrow(
                     """
-                    SELECT * FROM subscriptions 
-                    WHERE organization_id = $1 
+                    SELECT * FROM subscriptions
+                    WHERE organization_id = $1
                     AND status IN ('active', 'trial')
                     ORDER BY created_at DESC LIMIT 1
                 """,
@@ -674,8 +674,8 @@ class PricingBillingService:
                     """
                     SELECT COALESCE(SUM(value), 0)
                     FROM usage_records
-                    WHERE organization_id = $1 
-                    AND subscription_id = $2 
+                    WHERE organization_id = $1
+                    AND subscription_id = $2
                     AND metric_type = $3
                     AND billing_period = $4
                 """,
@@ -721,9 +721,9 @@ class PricingBillingService:
             async with self.db_pool.acquire() as conn:
                 result = await conn.execute(
                     """
-                    UPDATE subscriptions 
+                    UPDATE subscriptions
                     SET tier = $2, updated_at = $3
-                    WHERE organization_id = $1 
+                    WHERE organization_id = $1
                     AND status IN ('active', 'trial')
                 """,
                     organization_id,

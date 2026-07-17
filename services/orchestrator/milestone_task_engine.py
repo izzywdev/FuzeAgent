@@ -140,7 +140,7 @@ class MilestoneTaskEngine:
                 # Update goal with generated plan metadata
                 await conn.execute(
                     """
-                    UPDATE organization_goals 
+                    UPDATE organization_goals
                     SET metadata = metadata || $2, updated_at = NOW()
                     WHERE id = $1
                 """,

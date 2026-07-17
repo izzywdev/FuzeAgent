@@ -285,9 +285,9 @@ class MigrationManager:
             if applied_versions:
                 last_applied_row = await conn.fetchrow(
                     """
-                    SELECT version, name, applied_at, execution_time_ms 
-                    FROM schema_migrations 
-                    ORDER BY version DESC 
+                    SELECT version, name, applied_at, execution_time_ms
+                    FROM schema_migrations
+                    ORDER BY version DESC
                     LIMIT 1
                 """
                 )
@@ -312,7 +312,7 @@ class MigrationManager:
             # Get all table names
             tables = await conn.fetch(
                 """
-                SELECT tablename FROM pg_tables 
+                SELECT tablename FROM pg_tables
                 WHERE schemaname = 'public'
             """
             )

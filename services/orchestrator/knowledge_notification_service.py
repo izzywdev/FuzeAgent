@@ -1,3 +1,4 @@
+# fmt: off
 """
 Knowledge Notification Service for FuzeAgent
 

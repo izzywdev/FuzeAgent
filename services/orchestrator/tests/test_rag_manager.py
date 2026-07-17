@@ -1,3 +1,4 @@
+# fmt: off
 """
 Test cases for RAG Manager functionality
 """

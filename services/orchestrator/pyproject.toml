@@ -1,0 +1,22 @@
+[tool.black]
+line-length = 260
+skip-string-normalization = true
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | migrations
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 260
+skip_glob = ["*/migrations/*"]

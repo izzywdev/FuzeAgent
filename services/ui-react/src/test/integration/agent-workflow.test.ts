@@ -10,7 +10,7 @@ describe('Agent Workflow Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Reset fetch mock
-    vi.mocked(fetch).mockClear()
+    vi.mocked(fetch).mockReset()
   })
 
   describe('Agent Creation Workflow', () => {

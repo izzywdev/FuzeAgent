@@ -3,7 +3,7 @@ Cross-Product Coordination Service for WCG Multi-Product Environment
 
 This service manages coordination protocols between different products in the WCG ecosystem:
 - FuzeAgent (AI team orchestration)
-- FuzeFront (Frontend platform)  
+- FuzeFront (Frontend platform)
 - HubHit (Admin portals)
 - DeployAI (AI deployment tools)
 - And other WCG products
@@ -264,7 +264,7 @@ class CrossProductCoordinator:
                 # Get active coordination requests
                 active_requests = await conn.fetch(
                     """
-                    SELECT * FROM coordination_requests 
+                    SELECT * FROM coordination_requests
                     WHERE (requesting_product = $1 OR $1 = ANY(target_products))
                     AND status IN ('pending', 'in_progress')
                     ORDER BY priority DESC, created_at ASC
@@ -275,7 +275,7 @@ class CrossProductCoordinator:
                 # Get recent resolved requests
                 recent_resolved = await conn.fetch(
                     """
-                    SELECT * FROM coordination_requests 
+                    SELECT * FROM coordination_requests
                     WHERE (requesting_product = $1 OR $1 = ANY(target_products))
                     AND status = 'resolved'
                     AND resolved_at > $2
@@ -371,8 +371,8 @@ class CrossProductCoordinator:
             async with self.db_pool.acquire() as conn:
                 agents = await conn.fetch(
                     """
-                    SELECT id FROM agents 
-                    WHERE type IN ('executive', 'manager') 
+                    SELECT id FROM agents
+                    WHERE type IN ('executive', 'manager')
                     AND status = 'active'
                 """
                 )

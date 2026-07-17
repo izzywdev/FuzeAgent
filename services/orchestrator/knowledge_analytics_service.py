@@ -1,3 +1,4 @@
+# fmt: off
 """
 Knowledge Analytics and Optimization Service for FuzeAgent
 

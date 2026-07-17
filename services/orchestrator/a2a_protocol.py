@@ -1,3 +1,4 @@
+# fmt: off
 """
 Agent-to-Agent (A2A) Protocol Implementation for FuzeAgent
 

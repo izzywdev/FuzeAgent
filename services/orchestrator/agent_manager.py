@@ -10,6 +10,7 @@ from .sandbox_manager import AgentSandboxManager
 from .git_workflow_manager import GitWorkflowManager
 from .agent_expertise_tracker import AgentExpertiseTracker
 
+
 class AgentManager:
     def __init__(self, database_url: str):
         self.agents: Dict[str, Agent] = {}
@@ -24,10 +25,10 @@ class AgentManager:
         self.sandbox_manager: Optional[AgentSandboxManager] = None
         self.expertise_tracker = AgentExpertiseTracker(database_url)
         self.database_url = database_url
-        
+
         # Track active memory-enabled agent containers
         self.memory_enabled_agents: Dict[str, Dict[str, Any]] = {}
-        
+
         # Agent templates configuration
         self.agent_templates = {
             "python_developer": {
@@ -47,7 +48,7 @@ class AgentManager:
                 }
             },
             "typescript_developer": {
-                "role": "TypeScript Developer", 
+                "role": "TypeScript Developer",
                 "type": "developer",
                 "config": {
                     "goal": "Build modern TypeScript applications with Node.js, Express, and comprehensive testing",
@@ -58,7 +59,7 @@ class AgentManager:
                 },
                 "resource_limits": {
                     "memory": "2Gi",
-                    "cpu": "1.0", 
+                    "cpu": "1.0",
                     "disk": "10Gi"
                 }
             },
@@ -111,11 +112,11 @@ class AgentManager:
                 }
             }
         }
-        
+
     async def create_agent(
-        self, 
-        name: str, 
-        role: str, 
+        self,
+        name: str,
+        role: str,
         type: str,
         config: dict,
         team_id: Optional[str] = None,
@@ -124,10 +125,10 @@ class AgentManager:
         sandbox_settings: Optional[Dict[str, Any]] = None
     ) -> Agent:
         """Create a new agent with repository and sandbox settings"""
-        
+
         # Generate agent ID
         agent_id = str(uuid.uuid4())
-        
+
         # Create CrewAI agent
         agent = Agent(
             role=role,
@@ -140,16 +141,16 @@ class AgentManager:
             },
             verbose=True
         )
-        
+
         # Set agent ID for reference
         agent.id = agent_id
         agent.created_at = asyncio.get_event_loop().time()
-        
+
         # For developer agents, create enhanced Claude Code wrapper
         if type == 'developer':
             workspace_path = None
             git_manager = None
-            
+
             # Set up Git workflow if repository settings provided
             if repository_settings and repository_settings.get('repository_url'):
                 git_manager = GitWorkflowManager(
@@ -158,7 +159,7 @@ class AgentManager:
                     repo_settings=repository_settings
                 )
                 workspace_path = git_manager.workspace_path
-            
+
             # Create enhanced Claude Code wrapper
             claude_wrapper = ClaudeCodeWrapper(
                 workspace_path=workspace_path,
@@ -167,10 +168,10 @@ class AgentManager:
                 task_id="default"
             )
             agent.tools.append(claude_wrapper)
-        
+
         # Store agent
         self.agents[agent_id] = agent
-        
+
         # Register in database
         if team_id:
             await DatabaseManager.insert_agent(
@@ -191,13 +192,13 @@ class AgentManager:
                 "repository_settings": repository_settings or {},
                 "sandbox_settings": sandbox_settings or {}
             })
-        
+
         return agent
-    
+
     async def _spawn_agent_container(
-        self, 
-        name: str, 
-        role: str, 
+        self,
+        name: str,
+        role: str,
         type: str,
         config: dict
     ):
@@ -219,7 +220,7 @@ class AgentManager:
             'network': 'ai-team-network',
             'restart_policy': {'Name': 'unless-stopped'}
         }
-        
+
         try:
             container = self.docker_client.containers.run(
                 detach=True,
@@ -228,10 +229,10 @@ class AgentManager:
             print(f"Spawned container for {name}: {container.id}")
         except Exception as e:
             print(f"Error spawning container for {name}: {e}")
-    
+
     def _get_tools_for_role(self, type: str, custom_tools: List[str]) -> List:
         """Get appropriate tools based on agent type"""
-        
+
         base_tools = {
             'executive': ['strategic_planning', 'resource_allocation', 'team_management'],
             'developer': ['code_generation', 'code_review', 'debugging'],
@@ -239,19 +240,19 @@ class AgentManager:
             'designer': ['mockup_generation', 'design_review', 'accessibility_check'],
             'support': ['ticket_handling', 'knowledge_search', 'customer_response']
         }
-        
+
         tools = base_tools.get(type, [])
         tools.extend(custom_tools)
-        
+
         # Convert to actual tool instances
         return [self._create_tool(tool_name) for tool_name in tools]
-    
+
     def _create_tool(self, tool_name: str):
         """Create a tool instance based on name"""
         # This would create actual tool instances
         # For now, return a placeholder
         return {"name": tool_name, "description": f"Tool for {tool_name}"}
-    
+
     async def _register_agent_in_db(self, name: str, role: str, type: str, config: dict):
         """Register agent in database (legacy method)"""
         async with get_db_connection() as conn:
@@ -260,18 +261,18 @@ class AgentManager:
                 INSERT INTO agents (name, role, type, status, config, repository_settings, sandbox_settings)
                 VALUES ($1, $2, $3, 'active', $4, $5, $6)
                 """,
-                name, role, type, 
+                name, role, type,
                 {k: v for k, v in config.items() if k not in ['repository_settings', 'sandbox_settings']},
                 config.get('repository_settings', {}),
                 config.get('sandbox_settings', {})
             )
-    
+
     async def list_agents(self) -> List[Dict]:
         """List all agents"""
         async with get_db_connection() as conn:
             rows = await conn.fetch("SELECT * FROM agents")
             return [dict(row) for row in rows]
-    
+
     async def get_agent_status(self, agent_id: str) -> Dict:
         """Get detailed agent status"""
         async with get_db_connection() as conn:
@@ -279,7 +280,7 @@ class AgentManager:
             if row:
                 return dict(row)
             raise HTTPException(status_code=404, detail="Agent not found")
-    
+
     async def get_updates(self) -> Dict:
         """Get real-time updates for WebSocket"""
         agents = await self.list_agents()
@@ -287,20 +288,20 @@ class AgentManager:
             "agents": agents,
             "timestamp": asyncio.get_event_loop().time()
         }
-    
+
     async def get_template_config(self, template_id: str) -> Optional[Dict[str, Any]]:
         """Get agent template configuration"""
         return self.agent_templates.get(template_id)
-    
+
     async def get_available_templates(self) -> Dict[str, Dict[str, Any]]:
         """Get all available agent templates"""
         return self.agent_templates
-    
+
     async def get_agent_sandbox(self, agent_id: str) -> Dict[str, Any]:
         """Get agent sandbox information"""
         if not self.sandbox_manager:
             return {"error": "Sandbox manager not initialized"}
-        
+
         sandboxes = await self.sandbox_manager.list_sandboxes(agent_id=agent_id)
         return {
             "agent_id": agent_id,
@@ -312,11 +313,11 @@ class AgentManager:
                 "resource_limits": s.resource_limits
             } for s in sandboxes]
         }
-    
+
     async def set_sandbox_manager(self, sandbox_manager: AgentSandboxManager):
         """Set the sandbox manager reference"""
         self.sandbox_manager = sandbox_manager
-    
+
     async def deploy_memory_enabled_agent(
         self,
         agent_id: str,
@@ -325,10 +326,10 @@ class AgentManager:
         repository_settings: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Deploy a memory-enabled autonomous agent container"""
-        
+
         if not self.sandbox_manager:
             raise RuntimeError("Sandbox manager not initialized")
-        
+
         try:
             # Create sandbox for memory-enabled agent
             sandbox = await self.sandbox_manager.create_sandbox(
@@ -348,7 +349,7 @@ class AgentManager:
                     }
                 }
             )
-            
+
             # Track the memory-enabled agent
             self.memory_enabled_agents[agent_id] = {
                 "sandbox_id": sandbox.sandbox_id,
@@ -358,14 +359,14 @@ class AgentManager:
                 "deployed_at": asyncio.get_event_loop().time(),
                 "task_id": task_id
             }
-            
+
             # Update agent status in database
             await self._update_agent_memory_status(agent_id, "memory_enabled", {
                 "sandbox_id": sandbox.sandbox_id,
                 "container_id": sandbox.container_id,
                 "memory_enabled": True
             })
-            
+
             return {
                 "success": True,
                 "agent_id": agent_id,
@@ -373,30 +374,30 @@ class AgentManager:
                 "container_id": sandbox.container_id,
                 "status": "deployed"
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
                 "agent_id": agent_id,
                 "error": str(e)
             }
-    
+
     async def get_agent_memory_status(self, agent_id: str) -> Dict[str, Any]:
         """Get agent memory status and expertise summary"""
-        
+
         try:
             # Get basic agent info
             agent_info = await self.get_agent_status(agent_id)
-            
+
             # Get memory-enabled container status
             container_status = self.memory_enabled_agents.get(agent_id, {})
-            
+
             # Get expertise metrics
             performance_metrics = await self.expertise_tracker.get_agent_performance_metrics(agent_id)
-            
+
             # Get recent insights
             insights = await self.expertise_tracker.generate_expertise_insights(agent_id)
-            
+
             return {
                 "agent_id": agent_id,
                 "basic_info": agent_info,
@@ -406,14 +407,14 @@ class AgentManager:
                 "memory_enabled": bool(container_status),
                 "status": container_status.get("status", "unknown")
             }
-            
+
         except Exception as e:
             return {
                 "agent_id": agent_id,
                 "error": str(e),
                 "memory_enabled": False
             }
-    
+
     async def assign_task_to_memory_agent(
         self,
         agent_id: str,
@@ -421,24 +422,24 @@ class AgentManager:
         task_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Assign a task to a memory-enabled agent"""
-        
+
         if agent_id not in self.memory_enabled_agents:
             return {
                 "success": False,
                 "error": f"Agent {agent_id} is not memory-enabled or not deployed"
             }
-        
+
         try:
             # Store task in database with memory-enabled flag
             async with get_db_connection() as conn:
                 await conn.execute("""
                     INSERT INTO tasks (
                         id, agent_id, title, description, type, complexity,
-                        language, framework, requirements, status, 
+                        language, framework, requirements, status,
                         assigned_to_memory_agent, created_at
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', true, NOW())
-                """, 
-                    task_id, agent_id, 
+                """,
+                    task_id, agent_id,
                     task_data.get('title', 'Untitled'),
                     task_data.get('description', ''),
                     task_data.get('type', 'development'),
@@ -447,10 +448,10 @@ class AgentManager:
                     task_data.get('framework'),
                     task_data.get('requirements', [])
                 )
-            
+
             # The memory-enabled agent will automatically pick up the task
             # through its polling mechanism
-            
+
             return {
                 "success": True,
                 "task_id": task_id,
@@ -458,7 +459,7 @@ class AgentManager:
                 "status": "assigned_to_memory_agent",
                 "message": "Task assigned to memory-enabled agent - agent will pick it up automatically"
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
@@ -466,24 +467,24 @@ class AgentManager:
                 "agent_id": agent_id,
                 "error": str(e)
             }
-    
+
     async def get_system_expertise_dashboard(self) -> Dict[str, Any]:
         """Get system-wide expertise and memory analytics dashboard"""
-        
+
         try:
             # Get system-wide expertise summary
             expertise_summary = await self.expertise_tracker.get_system_wide_expertise_summary()
-            
+
             # Get memory-enabled agents status
             memory_agents_status = []
             for agent_id, container_info in self.memory_enabled_agents.items():
                 agent_memory_status = await self.get_agent_memory_status(agent_id)
                 memory_agents_status.append(agent_memory_status)
-            
+
             # Get recent activity across all agents
             async with get_db_connection() as conn:
                 recent_tasks = await conn.fetch("""
-                    SELECT 
+                    SELECT
                         t.id, t.agent_id, t.title, t.status, t.assigned_to_memory_agent,
                         t.created_at, t.updated_at,
                         a.name as agent_name, a.role as agent_role
@@ -493,7 +494,7 @@ class AgentManager:
                     ORDER BY t.created_at DESC
                     LIMIT 20
                 """)
-            
+
             return {
                 "system_expertise": expertise_summary,
                 "memory_enabled_agents": {
@@ -503,72 +504,72 @@ class AgentManager:
                 "recent_activity": [dict(task) for task in recent_tasks],
                 "dashboard_generated_at": asyncio.get_event_loop().time()
             }
-            
+
         except Exception as e:
             return {
                 "error": str(e),
                 "dashboard_generated_at": asyncio.get_event_loop().time()
             }
-    
+
     async def stop_memory_enabled_agent(self, agent_id: str) -> Dict[str, Any]:
         """Stop a memory-enabled agent container"""
-        
+
         if agent_id not in self.memory_enabled_agents:
             return {
                 "success": False,
                 "error": f"Agent {agent_id} is not memory-enabled or not deployed"
             }
-        
+
         try:
             container_info = self.memory_enabled_agents[agent_id]
             sandbox_id = container_info["sandbox_id"]
-            
+
             # Destroy the sandbox (this will stop and clean up the container)
             if self.sandbox_manager:
                 await self.sandbox_manager.destroy_sandbox(sandbox_id)
-            
+
             # Update agent status
             await self._update_agent_memory_status(agent_id, "stopped", {
                 "memory_enabled": False,
                 "stopped_at": asyncio.get_event_loop().time()
             })
-            
+
             # Remove from tracking
             del self.memory_enabled_agents[agent_id]
-            
+
             return {
                 "success": True,
                 "agent_id": agent_id,
                 "message": "Memory-enabled agent stopped successfully"
             }
-            
+
         except Exception as e:
             return {
                 "success": False,
                 "agent_id": agent_id,
                 "error": str(e)
             }
-    
+
     async def _update_agent_memory_status(self, agent_id: str, status: str, additional_data: Dict[str, Any]):
         """Update agent memory-related status in database"""
-        
+
         try:
             async with get_db_connection() as conn:
                 # Update agent config with memory status
                 await conn.execute("""
-                    UPDATE agents 
-                    SET status = $2, 
+                    UPDATE agents
+                    SET status = $2,
                         config = config || $3,
                         updated_at = NOW()
                     WHERE id = $1
                 """, agent_id, status, additional_data)
-                
+
         except Exception as e:
             print(f"Error updating agent memory status: {e}")
-    
+
     async def shutdown_all(self):
         """Shutdown all agents including memory-enabled ones"""
-        
+
         # Stop all memory-enabled agents
         memory_agent_ids = list(self.memory_enabled_agents.keys())
         for agent_id in memory_agent_ids:
@@ -576,7 +577,7 @@ class AgentManager:
                 await self.stop_memory_enabled_agent(agent_id)
             except Exception as e:
                 print(f"Error stopping memory-enabled agent {agent_id}: {e}")
-        
+
         # Shutdown regular agents
         for agent_id, agent in self.agents.items():
             print(f"Shutting down agent: {agent_id}")

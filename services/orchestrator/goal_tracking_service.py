@@ -1,3 +1,4 @@
+# fmt: off
 """
 Goal Tracking and Progress Monitoring Service for FuzeAgent
 
