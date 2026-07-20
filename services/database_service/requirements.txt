@@ -1,2 +1,2 @@
 # Requirements for the database test script
-asyncpg>=0.29.0
+asyncpg>=0.29.0,<0.32.0

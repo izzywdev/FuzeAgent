@@ -9,6 +9,7 @@ import asyncpg
 import json
 import uuid
 import httpx
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -29,12 +30,29 @@ except Exception:  # pragma: no cover - allow import from repo root or service d
         authenticate_websocket,
     )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan.
+
+    Replaces the removed ``app.add_event_handler("startup"/"shutdown", ...)``
+    API (dropped in Starlette 1.x). Behaviour is unchanged: open the asyncpg
+    pool on startup, close it on shutdown. ``startup``/``shutdown`` are
+    resolved at call time, so they may be defined further down the module.
+    """
+    await startup()
+    try:
+        yield
+    finally:
+        await shutdown()
+
+
 # SECURITY (issue #6 CRITICAL-1): authenticate every route by default (health
 # and docs are on the allowlist inside get_current_user).
 app = FastAPI(
     title="FuzeAgent Hierarchy API",
     version="1.0.0",
     dependencies=[Depends(get_current_user)],
+    lifespan=lifespan,
 )
 
 # SECURITY (issue #6 MEDIUM-2): explicit, non-wildcard origins when credentials
@@ -92,8 +110,9 @@ async def shutdown():
     if db_pool:
         await db_pool.close()
 
-app.add_event_handler("startup", startup)
-app.add_event_handler("shutdown", shutdown)
+# NOTE: startup/shutdown are wired via the `lifespan` context manager defined
+# above and passed to FastAPI(...); `add_event_handler` was removed in
+# Starlette 1.x.
 
 # Pydantic models
 class Organization(BaseModel):
