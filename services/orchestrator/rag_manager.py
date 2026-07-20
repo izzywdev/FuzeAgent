@@ -16,12 +16,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import asyncpg
 import numpy as np
 import tiktoken
-from langchain_core.prompts import PromptTemplate
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_anthropic import ChatAnthropic
-
-# LangChain imports for conversation summarization
-from langchain_community.memory import ConversationSummaryBufferMemory
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.prompts import PromptTemplate
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
@@ -50,11 +47,7 @@ class RAGManager:
             temperature=0.3,
         )
 
-        # Conversation memory with token limit
         self.max_tokens = 4000  # Max tokens before summarization
-        self.summary_buffer_memory = ConversationSummaryBufferMemory(
-            llm=self.llm, max_token_limit=self.max_tokens, return_messages=True
-        )
 
         self.pool = None
 
