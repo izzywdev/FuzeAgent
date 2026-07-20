@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Guard shim (defense-in-depth beyond permission policies): reject irreversible /
+# prod-affecting kubectl verbs at the OS level, regardless of what the agent is
+# instructed or injected to do. GitOps-safe verbs (get/apply/create/label/
+# rollout/describe/logs...) pass straight through. Real binary lives at the
+# absolute path below so PATH order can't be used to bypass the guard.
+# Lifted from .github/workflows/claude.yml.
+set -euo pipefail
+REAL=/usr/local/bin/kubectl
+for a in "$@"; do
+  case "$a" in
+    delete|drain|cordon|uncordon|taint|patch|edit|replace)
+      echo "guard: 'kubectl $a' is blocked on this worker (prod is GitOps under ArgoCD selfHeal; reconcile via chart+PR)" >&2
+      exit 97 ;;
+  esac
+done
+exec "$REAL" "$@"

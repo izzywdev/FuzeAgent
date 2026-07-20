@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Guard shim: reject destructive helm verbs. template / upgrade --dry-run / lint
+# pass through; uninstall/rollback/delete do not. See guards/kubectl for rationale.
+set -euo pipefail
+REAL=/usr/local/bin/helm
+for a in "$@"; do
+  case "$a" in
+    uninstall|delete|rollback)
+      echo "guard: 'helm $a' is blocked on this worker (reconcile via chart+PR, not by hand)" >&2
+      exit 97 ;;
+  esac
+done
+exec "$REAL" "$@"

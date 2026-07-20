@@ -152,6 +152,31 @@ services:
       retries: 3
       start_period: 20s
 
+  # Managed-Agents handoff MCP (ported orchestration runtime — see agent-templates/).
+  # OPT-IN: nothing depends_on this, so a normal `docker compose up` of the existing
+  # services does not start it. Run explicitly: `docker compose up handoff-mcp`.
+  # Serves streamable-HTTP MCP at /mcp — point each role's HANDOFF_MCP_URL here.
+  handoff-mcp:
+    build:
+      context: ./agent-templates
+      dockerfile: orchestration/handoff_mcp/Dockerfile
+    ports:
+      - "8010:8000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      # Bearer token gating the MCP. UNAUTHENTICATED (with a loud warning) if unset.
+      HANDOFF_MCP_TOKEN: ${HANDOFF_MCP_TOKEN}
+      FUZE_STATE_DIR: /state
+      PYTHONUNBUFFERED: 1
+    volumes:
+      # Provisioned id state (agent-ids/vault-ids/memory-ids.json) from providers/provision.py.
+      # Ids are not secrets; CI publishes them as an artifact/ConfigMap.
+      - ./agent-templates/sync/.state:/state:ro
+    networks:
+      - ai-team-network
+    restart: unless-stopped
+
+
 networks:
   ai-team-network:
     driver: bridge
