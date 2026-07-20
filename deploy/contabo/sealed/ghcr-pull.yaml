@@ -1,0 +1,16 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  creationTimestamp: null
+  name: ghcr-pull
+  namespace: fuzeagent
+spec:
+  encryptedData:
+    .dockerconfigjson: AgBm3GvnYKzWoPgbiVohNWL1z/xlLu4dsQ+GZP7mlFsENMBZs33oPySbPkWeEhbTFb3aKLGNi+1zZdC+uT2KrbDCQfvxQXTVk0p/ECm0Wyab/JuPmLYA1KmM1NEjT0G4cs6YWMW9Stp3J82Mih1uwL1DxDRwxk4ca+DI4iPy7Mpz+oytbTrDNdeib1FIb2P/+mwq8NYL7RDhwqWpMNBJhueHj3uaxlnOilN4y4s0mmRdsOuDTC8ZYBocjYMT1QrMjw7by7GpfNbDgDCGj0QJ4zjX62k8YqMDGca30eFuYMawexC3KUAklrGVymeOveEy9ociyOTkhz7i8kjnSOGT7k2pmK47HHRNaEtjpIwBXtfeGtsH6szH9D/qp41zZYR/fdS1SYwOfquHp0LpItQ5QB6R3i0fjY6kxXyr8fFzabvnrUcMLbChaTK/iFES6PacZDzo2BL4/T6NE6E5S9dfiYMx6uC+Gqy8q5x534NXKMpJwIvJXrixyx32m2WLuatTnb903l+KGkAtr1jqT/3j2nyqEzLJRKi5Z+IVCm1LRNEjOJW+DewyjD+ZPJOmfx/NlK3exMHbw2H1Dw2UPi2jJMJqlqitmxrm5JUljacvzcP+TGJfT1HwJW1fekGRpFIC6fHdwoV3LfTPBb2e6wXtLEyL0xNfdnpuzvbYMn2pTiDCAFyingl3IRt5H9vOxecqYAuG0YcqMs9UOrGMUcXc8hadvq82/dCLXQ23KKpY8Nz2IWYA8LuAsl5+Ycb75qqyOV/2bJimJmXjKgpz56Qr2IV5xy3xOzLIgyHKOBpmNCQ3mPrelC03VPepShlrtmUUR/eiOtz7rUIR8U0rkaJJ/SZ5zYTHcPCTNITuCUzdOHHcnxi5Pz2nL6nilXZkX2dg7LPJzEQkQZNnJ9rnqPrYn/39Vl5Iky0wu0izf6DQpoYsz4k=
+  template:
+    metadata:
+      creationTimestamp: null
+      name: ghcr-pull
+      namespace: fuzeagent
+    type: kubernetes.io/dockerconfigjson
