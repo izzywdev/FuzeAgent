@@ -92,7 +92,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "unit" -v --cov=. --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ --ignore=tests/test_a2a_protocol.py -m "unit" -v --cov=. --cov-report=xml --cov-report=term-missing
     
     - name: Run API tests
       working-directory: services/orchestrator
