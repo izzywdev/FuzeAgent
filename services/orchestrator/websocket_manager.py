@@ -2,6 +2,7 @@
 WebSocket Manager for FuzeAgent
 Handles real-time updates for agents, tasks, containers, and system notifications
 """
+
 import asyncio
 import json
 import logging
@@ -454,9 +455,11 @@ async def notify_knowledge_update(
         agent_id=agent_id,
         data={
             "document_title": document_title,
-            "message": f"Knowledge base updated: {document_title}"
-            if document_title
-            else "Knowledge base updated",
+            "message": (
+                f"Knowledge base updated: {document_title}"
+                if document_title
+                else "Knowledge base updated"
+            ),
         },
     )
 

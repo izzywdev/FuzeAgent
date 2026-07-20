@@ -40,25 +40,21 @@ class TestRAGManager:
         # Check that tables exist by trying to query them
         async with manager.db_pool.acquire() as conn:
             # Check agent_conversations table
-            result = await conn.fetchrow(
-                """
+            result = await conn.fetchrow("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
                     WHERE table_name = 'agent_conversations'
                 );
-            """
-            )
+            """)
             assert result["exists"] is True
 
             # Check conversation_summaries table
-            result = await conn.fetchrow(
-                """
+            result = await conn.fetchrow("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
                     WHERE table_name = 'conversation_summaries'
                 );
-            """
-            )
+            """)
             assert result["exists"] is True
 
     async def test_store_conversation_message(

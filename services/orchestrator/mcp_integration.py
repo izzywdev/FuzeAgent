@@ -343,9 +343,9 @@ class FuzeAgentMCPServer:
                     "status": agent["status"],
                     "capabilities": agent.get("config", {}).get("tools", []),
                     "current_task": agent.get("current_task_id"),
-                    "created_at": agent["created_at"].isoformat()
-                    if agent["created_at"]
-                    else None,
+                    "created_at": (
+                        agent["created_at"].isoformat() if agent["created_at"] else None
+                    ),
                 }
                 for agent in agents
             ],
@@ -375,9 +375,9 @@ class FuzeAgentMCPServer:
                     "id": task["id"],
                     "title": task["title"],
                     "status": task["status"],
-                    "created_at": task["created_at"].isoformat()
-                    if task["created_at"]
-                    else None,
+                    "created_at": (
+                        task["created_at"].isoformat() if task["created_at"] else None
+                    ),
                 }
                 for task in tasks
                 if task["status"] in ["pending", "executing"]
@@ -387,9 +387,9 @@ class FuzeAgentMCPServer:
                     "id": task["id"],
                     "title": task["title"],
                     "status": task["status"],
-                    "completed_at": task["updated_at"].isoformat()
-                    if task["updated_at"]
-                    else None,
+                    "completed_at": (
+                        task["updated_at"].isoformat() if task["updated_at"] else None
+                    ),
                 }
                 for task in tasks
                 if task["status"] in ["completed", "failed"]
@@ -419,17 +419,19 @@ class FuzeAgentMCPServer:
             "description": task["description"],
             "status": task["status"],
             "priority": task.get("priority", "medium"),
-            "created_at": task["created_at"].isoformat()
-            if task["created_at"]
-            else None,
-            "assigned_agent": {
-                "id": agent["id"],
-                "name": agent["name"],
-                "role": agent["role"],
-                "type": agent["type"],
-            }
-            if agent
-            else None,
+            "created_at": (
+                task["created_at"].isoformat() if task["created_at"] else None
+            ),
+            "assigned_agent": (
+                {
+                    "id": agent["id"],
+                    "name": agent["name"],
+                    "role": agent["role"],
+                    "type": agent["type"],
+                }
+                if agent
+                else None
+            ),
         }
 
         if include_history:
@@ -439,12 +441,14 @@ class FuzeAgentMCPServer:
                 {
                     "iteration": iter["iteration_number"],
                     "step": iter["step"],
-                    "started_at": iter["started_at"].isoformat()
-                    if iter["started_at"]
-                    else None,
-                    "completed_at": iter["completed_at"].isoformat()
-                    if iter["completed_at"]
-                    else None,
+                    "started_at": (
+                        iter["started_at"].isoformat() if iter["started_at"] else None
+                    ),
+                    "completed_at": (
+                        iter["completed_at"].isoformat()
+                        if iter["completed_at"]
+                        else None
+                    ),
                     "success": iter["success"],
                     "human_question": iter["human_question"],
                     "human_response": iter["human_response"],

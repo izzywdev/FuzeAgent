@@ -16,8 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import asyncpg
 import numpy as np
 import tiktoken
-from langchain.prompts import PromptTemplate
-from langchain.schema import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_anthropic import ChatAnthropic
 
 # LangChain imports for conversation summarization

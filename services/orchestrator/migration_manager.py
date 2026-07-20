@@ -70,8 +70,7 @@ class MigrationManager:
 
     async def _ensure_migrations_table(self, conn: asyncpg.Connection):
         """Create migrations tracking table if it doesn't exist"""
-        await conn.execute(
-            """
+        await conn.execute("""
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 version VARCHAR(50) PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
@@ -79,8 +78,7 @@ class MigrationManager:
                 checksum VARCHAR(64),
                 execution_time_ms INTEGER
             )
-        """
-        )
+        """)
         logger.info("Ensured schema_migrations table exists")
 
     async def get_applied_migrations(self) -> List[str]:
@@ -290,14 +288,12 @@ class MigrationManager:
             # Get last applied migration info
             last_applied = None
             if applied_versions:
-                last_applied_row = await conn.fetchrow(
-                    """
+                last_applied_row = await conn.fetchrow("""
                     SELECT version, name, applied_at, execution_time_ms 
                     FROM schema_migrations 
                     ORDER BY version DESC 
                     LIMIT 1
-                """
-                )
+                """)
                 if last_applied_row:
                     last_applied = dict(last_applied_row)
 
@@ -317,12 +313,10 @@ class MigrationManager:
 
         async with self._get_connection() as conn:
             # Get all table names
-            tables = await conn.fetch(
-                """
+            tables = await conn.fetch("""
                 SELECT tablename FROM pg_tables 
                 WHERE schemaname = 'public'
-            """
-            )
+            """)
 
             # Drop all tables
             for table in tables:

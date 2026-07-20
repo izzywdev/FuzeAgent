@@ -318,21 +318,25 @@ class GoalConversationService:
                     "conversation_type": conversation["conversation_type"],
                     "conversation_title": conversation["conversation_title"],
                     "conversation_summary": conversation["conversation_summary"],
-                    "conversation_context": json.loads(
-                        conversation["conversation_context"]
-                    )
-                    if conversation["conversation_context"]
-                    else {},
-                    "participants": json.loads(conversation["participants"])
-                    if conversation["participants"]
-                    else [],
+                    "conversation_context": (
+                        json.loads(conversation["conversation_context"])
+                        if conversation["conversation_context"]
+                        else {}
+                    ),
+                    "participants": (
+                        json.loads(conversation["participants"])
+                        if conversation["participants"]
+                        else []
+                    ),
                     "messages": messages,
                     "insights_generated": insights,
                     "action_items": action_items,
                     "status": conversation["status"],
-                    "last_activity_at": conversation["last_activity_at"].isoformat()
-                    if conversation["last_activity_at"]
-                    else None,
+                    "last_activity_at": (
+                        conversation["last_activity_at"].isoformat()
+                        if conversation["last_activity_at"]
+                        else None
+                    ),
                     "created_at": conversation["created_at"].isoformat(),
                     "updated_at": conversation["updated_at"].isoformat(),
                     "message_count": len(messages),
@@ -471,12 +475,16 @@ class GoalConversationService:
                     "review_period_days": review_period_days,
                     "goal_progress": {
                         "current_progress": float(conversation["progress_percentage"]),
-                        "target_value": float(conversation["target_value"])
-                        if conversation["target_value"]
-                        else None,
-                        "current_value": float(conversation["current_value"])
-                        if conversation["current_value"]
-                        else None,
+                        "target_value": (
+                            float(conversation["target_value"])
+                            if conversation["target_value"]
+                            else None
+                        ),
+                        "current_value": (
+                            float(conversation["current_value"])
+                            if conversation["current_value"]
+                            else None
+                        ),
                         "completion_confidence": float(
                             conversation["completion_confidence"]
                         ),
@@ -549,9 +557,9 @@ class GoalConversationService:
                             "id": str(uuid.uuid4()),
                             "title": action["title"],
                             "description": action["description"],
-                            "assigned_to": action.get("assigned_to")
-                            if auto_assign
-                            else None,
+                            "assigned_to": (
+                                action.get("assigned_to") if auto_assign else None
+                            ),
                             "due_date": action.get("due_date"),
                             "status": "pending",
                             "priority": action.get("priority", 5),
@@ -625,9 +633,7 @@ class GoalConversationService:
                     WHERE {where_clause}
                     ORDER BY last_activity_at DESC, created_at DESC
                     LIMIT ${param_idx}
-                """.format(
-                        where_clause=where_clause, param_idx=param_idx
-                    ),
+                """.format(where_clause=where_clause, param_idx=param_idx),
                     *params,
                     limit,
                 )
@@ -739,9 +745,11 @@ class GoalConversationService:
                 goal_title=goal["title"],
                 goal_type=goal["goal_type"],
                 deadline=goal["target_deadline"].strftime("%B %d, %Y"),
-                target_value=goal["target_value"]
-                if goal["target_value"]
-                else "defined objectives",
+                target_value=(
+                    goal["target_value"]
+                    if goal["target_value"]
+                    else "defined objectives"
+                ),
             )
         elif conversation_type == ConversationType.REVIEW:
             return starters["default"].format(

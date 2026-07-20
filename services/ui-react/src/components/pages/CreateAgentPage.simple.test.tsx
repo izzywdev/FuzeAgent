@@ -133,8 +133,8 @@ describe('CreateAgentPage - Simple Tests', () => {
 
     it('should update model selection', async () => {
       const modelSelect = screen.getByLabelText(/Model/)
-      await user.selectOptions(modelSelect, 'claude-opus-4-20250514')
-      expect(modelSelect).toHaveValue('claude-opus-4-20250514')
+      await user.selectOptions(modelSelect, 'claude-3-opus-20240229')
+      expect(modelSelect).toHaveValue('claude-3-opus-20240229')
     })
 
     it('should update goal textarea', async () => {

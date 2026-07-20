@@ -721,9 +721,9 @@ class KnowledgeAnalyticsService:
 
         return {
             "sharing_rate": sharing_rate,
-            "total_propagations": sharing_stats["total_propagations"]
-            if sharing_stats
-            else 0,
+            "total_propagations": (
+                sharing_stats["total_propagations"] if sharing_stats else 0
+            ),
             "avg_confidence": sharing_stats["avg_confidence"] if sharing_stats else 0.0,
         }
 

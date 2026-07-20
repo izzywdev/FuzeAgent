@@ -2,6 +2,7 @@
 RAG (Retrieval-Augmented Generation) Integration for FuzeAgent
 Handles vector embeddings, similarity search, and context retrieval for AI agents
 """
+
 import asyncio
 import json
 import logging

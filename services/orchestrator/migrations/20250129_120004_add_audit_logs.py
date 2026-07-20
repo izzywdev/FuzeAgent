@@ -9,8 +9,7 @@ async def upgrade(conn):
     """Apply the migration"""
 
     # Create audit log table
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE TABLE audit_logs (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             table_name VARCHAR(50) NOT NULL,
@@ -23,8 +22,7 @@ async def upgrade(conn):
             ip_address INET,
             user_agent TEXT
         );
-    """
-    )
+    """)
 
     # Create index for efficient querying
     await conn.execute(
@@ -36,8 +34,7 @@ async def upgrade(conn):
     await conn.execute("CREATE INDEX idx_audit_logs_action ON audit_logs(action);")
 
     # Create audit trigger function
-    await conn.execute(
-        """
+    await conn.execute("""
         CREATE OR REPLACE FUNCTION audit_trigger_function()
         RETURNS TRIGGER AS $$
         BEGIN
@@ -57,20 +54,17 @@ async def upgrade(conn):
             RETURN NULL;
         END;
         $$ LANGUAGE plpgsql;
-    """
-    )
+    """)
 
     # Add audit triggers to key tables
     tables_to_audit = ["organizations", "teams", "agents"]
 
     for table in tables_to_audit:
-        await conn.execute(
-            f"""
+        await conn.execute(f"""
             CREATE TRIGGER audit_trigger_{table}
             AFTER INSERT OR UPDATE OR DELETE ON {table}
             FOR EACH ROW EXECUTE FUNCTION audit_trigger_function();
-        """
-        )
+        """)
 
     print("✅ Created audit logging system with triggers")
 

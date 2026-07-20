@@ -268,7 +268,7 @@ class AgentManager:
         orchestrator_svc = os.environ.get(
             "ORCHESTRATOR_SERVICE_NAME", "fuzeagent-orchestrator"
         )
-        ws_relay_url = f"ws://{orchestrator_svc}/agent-relay/{agent_id}"
+        ws_relay_url = f"wss://{orchestrator_svc}/agent-relay/{agent_id}"
 
         job = k8s_client.V1Job(
             api_version="batch/v1",
@@ -577,9 +577,9 @@ class AgentManager:
                 "agent_id": agent_id,
                 "basic_info": agent_info,
                 "memory_container": container_status,
-                "performance_metrics": performance_metrics.__dict__
-                if performance_metrics
-                else None,
+                "performance_metrics": (
+                    performance_metrics.__dict__ if performance_metrics else None
+                ),
                 "recent_insights": [insight.__dict__ for insight in insights[:5]],
                 "memory_enabled": bool(container_status),
                 "status": container_status.get("status", "unknown"),
@@ -657,8 +657,7 @@ class AgentManager:
 
             # Get recent activity across all agents
             async with get_db_connection() as conn:
-                recent_tasks = await conn.fetch(
-                    """
+                recent_tasks = await conn.fetch("""
                     SELECT 
                         t.id, t.agent_id, t.title, t.status, t.assigned_to_memory_agent,
                         t.created_at, t.updated_at,
@@ -668,8 +667,7 @@ class AgentManager:
                     WHERE t.created_at > NOW() - INTERVAL '24 hours'
                     ORDER BY t.created_at DESC
                     LIMIT 20
-                """
-                )
+                """)
 
             return {
                 "system_expertise": expertise_summary,

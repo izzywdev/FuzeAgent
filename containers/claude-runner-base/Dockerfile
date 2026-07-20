@@ -28,9 +28,12 @@ RUN --mount=type=secret,id=npm_token \
 COPY session-relay.sh /usr/local/bin/session-relay
 RUN chmod +x /usr/local/bin/session-relay
 
+RUN useradd -m -u 1001 -s /bin/bash agent
+
 WORKDIR /workspace
 ENV ANTHROPIC_API_KEY=""
 ENV WS_RELAY_URL=""
 ENV AGENT_ID=""
 
+USER agent
 CMD ["/usr/local/bin/session-relay"]

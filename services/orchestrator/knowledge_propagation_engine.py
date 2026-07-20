@@ -934,17 +934,19 @@ class KnowledgePropagationEngine:
             target_type=row["target_type"],
             target_id=str(row["target_id"]),
             knowledge_type=row["knowledge_type"],
-            knowledge_content_id=str(row["knowledge_content_id"])
-            if row["knowledge_content_id"]
-            else "",
+            knowledge_content_id=(
+                str(row["knowledge_content_id"]) if row["knowledge_content_id"] else ""
+            ),
             propagation_method=row["propagation_method"],
             propagation_trigger=PropagationTrigger(row["propagation_trigger"]),
             confidence_score=row["confidence_score"],
             propagation_status=PropagationStatus(row["propagation_status"]),
             acceptance_status=AcceptanceStatus(row["acceptance_status"]),
-            metadata=json.loads(row["metadata"])
-            if isinstance(row["metadata"], str)
-            else row["metadata"],
+            metadata=(
+                json.loads(row["metadata"])
+                if isinstance(row["metadata"], str)
+                else row["metadata"]
+            ),
             created_at=row["propagated_at"],
             processed_at=row["processed_at"],
             completed_at=row["completed_at"],

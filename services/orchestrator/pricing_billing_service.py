@@ -306,9 +306,11 @@ class PricingBillingService:
                     subscription_id,
                     organization_id,
                     tier.value,
-                    SubscriptionStatus.TRIAL.value
-                    if trial_end
-                    else SubscriptionStatus.ACTIVE.value,
+                    (
+                        SubscriptionStatus.TRIAL.value
+                        if trial_end
+                        else SubscriptionStatus.ACTIVE.value
+                    ),
                     billing_cycle.value,
                     period_start,
                     period_end,

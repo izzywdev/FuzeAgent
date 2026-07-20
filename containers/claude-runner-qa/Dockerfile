@@ -6,4 +6,5 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2t64 \
     && rm -rf /var/lib/apt/lists/*
 RUN npm install -g @playwright/test
+USER agent
 CMD ["/usr/local/bin/session-relay"]

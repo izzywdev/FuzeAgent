@@ -211,9 +211,9 @@ class GoalTrackingService:
                             "velocity": float(velocity) if velocity else None,
                             "risk_assessment": risk_assessment,
                             "performance_indicators": performance_indicators,
-                            "confidence_score": float(confidence_score)
-                            if confidence_score
-                            else None,
+                            "confidence_score": (
+                                float(confidence_score) if confidence_score else None
+                            ),
                         }
                     ),
                 )
@@ -429,12 +429,16 @@ class GoalTrackingService:
                     "generated_at": datetime.now().isoformat(),
                     "current_status": {
                         "progress_percentage": float(goal["progress_percentage"]),
-                        "current_value": float(goal["current_value"])
-                        if goal["current_value"]
-                        else None,
-                        "target_value": float(goal["target_value"])
-                        if goal["target_value"]
-                        else None,
+                        "current_value": (
+                            float(goal["current_value"])
+                            if goal["current_value"]
+                            else None
+                        ),
+                        "target_value": (
+                            float(goal["target_value"])
+                            if goal["target_value"]
+                            else None
+                        ),
                         "days_remaining": goal["days_remaining"],
                         "status": goal["calculated_status"],
                     },
@@ -451,9 +455,11 @@ class GoalTrackingService:
                         {
                             "recorded_at": p["recorded_at"].isoformat(),
                             "progress_percentage": float(p["progress_percentage"]),
-                            "current_value": float(p["current_value"])
-                            if p["current_value"]
-                            else None,
+                            "current_value": (
+                                float(p["current_value"])
+                                if p["current_value"]
+                                else None
+                            ),
                             "notes": p["progress_notes"],
                         }
                         for p in progress_history
@@ -682,12 +688,16 @@ class GoalTrackingService:
         """Calculate performance indicators"""
 
         return {
-            "progress_health": "good"
-            if progress_percentage and progress_percentage > 50
-            else "needs_attention",
-            "completion_likelihood": "high"
-            if progress_percentage and progress_percentage > 75
-            else "moderate",
+            "progress_health": (
+                "good"
+                if progress_percentage and progress_percentage > 50
+                else "needs_attention"
+            ),
+            "completion_likelihood": (
+                "high"
+                if progress_percentage and progress_percentage > 75
+                else "moderate"
+            ),
             "resource_efficiency": "optimal",  # Would be calculated based on actual metrics
         }
 
@@ -855,12 +865,10 @@ class GoalTrackingService:
                 await asyncio.sleep(self.risk_calculation_interval_hours * 3600)
 
                 async with self.pool.acquire() as conn:
-                    active_goals = await conn.fetch(
-                        """
+                    active_goals = await conn.fetch("""
                         SELECT id FROM organization_goals 
                         WHERE status IN ('active', 'overdue')
-                    """
-                    )
+                    """)
 
                     for goal in active_goals:
                         try:

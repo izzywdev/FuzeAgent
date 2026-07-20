@@ -139,9 +139,11 @@ class AgentExpertiseTracker:
                     declining_skills_count=expertise_stats["declining_skills"] or 0,
                     memory_usage_stats={
                         "total_memories": memory_stats["total_memories"] or 0,
-                        "avg_confidence": float(memory_stats["avg_confidence"])
-                        if memory_stats["avg_confidence"]
-                        else 0.0,
+                        "avg_confidence": (
+                            float(memory_stats["avg_confidence"])
+                            if memory_stats["avg_confidence"]
+                            else 0.0
+                        ),
                         "total_usage": memory_stats["total_usage"] or 0,
                         "memory_types_used": memory_stats["memory_types_used"] or 0,
                     },
@@ -206,8 +208,7 @@ class AgentExpertiseTracker:
         try:
             async with get_db_connection() as conn:
                 # Overall system stats
-                system_stats = await conn.fetchrow(
-                    """
+                system_stats = await conn.fetchrow("""
                     SELECT 
                         COUNT(DISTINCT a.id) as total_agents,
                         COUNT(DISTINCT ae.skill_area) as total_skill_areas,
@@ -216,24 +217,20 @@ class AgentExpertiseTracker:
                         COUNT(CASE WHEN ae.performance_trend = 'declining' THEN 1 END) as declining_agents
                     FROM agents a
                     LEFT JOIN agent_expertise ae ON a.id = ae.agent_id
-                """
-                )
+                """)
 
                 # Memory system stats
-                memory_stats = await conn.fetchrow(
-                    """
+                memory_stats = await conn.fetchrow("""
                     SELECT 
                         COUNT(*) as total_memories,
                         AVG(confidence_score) as avg_confidence,
                         SUM(usage_count) as total_usage,
                         COUNT(DISTINCT agent_id) as agents_with_memory
                     FROM agent_memory
-                """
-                )
+                """)
 
                 # Top performing skill areas
-                top_skill_areas = await conn.fetch(
-                    """
+                top_skill_areas = await conn.fetch("""
                     SELECT 
                         skill_area,
                         COUNT(*) as agent_count,
@@ -243,19 +240,16 @@ class AgentExpertiseTracker:
                     GROUP BY skill_area
                     ORDER BY avg_expertise DESC, avg_success_rate DESC
                     LIMIT 10
-                """
-                )
+                """)
 
                 # Recent activity
-                recent_activity = await conn.fetchrow(
-                    """
+                recent_activity = await conn.fetchrow("""
                     SELECT 
                         COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as memories_24h,
                         COUNT(CASE WHEN created_at > NOW() - INTERVAL '7 days' THEN 1 END) as memories_7d,
                         COUNT(DISTINCT CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN agent_id END) as active_agents_24h
                     FROM agent_memory
-                """
-                )
+                """)
 
                 return {
                     "system_stats": dict(system_stats) if system_stats else {},

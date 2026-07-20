@@ -2,6 +2,7 @@
 Knowledge Management System for FuzeAgent
 Handles document upload, storage, processing, and RAG integration
 """
+
 import asyncio
 import logging
 import mimetypes
@@ -206,9 +207,11 @@ class KnowledgeManager:
                 status="active",
                 upload_date=datetime.now(),
                 last_modified=datetime.now(),
-                content_preview=extracted_text[:500] + "..."
-                if len(extracted_text) > 500
-                else extracted_text,
+                content_preview=(
+                    extracted_text[:500] + "..."
+                    if len(extracted_text) > 500
+                    else extracted_text
+                ),
                 tags=tags or [],
                 organization_id=organization_id,
                 team_id=team_id,
@@ -281,9 +284,11 @@ class KnowledgeManager:
             # Create metadata
             metadata = DocumentMetadata(
                 id=doc_id,
-                title=title or soup.find("title").get_text()
-                if soup.find("title")
-                else url,
+                title=(
+                    title or soup.find("title").get_text()
+                    if soup.find("title")
+                    else url
+                ),
                 filename=f"url_{doc_id}.html",
                 type="link",
                 mime_type="text/html",
@@ -291,9 +296,11 @@ class KnowledgeManager:
                 status="active",
                 upload_date=datetime.now(),
                 last_modified=datetime.now(),
-                content_preview=extracted_text[:500] + "..."
-                if len(extracted_text) > 500
-                else extracted_text,
+                content_preview=(
+                    extracted_text[:500] + "..."
+                    if len(extracted_text) > 500
+                    else extracted_text
+                ),
                 tags=tags or [],
                 source_url=url,
                 organization_id=organization_id,

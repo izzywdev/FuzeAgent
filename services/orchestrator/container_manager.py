@@ -2,6 +2,7 @@
 Container Management System for FuzeAgent
 Handles Docker container lifecycle for AI agents
 """
+
 import asyncio
 import json
 import logging
@@ -584,9 +585,9 @@ class ContainerManager:
                 for container_port, host_bindings in network_settings["Ports"].items():
                     if host_bindings:
                         for binding in host_bindings:
-                            ports[
-                                container_port
-                            ] = f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"
+                            ports[container_port] = (
+                                f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"
+                            )
 
             # Get health status
             health = None

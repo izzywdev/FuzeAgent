@@ -321,9 +321,11 @@ class TeamKnowledgeManager:
                 {
                     "id": result.team_knowledge.id,
                     "title": result.team_knowledge.title,
-                    "content": result.team_knowledge.content[:500] + "..."
-                    if len(result.team_knowledge.content) > 500
-                    else result.team_knowledge.content,
+                    "content": (
+                        result.team_knowledge.content[:500] + "..."
+                        if len(result.team_knowledge.content) > 500
+                        else result.team_knowledge.content
+                    ),
                     "category": result.team_knowledge.knowledge_category.value,
                     "relevance_score": result.combined_score,
                     "usage_stats": {
@@ -766,9 +768,11 @@ class TeamKnowledgeManager:
             agent_adoption_rate=row["agent_adoption_rate"],
             effectiveness_score=row["effectiveness_score"],
             visibility_level=VisibilityLevel(row["visibility_level"]),
-            metadata=json.loads(row["metadata"])
-            if isinstance(row["metadata"], str)
-            else row["metadata"],
+            metadata=(
+                json.loads(row["metadata"])
+                if isinstance(row["metadata"], str)
+                else row["metadata"]
+            ),
             tags=row["tags"] or [],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
