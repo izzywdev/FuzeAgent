@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/izzywdev/FuzeAgent/agent-templates/contracts/a2a/v1/schema/manifest-a2a-extension.schema.json",
+  "title": "A2A additions to .fuze/manifest.json",
+  "description": "NORMATIVE schema for the manifest fields the A2A card projection and the authZ allowlist read. This is an ADDITIVE extension to the existing per-repo .fuze/manifest.json; it does not redefine the manifest. Fields already present family-wide (repo, tier, expert) are declared here only because the projection depends on them.\n\nIMPORTANT — VERIFIED GAP: `dependsOn`/`providesTo` are NOT universally present. As of freezing they exist on 4 of the surveyed repos (FuzeBI, FuzeExecutive, FuzeSales, FuzeService) and are ABSENT from FuzeAgent, FuzeInfra, FuzeFront, FuzeKeys, FuzePlan, FuzeContact, FuzeHub, FuzeSocial, FuzeDeploy, FuzeSDLC. Backfilling them is a precondition for enabling A2A on those repos, tracked as a devops/platform-governance task — NOT part of this contract PR. Until a repo declares them, the callee MUST deny (see authz.md §4, fail-closed).",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+      "description": "owner/name. The repo NAME (segment after '/') is the canonical agent identity used as the A2A `tenant` and as the allowlist principal."
+    },
+    "tier": {
+      "enum": ["product", "infra", "governance", "exec"],
+      "description": "Selects the projection variant. `product`/`infra` project product cards; `exec` projects an exec-tier card. Repos that serve exec roles WITHOUT being tier `exec` are handled by role-level `metadata.tier == \"executive\"` (see card-projection.md §5)."
+    },
+    "expert": {
+      "type": "string",
+      "description": "The repo's `<repo>-expert` agent. Projected into the card description as the authority the callee consults; never exposed as a callable skill."
+    },
+    "dependsOn": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repoName" },
+      "description": "Repos THIS repo may call. Read by the CALLER only as a sanity check; it is NOT an authorization grant — grants come exclusively from the callee's `providesTo`."
+    },
+    "providesTo": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repoName" },
+      "description": "AUTHORITATIVE ALLOWLIST. The set of caller identities this repo's A2A agent will accept tasks from. The callee enforces this; see authz.md. An empty array means 'accept no agent callers' and is a valid, meaningful value. An ABSENT array is NOT the same as empty — absent means unconfigured and MUST fail closed."
+    },
+    "a2a": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional per-repo A2A overrides. Everything here has a derived default; a repo that sets nothing still gets a valid card.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this repo publishes an A2A agent surface at all. Mirrors the Helm `enabled` gate (values-interface.schema.json)."
+        },
+        "servingRoles": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+          "description": "Role keys (from agent-templates/roles/) projected into card `skills`. Default: every role in the repo EXCEPT `_base` and any role whose manifest sets `coordinator: true`. Order is preserved and becomes skill order."
+        },
+        "entryRole": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+$",
+          "description": "The role that receives an incoming SendMessage when the caller names no skill. Default: the repo's coordinator role if one exists, else the first entry of servingRoles."
+        },
+        "documentationUrl": { "type": "string", "format": "uri" },
+        "iconUrl": { "type": "string", "format": "uri" },
+        "external": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true the card is ALSO published through the Cloudflare tunnel with an https:// interface URL and Cloudflare Access in front. Default false = in-cluster service DNS only."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "repoName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+$",
+      "description": "Bare repo name (e.g. 'FuzePlan'), matching the segment after '/' in `repo`."
+    }
+  }
+}
