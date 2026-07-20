@@ -2,21 +2,23 @@
 RAG (Retrieval-Augmented Generation) Integration for FuzeAgent
 Handles vector embeddings, similarity search, and context retrieval for AI agents
 """
-import os
-import json
-import uuid
-import logging
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+
 import asyncio
+import json
+import logging
+import os
+import uuid
+from datetime import datetime
 from pathlib import Path
-import numpy as np
-from sentence_transformers import SentenceTransformer
+from typing import Any, Dict, List, Optional, Tuple
+
 import chromadb
+import numpy as np
 from chromadb.config import Settings
 from pydantic import BaseModel, Field
+from sentence_transformers import SentenceTransformer
 
-from knowledge_manager import knowledge_manager, DocumentMetadata
+from knowledge_manager import DocumentMetadata, knowledge_manager
 
 logger = logging.getLogger(__name__)
 

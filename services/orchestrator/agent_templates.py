@@ -3,8 +3,8 @@ Agent Templates System for FuzeAgent
 Defines standardized agent configurations with specialized prompts and capabilities
 """
 
-from typing import Dict, List, Any
 from enum import Enum
+from typing import Any, Dict, List
 
 
 class AgentCategory(Enum):

@@ -11,21 +11,21 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 from sentence_transformers import SentenceTransformer
 
+from .knowledge_propagation_engine import KnowledgePropagationEngine, PropagationTrigger
 from .organization_rag_manager import (
-    OrganizationRAGManager,
-    KnowledgeCategory,
     ContentType,
+    KnowledgeCategory,
+    OrganizationRAGManager,
     SourceType,
 )
 from .team_knowledge_manager import TeamKnowledgeManager
-from .knowledge_propagation_engine import KnowledgePropagationEngine, PropagationTrigger
 
 logger = logging.getLogger(__name__)
 

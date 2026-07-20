@@ -4,6 +4,8 @@ Created: 2025-01-29T12:00:03
 Description: Seeds the database with default organization, team, and essential data
 """
 
+import json
+
 # Default IDs for consistent referencing
 DEFAULT_ORG_ID = "550e8400-e29b-41d4-a716-446655440000"
 DEFAULT_TEAM_ID = "550e8400-e29b-41d4-a716-446655440001"
@@ -22,11 +24,13 @@ async def upgrade(conn):
         DEFAULT_ORG_ID,
         "Default Organization",
         "Default organization for initial setup",
-        {
-            "created_by": "system",
-            "is_default": True,
-            "features": ["agents", "teams", "tasks", "templates"],
-        },
+        json.dumps(
+            {
+                "created_by": "system",
+                "is_default": True,
+                "features": ["agents", "teams", "tasks", "templates"],
+            }
+        ),
     )
 
     # Insert default team
@@ -41,7 +45,7 @@ async def upgrade(conn):
         "Default Team",
         "Default team for initial setup",
         "general",
-        {"created_by": "system", "is_default": True, "max_agents": 50},
+        json.dumps({"created_by": "system", "is_default": True, "max_agents": 50}),
     )
 
     # Insert sample AI CEO agent for demonstration
@@ -56,20 +60,22 @@ async def upgrade(conn):
         "Digital Chief Executive Officer",
         "executive",
         "active",
-        {
-            "goal": "Lead the organization with strategic vision and efficient resource allocation",
-            "backstory": "An AI executive with expertise in strategic planning, team management, and business operations",
-            "model": "claude-sonnet-4-20250514",
-            "temperature": 0.7,
-            "tools": [
-                "strategic_planning",
-                "resource_allocation",
-                "team_management",
-                "decision_making",
-            ],
-            "skills": ["leadership", "strategy", "communication", "analysis"],
-            "personality": "Strategic, decisive, and collaborative",
-        },
+        json.dumps(
+            {
+                "goal": "Lead the organization with strategic vision and efficient resource allocation",
+                "backstory": "An AI executive with expertise in strategic planning, team management, and business operations",
+                "model": "claude-sonnet-4-20250514",
+                "temperature": 0.7,
+                "tools": [
+                    "strategic_planning",
+                    "resource_allocation",
+                    "team_management",
+                    "decision_making",
+                ],
+                "skills": ["leadership", "strategy", "communication", "analysis"],
+                "personality": "Strategic, decisive, and collaborative",
+            }
+        ),
         "ai_human_manager",
     )
 

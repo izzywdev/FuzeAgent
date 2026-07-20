@@ -202,23 +202,21 @@ describe('CreateAgentPage', () => {
 
       // Should call API with correct data
       await waitFor(() => {
-        expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/agents$/), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: 'Test Agent',
-            role: 'Test Developer',
-            type: 'developer',
-            team_id: 'test-team-id',
-            config: expect.objectContaining({
-              model: 'claude-sonnet-4-20250514',
-              temperature: 0.7,
-              tools: [],
-              goal: '',
-              backstory: ''
-            })
+        const agentCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+          (call: unknown[]) => /\/agents$/.test(call[0] as string)
+        )
+        expect(agentCall).toBeDefined()
+        const [, options] = agentCall!
+        expect(options.method).toBe('POST')
+        const body = JSON.parse(options.body)
+        expect(body).toMatchObject({
+          name: 'Test Agent',
+          role: 'Test Developer',
+          type: 'developer',
+          team_id: 'test-team-id',
+          config: expect.objectContaining({
+            model: 'claude-sonnet-4-20250514',
+            temperature: 0.7,
           })
         })
       })

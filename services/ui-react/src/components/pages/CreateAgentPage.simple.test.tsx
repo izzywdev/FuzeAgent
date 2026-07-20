@@ -119,6 +119,47 @@ describe('CreateAgentPage - Simple Tests', () => {
     })
   })
 
+  describe('Configuration Fields', () => {
+    beforeEach(async () => {
+      mockFetch.success(mockApiResponses.teams)
+      mockFetch.success(mockApiResponses.templates)
+
+      renderWithRouter(<CreateAgentPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Create New Agent')).toBeInTheDocument()
+      })
+    })
+
+    it('should update model selection', async () => {
+      const modelSelect = screen.getByLabelText(/Model/)
+      await user.selectOptions(modelSelect, 'claude-3-opus-20240229')
+      expect(modelSelect).toHaveValue('claude-3-opus-20240229')
+    })
+
+    it('should update goal textarea', async () => {
+      const goalTextarea = screen.getByLabelText(/Goal/)
+      await user.clear(goalTextarea)
+      await user.type(goalTextarea, 'Build amazing software')
+      expect(goalTextarea).toHaveValue('Build amazing software')
+    })
+
+    it('should update backstory textarea', async () => {
+      const backstoryTextarea = screen.getByLabelText(/Backstory/)
+      await user.clear(backstoryTextarea)
+      await user.type(backstoryTextarea, 'Experienced developer')
+      expect(backstoryTextarea).toHaveValue('Experienced developer')
+    })
+
+    it('should toggle tool selection', async () => {
+      const codeGenCheckbox = screen.getByRole('checkbox', { name: /code generation/i })
+      await user.click(codeGenCheckbox)
+      expect(codeGenCheckbox).toBeChecked()
+      await user.click(codeGenCheckbox)
+      expect(codeGenCheckbox).not.toBeChecked()
+    })
+  })
+
   describe('API Integration', () => {
     beforeEach(async () => {
       mockFetch.success(mockApiResponses.teams)
@@ -144,8 +185,8 @@ describe('CreateAgentPage - Simple Tests', () => {
       await user.type(nameInput, 'Test Agent')
       await user.type(roleInput, 'Test Developer')
 
-      // Select team
-      const teamSelect = screen.getByDisplayValue('') // Empty select initially
+      // Select team (use label association to avoid ambiguity with other selects)
+      const teamSelect = screen.getByRole('combobox', { name: /team assignment/i })
       await user.selectOptions(teamSelect, 'test-team-id')
 
       // Mock API response

@@ -16,20 +16,20 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
-from .database import get_db_connection, DatabaseManager
-from .sandbox_manager import AgentSandboxManager, Sandbox
-from .git_workflow_manager import GitWorkflowManager
 from .claude_code_wrapper import ClaudeCodeWrapper
-from .conversation_manager import ConversationManager, InteractionType
-from .file_operations_engine import FileOperationsEngine
 from .claude_sdk_manager import ClaudeSDKManager, ClaudeSDKSession
-from .task_knowledge_extractor import TaskKnowledgeExtractor
 from .context_enhancement_service import ContextEnhancementService
+from .conversation_manager import ConversationManager, InteractionType
+from .database import DatabaseManager, get_db_connection
+from .file_operations_engine import FileOperationsEngine
+from .git_workflow_manager import GitWorkflowManager
+from .sandbox_manager import AgentSandboxManager, Sandbox
+from .task_knowledge_extractor import TaskKnowledgeExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -258,13 +258,13 @@ class TaskExecutionEngine:
             "current_iteration": execution.current_iteration,
             "iterations_count": len(execution.iterations),
             "started_at": execution.started_at.isoformat(),
-            "completed_at": execution.completed_at.isoformat()
-            if execution.completed_at
-            else None,
+            "completed_at": (
+                execution.completed_at.isoformat() if execution.completed_at else None
+            ),
             "sandbox_id": execution.sandbox.sandbox_id if execution.sandbox else None,
-            "git_branch": execution.git_manager.feature_branch
-            if execution.git_manager
-            else None,
+            "git_branch": (
+                execution.git_manager.feature_branch if execution.git_manager else None
+            ),
             "result": execution.result,
             "error": execution.error,
             "active_execution": True,
@@ -285,9 +285,9 @@ class TaskExecutionEngine:
                 "iteration_number": it.iteration_number,
                 "step": it.step.value if hasattr(it.step, "value") else str(it.step),
                 "started_at": it.started_at.isoformat(),
-                "completed_at": it.completed_at.isoformat()
-                if it.completed_at
-                else None,
+                "completed_at": (
+                    it.completed_at.isoformat() if it.completed_at else None
+                ),
                 "success": it.success,
                 "error_message": it.error_message,
                 "human_question": it.human_question,
@@ -651,9 +651,9 @@ class TaskExecutionEngine:
             "task_description": task_description,
             "task_title": task_title,
             "iteration_number": iteration.iteration_number,
-            "workspace_path": execution.sandbox.workspace_path
-            if execution.sandbox
-            else None,
+            "workspace_path": (
+                execution.sandbox.workspace_path if execution.sandbox else None
+            ),
         }
 
         try:
@@ -684,9 +684,11 @@ Work incrementally and ask for clarification if needed.
                     await execution.claude_sdk_manager.start_session(
                         task_id=execution.task_id,
                         agent_id=execution.agent_id,
-                        workspace_path=execution.git_manager.workspace_path
-                        if execution.git_manager
-                        else execution.sandbox.workspace_path,
+                        workspace_path=(
+                            execution.git_manager.workspace_path
+                            if execution.git_manager
+                            else execution.sandbox.workspace_path
+                        ),
                         task_description=task_prompt,
                         additional_context=context_info,
                     )
@@ -889,9 +891,9 @@ Approve these changes? (yes/no)"""
             "completed_at": execution.completed_at.isoformat(),
             "pull_request_url": pr_url,
             "sandbox_id": execution.sandbox.sandbox_id if execution.sandbox else None,
-            "git_branch": execution.git_manager.feature_branch
-            if execution.git_manager
-            else None,
+            "git_branch": (
+                execution.git_manager.feature_branch if execution.git_manager else None
+            ),
         }
 
         # Update database
@@ -1145,12 +1147,14 @@ Approve these changes? (yes/no)"""
                         step=ExecutionStep(row["step"]),
                         started_at=row["started_at"],
                         completed_at=row["completed_at"],
-                        input_data=json.loads(row["input_data"])
-                        if row["input_data"]
-                        else {},
-                        output_data=json.loads(row["output_data"])
-                        if row["output_data"]
-                        else None,
+                        input_data=(
+                            json.loads(row["input_data"]) if row["input_data"] else {}
+                        ),
+                        output_data=(
+                            json.loads(row["output_data"])
+                            if row["output_data"]
+                            else None
+                        ),
                         success=row["success"],
                         error_message=row["error_message"],
                         human_question=row["human_question"],

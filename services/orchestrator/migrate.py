@@ -11,14 +11,14 @@ Usage:
     python migrate.py reset                     # Reset database (DANGER!)
 """
 
+import argparse
 import asyncio
-import sys
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
-import argparse
 
-from migration_manager import MigrationManager, migrate, rollback, status, reset
+from migration_manager import MigrationManager, migrate, reset, rollback, status
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql://postgres:password@localhost:5434/ai_context"

@@ -1,45 +1,89 @@
+import asyncio
+import json
+import logging
+import os
+from collections import defaultdict
+from contextlib import asynccontextmanager
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
+
+import jwt
 from fastapi import (
-    FastAPI,
-    WebSocket,
-    HTTPException,
-    Query,
-    Path,
     Body,
-    UploadFile,
+    Depends,
+    FastAPI,
     File,
     Form,
+    HTTPException,
+    Path,
+    Query,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
-import asyncio
-import os
-import logging
-from datetime import datetime, date
-from decimal import Decimal
-from contextlib import asynccontextmanager
-from .agent_manager import AgentManager
-from .task_queue import TaskQueue
-from .context_service import ContextService
-from .sandbox_manager import AgentSandboxManager
-from .task_execution_engine import TaskExecutionEngine
-from .database import get_db_connection
-from .knowledge_manager import knowledge_manager, DocumentMetadata
-from .container_manager import container_manager, ContainerStatus, ContainerConfig
-from .rag_integration import rag_system, RAGContext
-from .websocket_manager import (
-    websocket_manager,
-    WebSocketUpdate,
-    UpdateType,
-    notify_agent_status_change,
-    notify_task_progress,
-    notify_container_status_change,
-    notify_knowledge_update,
-)
+
 from hierarchy_endpoints import router as hierarchy_router
 
+from .agent_manager import AgentManager
+from .container_manager import ContainerConfig, ContainerStatus, container_manager
+from .context_service import ContextService
+from .database import get_db_connection
+from .knowledge_manager import DocumentMetadata, knowledge_manager
+from .rag_integration import RAGContext, rag_system
+from .sandbox_manager import AgentSandboxManager
+from .task_execution_engine import TaskExecutionEngine
+from .task_queue import TaskQueue
+from .websocket_manager import (
+    UpdateType,
+    WebSocketUpdate,
+    notify_agent_status_change,
+    notify_container_status_change,
+    notify_knowledge_update,
+    notify_task_progress,
+    websocket_manager,
+)
+
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Auth helpers (Track 3)
+# ---------------------------------------------------------------------------
+_security = HTTPBearer(auto_error=False)
+_jwt_secret = os.environ.get("FUZEFRONT_JWT_SECRET", "")
+
+
+def require_auth(credentials: HTTPAuthorizationCredentials = Depends(_security)):
+    """Verify FuzeFront JWT on mutating endpoints. Disabled when secret not set (dev)."""
+    if not _jwt_secret:
+        return None  # Auth disabled when secret not configured (dev mode)
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token"
+        )
+    try:
+        payload = jwt.decode(credentials.credentials, _jwt_secret, algorithms=["HS256"])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Agent relay state (Track 4)
+# ---------------------------------------------------------------------------
+# agent_id -> list of subscriber WebSockets watching that agent's session
+agent_relay_subscribers: Dict[str, List[WebSocket]] = defaultdict(list)
 
 
 # Pydantic models for API documentation
@@ -367,12 +411,12 @@ async def lifespan(app: FastAPI):
 
     # Initialize knowledge management system
     try:
-        from .organization_rag_manager import OrganizationRAGManager
-        from .team_knowledge_manager import TeamKnowledgeManager
-        from .knowledge_propagation_engine import KnowledgePropagationEngine
-        from .knowledge_notification_service import KnowledgeNotificationService
-        from .task_knowledge_extractor import TaskKnowledgeExtractor
         from .context_enhancement_service import ContextEnhancementService
+        from .knowledge_notification_service import KnowledgeNotificationService
+        from .knowledge_propagation_engine import KnowledgePropagationEngine
+        from .organization_rag_manager import OrganizationRAGManager
+        from .task_knowledge_extractor import TaskKnowledgeExtractor
+        from .team_knowledge_manager import TeamKnowledgeManager
 
         app.state.org_rag_manager = OrganizationRAGManager(database_url)
         await app.state.org_rag_manager.initialize()
@@ -414,10 +458,10 @@ async def lifespan(app: FastAPI):
 
     # Initialize goals management system
     try:
-        from .goals_management_service import GoalsManagementService
-        from .milestone_task_engine import MilestoneTaskEngine
         from .goal_conversation_service import GoalConversationService
         from .goal_tracking_service import GoalTrackingService
+        from .goals_management_service import GoalsManagementService
+        from .milestone_task_engine import MilestoneTaskEngine
 
         app.state.goals_service = GoalsManagementService(database_url)
         await app.state.goals_service.initialize()
@@ -825,9 +869,11 @@ async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str)
                                 "batch_id": batch.batch_id,
                                 "description": batch.description,
                                 "operations_count": len(batch.operations),
-                                "applied_at": batch.applied_at.isoformat()
-                                if batch.applied_at
-                                else None,
+                                "applied_at": (
+                                    batch.applied_at.isoformat()
+                                    if batch.applied_at
+                                    else None
+                                ),
                                 "timestamp": batch.created_at.isoformat(),
                             }
                         )
@@ -868,7 +914,7 @@ async def file_operations_websocket_endpoint(websocket: WebSocket, task_id: str)
     description="Create a new AI agent with repository and sandbox settings",
     response_model=AgentResponse,
 )
-async def create_agent(agent_config: AgentCreateRequest):
+async def create_agent(agent_config: AgentCreateRequest, _auth=Depends(require_auth)):
     """Create a new AI agent with repository and sandbox settings"""
     try:
         agent = await app.state.agent_manager.create_agent(**agent_config)
@@ -882,9 +928,9 @@ async def create_agent(agent_config: AgentCreateRequest):
                 "type": agent_config.get("type"),
                 "repository_settings": agent_config.get("repository_settings", {}),
                 "sandbox_settings": agent_config.get("sandbox_settings", {}),
-                "created_at": agent.created_at
-                if hasattr(agent, "created_at")
-                else None,
+                "created_at": (
+                    agent.created_at if hasattr(agent, "created_at") else None
+                ),
             },
         }
     except Exception as e:
@@ -912,6 +958,7 @@ async def list_agents():
 async def assign_task(
     agent_id: str = Path(..., description="Agent ID"),
     task: TaskCreateRequest = Body(...),
+    _auth=Depends(require_auth),
 ):
     """Assign a task to an agent"""
     task_id = await app.state.task_queue.assign_task(agent_id, task)
@@ -1731,9 +1778,9 @@ async def get_task_file_operations(
                     "approval_status": batch.approval_status.value,
                     "operations_count": len(batch.operations),
                     "created_at": batch.created_at.isoformat(),
-                    "applied_at": batch.applied_at.isoformat()
-                    if batch.applied_at
-                    else None,
+                    "applied_at": (
+                        batch.applied_at.isoformat() if batch.applied_at else None
+                    ),
                 }
             )
 
@@ -2318,6 +2365,50 @@ async def coordination_websocket_endpoint(websocket: WebSocket, session_id: str)
         await websocket.close()
 
 
+# ---------------------------------------------------------------------------
+# Agent relay WebSocket (Track 4)
+# ---------------------------------------------------------------------------
+@app.websocket("/agent-relay/{agent_id}")
+async def agent_relay_endpoint(websocket: WebSocket, agent_id: str):
+    """
+    Agent pods connect here to stream their session output.
+    Dashboard clients connect here to watch a specific agent's session.
+    Both use the same endpoint — first JSON message determines role:
+      {"role": "agent"}      -> agent pod streaming output
+      {"role": "subscriber"} -> human dashboard watcher (default)
+    """
+    await websocket.accept()
+    role = None
+    try:
+        init_msg = await websocket.receive_json()
+        role = init_msg.get("role", "subscriber")
+
+        if role == "agent":
+            # Stream from agent pod to all subscribers
+            async for data in websocket.iter_json():
+                msg = {"agentId": agent_id, **data}
+                dead = []
+                for sub in list(agent_relay_subscribers[agent_id]):
+                    try:
+                        await sub.send_json(msg)
+                    except Exception:
+                        dead.append(sub)
+                for d in dead:
+                    agent_relay_subscribers[agent_id].remove(d)
+        else:
+            # Human dashboard subscriber — wait for messages from agent
+            agent_relay_subscribers[agent_id].append(websocket)
+            await websocket.receive_text()  # keep alive until disconnect
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.warning(f"agent-relay {agent_id}: {e}")
+    finally:
+        subs = agent_relay_subscribers.get(agent_id, [])
+        if role != "agent" and websocket in subs:
+            subs.remove(websocket)
+
+
 # Model Configuration and API Key Management Endpoints
 @app.post(
     "/organizations/{organization_id}/providers/{provider}/credentials",
@@ -2332,7 +2423,7 @@ async def store_provider_credentials(
 ):
     """Store encrypted API credentials for a model provider at organization level"""
     try:
-        from .model_configuration import model_config_manager, ModelProvider
+        from .model_configuration import ModelProvider, model_config_manager
 
         # Validate provider
         try:
@@ -2382,9 +2473,9 @@ async def get_available_models(
     """Get available AI models with provider credential validation"""
     try:
         from .model_configuration import (
-            model_config_manager,
-            ModelProvider,
             ModelCapability,
+            ModelProvider,
+            model_config_manager,
         )
 
         provider_filter = None
@@ -2437,7 +2528,7 @@ async def configure_agent_model(
 ):
     """Configure model settings for an AI agent"""
     try:
-        from .model_configuration import model_config_manager, AgentModelConfig
+        from .model_configuration import AgentModelConfig, model_config_manager
 
         agent_config = AgentModelConfig(
             agent_id=agent_id,
@@ -2592,7 +2683,7 @@ async def get_model_recommendations(
 ):
     """Get model recommendations based on task capabilities and cost constraints"""
     try:
-        from .model_configuration import model_config_manager, ModelCapability
+        from .model_configuration import ModelCapability, model_config_manager
 
         # Parse capabilities
         try:
@@ -2821,7 +2912,12 @@ async def add_organizational_knowledge(
 ):
     """Add knowledge to organization-level knowledge base"""
     try:
-        from .organization_rag_manager import ContentType, KnowledgeCategory, SourceType
+        from .organization_rag_manager import (
+            ContentType,
+            KnowledgeCategory,
+            OrganizationRAGManager,
+            SourceType,
+        )
 
         # Initialize services if not already done
         if not hasattr(app.state, "org_rag_manager"):
@@ -2912,9 +3008,11 @@ async def search_organizational_knowledge(
                 {
                     "knowledge_id": result.knowledge.id,
                     "title": result.knowledge.title,
-                    "content_preview": result.knowledge.content[:200] + "..."
-                    if len(result.knowledge.content) > 200
-                    else result.knowledge.content,
+                    "content_preview": (
+                        result.knowledge.content[:200] + "..."
+                        if len(result.knowledge.content) > 200
+                        else result.knowledge.content
+                    ),
                     "category": result.knowledge.knowledge_category.value,
                     "content_type": result.knowledge.content_type.value,
                     "similarity_score": result.similarity_score,
@@ -3020,9 +3118,11 @@ async def get_enhanced_context_for_agent(
                     "category": item.category,
                     "relevance_score": item.relevance_score,
                     "confidence_score": item.confidence_score,
-                    "content_preview": item.content[:200] + "..."
-                    if len(item.content) > 200
-                    else item.content,
+                    "content_preview": (
+                        item.content[:200] + "..."
+                        if len(item.content) > 200
+                        else item.content
+                    ),
                 }
                 for item in enhanced_context.organizational_knowledge
             ],
@@ -3033,9 +3133,11 @@ async def get_enhanced_context_for_agent(
                     "category": item.category,
                     "relevance_score": item.relevance_score,
                     "confidence_score": item.confidence_score,
-                    "content_preview": item.content[:200] + "..."
-                    if len(item.content) > 200
-                    else item.content,
+                    "content_preview": (
+                        item.content[:200] + "..."
+                        if len(item.content) > 200
+                        else item.content
+                    ),
                 }
                 for item in enhanced_context.team_knowledge
             ],
@@ -3699,13 +3801,13 @@ async def list_organization_goals(
                     "goal_type": goal.goal_type.value,
                     "status": goal.status.value,
                     "progress_percentage": float(goal.progress_percentage),
-                    "target_value": float(goal.target_value)
-                    if goal.target_value
-                    else None,
+                    "target_value": (
+                        float(goal.target_value) if goal.target_value else None
+                    ),
                     "target_unit": goal.target_unit,
-                    "current_value": float(goal.current_value)
-                    if goal.current_value
-                    else None,
+                    "current_value": (
+                        float(goal.current_value) if goal.current_value else None
+                    ),
                     "target_deadline": goal.target_deadline.isoformat(),
                     "priority_level": goal.priority_level,
                     "completion_confidence": float(goal.completion_confidence),
@@ -3749,9 +3851,11 @@ async def get_goal(goal_id: str = Path(..., description="Goal ID")):
             "success_criteria": goal.success_criteria,
             "start_date": goal.start_date.isoformat(),
             "target_deadline": goal.target_deadline.isoformat(),
-            "actual_completion_date": goal.actual_completion_date.isoformat()
-            if goal.actual_completion_date
-            else None,
+            "actual_completion_date": (
+                goal.actual_completion_date.isoformat()
+                if goal.actual_completion_date
+                else None
+            ),
             "priority_level": goal.priority_level,
             "completion_confidence": float(goal.completion_confidence),
             "assigned_teams": goal.assigned_teams,
@@ -4236,7 +4340,7 @@ async def get_goal_conversations(
 ):
     """Get conversations for a goal"""
     try:
-        from .goal_conversation_service import ConversationType, ConversationStatus
+        from .goal_conversation_service import ConversationStatus, ConversationType
 
         conv_type = ConversationType(conversation_type) if conversation_type else None
         conv_status = ConversationStatus(status) if status else None

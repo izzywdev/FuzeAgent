@@ -18,10 +18,10 @@ import asyncio
 import json
 import logging
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Set, Tuple
-from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .database import DatabaseManager
 from .task_execution_engine import TaskExecutionEngine, TaskStatus
@@ -280,12 +280,12 @@ class MultiAgentCoordinator:
             "subtasks": subtask_statuses,
             "communications_count": len(session.communications),
             "started_at": session.started_at.isoformat(),
-            "completed_at": session.completed_at.isoformat()
-            if session.completed_at
-            else None,
-            "estimated_completion": session.plan.estimated_completion.isoformat()
-            if session.plan
-            else None,
+            "completed_at": (
+                session.completed_at.isoformat() if session.completed_at else None
+            ),
+            "estimated_completion": (
+                session.plan.estimated_completion.isoformat() if session.plan else None
+            ),
         }
 
     async def send_agent_communication(

@@ -2,18 +2,20 @@
 Container Management System for FuzeAgent
 Handles Docker container lifecycle for AI agents
 """
-import docker
+
 import asyncio
+import json
 import logging
 import os
-import json
-from typing import Dict, List, Optional, Any, AsyncGenerator
-from datetime import datetime, timedelta
-from pydantic import BaseModel, Field
-import aiofiles
 import threading
 import time
-from docker.errors import DockerException, NotFound, APIError
+from datetime import datetime, timedelta
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+import aiofiles
+import docker
+from docker.errors import APIError, DockerException, NotFound
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -583,9 +585,9 @@ class ContainerManager:
                 for container_port, host_bindings in network_settings["Ports"].items():
                     if host_bindings:
                         for binding in host_bindings:
-                            ports[
-                                container_port
-                            ] = f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"
+                            ports[container_port] = (
+                                f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"
+                            )
 
             # Get health status
             health = None

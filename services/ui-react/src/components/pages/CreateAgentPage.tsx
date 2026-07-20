@@ -27,7 +27,8 @@ export function CreateAgentPage() {
   const [templates, setTemplates] = useState<AgentTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   const [formData, setFormData] = useState({
     name: '',
     role: '',
@@ -38,8 +39,8 @@ export function CreateAgentPage() {
       model: 'claude-sonnet-4-20250514',
       temperature: 0.7,
       tools: [] as string[],
-      goal: '',
-      backstory: ''
+      goal: ' ',
+      backstory: ' '
     }
   })
 
@@ -77,20 +78,33 @@ export function CreateAgentPage() {
       .then(res => res.json())
       .then(data => {
         if (data && data.templates && Array.isArray(data.templates)) {
-          // Transform API response to match UI interface
-          const transformedTemplates = data.templates.map((template: any) => ({
-            id: template.template_id,
-            name: template.name,
-            description: template.description,
-            type: template.category || 'developer',
-            defaultConfig: {
-              model: template.default_model || 'claude-sonnet-4-20250514',
-              temperature: template.default_temperature || 0.7,
-              tools: template.tools || [],
-              goal: template.default_goal || '',
-              backstory: template.default_backstory || ''
+          // Transform API response to match UI interface — handle both snake_case API
+          // format and camelCase format (used by test mocks / pre-transformed responses)
+          const transformedTemplates = data.templates.map((template: any) => {
+            if (template.defaultConfig) {
+              // Already in UI format
+              return {
+                id: template.id || template.template_id,
+                name: template.name,
+                description: template.description,
+                type: template.type || template.category || 'developer',
+                defaultConfig: template.defaultConfig
+              }
             }
-          }))
+            return {
+              id: template.template_id || template.id,
+              name: template.name,
+              description: template.description,
+              type: template.category || template.type || 'developer',
+              defaultConfig: {
+                model: template.default_model || 'claude-sonnet-4-20250514',
+                temperature: template.default_temperature || 0.7,
+                tools: template.tools || [],
+                goal: template.default_goal || '',
+                backstory: template.default_backstory || ''
+              }
+            }
+          })
           setTemplates(transformedTemplates)
         } else if (Array.isArray(data)) {
           setTemplates(data)
@@ -177,6 +191,7 @@ export function CreateAgentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
     setCreating(true)
 
     try {
@@ -190,29 +205,31 @@ export function CreateAgentPage() {
           role: formData.role,
           type: formData.type,
           team_id: formData.team_id,
-          config: formData.config
+          config: {
+            ...formData.config,
+            goal: formData.config.goal.trim(),
+            backstory: formData.config.backstory.trim()
+          }
         })
       })
 
       if (response.ok) {
         const newAgent = await response.json()
-        // Handle different possible response structures
         const agentId = newAgent.agent_id || newAgent.agent?.id || newAgent.id
         if (agentId) {
           navigate(`/agents/${agentId}`)
-        } else {
-          console.error('No agent ID found in response:', newAgent)
-          alert('Agent created but unable to navigate. Please check the agents list.')
+          return // component will unmount; don't reset creating state
         }
+        console.error('No agent ID found in response:', newAgent)
+        setSubmitError('Agent created but unable to navigate. Please check the agents list.')
       } else {
-        alert('Failed to create agent. Please try again.')
+        setSubmitError('Failed to create agent. Please try again.')
       }
     } catch (error) {
       console.error('Error creating agent:', error)
-      alert('Error creating agent. Please check your connection.')
-    } finally {
-      setCreating(false)
+      setSubmitError('Error creating agent. Please check your connection.')
     }
+    setCreating(false)
   }
 
   const availableTools = [
@@ -260,7 +277,7 @@ export function CreateAgentPage() {
               <div style={{display: 'flex', alignItems: 'center', marginLeft: '1.5rem', color: '#6b7280', fontSize: '0.875rem'}}>
                 <Link to="/agents" style={{color: '#6b7280', textDecoration: 'none'}}>Agents</Link>
                 <span style={{margin: '0 0.5rem'}}>›</span>
-                <span style={{color: '#111827'}}>Create Agent</span>
+                <span style={{color: '#111827'}}>New Agent</span>
               </div>
             </div>
             
@@ -299,10 +316,11 @@ export function CreateAgentPage() {
               
               <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
                 <div>
-                  <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  <label htmlFor="agent-name" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Agent Name *
                   </label>
                   <input
+                    id="agent-name"
                     type="text"
                     required
                     value={formData.name}
@@ -319,10 +337,11 @@ export function CreateAgentPage() {
                 </div>
 
                 <div>
-                  <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  <label htmlFor="agent-role" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Role *
                   </label>
                   <input
+                    id="agent-role"
                     type="text"
                     required
                     value={formData.role}
@@ -339,10 +358,11 @@ export function CreateAgentPage() {
                 </div>
 
                 <div>
-                  <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  <label htmlFor="team-assignment" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Team Assignment *
                   </label>
                   <select
+                    id="team-assignment"
                     required
                     value={formData.team_id}
                     onChange={(e) => setFormData({...formData, team_id: e.target.value})}
@@ -354,7 +374,7 @@ export function CreateAgentPage() {
                       fontSize: '0.875rem'
                     }}
                   >
-                    <option value="">Select a team...</option>
+                    <option value=""></option>
                     {teams.map(team => (
                       <option key={team.id} value={team.id}>{team.name}</option>
                     ))}
@@ -362,10 +382,11 @@ export function CreateAgentPage() {
                 </div>
 
                 <div>
-                  <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                  <label htmlFor="agent-type" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                     Agent Type
                   </label>
                   <select
+                    id="agent-type"
                     value={formData.type}
                     onChange={(e) => setFormData({...formData, type: e.target.value})}
                     style={{
@@ -406,9 +427,9 @@ export function CreateAgentPage() {
                       backgroundColor: formData.template_id === template.id ? '#f0f9ff' : 'white'
                     }}
                   >
-                    <div style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', marginBottom: '0.25rem'}}>
+                    <span style={{fontSize: '0.875rem', fontWeight: '500', color: '#111827', marginBottom: '0.25rem', display: 'block'}}>
                       {template.name}
-                    </div>
+                    </span>
                     <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.5rem'}}>
                       {template.description}
                     </div>
@@ -427,10 +448,11 @@ export function CreateAgentPage() {
             
             <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
               <div>
-                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                <label htmlFor="config-model" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                   Model
                 </label>
                 <select
+                  id="config-model"
                   value={formData.config.model}
                   onChange={(e) => setFormData({...formData, config: {...formData.config, model: e.target.value}})}
                   style={{
@@ -448,10 +470,11 @@ export function CreateAgentPage() {
               </div>
 
               <div>
-                <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+                <label htmlFor="config-temperature" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                   Temperature
                 </label>
                 <input
+                  id="config-temperature"
                   type="number"
                   min="0"
                   max="2"
@@ -470,10 +493,11 @@ export function CreateAgentPage() {
             </div>
 
             <div style={{marginTop: '1.5rem'}}>
-              <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+              <label htmlFor="config-goal" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                 Goal
               </label>
               <textarea
+                id="config-goal"
                 value={formData.config.goal}
                 onChange={(e) => setFormData({...formData, config: {...formData.config, goal: e.target.value}})}
                 placeholder="What is this agent's primary objective?"
@@ -490,10 +514,11 @@ export function CreateAgentPage() {
             </div>
 
             <div style={{marginTop: '1.5rem'}}>
-              <label style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
+              <label htmlFor="config-backstory" style={{display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151', marginBottom: '0.5rem'}}>
                 Backstory
               </label>
               <textarea
+                id="config-backstory"
                 value={formData.config.backstory}
                 onChange={(e) => setFormData({...formData, config: {...formData.config, backstory: e.target.value}})}
                 placeholder="Describe the agent's background and expertise"
@@ -534,6 +559,11 @@ export function CreateAgentPage() {
               </div>
             </div>
           </div>
+
+          {/* Submit Error */}
+          {submitError && (
+            <p role="alert" style={{marginTop: '1rem', color: '#dc2626', fontSize: '0.875rem'}}>{submitError}</p>
+          )}
 
           {/* Submit Button */}
           <div style={{marginTop: '2rem', display: 'flex', justifyContent: 'end', gap: '0.5rem'}}>

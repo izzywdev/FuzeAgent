@@ -7,22 +7,19 @@ and semantic search capabilities for agent chat history and knowledge base.
 
 import asyncio
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-import logging
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 import numpy as np
-from sentence_transformers import SentenceTransformer
 import tiktoken
-
-# LangChain imports for conversation summarization
-from langchain.memory import ConversationSummaryBufferMemory
-from langchain.schema import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_anthropic import ChatAnthropic
-from langchain.prompts import PromptTemplate
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.prompts import PromptTemplate
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +47,7 @@ class RAGManager:
             temperature=0.3,
         )
 
-        # Conversation memory with token limit
         self.max_tokens = 4000  # Max tokens before summarization
-        self.summary_buffer_memory = ConversationSummaryBufferMemory(
-            llm=self.llm, max_token_limit=self.max_tokens, return_messages=True
-        )
 
         self.pool = None
 
