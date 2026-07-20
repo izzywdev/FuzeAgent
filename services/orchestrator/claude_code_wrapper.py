@@ -13,8 +13,15 @@ from anthropic import Anthropic
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-# Import conversation manager for full chat tracking
-from .conversation_manager import ConversationManager, MessageType
+# Import conversation manager for full chat tracking.
+# This module is imported both as part of the `services.orchestrator` package
+# (relative form, e.g. from main.py/agent_manager.py) and flat with
+# services/orchestrator on sys.path (e.g. from tests and main_with_hierarchy.py),
+# so support both — mirrors the existing pattern in hierarchy_endpoints.py.
+try:
+    from .conversation_manager import ConversationManager, MessageType
+except ImportError:  # pragma: no cover - flat import (no parent package)
+    from conversation_manager import ConversationManager, MessageType
 
 
 class ClaudeCodeInput(BaseModel):

@@ -15,7 +15,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from .database import get_db_connection
+# Importable both as `services.orchestrator.conversation_manager` (relative) and
+# flat with services/orchestrator on sys.path (as the tests import it).
+try:
+    from .database import get_db_connection
+except ImportError:  # pragma: no cover - flat import (no parent package)
+    from database import get_db_connection
 
 logger = logging.getLogger(__name__)
 

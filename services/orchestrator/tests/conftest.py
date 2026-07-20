@@ -4,9 +4,21 @@ Pytest configuration and fixtures for FuzeAgent tests
 
 import asyncio
 import os
+import sys
 import tempfile
+from pathlib import Path
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
+
+# Some test modules import the orchestrator by its fully-qualified package path
+# (`services.orchestrator.<module>`), so the repo root must be importable.
+# NOTE: append, never insert(0, ...) — the repo root holds a *different*
+# `hierarchy_endpoints.py` (the standalone app) than the service-local one
+# (the `router` that `main_with_hierarchy` imports). Prepending would shadow
+# the service-local module and break collection outright.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.append(str(_REPO_ROOT))
 
 import asyncpg
 import pytest
