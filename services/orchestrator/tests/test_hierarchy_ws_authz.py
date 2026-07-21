@@ -39,7 +39,13 @@ os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ.pop("AUTH_DISABLED", None)
 os.environ.pop("JWT_AUDIENCE", None)
 os.environ.pop("JWT_ISSUER", None)
-os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5434/ai_context"
+# NOTE: Do NOT set DATABASE_URL here. This module is imported during pytest
+# collection, so a module-scope os.environ mutation leaks into the shared
+# process env and pollutes every other test module's `client` fixture (which
+# reads DATABASE_URL at fixture-setup time). The CI-provisioned value from
+# conftest.py (…/ai_context_test) is what the real DB fixtures need; this test
+# stubs asyncpg.create_pool (below) so it never touches a real database and does
+# not care about the DATABASE_URL value at all.
 os.environ["ORCHESTRATOR_URL"] = "http://localhost:8000"
 
 # Add repo root to sys.path so ``import hierarchy_endpoints`` resolves.

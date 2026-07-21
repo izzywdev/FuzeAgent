@@ -50,6 +50,24 @@ class ClaudeCodeWrapper(BaseTool):
     """
     args_schema: Type[BaseModel] = ClaudeCodeInput
 
+    # Runtime attributes. ``BaseTool`` is a Pydantic v2 model, which rejects
+    # assignment to undeclared attributes ("object has no field ...").  These
+    # are declared as model fields (rather than PrivateAttr) so they remain
+    # publicly readable on the instance (e.g. ``wrapper.client`` /
+    # ``wrapper.model``), preserving the tool's public interface.  Object
+    # handles (Anthropic SDK client, git/conversation managers) are typed
+    # ``Any`` so Pydantic stores them as-is without schema validation.
+    client: Optional[Any] = None
+    model: str = "claude-3-5-sonnet-20241022"
+    workspace_path: Optional[str] = None
+    git_manager: Optional[Any] = None
+    agent_id: Optional[str] = None
+    task_id: Optional[str] = None
+    conversation_manager: Optional[Any] = None
+    conversation_session_id: Optional[str] = None
+    current_context: Dict[str, Any] = Field(default_factory=dict)
+    repository_context: Dict[str, Any] = Field(default_factory=dict)
+
     def __init__(
         self,
         workspace_path: Optional[str] = None,
