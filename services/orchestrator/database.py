@@ -11,12 +11,31 @@ DATABASE_URL = os.getenv(
 )
 
 
+async def _register_json_codecs(conn: asyncpg.Connection) -> None:
+    """Register JSON/JSONB codecs so Python dicts/lists round-trip transparently.
+
+    asyncpg does not encode Python ``dict``/``list`` objects into ``json``/``jsonb``
+    columns automatically (it expects a pre-serialized ``str``), and on read it
+    returns the raw JSON text rather than a decoded object. Registering these
+    codecs lets the DatabaseManager pass native dicts to INSERT/UPDATE and get
+    native dicts back from SELECT, which is what the API response models expect.
+    """
+    for type_name in ("json", "jsonb"):
+        await conn.set_type_codec(
+            type_name,
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema="pg_catalog",
+        )
+
+
 @asynccontextmanager
 async def get_db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
     """Get database connection with automatic cleanup"""
     conn = None
     try:
         conn = await asyncpg.connect(DATABASE_URL)
+        await _register_json_codecs(conn)
         yield conn
     finally:
         if conn:

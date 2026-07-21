@@ -355,7 +355,7 @@ async def get_teams(organization_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=f"Failed to get teams: {str(e)}")
 
 
-@app.post("/teams", response_model=Team)
+@app.post("/teams", response_model=Team, status_code=201)
 async def create_team(team_data: TeamCreate):
     """Create a new team"""
     try:
@@ -433,6 +433,25 @@ async def delete_team(team_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete team: {str(e)}")
+
+
+@app.get("/teams/{team_id}/agents")
+async def get_team_agents(team_id: str):
+    """Get all agents that belong to a specific team"""
+    try:
+        # Verify team exists so callers get a clear 404 instead of an empty list
+        team = await DatabaseManager.get_team(team_id)
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+
+        agents = await DatabaseManager.get_agents(team_id)
+        return agents
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get team agents: {str(e)}"
+        )
 
 
 # ============================================================================

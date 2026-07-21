@@ -73,10 +73,34 @@ def event_loop():
     loop.close()
 
 
+async def _truncate_hierarchy_tables() -> None:
+    """Remove all seeded hierarchy rows so api tests start from an empty DB."""
+    conn = await asyncpg.connect(os.environ["DATABASE_URL"])
+    try:
+        # organizations is the root of the hierarchy; CASCADE clears teams,
+        # agents, tasks and everything referencing them in one statement.
+        await conn.execute("TRUNCATE TABLE organizations RESTART IDENTITY CASCADE")
+    finally:
+        await conn.close()
+
+
 @pytest.fixture
-def client():
-    """FastAPI test client"""
+def client(request):
+    """FastAPI test client.
+
+    The app lifespan runs migrations, which seed a default organization, team
+    and agents. The ``api``-marked endpoint tests assert on an initially empty
+    database, so for those tests we truncate the hierarchy tables *after* the
+    app has started (and seeded) but *before* the test body — and therefore
+    before any test-requested setup fixture that depends on ``client`` — runs.
+    """
     with TestClient(app) as c:
+        if request.node.get_closest_marker("api") is not None:
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(_truncate_hierarchy_tables())
+            finally:
+                loop.close()
         yield c
 
 
