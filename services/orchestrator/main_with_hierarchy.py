@@ -614,7 +614,7 @@ async def get_agent(agent_id: str):
 )
 async def get_templates():
     """Get all agent templates"""
-    templates = template_manager.get_all_templates()
+    templates = template_manager.list_templates()
     return {
         "templates": templates,
         "categories": [category.value for category in AgentCategory],
