@@ -6,7 +6,9 @@ import pytest
 # template IDs/tools not in the catalog). Un-skipping requires freezing the /templates contract
 # + catalog (contract-designer) and implementing it — not rewriting tests to match the current
 # incomplete endpoint. Skipped at collection to track the debt honestly.
-pytestmark = pytest.mark.skip(reason="aspirational /templates contract not yet built; see #79")
+pytestmark = pytest.mark.skip(
+    reason="aspirational /templates contract not yet built; see #79"
+)
 pytest.skip("aspirational /templates contract; see #79", allow_module_level=True)
 
 """
