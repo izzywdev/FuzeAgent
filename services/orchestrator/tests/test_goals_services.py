@@ -26,6 +26,8 @@ from services.orchestrator.goals_management_service import (
 )
 from services.orchestrator.milestone_task_engine import MilestoneTaskEngine
 
+pytestmark = pytest.mark.goals
+
 
 class TestGoalsManagementService:
     """Test GoalsManagementService"""

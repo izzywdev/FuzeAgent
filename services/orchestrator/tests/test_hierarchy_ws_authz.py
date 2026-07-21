@@ -26,7 +26,7 @@ from __future__ import annotations
 import importlib
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -39,7 +39,6 @@ os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ.pop("AUTH_DISABLED", None)
 os.environ.pop("JWT_AUDIENCE", None)
 os.environ.pop("JWT_ISSUER", None)
-os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@localhost:5434/ai_context"
 os.environ["ORCHESTRATOR_URL"] = "http://localhost:8000"
 
 # Add repo root to sys.path so ``import hierarchy_endpoints`` resolves.
@@ -58,13 +57,6 @@ if _SVC_DIR not in sys.path:
 import auth as auth_module  # noqa: E402
 
 importlib.reload(auth_module)
-
-# Stub asyncpg.create_pool so the startup handler doesn't need a real DB.
-import asyncpg  # noqa: E402
-
-_mock_pool = MagicMock()
-_mock_pool.close = AsyncMock()
-asyncpg.create_pool = AsyncMock(return_value=_mock_pool)  # type: ignore[attr-defined]
 
 # Now import the REAL hierarchy_endpoints app (it uses the already-loaded auth).
 import hierarchy_endpoints  # noqa: E402
@@ -87,9 +79,19 @@ def make_token(**extra) -> str:
 
 @pytest.fixture(scope="module")
 def hier_client():
-    """TestClient wrapping the REAL hierarchy_endpoints.app."""
-    with TestClient(app) as c:
-        yield c
+    """TestClient wrapping the REAL hierarchy_endpoints.app.
+
+    asyncpg.create_pool is patched within this fixture's scope so the
+    hierarchy_endpoints startup handler never opens a real DB connection.
+    The patch is properly restored after all module-scoped tests finish,
+    leaving the asyncpg module unmodified for the rest of the test session.
+    """
+    _mock_pool = MagicMock()
+    _mock_pool.close = AsyncMock()
+    with patch("asyncpg.create_pool", new_callable=AsyncMock) as mock_cp:
+        mock_cp.return_value = _mock_pool
+        with TestClient(app) as c:
+            yield c
 
 
 # ---------------------------------------------------------------------------
