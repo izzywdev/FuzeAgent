@@ -4,7 +4,9 @@ import pytest
 # This tests the BESPOKE services/orchestrator/a2a_protocol.py, whose AgentCapability/
 # TaskDelegation were never implemented; that module is superseded by the open-standard
 # A2A contract frozen in #73. Skipped at collection (not deleted) to track the debt.
-pytestmark = pytest.mark.skip(reason="bespoke a2a_protocol superseded by #73; retire per #76")
+pytestmark = pytest.mark.skip(
+    reason="bespoke a2a_protocol superseded by #73; retire per #76"
+)
 pytest.skip("bespoke a2a_protocol superseded by #73; see #76", allow_module_level=True)
 
 """
