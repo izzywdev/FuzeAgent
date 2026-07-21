@@ -11,14 +11,17 @@ DATABASE_URL = os.getenv(
 )
 
 
-async def _register_json_codecs(conn: asyncpg.Connection) -> None:
-    """Register JSON/JSONB codecs so Python dicts/lists round-trip transparently.
+async def _register_connection_codecs(conn: asyncpg.Connection) -> None:
+    """Register codecs so DB values round-trip as the API layer expects.
 
-    asyncpg does not encode Python ``dict``/``list`` objects into ``json``/``jsonb``
-    columns automatically (it expects a pre-serialized ``str``), and on read it
-    returns the raw JSON text rather than a decoded object. Registering these
-    codecs lets the DatabaseManager pass native dicts to INSERT/UPDATE and get
-    native dicts back from SELECT, which is what the API response models expect.
+    * ``json``/``jsonb``: asyncpg does not encode Python ``dict``/``list`` objects
+      into these columns automatically (it expects a pre-serialized ``str``) and
+      returns the raw JSON text on read. These codecs let the DatabaseManager pass
+      native dicts to INSERT/UPDATE and get native dicts back from SELECT.
+    * ``uuid``: asyncpg decodes UUID columns to ``uuid.UUID`` objects, but the API
+      response models (Organization/Team/Agent ``id``, ``organization_id``,
+      ``team_id`` …) are typed as ``str``. Decoding/encoding as ``str`` keeps the
+      whole layer string-based and accepts the string ids the endpoints pass in.
     """
     for type_name in ("json", "jsonb"):
         await conn.set_type_codec(
@@ -27,6 +30,12 @@ async def _register_json_codecs(conn: asyncpg.Connection) -> None:
             decoder=json.loads,
             schema="pg_catalog",
         )
+    await conn.set_type_codec(
+        "uuid",
+        encoder=str,
+        decoder=str,
+        schema="pg_catalog",
+    )
 
 
 @asynccontextmanager
@@ -35,7 +44,7 @@ async def get_db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
     conn = None
     try:
         conn = await asyncpg.connect(DATABASE_URL)
-        await _register_json_codecs(conn)
+        await _register_connection_codecs(conn)
         yield conn
     finally:
         if conn:
