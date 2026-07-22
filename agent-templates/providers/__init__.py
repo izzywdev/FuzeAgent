@@ -28,10 +28,5 @@ def get_provider(name=None):
     if name == "hermes":
         from providers.hermes.adapter import HermesProvider
         return HermesProvider()
-    if name == "echo":
-        # Acceptance-gate-only mock runtime (AGENT_PROVIDER=echo). Never used in a
-        # real deployment; see providers/echo/adapter.py.
-        from providers.echo.adapter import EchoProvider
-        return EchoProvider()
     raise ValueError(f"unknown provider '{name}' — known: {', '.join(PROVIDERS)}. "
                      f"See agent-templates/providers/<name>/adapter.py to add one.")
