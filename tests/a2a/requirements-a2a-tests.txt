@@ -1,0 +1,6 @@
+# Deps for the independent A2A contract/acceptance suite (test-engineer slice).
+# Intentionally minimal: this suite verifies the FROZEN contract, not the app.
+pytest>=8.0
+jsonschema>=4.20
+pydantic>=2.7
+httpx>=0.27
