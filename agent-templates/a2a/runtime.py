@@ -104,7 +104,10 @@ def main() -> None:  # pragma: no cover
     import uvicorn
 
     config, app = build_from_env()
-    uvicorn.run(app, host=os.environ.get("HOST", "0.0.0.0"), port=config.port)
+    # Bind to loopback by default; the Helm chart sets HOST=0.0.0.0 EXPLICITLY so the
+    # in-cluster Service can reach the pod. Never hardcode a bind-all default (CWE-605).
+    host = os.environ.get("HOST", "127.0.0.1")
+    uvicorn.run(app, host=host, port=config.port)
 
 
 if __name__ == "__main__":  # pragma: no cover
