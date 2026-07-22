@@ -1,0 +1,10 @@
+{
+  "role": "ux-designer",
+  "name": "FuzePlan ux-designer",
+  "description": "Produces user-flow and interaction specifications for a described feature, aligned to the family design system.",
+  "services": { "github": "write", "k8s": "none", "cloud": "none" },
+  "a2a": {
+    "tags": ["design"],
+    "examples": ["Draft the user flow for self-registration with email OTP."]
+  }
+}
