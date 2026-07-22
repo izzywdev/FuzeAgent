@@ -1,0 +1,22 @@
+{
+  "a2a": {
+    "enabled": true,
+    "protocolVersion": "1.0",
+    "service": { "port": 8080 },
+    "auth": {
+      "oidcIssuerUrl": "http://127.0.0.1:9099",
+      "audience": "fuze-a2a-acceptance",
+      "callerClaim": "sub"
+    },
+    "tenants": [
+      {
+        "tenant": "FuzePlan",
+        "repo": "izzywdev/FuzePlan",
+        "enabled": true,
+        "ref": "main",
+        "entryRole": "product-manager",
+        "provider": { "name": "echo" }
+      }
+    ]
+  }
+}
