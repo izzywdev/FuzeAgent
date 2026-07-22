@@ -1,0 +1,68 @@
+# =============================================================================
+# Production overlay (Contabo k3s), consumed by the Argo CD `a2a-shared` Application.
+#
+# SHIPS DISABLED. Enabling A2A in prod has hard PRECONDITIONS that are out of this
+# chart's scope (see deploy/helm/a2a-shared/README.md go-live steps):
+#   1. The shared A2A server image exists on GHCR (backend-engineer + release.yml).
+#   2. `providesTo` is backfilled on every served repo's manifest — authz.md §3
+#      fail-closed: absent == DENY, so enabling before backfill is safe but useless.
+#   3. The card-signing SealedSecret is provisioned.
+# Until then this stays enabled:false → the Argo app renders nothing (inert).
+#
+# The single `tag:` line below is rewritten to the built commit SHA by
+# .github/workflows/release.yml — keep it the ONLY `tag:` key in this file.
+# All secrets come from SealedSecrets — never inline here.
+# =============================================================================
+a2a:
+  enabled: false
+
+  image:
+    repository: ghcr.io/izzywdev/fuzeagent-a2a
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  protocolVersion: "1.0"
+
+  # Identity config (authz.md). REQUIRED before flipping enabled:true — supply the
+  # family OIDC issuer (Authentik/Keycloak) at go-live. oidcIssuerUrl is REQUIRED
+  # whenever `auth` is present, so it stays commented while disabled.
+  # auth:
+  #   oidcIssuerUrl: https://<family-oidc-issuer>/application/o/a2a/
+  #   audience: a2a
+  #   callerClaim: sub
+  #   mtls:
+  #     enabled: true
+  #     caSecretRef: { name: a2a-mtls-ca, key: ca.crt }
+
+  # JWS Agent-Card signing key (SealedSecret-provisioned at go-live).
+  # cardSigning:
+  #   keySecretRef: { name: a2a-card-signing, key: jws.key }
+  #   keyId: a2a-v1
+
+  # Tenants onboard here at go-live — one entry per served product/exec agent,
+  # only AFTER that repo's `providesTo` is backfilled. No new pod per tenant.
+  tenants: []
+  #   - tenant: FuzePlan
+  #     repo: izzywdev/FuzePlan
+  #     ref: main
+  #     enabled: true
+  #     entryRole: product-manager
+  #     external: false
+  #     provider:
+  #       name: anthropic
+  #       apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
+
+deploy:
+  replicas: 1
+  # Private GHCR pull secret (sealed; name must match the SealedSecret exactly).
+  imagePullSecrets:
+    - name: ghcr-pull
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  externalDomain: prod.fuzefront.com
+  ingressClassName: traefik

@@ -1,0 +1,19 @@
+{{- if .Values.a2a.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  # MUST be `a2a-shared`: binding.md/card-projection.md §2 hardcode the in-cluster
+  # interface URL http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc.
+  name: {{ include "a2a.name" . }}
+  labels:
+    {{- include "a2a.labels" . | nindent 4 }}
+spec:
+  # ClusterIP only — ingress is Cloudflare-tunnel-only (no LoadBalancer/NodePort).
+  type: {{ .Values.a2a.service.type }}
+  selector:
+    {{- include "a2a.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.a2a.service.port }}
+      targetPort: http
+{{- end }}
