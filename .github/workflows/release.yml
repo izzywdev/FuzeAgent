@@ -14,6 +14,9 @@ on:
       - 'hierarchy_endpoints.py'
       - 'requirements-hierarchy.txt'
       - 'deploy/helm/fuzeagent/**'
+      - 'deploy/helm/a2a-shared/**'
+      - 'agent-templates/a2a/**'
+      - 'agent-templates/contracts/a2a/**'
       - 'containers/**'
       - '.github/workflows/release.yml'
 
@@ -97,6 +100,22 @@ jobs:
           cache-from: type=gha,scope=mcp
           cache-to: type=gha,mode=max,scope=mcp
 
+      - name: Build & push a2a-shared
+        # The ONE shared A2A server. Context = agent-templates/ (mirrors handoff_mcp);
+        # packages a2a/*.py + the frozen contract client. Chart ships enabled:false
+        # until the server + providesTo backfill land, so this image is tagged but
+        # not run in prod yet.
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: agent-templates
+          file: agent-templates/a2a/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/izzywdev/fuzeagent-a2a:${{ steps.tag.outputs.sha }}
+            ghcr.io/izzywdev/fuzeagent-a2a:latest
+          cache-from: type=gha,scope=a2a
+          cache-to: type=gha,mode=max,scope=a2a
+
       - name: Bump image tags in values-prod.yaml (GitOps)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -106,10 +125,12 @@ jobs:
           # Rewrites the four app-image `tag:` lines. Datastore images are single
           # `image:` strings (no tag: key), so they are untouched.
           sed -i -E "s/^(\s*tag:).*/\1 ${SHA}/" deploy/helm/fuzeagent/values-prod.yaml
+          # a2a-shared overlay has exactly one `tag:` key (the a2a image) — same rewrite.
+          sed -i -E "s/^(\s*tag:).*/\1 ${SHA}/" deploy/helm/a2a-shared/values-prod.yaml
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git checkout -b "${BRANCH}"
-          git add deploy/helm/fuzeagent/values-prod.yaml
+          git add deploy/helm/fuzeagent/values-prod.yaml deploy/helm/a2a-shared/values-prod.yaml
           git commit -m "release: fuzeagent images ${SHA} [skip ci]" || exit 0
           git push origin "${BRANCH}"
           # Bot (GITHUB_TOKEN) creates PR; owner (GH_APPROVE_TOKEN) approves then admin-merges

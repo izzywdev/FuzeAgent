@@ -28,6 +28,8 @@ jobs:
         run: |
           helm lint deploy/helm/fuzeagent
           helm lint deploy/helm/fuzeagent -f deploy/helm/fuzeagent/values-prod.yaml
+          helm lint deploy/helm/a2a-shared
+          helm lint deploy/helm/a2a-shared -f deploy/helm/a2a-shared/values-prod.yaml
 
       - name: Install kubeconform
         run: |
@@ -41,8 +43,16 @@ jobs:
           # -ignore-missing-schemas: Traefik / SealedSecret CRDs have no published
           # JSON schema; matches FuzeInfra's helm-validate + deploy-prod convention.
           for overlay in values.yaml values-prod.yaml; do
-            echo "::group::$overlay"
+            echo "::group::fuzeagent $overlay"
             helm template fuzeagent deploy/helm/fuzeagent -f "deploy/helm/fuzeagent/$overlay" \
+              | kubeconform -strict -summary -kubernetes-version 1.29.0 -ignore-missing-schemas
+            echo "::endgroup::"
+          done
+          # a2a-shared ships enabled:false (default/prod render nothing); the ci/
+          # overlay exercises the enabled Deployment/Service/ConfigMap/Ingress path.
+          for overlay in values.yaml values-prod.yaml ci/enabled-values.yaml; do
+            echo "::group::a2a-shared $overlay"
+            helm template a2a-shared deploy/helm/a2a-shared -f "deploy/helm/a2a-shared/$overlay" \
               | kubeconform -strict -summary -kubernetes-version 1.29.0 -ignore-missing-schemas
             echo "::endgroup::"
           done

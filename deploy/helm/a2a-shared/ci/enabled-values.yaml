@@ -1,0 +1,45 @@
+# CI-only overlay: exercises the ENABLED render path so helm lint + kubeconform
+# actually validate the Deployment/Service/ConfigMap/Ingress (the shipped overlays
+# default enabled:false and would render nothing). Not a deploy overlay.
+a2a:
+  enabled: true
+  image:
+    repository: ghcr.io/izzywdev/fuzeagent-a2a
+    tag: "0.0.0-ci"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  protocolVersion: "1.0"
+  auth:
+    oidcIssuerUrl: https://issuer.example.com/application/o/a2a/
+    audience: a2a
+    callerClaim: sub
+    mtls:
+      enabled: true
+      caSecretRef: { name: a2a-mtls-ca, key: ca.crt }
+  cardSigning:
+    keySecretRef: { name: a2a-card-signing, key: jws.key }
+    keyId: a2a-v1
+  tenants:
+    - tenant: FuzePlan
+      repo: izzywdev/FuzePlan
+      ref: main
+      enabled: true
+      entryRole: product-manager
+      servingRoles: [product-manager, backend-engineer]
+      external: false
+      provider:
+        name: anthropic
+        environmentId: env-fuzeplan
+        apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
+        vaultIds: [fuzeplan]
+        memoryResources: [handoff]
+    - tenant: FuzeSales
+      repo: izzywdev/FuzeSales
+      ref: main
+      enabled: true
+      external: true
+deploy:
+  imagePullSecrets:
+    - name: ghcr-pull
