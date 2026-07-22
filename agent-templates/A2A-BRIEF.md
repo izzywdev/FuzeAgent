@@ -87,7 +87,8 @@ missed this.
 4. **The state mapping** — the table above, normatively, incl. how an `always_ask` pause surfaces as
    `INPUT_REQUIRED`/`AUTH_REQUIRED` and how `reach_human` resolves it.
 5. **AuthZ model** — **the callee enforces; the caller is opaque and untrusted.** The allowlist
-   already exists: **`dependsOn` / `providesTo` in `.fuze/manifest.json`**, live on all 20 repos.
+   already exists in SHAPE: **`dependsOn` / `providesTo` in `.fuze/manifest.json`** — but it is **NOT yet populated fleet-wide.** Verified 2026-07-21: present on only **5 of 20** repos (FuzeBI, FuzeContact, FuzeExecutive, FuzeSales, FuzeService); absent on FuzeAgent, FuzeInfra, FuzeFront, FuzeKeys, FuzePlan, FuzeCall, FuzeDeploy, FuzeHub, FuzeMarket, FuzeMerchandize, FuzePicker, FuzeSocial, FuzeX, MendysRobotics, MendysRoboticsWP. An earlier revision of this brief wrongly claimed "live on all 20 repos" — do not rely on it.
+   **Therefore: absence MUST deny, never allow.** A permissive default would expose every un-backfilled repo to every caller the moment A2A is enabled. Backfilling the graph is a PRECONDITION of enabling A2A authZ, not a follow-up.
    Specify identity (FuzeKeys / OIDC / mTLS per A2A securitySchemes), and that in-cluster service
    DNS is the transport (CF Access only if a surface is external).
 6. **The shared server's interface** — the Helm values contract each product sets (`enabled` gate,
