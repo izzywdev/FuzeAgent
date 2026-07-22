@@ -85,6 +85,36 @@ ConfigMap; the ids are **not** secrets. See `deploy/handoff-mcp.yaml` (Deploymen
 Service; GitOps via Argo, `SealedSecret` for the key). In-cluster the role agents point
 `HANDOFF_MCP_URL` at `http://handoff-mcp.fuzeinfra.svc.cluster.local:8000/mcp`.
 
+### A2A transport (the wire under the tools)
+
+The handoff tools (`spawn_agent`, `resume_session`, `ask_agent`, `approve`,
+`reach_human`) now hand a **goal** to another product/exec agent **over the A2A wire**
+instead of driving a Managed-Agents session directly. The tool signatures are
+UNCHANGED — only the transport changed. `orchestration/a2a_transport.py` discovers the
+target's Agent Card at its well-known path, issues JSON-RPC `SendMessage`/`GetTask`/
+`CancelTask` through the FROZEN generated client (`contracts/a2a/v1/client`), and maps
+the returned `TaskState` back onto the same `{session_id, status, reply, pending}`
+shape (state-mapping.md §3). A calling agent holds NONE of the callee's tools,
+skills or credentials (card-projection.md §7). `memory_write`/`memory_read` are a
+separate durable-state channel and are unaffected.
+
+Config (all optional; defaults are in-cluster-sane):
+
+- `A2A_TOKEN` — OIDC bearer presented on every call (held server-side, like the API key).
+- `A2A_TARGETS` — JSON registry (or `a2a-targets.json` in `FUZE_STATE_DIR`) mapping a
+  target key → `{skill_id, tenant, discovery_url}`. See `handoff_mcp/a2a-targets.example.json`.
+- `A2A_DISCOVERY_DOMAIN` / `A2A_DISCOVERY_PORT` / `A2A_DISCOVERY_SCHEME` — convention discovery.
+- `MCP_BIND_HOST` — narrow the server bind (defaults to all interfaces: an in-cluster
+  pod must accept peer traffic; the surface is closed by NetworkPolicy + `HANDOFF_MCP_TOKEN`).
+
+**Chosen defaults (decided — not open questions):**
+
+- **Per-tenant discovery service-DNS = `a2a-<slug>`** (e.g. `Exec-cto` →
+  `http://a2a-exec-cto.<A2A_DISCOVERY_DOMAIN>:<port>`), overridable per target via
+  `discovery_url` in the registry.
+- **Persona-target naming = `persona-<human>`** (used by `reach_human`, prefix set by
+  `A2A_PERSONA_PREFIX`), overridable to any tenant/skill/`discovery_url` in the registry.
+
 ## Memory-store handoff channel
 
 A shared **memory store** (`memory/handoff.json`, synced by `sync_memory.py`) is attached

@@ -50,11 +50,11 @@ class FakeTransport:
         self._i = 0
 
     def get(self, url, *, headers):
-        assert url.endswith("/.well-known/agent-card.json"), url
+        assert url.endswith("/.well-known/agent-card.json"), url  # nosec B101 — test fixture assertion
         return _Resp(CARD)
 
     def post(self, url, *, json, headers):
-        assert json["method"], "missing method"
+        assert json["method"], "missing method"  # nosec B101 — test fixture assertion
         fixture_key = self._script[self._i]
         self._i += 1
         return _Resp(RESP[fixture_key])
@@ -66,7 +66,7 @@ class FakeTransport:
 def _mk_client(script):
     from fuze_a2a_client import A2AClient, AgentCard
     card = AgentCard.model_validate(CARD)
-    return A2AClient(card, token="smoke", transport=FakeTransport(script))
+    return A2AClient(card, token="smoke", transport=FakeTransport(script))  # nosec B106 — test fixture, not a real credential
 
 
 def _bind(target, client):

@@ -54,9 +54,14 @@ STATE = common.state_dir()  # honors FUZE_STATE_DIR (mounted /state volume in th
 HANDOFF_INSTRUCTIONS = ("Shared cross-session handoff workspace. Read relevant /handoff/*.md before "
                         "starting delegated work; persist your work-state under /handoff/<id>.md.")
 
-mcp = FastMCP("fuze-handoff",
-              host=os.environ.get("HOST", "0.0.0.0"),
-              port=int(os.environ.get("PORT", "8000")))
+# Bind address for the MCP HTTP server. Defaults to all interfaces because this runs
+# as an in-cluster pod that MUST accept traffic from peer pods (its Service DNS); the
+# surface is closed by NetworkPolicy/service mesh + the HANDOFF_MCP_TOKEN bearer, not
+# by the bind address. Override with MCP_BIND_HOST (or the legacy HOST) to narrow it.
+BIND_HOST = os.environ.get("MCP_BIND_HOST") or os.environ.get("HOST", "0.0.0.0")  # nosec B104 — in-cluster pod bind; access controlled by NetworkPolicy/service mesh
+BIND_PORT = int(os.environ.get("PORT", "8000"))
+
+mcp = FastMCP("fuze-handoff", host=BIND_HOST, port=BIND_PORT)
 
 
 # ---------------------------------------------------------------------------
@@ -248,5 +253,4 @@ def build_app():
 if __name__ == "__main__":
     # Managed Agents connect to remote MCP servers over streamable HTTP.
     import uvicorn
-    uvicorn.run(build_app(), host=os.environ.get("HOST", "0.0.0.0"),
-                port=int(os.environ.get("PORT", "8000")))
+    uvicorn.run(build_app(), host=BIND_HOST, port=BIND_PORT)
