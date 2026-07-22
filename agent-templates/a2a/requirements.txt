@@ -1,11 +1,15 @@
-# Shared A2A server — runtime deps (STARTER; backend-engineer owns evolution).
-# Mirrors the handoff_mcp HTTP-server stack + what the contract binding implies:
-# JSON-RPC/SSE over HTTP (starlette/uvicorn), pydantic models (contract client),
-# OIDC bearer validation + JWS card signing.
-uvicorn>=0.30
+# Runtime dependencies for the shared A2A server (agent-templates/a2a).
+# The wire/card models come from the frozen contract client, which needs only pydantic.
+pydantic>=2.0
 starlette>=0.37
-pydantic>=2.7
-httpx>=0.27
+uvicorn>=0.30
+# OIDC bearer validation at runtime (JWKS). Optional at import time; runtime._build_verifier
+# fails closed if absent, so the package imports without it for unit tests.
 PyJWT>=2.8
+# Card schema/profile validation.
+jsonschema>=4.0
+# Asymmetric verification backend for PyJWT — runtime._build_verifier decodes RS256/ES256
+# JWKS-signed OIDC tokens, which PyJWT can only do with `cryptography` present. Added by
+# devops for the deployed image (unit tests never construct the verifier, so main's
+# server-owned deps omit it). See PR #85.
 cryptography>=42
-PyYAML>=6

@@ -85,3 +85,17 @@ deploy:
   # (card-projection.md §2: https://a2a.<repo-slug>.<externalDomain>/rpc).
   externalDomain: prod.fuzefront.com
   ingressClassName: traefik
+  # Managed-Agents provider id set as AGENT_PROVIDER (runtime.build_from_env default).
+  agentProvider: anthropic
+  # Init-container image that shallow-clones each enabled tenant's repo into /repos
+  # (runtime.LocalRepoResolver reads the projection inputs from there).
+  gitImage: alpine/git:latest
+  # Optional token (SealedSecret ref {name,key}) for cloning PRIVATE tenant repos in
+  # the repo-sync init container. Unset = anonymous clone (public repos only).
+  reposGitTokenSecretRef: null
+  # Optional Managed-Agents API key (SealedSecret ref {name,key}) exported as
+  # ANTHROPIC_API_KEY for session provisioning (sync/common.py). Unset = not injected.
+  providerApiKeySecretRef: null
+  # Optional ConfigMap name holding the Managed-Agents id-state (agent/vault/memory/
+  # environment ids) mounted at FUZE_STATE_DIR=/state, same pattern as handoff-mcp.
+  stateConfigMap: null

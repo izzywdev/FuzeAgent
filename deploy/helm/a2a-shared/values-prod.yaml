@@ -66,3 +66,12 @@ deploy:
     limits: { cpu: 500m, memory: 512Mi }
   externalDomain: prod.fuzefront.com
   ingressClassName: traefik
+  agentProvider: anthropic
+  gitImage: alpine/git:latest
+  # Go-live: seal these and reference them here (all SealedSecret-provisioned).
+  #   reposGitTokenSecretRef: { name: a2a-repos-git, key: token }        # private tenant repos
+  #   providerApiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
+  #   stateConfigMap: a2a-state                                          # Managed-Agents id-state
+  reposGitTokenSecretRef: null
+  providerApiKeySecretRef: null
+  stateConfigMap: null

@@ -33,14 +33,31 @@ byte-conformant to the interface.
 ## Go-live (single GitOps PR, human-gated)
 
 1. Provision the SealedSecrets in `deploy/contabo/sealed/` (synced by `fuzeagent-sealed`):
-   - `a2a-card-signing` (key `jws.key`) — JWS Agent-Card signing key.
-   - `a2a-provider-anthropic` (key `api-key`) and any per-tenant `provider.apiKeySecretRef`.
+   - `a2a-provider-anthropic` (key `api-key`) — Managed-Agents key, exported as
+     `ANTHROPIC_API_KEY` for session provisioning; set `deploy.providerApiKeySecretRef`.
+   - `a2a-repos-git` (key `token`) — token for cloning PRIVATE tenant repos in the
+     repo-sync init container; set `deploy.reposGitTokenSecretRef`. Omit for public repos.
    - `a2a-mtls-ca` (key `ca.crt`) if in-cluster mTLS is enabled.
+   - Card-signing: the server reads `cardSigning.keyId` from the values doc; the JWS
+     signer injection is still a server-side TODO ("production injects a real JWS signer"
+     in `card_generator.py`), so no signing-key env is wired yet.
    Seal with `scripts/seal-secret.sh` (same flow as handoff-mcp).
-2. In `values-prod.yaml`: set `a2a.enabled: true`, uncomment `auth` (real family OIDC
+2. Provide the Managed-Agents id-state (agent/vault/memory/environment ids) as a ConfigMap
+   mounted at `FUZE_STATE_DIR=/state` — same mechanism as handoff-mcp — and set
+   `deploy.stateConfigMap`.
+3. In `values-prod.yaml`: set `a2a.enabled: true`, uncomment `auth` (real family OIDC
    issuer) + `cardSigning`, and add the `tenants[]` (only repos whose `providesTo` is
    backfilled). Keep the single `tag:` line — `release.yml` owns it.
-3. Merge → Argo syncs the Deployment/Service/ConfigMap (+ per-external-tenant Ingress).
+4. Merge → Argo syncs the Deployment/Service (+ the `values.json` ConfigMap the server
+   reads via `A2A_VALUES_FILE`, the repo-sync init container, per-external-tenant Ingress).
+
+### Runtime shape (matches the merged server, `agent-templates/a2a/`)
+- Entrypoint `python -m a2a.runtime` → `build_from_env()` reads `A2A_VALUES_FILE`
+  (the `a2a` block as JSON), `A2A_REPOS_DIR=/repos`, `AGENT_PROVIDER`, `HOST`.
+- The image vendors `a2a/` + `providers/` + `sync/` (runtime imports `providers`, whose
+  anthropic adapter delegates to the `sync/` modules) + the frozen `fuze_a2a_client`.
+- Per-tenant card projection reads each repo's `.fuze/manifest.json` + `roles/` from
+  `/repos/<repo-name>`, populated by the `repo-sync` init container at each tenant `ref`.
 
 ## Validate (matches `helm-validate.yml`)
 
@@ -52,7 +69,7 @@ helm template a2a-shared deploy/helm/a2a-shared -f deploy/helm/a2a-shared/ci/ena
   | kubeconform -strict -summary -kubernetes-version 1.29.0 -ignore-missing-schemas
 ```
 
-> `TODO(server-entrypoint)` markers in the templates/Dockerfile flag the few points
-> that depend on the shared server's runtime contract (CMD, `/healthz`, per-tenant
-> secret injection) — resolve them when `agent-templates/a2a/*.py` lands. None block
-> validation; the chart renders and passes kubeconform today.
+> Remaining server-side gap (tracked, non-blocking): a real JWS card signer injection
+> (`card_generator.py` — "production injects a real JWS signer"). The health/readiness
+> probe uses the server's `GET /healthz`. None block validation; the chart renders and
+> passes kubeconform, and the image composes the app from the chart's `values.json`.

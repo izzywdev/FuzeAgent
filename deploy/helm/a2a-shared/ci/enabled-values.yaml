@@ -43,3 +43,7 @@ a2a:
 deploy:
   imagePullSecrets:
     - name: ghcr-pull
+  # Exercise the init-container repo-sync + optional secret/state wiring in render.
+  reposGitTokenSecretRef: { name: a2a-repos-git, key: token }
+  providerApiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
+  stateConfigMap: a2a-state

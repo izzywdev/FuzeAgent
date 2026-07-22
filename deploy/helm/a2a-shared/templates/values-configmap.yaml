@@ -1,0 +1,17 @@
+{{- if .Values.a2a.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "a2a.name" . }}-values
+  labels:
+    {{- include "a2a.labels" . | nindent 4 }}
+data:
+  # The values-interface document the server reads at startup via A2A_VALUES_FILE
+  # (runtime.build_from_env -> config.load_config, which does values.get("a2a", …)).
+  # It is exactly the `a2a` block (frozen operator interface) — DATA that lets one
+  # shared server front every tenant. Only secret *references* (name/key) can appear
+  # here, never secret VALUES; load_config reads non-secret fields + keyId only.
+  # GitOps source of truth — never live-mutated.
+  values.json: |
+    {{ dict "a2a" .Values.a2a | toJson }}
+{{- end }}
