@@ -84,23 +84,31 @@ def all_example_cards() -> dict[str, dict]:
 
 
 # --- live-server gate -------------------------------------------------------
-# Integration tests require a real A2A server. This is a live DEPENDENCY, so the
-# tier is env-gated, not hard-failing:
-#   * A2A_SERVER_BASE_URL UNSET  -> the whole live module SKIPs (Phase 3 gate not
-#     yet wired). Each live_*.py declares `pytestmark = requires_live_server` so
-#     the skip happens at collection with a clear reason. Skipping keeps main and
-#     every PR green and avoids tripping claude-ci-autofix into weakening the
-#     acceptance tests.
-#   * A2A_SERVER_BASE_URL SET    -> the tests RUN FOR REAL and FAIL LOUDLY on any
-#     deviation (no soft-pass, no swallowed errors). That is the Phase 3
-#     rollout/CI-with-server context where the honest grade must bite.
-# The conformance tier needs no server and always runs.
+# The live tier (marker `live`) is the **Phase-3 rollout acceptance gate**, not a
+# per-PR check. Its dependency — a deployed A2A server — does not exist per-PR, so
+# it is relocated to `.github/workflows/a2a-acceptance.yml` (workflow_dispatch /
+# workflow_call), NOT run on pull_request/push. Two contexts:
+#
+#   * Per-PR / local (default): `A2A_REQUIRE_LIVE` unset and no server configured
+#     -> the live modules SKIP at collection (via `requires_live_server`). Per-PR
+#     CI never even collects them (it runs `-m conformance` only); the skip is a
+#     library-level safety for ad-hoc `pytest tests/a2a` runs.
+#   * Phase-3 acceptance (a2a-acceptance.yml sets `A2A_REQUIRE_LIVE=1`): the server
+#     is EXPECTED to be reachable, so the tests RUN and FAIL LOUDLY. A missing
+#     $A2A_SERVER_BASE_URL / token at acceptance time IS a failure, never a skip.
+# The conformance tier needs no server and always runs per-PR.
 LIVE_ENV = "A2A_SERVER_BASE_URL"
 
 _SKIP_REASON = (
-    "A2A server not deployed in this environment (${var} unset) — this is the "
-    "Phase 3 acceptance gate; set A2A_SERVER_BASE_URL (server deployed in CI/staging) "
-    "to run and ENFORCE these live contract/acceptance/authZ tests."
+    "A2A live tier is the Phase-3 rollout acceptance gate (tracked in #90) — it "
+    "requires a deployed A2A server and runs via a2a-acceptance.yml "
+    "(workflow_dispatch/workflow_call), NOT per-PR. ${var} unset and "
+    "A2A_REQUIRE_LIVE off, so these live tests are skipped here."
+)
+_ENFORCE_REASON = (
+    "Phase-3 acceptance gate: A2A_REQUIRE_LIVE is on but ${var} is unset. A missing "
+    "server at acceptance time IS a failure — deploy a2a-shared and export ${var} "
+    "(+ A2A_TEST_OIDC_TOKEN / A2A_TEST_UNAUTH_TOKEN) before running this gate."
 )
 
 
@@ -108,9 +116,15 @@ def live_server_configured() -> bool:
     return bool(os.environ.get(LIVE_ENV))
 
 
-# Reusable module-level marker for every live_*.py test file.
+def live_enforced() -> bool:
+    """True inside the Phase-3 acceptance workflow, which sets A2A_REQUIRE_LIVE."""
+    return bool(os.environ.get("A2A_REQUIRE_LIVE"))
+
+
+# Reusable module-level marker for every live_*.py test file. Skips per-PR/local,
+# but NEVER skips under enforcement — there a missing server surfaces as a failure.
 requires_live_server = pytest.mark.skipif(
-    not live_server_configured(),
+    not live_server_configured() and not live_enforced(),
     reason=_SKIP_REASON.replace("${var}", LIVE_ENV),
 )
 
@@ -119,6 +133,8 @@ requires_live_server = pytest.mark.skipif(
 def live_base_url() -> str:
     base = os.environ.get(LIVE_ENV)
     if not base:
+        if live_enforced():
+            pytest.fail(_ENFORCE_REASON.replace("${var}", LIVE_ENV), pytrace=False)
         # Defensive: reached only if a test forgot the module marker.
         pytest.skip(_SKIP_REASON.replace("${var}", LIVE_ENV))
     return base.rstrip("/")

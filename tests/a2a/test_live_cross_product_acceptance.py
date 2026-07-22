@@ -15,19 +15,22 @@ import os
 import pytest
 from fuze_a2a_client import A2AClient, TaskState
 
-# Gate on either a dedicated FuzePlan endpoint or the shared server URL. When
-# neither is set this is the Phase 3 acceptance gate and the module SKIPs; when
-# one is set the acceptance test RUNS and FAILS LOUDLY on any deviation.
+# Gate on either a dedicated FuzePlan endpoint or the shared server URL. Per-PR /
+# local: SKIP. Under Phase-3 enforcement (A2A_REQUIRE_LIVE, set by
+# a2a-acceptance.yml): NEVER skip — run and fail loudly if unconfigured.
 _live_configured = bool(os.environ.get("A2A_FUZEPLAN_BASE_URL") or os.environ.get("A2A_SERVER_BASE_URL"))
+_live_enforced = bool(os.environ.get("A2A_REQUIRE_LIVE"))
 pytestmark = [
     pytest.mark.a2a,
     pytest.mark.integration,
     pytest.mark.acceptance,
+    pytest.mark.live,
     pytest.mark.skipif(
-        not _live_configured,
+        not _live_configured and not _live_enforced,
         reason=(
-            "FuzePlan A2A server not deployed (A2A_FUZEPLAN_BASE_URL / "
-            "A2A_SERVER_BASE_URL unset) — Phase 3 acceptance gate; set one to enforce."
+            "FuzePlan A2A live acceptance is the Phase-3 rollout gate (#90) — runs vs a "
+            "deployed server via a2a-acceptance.yml, NOT per-PR. "
+            "A2A_FUZEPLAN_BASE_URL / A2A_SERVER_BASE_URL unset and A2A_REQUIRE_LIVE off."
         ),
     ),
 ]

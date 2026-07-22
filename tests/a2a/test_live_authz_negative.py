@@ -18,7 +18,7 @@ from fuze_a2a_client.errors import A2AError, TaskNotFoundError
 
 from conftest import requires_live_server
 
-pytestmark = [pytest.mark.a2a, pytest.mark.integration, pytest.mark.authz, requires_live_server]
+pytestmark = [pytest.mark.a2a, pytest.mark.integration, pytest.mark.authz, pytest.mark.live, requires_live_server]
 
 
 def _is_denial(task_or_exc) -> bool:

@@ -14,7 +14,7 @@ from fuze_a2a_client.errors import UnsupportedOperationError
 
 from conftest import requires_live_server
 
-pytestmark = [pytest.mark.a2a, pytest.mark.integration, requires_live_server]
+pytestmark = [pytest.mark.a2a, pytest.mark.integration, pytest.mark.live, requires_live_server]
 
 
 def _skill(live_card):
