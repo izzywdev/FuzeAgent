@@ -1,0 +1,70 @@
+# Phase-3 A2A ACCEPTANCE GATE (tracked in #90).
+#
+# This is the relocation of the live tier out of per-PR CI to where its dependency
+# — a DEPLOYED A2A server — actually exists. It runs ONLY the live tests:
+#   * cross-product acceptance (caller with no Jira skill/MCP -> FuzePlan tickets)
+#   * authZ-negative (non-allowlisted caller refused BY THE CALLEE)
+#   * state-machine (always_ask / reach_human / cancel / subscribe)
+#   * live wire conformance vs the deployed server
+# selected by `pytest -m live`.
+#
+# It NEVER triggers on pull_request/push — only on manual dispatch or when a
+# Phase-3 rollout pipeline calls it (workflow_call). Here the server is EXPECTED
+# to be reachable: A2A_REQUIRE_LIVE=1 makes the suite FAIL LOUDLY (never skip) if
+# A2A_SERVER_BASE_URL / A2A_TEST_OIDC_TOKEN / A2A_TEST_UNAUTH_TOKEN are unset or
+# the server misbehaves. A missing server at acceptance time IS a failure.
+#
+# TODO(devops): stand up a2a-shared (docker compose OR kind+helm) as a step in
+# this workflow and export A2A_SERVER_BASE_URL + A2A_TEST_OIDC_TOKEN +
+# A2A_TEST_UNAUTH_TOKEN before the "Run live acceptance gate" step. This is the
+# Phase-3 wiring and is devops-engineer's slice; the test-engineer suite is ready
+# to enforce the moment those are exported.
+name: A2A Phase-3 Acceptance Gate
+
+on:
+  workflow_dispatch: {}
+  workflow_call:
+    secrets:
+      A2A_TEST_OIDC_TOKEN:
+        required: false
+      A2A_TEST_UNAUTH_TOKEN:
+        required: false
+
+jobs:
+  phase3-acceptance:
+    name: Phase-3 acceptance gate (live A2A server)
+    runs-on: ubuntu-latest
+    env:
+      # Enforcement flag: the library-level skipif is disabled, so a missing
+      # server/token surfaces as a FAILURE, not a skip.
+      A2A_REQUIRE_LIVE: "1"
+      # Wired from repo/env config once the Phase-3 server exists (see TODO above).
+      A2A_SERVER_BASE_URL: ${{ vars.A2A_SERVER_BASE_URL }}
+      A2A_FUZEPLAN_BASE_URL: ${{ vars.A2A_FUZEPLAN_BASE_URL }}
+      A2A_TEST_OIDC_TOKEN: ${{ secrets.A2A_TEST_OIDC_TOKEN }}
+      A2A_TEST_UNAUTH_TOKEN: ${{ secrets.A2A_TEST_UNAUTH_TOKEN }}
+      A2A_NO_ALLOWLIST_TENANT: ${{ vars.A2A_NO_ALLOWLIST_TENANT }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.11"
+      - name: Install suite deps
+        run: pip install -r tests/a2a/requirements-a2a-tests.txt
+
+      # TODO(devops): insert server stand-up here and export A2A_SERVER_BASE_URL
+      # (+ tokens) so the gate below has a reachable target.
+
+      - name: Preflight — acceptance requires a reachable server
+        run: |
+          if [ -z "${A2A_SERVER_BASE_URL}" ] && [ -z "${A2A_FUZEPLAN_BASE_URL}" ]; then
+            echo "::error::Phase-3 acceptance gate: no A2A server configured " \
+                 "(A2A_SERVER_BASE_URL / A2A_FUZEPLAN_BASE_URL unset). A missing " \
+                 "server at acceptance time IS a failure — this gate is not yet " \
+                 "wired (devops TODO / #90)."
+            exit 1
+          fi
+
+      - name: Run live acceptance gate (cross-product + authZ-negative + state-machine)
+        working-directory: tests/a2a
+        run: python -m pytest -m live -v
