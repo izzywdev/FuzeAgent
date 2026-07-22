@@ -5,6 +5,7 @@ onboards by adding an entry to ``a2a.tenants`` — never a new pod (values-inter
 §description). We parse only; the Helm chart that supplies these values is
 devops-engineer's slice.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

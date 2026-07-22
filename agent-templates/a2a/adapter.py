@@ -10,6 +10,7 @@ credential validation, then calls these methods with an already-resolved, TRUSTE
 ``AuthContext``. Skill selection travels as ``message.metadata.skillId`` (routing, which
 the callee may reject); it is NEVER trusted for authorization (authz.md §1).
 """
+
 from __future__ import annotations
 
 import json
@@ -30,8 +31,9 @@ RepoResolver = Callable[[TenantConfig], "tuple[dict, dict]"]
 
 class AgentProviderLike(Protocol):
     def ensure_agent(self, manifest, multiagent=None) -> dict: ...
-    def create_session(self, agent_id, version, environment_id, vault_ids=None,
-                       memory_resources=None, title=None) -> str: ...
+    def create_session(
+        self, agent_id, version, environment_id, vault_ids=None, memory_resources=None, title=None
+    ) -> str: ...
     def run_until_block(self, session_id, prompt=None) -> dict: ...
     def confirm_tool(self, session_id, tool_use_id, allow=True, deny_message=None) -> None: ...
     def resume_session(self, session_id, summary, context_ref="") -> None: ...
@@ -103,7 +105,7 @@ class A2AAdapter:
         manifest, roles = self.resolve_repo(tenant)
         # exec tenants (Exec-<role>) project a single exec role card
         if tenant.tenant.startswith("Exec-"):
-            role_key = tenant.tenant[len("Exec-"):]
+            role_key = tenant.tenant[len("Exec-") :]
             role = roles.get(role_key)
             if role is None:
                 raise we.task_not_found()
@@ -140,12 +142,9 @@ class A2AAdapter:
         """(skill_id, role_dict, known) from message.metadata.skillId or the entry role."""
         skill_id = (message.get("metadata") or {}).get("skillId")
         if not skill_id:
-            skill_id = (
-                tenant.entry_role
-                or (manifest.get("a2a") or {}).get("entryRole")
-            )
+            skill_id = tenant.entry_role or (manifest.get("a2a") or {}).get("entryRole")
         if tenant.tenant.startswith("Exec-") and not skill_id:
-            skill_id = tenant.tenant[len("Exec-"):]
+            skill_id = tenant.tenant[len("Exec-") :]
         role = roles.get(skill_id) if skill_id else None
         return skill_id, role, role is not None
 
@@ -209,7 +208,10 @@ class A2AAdapter:
                 {
                     "text": f"This skill requires scope(s): {', '.join(res.missing_scopes)}.",
                     "status": "blocked",
-                    "pending": {"event_ids": [], "tools": {"scope": "request_scope(" + ",".join(res.missing_scopes) + ")"}},
+                    "pending": {
+                        "event_ids": [],
+                        "tools": {"scope": "request_scope(" + ",".join(res.missing_scopes) + ")"},
+                    },
                 },
                 session_id=synth,
                 context_id=context_id,
@@ -249,7 +251,9 @@ class A2AAdapter:
     def _run_background(self, session_id: str, context_id: str, prompt: str | None):
         # mark WORKING immediately, then run out of band (returnImmediately: true)
         working = tm.map_result(
-            {"text": "", "status": "idle", "pending": None}, session_id=session_id, context_id=context_id
+            {"text": "", "status": "idle", "pending": None},
+            session_id=session_id,
+            context_id=context_id,
         )
         working.status.state = tm.TaskState.TASK_STATE_WORKING
         self.store.update(session_id, task=_dump(working), terminal=False)

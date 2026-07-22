@@ -16,6 +16,7 @@ What is DELIBERATELY not projected (card-projection.md §3/§7): ``tools``,
 ``environment`` and ``vault`` bindings. Leaking any of them would tell a caller which
 credentials the callee holds — exactly the coupling A2A removes.
 """
+
 from __future__ import annotations
 
 import json
@@ -290,9 +291,7 @@ def project_product_card(
 
 
 def _exec_description(role_key: str, role: dict) -> str:
-    base = role.get("description") or (
-        f"Executive {role_key.upper()} authority agent for FuzeOne."
-    )
+    base = role.get("description") or (f"Executive {role_key.upper()} authority agent for FuzeOne.")
     return (
         f"{base} Binding decisions pause the task in TASK_STATE_INPUT_REQUIRED while a "
         f"human is reached via their digital persona — callers must not impose short timeouts."
@@ -362,7 +361,13 @@ def generate_cards(
 
     for key in exec_keys:
         card = project_exec_card(
-            key, roles[key], manifest, issuer_url=issuer_url, version=version, sign=sign, signer=signer
+            key,
+            roles[key],
+            manifest,
+            issuer_url=issuer_url,
+            version=version,
+            sign=sign,
+            signer=signer,
         )
         out.append((f"Exec-{key}", card))
     return out

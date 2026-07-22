@@ -11,6 +11,7 @@ FAIL-CLOSED: absent means unconfigured, which is DENY (never permissive) — thi
 load-bearing, because ``providesTo`` is absent on most repos at freeze time and
 treating absent as allow would silently open them to every caller.
 """
+
 from __future__ import annotations
 
 import re

@@ -10,6 +10,7 @@ NOT persist its own task table that duplicates state. This store therefore holds
     only status a session reports is what ``run_until_block`` returned. The snapshot is
     a reflection of that result; the adapter never invents a transition.
 """
+
 from __future__ import annotations
 
 import threading
@@ -51,7 +52,9 @@ class SessionStore:
             return None
         return rec
 
-    def update(self, session_id: str, *, task: dict, terminal: bool, pending_tool_use_id=None) -> None:
+    def update(
+        self, session_id: str, *, task: dict, terminal: bool, pending_tool_use_id=None
+    ) -> None:
         with self._lock:
             rec = self._by_id.get(session_id)
             if rec is None:

@@ -6,6 +6,7 @@ Role ``extends`` inheritance is intentionally NOT flattened here — the project
 only ``role``, ``name``, ``description``, ``services``, ``metadata``, ``coordinator``
 and the optional ``a2a`` block, none of which are inherited from ``_base`` in practice.
 """
+
 from __future__ import annotations
 
 import json

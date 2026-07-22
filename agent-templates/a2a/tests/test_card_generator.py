@@ -6,6 +6,7 @@ frozen ``examples/*.json`` are hand-authored illustrations that differ from a ru
 the contract actually fixes — schema validity and the derived tag SET — not byte
 equality with the example.
 """
+
 from __future__ import annotations
 
 import pytest

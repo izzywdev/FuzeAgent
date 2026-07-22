@@ -13,6 +13,7 @@ Modules:
     adapter         -- wire method dispatch onto an AgentProvider
     server          -- Starlette JSON-RPC 2.0 + SSE transport
 """
+
 from __future__ import annotations
 
 __version__ = "1.0.0"

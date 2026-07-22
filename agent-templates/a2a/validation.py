@@ -5,6 +5,7 @@ A card MUST validate against BOTH ``agent-card.schema.json`` (the open A2A shape
 ``$ref``s the card schema by relative filename, so we resolve refs against the schema
 directory.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,9 +27,7 @@ def _validator(root_schema_name: str) -> Draft202012Validator:
     schema = _schema(root_schema_name)
     # Resolve sibling $ref filenames (agent-card.schema.json) against the schema dir.
     store = {
-        s["$id"]: s
-        for s in (_schema(p.name) for p in SCHEMA_DIR.glob("*.json"))
-        if "$id" in s
+        s["$id"]: s for s in (_schema(p.name) for p in SCHEMA_DIR.glob("*.json")) if "$id" in s
     }
     base = SCHEMA_DIR.as_uri() + "/"
     resolver = RefResolver(base_uri=base, referrer=schema, store=store)

@@ -6,6 +6,7 @@ redefined here. This module only adds the *server-side* helpers: turning an
 ``A2AError`` into the on-the-wire ``{"code","message","data"}`` object, where
 ``data`` is an ARRAY whose elements carry a ProtoJSON ``@type`` (binding.md §3).
 """
+
 from __future__ import annotations
 
 from typing import Any

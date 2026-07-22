@@ -4,6 +4,7 @@ Adds the ``agent-templates`` directory to ``sys.path`` so ``import a2a...`` and 
 contract client package resolve without an editable install, mirroring how the server
 process is launched.
 """
+
 from __future__ import annotations
 
 import json
@@ -12,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-_A2A_PKG = Path(__file__).resolve().parents[1]          # .../agent-templates/a2a
-_AGENT_TEMPLATES = _A2A_PKG.parent                       # .../agent-templates
+_A2A_PKG = Path(__file__).resolve().parents[1]  # .../agent-templates/a2a
+_AGENT_TEMPLATES = _A2A_PKG.parent  # .../agent-templates
 for p in (str(_AGENT_TEMPLATES),):
     if p not in sys.path:
         sys.path.insert(0, p)

@@ -10,6 +10,7 @@ and errors THROUGH here so there is exactly one definition of the contract types
 We NEVER redefine the wire or card models — redefining a generated model is how a
 server silently forks from its spec (see the client package docstring).
 """
+
 from __future__ import annotations
 
 import sys

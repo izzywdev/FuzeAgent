@@ -2,6 +2,7 @@
 
 The security-critical property is FAIL-CLOSED: absent/empty ``providesTo`` denies.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -53,7 +54,13 @@ def test_invalid_caller_identity_denied():
 
 @pytest.mark.parametrize(
     "caller,ok",
-    [("FuzeSales", True), ("Exec-cto", True), ("izzywdev/FuzeSales", False), ("", False), ("bad name", False)],
+    [
+        ("FuzeSales", True),
+        ("Exec-cto", True),
+        ("izzywdev/FuzeSales", False),
+        ("", False),
+        ("bad name", False),
+    ],
 )
 def test_valid_caller_identity(caller, ok):
     assert valid_caller_identity(caller) is ok

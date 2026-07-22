@@ -15,6 +15,7 @@ missed state-mapping.md.
 
 ``TASK_STATE_UNSPECIFIED`` MUST never be emitted.
 """
+
 from __future__ import annotations
 
 import re
@@ -73,7 +74,9 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def agent_message(text: str, *, context_id: str | None = None, task_id: str | None = None) -> Message:
+def agent_message(
+    text: str, *, context_id: str | None = None, task_id: str | None = None
+) -> Message:
     """An agent-role Message carrying a single text part."""
     return Message(
         messageId=str(uuid.uuid4()),
@@ -160,7 +163,9 @@ def map_result(
         message = agent_message(text, context_id=context_id, task_id=session_id) if text else None
     elif status == "error":
         state = TaskState.TASK_STATE_FAILED
-        message = agent_message(text or "The task failed.", context_id=context_id, task_id=session_id)
+        message = agent_message(
+            text or "The task failed.", context_id=context_id, task_id=session_id
+        )
     elif status == "blocked":
         state = classify_pause(pending)
         message = agent_message(
@@ -200,6 +205,4 @@ def rejected_task(session_id: str, context_id: str) -> Task:
 
 
 def canceled_task(session_id: str, context_id: str) -> Task:
-    return Task(
-        id=session_id, contextId=context_id, status=_status(TaskState.TASK_STATE_CANCELED)
-    )
+    return Task(id=session_id, contextId=context_id, status=_status(TaskState.TASK_STATE_CANCELED))
