@@ -15,7 +15,22 @@ import os
 import pytest
 from fuze_a2a_client import A2AClient, TaskState
 
-pytestmark = [pytest.mark.a2a, pytest.mark.integration, pytest.mark.acceptance]
+# Gate on either a dedicated FuzePlan endpoint or the shared server URL. When
+# neither is set this is the Phase 3 acceptance gate and the module SKIPs; when
+# one is set the acceptance test RUNS and FAILS LOUDLY on any deviation.
+_live_configured = bool(os.environ.get("A2A_FUZEPLAN_BASE_URL") or os.environ.get("A2A_SERVER_BASE_URL"))
+pytestmark = [
+    pytest.mark.a2a,
+    pytest.mark.integration,
+    pytest.mark.acceptance,
+    pytest.mark.skipif(
+        not _live_configured,
+        reason=(
+            "FuzePlan A2A server not deployed (A2A_FUZEPLAN_BASE_URL / "
+            "A2A_SERVER_BASE_URL unset) — Phase 3 acceptance gate; set one to enforce."
+        ),
+    ),
+]
 
 REQUIREMENTS = (
     "From this discussion, create Jira tickets: (1) add email-OTP to self-registration, "

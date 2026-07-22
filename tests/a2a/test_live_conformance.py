@@ -9,7 +9,9 @@ from __future__ import annotations
 import pytest
 from jsonschema import Draft202012Validator
 
-pytestmark = [pytest.mark.a2a, pytest.mark.integration]
+from conftest import requires_live_server
+
+pytestmark = [pytest.mark.a2a, pytest.mark.integration, requires_live_server]
 
 
 def test_wellknown_card_is_schema_valid(live_card, card_schema):
