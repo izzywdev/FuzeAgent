@@ -1,0 +1,18 @@
+{
+  "_comment": "Example A2A target registry for the handoff MCP transport (a2a_transport.py). Provide it via the A2A_TARGETS env var (as a JSON string) or as a2a-targets.json in FUZE_STATE_DIR. Each key is a target agent identity a caller names in spawn_agent/ask_agent/reach_human. All fields are optional: with no entry, a2a_transport falls back to convention (discovery at http://a2a-<slug>.<A2A_DISCOVERY_DOMAIN>:<port>, skill_id = key, tenant = key). The card discovered at the well-known path is the source of truth for the RPC url + binding; these only steer discovery + skill selection.",
+  "FuzePlan": {
+    "skill_id": "product-manager",
+    "tenant": "FuzePlan",
+    "discovery_url": "http://a2a-fuzeplan.fuzeagent.svc.cluster.local:8080"
+  },
+  "Exec-cto": {
+    "skill_id": "cto",
+    "tenant": "Exec-cto",
+    "discovery_url": "http://a2a-exec-cto.fuzeagent.svc.cluster.local:8080"
+  },
+  "persona-izzy": {
+    "skill_id": "digital-persona",
+    "tenant": "FuzeExecutive",
+    "discovery_url": "http://a2a-fuzeexecutive.fuzeagent.svc.cluster.local:8080"
+  }
+}
