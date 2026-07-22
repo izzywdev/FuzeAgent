@@ -13,8 +13,15 @@ from anthropic import Anthropic
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-# Import conversation manager for full chat tracking
-from .conversation_manager import ConversationManager, MessageType
+# Import conversation manager for full chat tracking.
+# This module is imported both as part of the `services.orchestrator` package
+# (relative form, e.g. from main.py/agent_manager.py) and flat with
+# services/orchestrator on sys.path (e.g. from tests and main_with_hierarchy.py),
+# so support both — mirrors the existing pattern in hierarchy_endpoints.py.
+try:
+    from .conversation_manager import ConversationManager, MessageType
+except ImportError:  # pragma: no cover - flat import (no parent package)
+    from conversation_manager import ConversationManager, MessageType
 
 
 class ClaudeCodeInput(BaseModel):
@@ -42,6 +49,24 @@ class ClaudeCodeWrapper(BaseTool):
     follows industry best practices. Enhanced for repository context and Git integration.
     """
     args_schema: Type[BaseModel] = ClaudeCodeInput
+
+    # Runtime attributes. ``BaseTool`` is a Pydantic v2 model, which rejects
+    # assignment to undeclared attributes ("object has no field ...").  These
+    # are declared as model fields (rather than PrivateAttr) so they remain
+    # publicly readable on the instance (e.g. ``wrapper.client`` /
+    # ``wrapper.model``), preserving the tool's public interface.  Object
+    # handles (Anthropic SDK client, git/conversation managers) are typed
+    # ``Any`` so Pydantic stores them as-is without schema validation.
+    client: Optional[Any] = None
+    model: str = "claude-3-5-sonnet-20241022"
+    workspace_path: Optional[str] = None
+    git_manager: Optional[Any] = None
+    agent_id: Optional[str] = None
+    task_id: Optional[str] = None
+    conversation_manager: Optional[Any] = None
+    conversation_session_id: Optional[str] = None
+    current_context: Dict[str, Any] = Field(default_factory=dict)
+    repository_context: Dict[str, Any] = Field(default_factory=dict)
 
     def __init__(
         self,

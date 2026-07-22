@@ -13,6 +13,11 @@ class TeamType(str, Enum):
     DESIGN = "design"
     MANAGEMENT = "management"
     GENERAL = "general"
+    OPERATIONS = "operations"
+    RESEARCH = "research"
+    MARKETING = "marketing"
+    SALES = "sales"
+    SUPPORT = "support"
 
 
 class AgentType(str, Enum):
@@ -94,9 +99,13 @@ class Team(TeamBase):
 
 # Agent Models
 class AgentBase(BaseModel):
+    # `type` is a free-form, template-derived identifier (e.g. "python_developer",
+    # "executive"). The backing column is VARCHAR(50) and the template system is
+    # open-ended, so this is intentionally a plain string rather than a closed
+    # enum. See AgentType for the well-known values.
     name: str = Field(..., min_length=1, max_length=255)
     role: str = Field(..., min_length=1, max_length=255)
-    type: AgentType
+    type: str = Field(..., min_length=1, max_length=50)
     config: Dict[str, Any] = Field(default_factory=dict)
     template_id: Optional[str] = None
 
@@ -108,7 +117,7 @@ class AgentCreate(AgentBase):
 class AgentUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     role: Optional[str] = Field(None, min_length=1, max_length=255)
-    type: Optional[AgentType] = None
+    type: Optional[str] = Field(None, min_length=1, max_length=50)
     status: Optional[AgentStatus] = None
     config: Optional[Dict[str, Any]] = None
     team_id: Optional[str] = None

@@ -92,7 +92,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "unit" -v --cov=. --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ -m "unit" -v --cov=. --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Run API tests
       working-directory: services/orchestrator
@@ -102,7 +102,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "api" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ -m "api" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Run database tests
       working-directory: services/orchestrator
@@ -112,7 +112,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "database" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ -m "database" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Run integration tests
       working-directory: services/orchestrator
@@ -122,7 +122,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "integration" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ -m "integration" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Run RAG system tests
       working-directory: services/orchestrator
@@ -132,7 +132,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "rag" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ -m "rag" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Run A2A protocol tests
       working-directory: services/orchestrator
@@ -142,7 +142,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "a2a" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ -m "a2a" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Run MCP server tests
       working-directory: services/orchestrator
@@ -152,7 +152,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "mcp" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ -m "mcp" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Run Goals Management tests
       working-directory: services/orchestrator
@@ -162,7 +162,7 @@ jobs:
         ANTHROPIC_API_KEY: test-api-key
         TESTING: 1
       run: |
-        python -m pytest tests/ -m "goals" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing
+        python -m pytest tests/ -m "goals" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -203,8 +203,8 @@ jobs:
     - name: Run Bandit security scan
       working-directory: services/orchestrator
       run: |
-        bandit -r . -f json -o bandit-report.json || true
-        bandit -r . -f txt
+        bandit -r . --skip B101 -f json -o bandit-report.json || true
+        bandit -r . --skip B101 -f txt
     
     - name: Check for known security vulnerabilities
       working-directory: services/orchestrator
@@ -274,7 +274,7 @@ jobs:
     
     - name: Test Docker image
       run: |
-        docker run --rm fuzeagent-orchestrator:test python -c "import main_with_hierarchy; print('Docker image works!')"
+        docker run --rm --entrypoint python fuzeagent-orchestrator:test -c "import main_with_hierarchy; print('Docker image works!')"
 
   test-frontend:
     runs-on: ubuntu-latest

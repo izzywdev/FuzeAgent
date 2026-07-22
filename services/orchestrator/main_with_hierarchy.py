@@ -355,7 +355,7 @@ async def get_teams(organization_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=f"Failed to get teams: {str(e)}")
 
 
-@app.post("/teams", response_model=Team)
+@app.post("/teams", response_model=Team, status_code=201)
 async def create_team(team_data: TeamCreate):
     """Create a new team"""
     try:
@@ -435,6 +435,25 @@ async def delete_team(team_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to delete team: {str(e)}")
 
 
+@app.get("/teams/{team_id}/agents")
+async def get_team_agents(team_id: str):
+    """Get all agents that belong to a specific team"""
+    try:
+        # Verify team exists so callers get a clear 404 instead of an empty list
+        team = await DatabaseManager.get_team(team_id)
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+
+        agents = await DatabaseManager.get_agents(team_id)
+        return agents
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get team agents: {str(e)}"
+        )
+
+
 # ============================================================================
 # AGENT ENDPOINTS (Updated for Teams)
 # ============================================================================
@@ -485,8 +504,9 @@ async def create_agent(agent_data: AgentCreate):
 async def create_agent_from_template(template_data: CreateAgentFromTemplate):
     """Create agent from template"""
     try:
-        template = template_manager.get_template(template_data.template_id)
-        if not template:
+        try:
+            template = template_manager.get_template(template_data.template_id)
+        except ValueError:
             raise HTTPException(status_code=404, detail="Template not found")
 
         # Get team_id from overrides or use default
@@ -508,7 +528,7 @@ async def create_agent_from_template(template_data: CreateAgentFromTemplate):
             "backstory": template_data.overrides.get(
                 "backstory", template.default_backstory
             ),
-            "model": template.model,
+            "model": template.default_model,
             "temperature": template_data.overrides.get(
                 "temperature", template.default_temperature
             ),
@@ -519,8 +539,8 @@ async def create_agent_from_template(template_data: CreateAgentFromTemplate):
         agent_id = await DatabaseManager.insert_agent(
             team_id=team_id,
             name=template_data.overrides.get("name", f"{template.name} Agent"),
-            role=template.role,
-            type=template.type,
+            role=template.name,
+            type=template.template_id,
             config=config,
             template_id=template.template_id,
         )
@@ -614,7 +634,7 @@ async def get_agent(agent_id: str):
 )
 async def get_templates():
     """Get all agent templates"""
-    templates = template_manager.get_all_templates()
+    templates = template_manager.list_templates()
     return {
         "templates": templates,
         "categories": [category.value for category in AgentCategory],

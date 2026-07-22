@@ -4,9 +4,32 @@ Pytest configuration and fixtures for FuzeAgent tests
 
 import asyncio
 import os
+import sys
 import tempfile
+import types
+from pathlib import Path
 from typing import AsyncGenerator, Generator
 from unittest.mock import AsyncMock, MagicMock
+
+# Some test modules import the orchestrator by its fully-qualified package path
+# (`services.orchestrator.<module>`). Register `services` as a namespace package
+# pointing at the repo root instead of putting the repo root on sys.path.
+#
+# sys.path must NOT be touched here. There are two different modules named
+# `hierarchy_endpoints` — the repo-root one (the standalone `app`) and the
+# service-local one (the `router` that main_with_hierarchy imports) — so which
+# one wins is purely a sys.path ordering question:
+#   * prepending the repo root shadows the service-local module and breaks
+#     conftest's own `from main_with_hierarchy import app`;
+#   * appending it silently defeats the `if _REPO_ROOT not in sys.path`
+#     guard in test_hierarchy_ws_authz.py, which needs to insert(0) the repo
+#     root to reach the standalone app.
+# Registering the namespace directly sidesteps the ordering problem entirely.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if "services" not in sys.modules:
+    _services_ns = types.ModuleType("services")
+    _services_ns.__path__ = [str(_REPO_ROOT / "services")]  # type: ignore[attr-defined]
+    sys.modules["services"] = _services_ns
 
 import asyncpg
 import pytest
@@ -21,6 +44,15 @@ os.environ["DATABASE_URL"] = (
 os.environ["ANTHROPIC_API_KEY"] = "test-api-key"
 os.environ["OPENAI_API_KEY"] = "test-openai-api-key"
 os.environ["ENCRYPTION_KEY"] = "dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy1sb25n"
+# KnowledgeManager defaults its storage root to the in-container path
+# "/app/knowledge_storage" and mkdir()s it in __init__, which main.py runs at
+# import time. Off a container that is an unwritable path, so importing
+# services.orchestrator.main failed collection with PermissionError: '/app'.
+# Point it at a temp dir for tests.
+os.environ.setdefault(
+    "KNOWLEDGE_STORAGE_PATH",
+    os.path.join(tempfile.gettempdir(), "fuzeagent-test-knowledge-storage"),
+)
 
 from a2a_protocol import A2AProtocolManager
 from database import DatabaseManager
@@ -41,10 +73,34 @@ def event_loop():
     loop.close()
 
 
+async def _truncate_hierarchy_tables() -> None:
+    """Remove all seeded hierarchy rows so api tests start from an empty DB."""
+    conn = await asyncpg.connect(os.environ["DATABASE_URL"])
+    try:
+        # organizations is the root of the hierarchy; CASCADE clears teams,
+        # agents, tasks and everything referencing them in one statement.
+        await conn.execute("TRUNCATE TABLE organizations RESTART IDENTITY CASCADE")
+    finally:
+        await conn.close()
+
+
 @pytest.fixture
-def client():
-    """FastAPI test client"""
+def client(request):
+    """FastAPI test client.
+
+    The app lifespan runs migrations, which seed a default organization, team
+    and agents. The ``api``-marked endpoint tests assert on an initially empty
+    database, so for those tests we truncate the hierarchy tables *after* the
+    app has started (and seeded) but *before* the test body — and therefore
+    before any test-requested setup fixture that depends on ``client`` — runs.
+    """
     with TestClient(app) as c:
+        if request.node.get_closest_marker("api") is not None:
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(_truncate_hierarchy_tables())
+            finally:
+                loop.close()
         yield c
 
 

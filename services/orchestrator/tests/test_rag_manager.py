@@ -1,10 +1,25 @@
+import pytest
+
+# QUARANTINED — see izzywdev/FuzeAgent#80.
+# These tests assert an aspirational RAGManager API that was never built: a `db_pool`
+# attribute (real is `self.pool`) plus `store_agent_knowledge`, `search_agent_knowledge`,
+# `get_conversation_history`, `get_enhanced_context`, `get_agent_statistics`,
+# `cleanup_old_conversations`, and `summarize_conversation` — none of which exist on
+# RAGManager (closest real methods: add_to_knowledge_base / search_knowledge_base /
+# search_conversation_history / cleanup_old_data). They also use the legacy
+# `await <async fixture>` coroutine-injection pattern, invalid under pytest-asyncio 1.x
+# auto-mode. Un-skipping requires freezing the intended RAGManager contract
+# (contract-designer) and implementing it — not rewriting tests to match current code.
+# Skipped at collection to track the debt honestly.
+pytestmark = pytest.mark.skip(
+    reason="aspirational RAGManager API not yet built; see #80"
+)
+
 """
 Test cases for RAG Manager functionality
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 from rag_manager import RAGManager
 
