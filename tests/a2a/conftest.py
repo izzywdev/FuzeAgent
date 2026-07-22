@@ -112,3 +112,78 @@ def live_transport(live_base_url):  # noqa: ARG001 - forces the gate to evaluate
     import httpx
 
     return httpx.Client(timeout=float(os.environ.get("A2A_TEST_TIMEOUT", "30")))
+
+
+def _oidc_token(var: str, role: str) -> str:
+    tok = os.environ.get(var)
+    if not tok:
+        pytest.fail(
+            f"No OIDC token for the {role} caller (${var} unset). "
+            "Cannot exercise the live authorization model without a real credential. "
+            "RED until the server + test credentials are wired.",
+            pytrace=False,
+        )
+    return tok
+
+
+@pytest.fixture
+def allowlisted_token() -> str:
+    """OIDC token whose subject IS in the callee's providesTo (an allowed caller)."""
+    return _oidc_token("A2A_TEST_OIDC_TOKEN", "allowlisted")
+
+
+@pytest.fixture
+def unauthorized_token() -> str:
+    """OIDC token whose subject is NOT in the callee's providesTo. authz.md §3:
+    absent-from-allowlist MUST be denied BY THE CALLEE, not merely un-routed."""
+    return _oidc_token("A2A_TEST_UNAUTH_TOKEN", "unauthorized")
+
+
+@pytest.fixture
+def live_card(live_base_url, live_transport):
+    """Fetch the public Agent Card from the live server, or FAIL red with a clear
+    'server slice not delivered' message on any connection error."""
+    import httpx
+    from fuze_a2a_client import A2AClient
+
+    try:
+        return A2AClient.fetch_card(live_base_url, transport=live_transport)
+    except (httpx.HTTPError, OSError) as exc:
+        pytest.fail(
+            f"Could not reach the A2A server at {live_base_url} "
+            f"(GET /.well-known/agent-card.json): {exc!r}. "
+            "RED because the server slice is not yet delivered/reachable.",
+            pytrace=False,
+        )
+
+
+@pytest.fixture
+def live_client(live_card, live_transport, allowlisted_token):
+    from fuze_a2a_client import A2AClient
+
+    return A2AClient(live_card, token=allowlisted_token, transport=live_transport)
+
+
+@pytest.fixture
+def live_raw(live_base_url, live_card, live_transport, allowlisted_token):
+    """POST a raw JSON-RPC envelope to the live /rpc endpoint and return
+    ``(http_status, parsed_body)``. Lets tests probe methods the typed client does
+    not expose (e.g. push-notification methods) and malformed headers."""
+    import uuid
+
+    rpc_url = str(live_card.supportedInterfaces[0].url)
+
+    def _post(method: str, params: dict, *, version: str = "1.0", token: str | None = ...):
+        headers = {"Content-Type": "application/json", "A2A-Version": version}
+        auth = allowlisted_token if token is ... else token
+        if auth:
+            headers["Authorization"] = f"Bearer {auth}"
+        envelope = {"jsonrpc": "2.0", "id": str(uuid.uuid4()), "method": method, "params": params}
+        resp = live_transport.post(rpc_url, json=envelope, headers=headers)
+        try:
+            body = resp.json()
+        except Exception:  # noqa: BLE001
+            body = {}
+        return resp.status_code, body
+
+    return _post
