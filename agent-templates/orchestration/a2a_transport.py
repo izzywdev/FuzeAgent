@@ -201,6 +201,21 @@ def _remember(task_id: str, target: str) -> None:
             _task_target[task_id] = target
 
 
+def is_known_task(task_id: str) -> bool:
+    """True if this task/session id was created/continued in this process — i.e. a
+    continuation can resolve which target agent (and tenant) owns it."""
+    with _lock:
+        return task_id in _task_target
+
+
+def persona_target(human: str) -> str:
+    """Target key for a human's digital-persona agent, used by reach_human. Defaults
+    to ``<A2A_PERSONA_PREFIX><human>`` (prefix default ``persona-``); the key can be
+    remapped to any tenant/skill/discovery_url in the A2A_TARGETS registry."""
+    prefix = os.environ.get("A2A_PERSONA_PREFIX", "persona-")
+    return f"{prefix}{human}"
+
+
 # ---------------------------------------------------------------------------
 # Task -> legacy shape mapping
 # ---------------------------------------------------------------------------
@@ -326,5 +341,7 @@ __all__ = [
     "continue_task",
     "get_task",
     "cancel_task",
+    "is_known_task",
+    "persona_target",
     "A2AError",
 ]

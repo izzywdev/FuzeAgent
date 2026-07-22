@@ -15,10 +15,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY sync/ /app/sync/
 COPY orchestration/handoff_mcp/ /app/handoff_mcp/
+# A2A transport module + the FROZEN generated client (client side of the wire).
+COPY orchestration/a2a_transport.py /app/a2a_transport.py
+COPY contracts/a2a/v1/client/fuze_a2a_client /app/a2a_client/fuze_a2a_client
 
 ENV HANDOFF_SYNC_DIR=/app/sync \
     FUZE_STATE_DIR=/state \
-    PYTHONPATH=/app/sync \
+    A2A_CLIENT_DIR=/app/a2a_client \
+    PYTHONPATH=/app/sync:/app \
     HOST=0.0.0.0 \
     PORT=8000 \
     PYTHONUNBUFFERED=1

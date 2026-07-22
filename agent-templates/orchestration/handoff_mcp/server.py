@@ -1,32 +1,34 @@
 #!/usr/bin/env python3
-"""Handoff MCP server — the knowledgeable, session-native way for one agent to
-inject a prompt into another agent (instead of the primitive "open a GitHub issue
-and poll for a comment").
+"""Handoff MCP server — the session-native way for one agent to hand a GOAL to
+another agent, now carried **over the A2A wire**.
 
-Runs on YOUR infra and holds ANTHROPIC_API_KEY, so agents never carry the key in
-their sandbox. It's declared as an MCP server on each role agent; agents call its
-tools. It creates/continues Managed-Agents sessions on their behalf.
+The tool surface is UNCHANGED (`spawn_agent`, `resume_session`, `ask_agent`,
+`approve`, `reach_human`, `memory_write`, `memory_read`) — a dev agent's interface
+is identical. What changed is the transport underneath: instead of creating and
+driving a Managed-Agents session directly, these tools now discover the target
+agent's A2A Agent Card and issue JSON-RPC `SendMessage` / `GetTask` / `CancelTask`
+through the FROZEN generated client (`contracts/a2a/v1/client/fuze_a2a_client`), via
+`orchestration/a2a_transport.py`.
 
-Core idea — sessions are persistent server-side (full history + sandbox state),
-so handoff carries only a POINTER + a SUMMARY, never a copied transcript:
-
-  spawn_agent(role, task, reply_to_session_id=A) -> B.session_id
-      A launches B, then goes idle (no live container while it waits).
-  resume_session(A.session_id, summary)          # B's callback when done
-      A wakes with its FULL history intact + B's concise work-state summary.
-  ask_agent(target, question) -> reply           # synchronous wait-for-reply
-  approve(session_id, tool_use_id, allow, reason) # answer an always_ask pause
-
-`context_ref` (a repo path like .fuze/handoff/<id>.md) is an alternative/companion
-to the inline summary for large state: the callee persists state there and the
-resumed agent reads the file itself.
+That is the whole point of A2A: the CALLING agent holds NO domain tools, skills or
+credentials of the callee — it just hands over a goal and reads back a Task
+(card-projection.md §7). Discovery + addressing follow binding.md; the returned
+A2A `TaskState` is mapped back onto the same `{session_id, status, reply, pending}`
+shape callers already consume (state-mapping.md §3). INPUT_REQUIRED / AUTH_REQUIRED
+surface as a `blocked` status whose `pending.message` a caller MUST read before
+assuming the pause is its own — some pauses are addressed to a human the caller
+cannot see, resolved on the callee side via `reach_human` (state-mapping.md §4).
 
 Run (on the worker host / a small service):
     pip install -r requirements.txt
-    export ANTHROPIC_API_KEY=...            # server-side only
+    export A2A_TOKEN=...                    # OIDC bearer, server-side only
+    export A2A_TARGETS='{"FuzePlan": {"skill_id": "product-manager"}}'   # optional
     python server.py                        # serves streamable-HTTP MCP
 Then set HANDOFF_MCP_URL to this server's URL when syncing agents (roles/_base
 declares it as an mcp_server so every role can hand off).
+
+The `memory_write` / `memory_read` tools remain a distinct durable-state channel
+(the shared memory store) and are unchanged — they are orthogonal to the wire.
 """
 import json
 import os
@@ -34,13 +36,19 @@ import sys
 
 from mcp.server.fastmcp import FastMCP
 
-# reuse the REST helper + session driver from ../../sync (HANDOFF_SYNC_DIR overrides
-# for the container image, where sync/ is copied to a fixed path).
+# a2a_transport lives one directory up (orchestration/); the memory tools still use
+# the REST `common` helper from ../../sync. HANDOFF_SYNC_DIR overrides sync/ for the
+# container image; A2A_CLIENT_DIR (handled inside a2a_transport) overrides the client.
+_HERE = os.path.dirname(os.path.abspath(__file__))              # handoff_mcp/
+_ORCH = os.path.dirname(_HERE)                                  # orchestration/
 SYNC = os.environ.get("HANDOFF_SYNC_DIR") or os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "sync")
-sys.path.insert(0, SYNC)
-import common   # noqa: E402
-import driver   # noqa: E402
+    os.path.dirname(_ORCH), "sync")
+for _p in (_ORCH, SYNC):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import a2a_transport as a2a   # noqa: E402
+import common                 # noqa: E402  (memory tools only)
 
 STATE = common.state_dir()  # honors FUZE_STATE_DIR (mounted /state volume in the container)
 HANDOFF_INSTRUCTIONS = ("Shared cross-session handoff workspace. Read relevant /handoff/*.md before "
@@ -51,25 +59,126 @@ mcp = FastMCP("fuze-handoff",
               port=int(os.environ.get("PORT", "8000")))
 
 
-def _roles():
-    path = os.path.join(STATE, "agent-ids.json")
-    if not os.path.exists(path):
-        raise RuntimeError("agent-ids.json missing — run sync_agents.py first")
-    return json.load(open(path, encoding="utf-8"))
+# ---------------------------------------------------------------------------
+# A2A-routed handoff tools (transport = A2A; signatures unchanged)
+# ---------------------------------------------------------------------------
+def _context_instructions(context_ref: str) -> str:
+    """Prompt suffix for large-state-by-reference. Over the A2A wire the callee
+    resumes its own session and never replays a transcript, so we never inline
+    state — we point at it (state-mapping.md §6, `never inline large state`)."""
+    if not context_ref:
+        return ""
+    return (f"\n\nLarger state is passed by reference: persist/read it at '{context_ref}' "
+            f"(a repo path, or a path in the shared handoff memory store) rather than inlining it.")
 
 
-def _vault_ids():
-    path = os.path.join(STATE, "vault-ids.json")
-    return list(json.load(open(path, encoding="utf-8")).values()) if os.path.exists(path) else []
+@mcp.tool()
+def spawn_agent(role: str, task: str, reply_to_session_id: str = "", context_ref: str = "", wait: bool = False) -> str:
+    """Hand a goal to a target agent over A2A, in its own session/environment.
+
+    role: the target agent key (a product/exec identity, e.g. 'FuzePlan' or
+        'Exec-cto'; mapped to a skill id via A2A_TARGETS or convention). The caller
+        needs NONE of that agent's tools — it only names the outcome it wants.
+    task: the goal — a concise instruction, not a pasted transcript.
+    reply_to_session_id: retained for signature compatibility. Over A2A there is no
+        caller-side resume callback: the result comes back as a Task the caller polls
+        via ask_agent(<session_id>) / get_task, or subscribes to. Recorded in the
+        returned payload so callers can correlate.
+    context_ref: optional repo/memory path holding larger persisted state.
+    wait: if true, block until the task settles (terminal or interrupted) and return
+        {session_id, status, reply, pending}. If false, fire-and-forget: the task is
+        submitted and {session_id, status:"spawned"} returns at once (poll later).
+    """
+    prompt = task + _context_instructions(context_ref)
+    if not wait:
+        res = a2a.start(role, prompt, return_immediately=True)
+        return json.dumps({"session_id": res["session_id"], "status": "spawned",
+                           "reply_to_session_id": reply_to_session_id or None})
+    res = a2a.start(role, prompt, return_immediately=False)
+    res["reply_to_session_id"] = reply_to_session_id or None
+    return json.dumps(res)
 
 
+@mcp.tool()
+def resume_session(session_id: str, summary: str, context_ref: str = "") -> str:
+    """Continue an existing A2A task with a concise work-state summary.
+
+    Over the wire this is `SendMessage` carrying the same taskId: the callee resumes
+    its own server-side session (full history + sandbox intact) — it never replays a
+    transcript (state-mapping.md §1). Returns the task's mapped state after the
+    continuation settles.
+    """
+    text = f"[handoff:resume] {summary}" + _context_instructions(context_ref)
+    res = a2a.continue_task(session_id, text)
+    res["resumed"] = session_id
+    return json.dumps(res)
+
+
+@mcp.tool()
+def ask_agent(target: str, question: str) -> str:
+    """Hand a goal to an agent and read back its Task. target = a target agent key
+    (starts a fresh task in that agent's own environment) OR an existing session/task
+    id (continues it). Returns {session_id, status, reply, pending}; a 'blocked'
+    status means the task is INPUT_REQUIRED/AUTH_REQUIRED — read pending.message
+    before assuming it is addressed to you (state-mapping.md §4), and answer via
+    approve()/resume_session() or, if it needs a human, reach_human()."""
+    if a2a.is_known_task(target):
+        return json.dumps(a2a.continue_task(target, question))
+    return json.dumps(a2a.start(target, question, return_immediately=False))
+
+
+@mcp.tool()
+def approve(session_id: str, tool_use_id: str, allow: bool = True, reason: str = "") -> str:
+    """Answer an interrupted (INPUT_REQUIRED/AUTH_REQUIRED) A2A task by continuing it
+    with your decision. Over the wire this is `SendMessage` with the same taskId and
+    the decision in the message (state-mapping.md §4) — the callee correlates it to
+    its own pending tool. Deny with a reason to steer the agent instead of blocking."""
+    decision = "APPROVE: proceed." if allow else f"DENY: {reason or 'denied by caller'}"
+    if tool_use_id:
+        decision += f" (re: {tool_use_id})"
+    res = a2a.continue_task(session_id, decision)
+    res["tool_use_id"] = tool_use_id
+    res["result"] = "allow" if allow else "deny"
+    return json.dumps(res)
+
+
+@mcp.tool()
+def reach_human(human: str, message: str, reply_to_session_id: str = "", channels: str = "", wait: bool = False) -> str:
+    """Reach a real human through their digital-persona agent — over A2A.
+
+    Hands the message to the persona agent that owns this human's channel credentials
+    (their vault: email/Slack/GitHub/WhatsApp/Telegram/phone). That agent — not this
+    caller — contacts the human, collects their ACTUAL reply, and reports it back as
+    the task result. Use this instead of stalling when a decision or approval needs a
+    human. The caller holds none of the human's channel credentials.
+
+    human: person key. Resolved to a persona target via A2A_PERSONA_PREFIX (default
+        'persona-') + human, overridable in A2A_TARGETS.
+    channels: comma list to prefer (e.g. "slack,email"); empty = their preferred.
+    wait: if true, block until the persona reports (reply|blocked|pending); else
+        fire-and-forget and return {session_id, human, status:"reaching"}.
+    """
+    target = a2a.persona_target(human)
+    ch = f" via {channels}" if channels else " via their preferred channel"
+    prompt = (f"You represent {human}. Reach the real {human}{ch} with the following, collect their "
+              f"ACTUAL reply (never fabricate a binding answer), and report it.\n\nMESSAGE:\n{message}")
+    if reply_to_session_id:
+        prompt += (f"\n\nContext: this was requested to unblock session '{reply_to_session_id}'. "
+                   f"If you cannot reach them, report 'BLOCKED: ...'.")
+    if not wait:
+        res = a2a.start(target, prompt, return_immediately=True)
+        return json.dumps({"session_id": res["session_id"], "human": human, "status": "reaching"})
+    res = a2a.start(target, prompt, return_immediately=False)
+    res["human"] = human
+    return json.dumps(res)
+
+
+# ---------------------------------------------------------------------------
+# Durable memory-store channel (unchanged — distinct from the A2A wire)
+# ---------------------------------------------------------------------------
 def _memory_ids():
     path = os.path.join(STATE, "memory-ids.json")
     return json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
-
-
-def _memory_resources():
-    return [driver.memory_resource(sid, "read_write", HANDOFF_INSTRUCTIONS) for sid in _memory_ids().values()]
 
 
 def _handoff_store_id():
@@ -77,90 +186,6 @@ def _handoff_store_id():
     if not ids:
         raise RuntimeError("no memory store synced — run sync_memory.py first")
     return next(iter(ids.values()))
-
-
-def _new_session(role):
-    roles = _roles()
-    if role not in roles:
-        raise RuntimeError(f"unknown role '{role}'. Known: {', '.join(roles)}")
-    e = roles[role]
-    s = driver.create_session(e["id"], e["version"], e["environment_id"],
-                              vault_ids=_vault_ids(), resources=_memory_resources(),
-                              title=f"handoff:{role}")
-    return s["id"]
-
-
-def _callback_instructions(reply_to, context_ref):
-    parts = []
-    if reply_to:
-        parts.append(
-            f"When you finish, hand back by calling resume_session(session_id='{reply_to}', "
-            f"summary=<concise work-state>). Send ONLY a concise state summary — never paste your "
-            f"transcript; the originating session already holds its full history."
-        )
-    if context_ref:
-        parts.append(f"Persist any larger state to '{context_ref}' and reference it in your summary "
-                     f"(a repo path, or a memory path under the mounted handoff store).")
-    if reply_to:
-        parts.append("For durable/large state prefer the shared handoff memory store (mounted in this "
-                     "session, or via the memory_write tool) over inlining — pass only the path back.")
-    return ("\n\n" + "\n".join(parts)) if parts else ""
-
-
-@mcp.tool()
-def spawn_agent(role: str, task: str, reply_to_session_id: str = "", context_ref: str = "", wait: bool = False) -> str:
-    """Launch a role agent in its own session/environment with a compact task.
-
-    role: frontend|backend|qa|devops (or any synced role/coordinator).
-    task: the work to do — a concise instruction, not a pasted transcript.
-    reply_to_session_id: if set, the spawned agent is told to resume_session() back
-        to this (the caller's) session when done, passing a summary.
-    context_ref: optional repo path holding larger persisted state to read/append.
-    wait: if true, run to the next stop and return {session_id, status, reply|pending}.
-          if false, fire-and-forget; returns {session_id, status:"spawned"}.
-    """
-    sid = _new_session(role)
-    prompt = task + _callback_instructions(reply_to_session_id, context_ref)
-    if not wait:
-        driver.send_message(sid, prompt)
-        return json.dumps({"session_id": sid, "status": "spawned"})
-    res = driver.run_until_block(sid, prompt)
-    return json.dumps({"session_id": sid, "status": res["status"],
-                       "reply": res["text"], "pending": res["pending"]})
-
-
-@mcp.tool()
-def resume_session(session_id: str, summary: str, context_ref: str = "") -> str:
-    """Wake an existing (originating) session with a concise work-state summary.
-
-    The session's full history and sandbox state are intact server-side — this only
-    delivers your summary (plus an optional repo file pointer). Use this to hand work
-    BACK to whoever spawned you.
-    """
-    msg = f"[handoff:resume] {summary}"
-    if context_ref:
-        msg += f"\n\nPersisted state: {context_ref} (read it for details)."
-    driver.send_message(session_id, msg)
-    return json.dumps({"resumed": session_id})
-
-
-@mcp.tool()
-def ask_agent(target: str, question: str) -> str:
-    """Synchronous wait-for-reply. target = a role name (spawns a fresh session) OR
-    an existing session id (continues it). Returns the agent's reply text, or a
-    'blocked' status if it paused for an approval (answer via approve())."""
-    sid = _new_session(target) if target in _roles() else target
-    res = driver.run_until_block(sid, question)
-    return json.dumps({"session_id": sid, "status": res["status"],
-                       "reply": res["text"], "pending": res["pending"]})
-
-
-@mcp.tool()
-def approve(session_id: str, tool_use_id: str, allow: bool = True, reason: str = "") -> str:
-    """Answer an always_ask pause in a spawned/continued session (e.g. a prod-affecting
-    devops action). Deny with a reason to steer the agent instead of blocking it."""
-    driver.confirm_tool(session_id, tool_use_id, allow=allow, deny_message=reason or None)
-    return json.dumps({"session_id": session_id, "tool_use_id": tool_use_id, "result": "allow" if allow else "deny"})
 
 
 @mcp.tool()
@@ -194,59 +219,14 @@ def memory_read(path: str) -> str:
     return json.dumps({"store_id": sid, "path": path, "found": True, "content": full.get("content", "")})
 
 
-def _vault_id_by_name(name):
-    path = os.path.join(STATE, "vault-ids.json")
-    ids = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
-    return ids.get(name)
-
-
-@mcp.tool()
-def reach_human(human: str, message: str, reply_to_session_id: str = "", channels: str = "", wait: bool = False) -> str:
-    """Reach a real human through their digital persona and relay their answer back.
-
-    Spawns the `digital-persona` agent bound to this human's vault (their channel
-    credentials: email/Slack/GitHub/WhatsApp/Telegram/phone) and tells it to contact
-    the human with `message`, collect their ACTUAL reply, and — if reply_to_session_id
-    is set — resume_session() that session with the human's answer. Use this instead of
-    stalling when a session needs a human's decision or approval.
-
-    human: person key (matches vault 'persona-<human>' + the persona's metadata).
-    channels: comma list to prefer (e.g. "slack,email"); empty = their preferred.
-    wait: if true, block until the persona reports (reply|blocked|pending); else fire-and-forget
-          (the persona resumes the origin session itself when the human replies).
-    """
-    roles = _roles()
-    if "digital-persona" not in roles:
-        raise RuntimeError("digital-persona agent not provisioned — run providers/provision.py")
-    e = roles["digital-persona"]
-    vid = _vault_id_by_name(f"persona-{human}")
-    if not vid:
-        raise RuntimeError(f"no vault 'persona-{human}' — create vaults/persona-{human}.json and provision it")
-    sid = driver.create_session(e["id"], e["version"], e["environment_id"],
-                                vault_ids=[vid], resources=_memory_resources(),
-                                title=f"persona:{human}")["id"]
-    ch = f" via {channels}" if channels else " via their preferred channel"
-    prompt = (f"You represent {human}. Reach the real {human}{ch} with the following, collect their "
-              f"ACTUAL reply (never fabricate a binding answer), and report it.\n\nMESSAGE:\n{message}")
-    if reply_to_session_id:
-        prompt += (f"\n\nWhen you have their real answer, call resume_session(session_id='{reply_to_session_id}', "
-                   f"summary=<their verbatim answer + your read>). If you cannot reach them, resume with 'BLOCKED: ...'.")
-    if not wait:
-        driver.send_message(sid, prompt)
-        return json.dumps({"session_id": sid, "human": human, "status": "reaching"})
-    res = driver.run_until_block(sid, prompt)
-    return json.dumps({"session_id": sid, "human": human, "status": res["status"],
-                       "reply": res["text"], "pending": res["pending"]})
-
-
 def build_app():
     """Streamable-HTTP MCP app, gated by a bearer token when HANDOFF_MCP_TOKEN is set.
 
-    This server creates sessions with our ANTHROPIC_API_KEY, so it must not be open.
-    Managed Agents connect server-to-server and present the token as a vault-injected
-    `Authorization: Bearer` credential (keyed to the handoff MCP url). In prod the
-    Cloudflare Access email-OTP wildcard is bypassed for this hostname (a more-specific
-    Access app), so this app-level bearer is the gate.
+    This server presents the family OIDC bearer (A2A_TOKEN) to callee agents on the
+    A2A wire, so it must not be open. Managed Agents connect server-to-server and
+    present the token as a vault-injected `Authorization: Bearer` credential (keyed to
+    the handoff MCP url). In prod the Cloudflare Access email-OTP wildcard is bypassed
+    for this hostname (a more-specific Access app), so this app-level bearer is the gate.
     """
     from starlette.responses import JSONResponse
     app = mcp.streamable_http_app()
