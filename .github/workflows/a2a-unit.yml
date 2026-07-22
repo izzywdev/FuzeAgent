@@ -1,0 +1,40 @@
+name: A2A server unit tests
+
+# Backend-engineer's slice: unit tests for agent-templates/a2a. The image build, Helm
+# chart and Argo wiring are devops-engineer's; this workflow only proves the server
+# code + card generator behave to the frozen contract.
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'agent-templates/a2a/**'
+      - 'agent-templates/contracts/a2a/**'
+      - 'agent-templates/providers/base.py'
+      - '.github/workflows/a2a-unit.yml'
+  pull_request:
+    paths:
+      - 'agent-templates/a2a/**'
+      - 'agent-templates/contracts/a2a/**'
+      - 'agent-templates/providers/base.py'
+      - '.github/workflows/a2a-unit.yml'
+
+jobs:
+  a2a-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pydantic 'starlette>=0.37' httpx jsonschema pytest
+
+      - name: Run A2A unit tests
+        working-directory: agent-templates/a2a
+        run: python -m pytest tests -q

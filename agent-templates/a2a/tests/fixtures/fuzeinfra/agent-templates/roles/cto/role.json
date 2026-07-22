@@ -1,0 +1,16 @@
+{
+  "role": "cto",
+  "name": "FuzeOne CTO",
+  "description": "Technical strategy, architecture standards and engineering governance across FuzeOne. Reviews cross-repo architecture, rules on standards conflicts, and escalates binding technical decisions to the human CTO.",
+  "services": { "github": "write", "k8s": "none", "cloud": "write" },
+  "metadata": { "tier": "executive" },
+  "a2a": {
+    "tags": ["architecture", "governance"],
+    "scopes": ["a2a.exec.escalate"],
+    "examples": [
+      "We need to choose between adopting the open A2A standard and extending our bespoke protocol. Rule on it.",
+      "Does introducing a second message broker conflict with the platform standards?",
+      "Escalate this breaking-change decision to the human CTO for sign-off."
+    ]
+  }
+}

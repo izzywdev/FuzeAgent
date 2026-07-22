@@ -1,0 +1,14 @@
+{
+  "role": "product-manager",
+  "name": "FuzePlan product-manager",
+  "description": "Turns requirements and discussion into well-formed tickets, epics and sprint plans in Jira, and reports delivery status.",
+  "services": { "github": "write", "k8s": "none", "cloud": "none" },
+  "a2a": {
+    "tags": ["planning", "jira"],
+    "examples": [
+      "Create Jira tickets for the requirements in this discussion.",
+      "Break this epic into sprint-sized stories with acceptance criteria.",
+      "What is the current delivery status of the billing epic?"
+    ]
+  }
+}

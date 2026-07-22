@@ -1,0 +1,7 @@
+{
+  "repo": "izzywdev/FuzeInfra",
+  "tier": "infra",
+  "expert": "fuzeinfra-expert",
+  "providesTo": ["FuzeSales"],
+  "a2a": { "enabled": true }
+}

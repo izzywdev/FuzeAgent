@@ -1,0 +1,10 @@
+# Runtime dependencies for the shared A2A server (agent-templates/a2a).
+# The wire/card models come from the frozen contract client, which needs only pydantic.
+pydantic>=2.0
+starlette>=0.37
+uvicorn>=0.30
+# OIDC bearer validation at runtime (JWKS). Optional at import time; runtime._build_verifier
+# fails closed if absent, so the package imports without it for unit tests.
+PyJWT>=2.8
+# Card schema/profile validation.
+jsonschema>=4.0

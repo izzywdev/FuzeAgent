@@ -1,0 +1,12 @@
+{
+  "repo": "izzywdev/FuzePlan",
+  "tier": "product",
+  "expert": "fuzeplan-expert",
+  "providesTo": ["FuzeSales", "FuzeService", "FuzeExecutive"],
+  "dependsOn": ["FuzeContact", "FuzeBI"],
+  "a2a": {
+    "enabled": true,
+    "servingRoles": ["product-manager", "ux-designer"],
+    "entryRole": "product-manager"
+  }
+}
