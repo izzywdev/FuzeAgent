@@ -1,0 +1,17 @@
+{{- if .Values.a2a.enabled }}
+a2a-shared (the ONE shared A2A server) is ENABLED.
+
+In-cluster interface (frozen contract — card-projection.md §2):
+  http://a2a-shared.fuzeagent.svc.cluster.local:{{ .Values.a2a.service.port }}/rpc
+Agent Card discovery (binding.md §1, unauthenticated):
+  http://a2a-shared.fuzeagent.svc.cluster.local:{{ .Values.a2a.service.port }}/.well-known/agent-card.json
+
+Tenants served (a2a.tenants[]):
+{{- range .Values.a2a.tenants }}
+  - {{ .tenant }} ({{ .repo }}@{{ .ref | default "main" }}){{ if .external }}  [external: https://a2a.{{ include "a2a.repoSlug" .repo }}.{{ $.Values.deploy.externalDomain }}/rpc]{{ end }}
+{{- else }}
+  (none — add entries under a2a.tenants to onboard a repo; no new pod required)
+{{- end }}
+{{- else }}
+a2a-shared is DISABLED (a2a.enabled=false). Set a2a.enabled=true (prod overlay) to deploy.
+{{- end }}

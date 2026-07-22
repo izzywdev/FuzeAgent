@@ -1,0 +1,166 @@
+{{- if .Values.a2a.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "a2a.name" . }}
+  labels:
+    {{- include "a2a.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.deploy.replicas }}
+  selector:
+    matchLabels:
+      {{- include "a2a.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "a2a.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Roll the pod when the values document (tenants/auth/etc.) changes — a
+        # ConfigMap update alone does not restart the pod.
+        checksum/values: {{ include (print $.Template.BasePath "/values-configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.deploy.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Matches the image's non-root USER 10001 (agent-templates/a2a/Dockerfile).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      {{- if .Values.a2a.tenants }}
+      # Repo checkout: runtime.py's LocalRepoResolver reads each tenant's projection
+      # inputs (.fuze/manifest.json + agent-templates/roles/) from A2A_REPOS_DIR/<name>.
+      # The server comment states the chart provides this checkout out of band, so an
+      # init container shallow-clones each enabled tenant's repo at its GitOps `ref`.
+      # GitOps: the ref is the source of truth, never live-mutated in /repos.
+      initContainers:
+        - name: repo-sync
+          image: {{ .Values.deploy.gitImage }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              {{- if .Values.deploy.reposGitTokenSecretRef }}
+              AUTH="${A2A_REPOS_GIT_TOKEN}@"
+              {{- else }}
+              AUTH=""
+              {{- end }}
+              {{- range .Values.a2a.tenants }}
+              {{- if .enabled }}
+              name="{{ include "a2a.repoSlug" .repo }}"
+              echo "cloning {{ .repo }}@{{ .ref | default "main" }} -> /repos/${name}"
+              rm -rf "/repos/${name}"
+              git clone --depth 1 --branch "{{ .ref | default "main" }}" \
+                "https://${AUTH}github.com/{{ .repo }}.git" "/repos/${name}"
+              {{- end }}
+              {{- end }}
+          {{- if .Values.deploy.reposGitTokenSecretRef }}
+          env:
+            - name: A2A_REPOS_GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.deploy.reposGitTokenSecretRef.name }}
+                  key: {{ .Values.deploy.reposGitTokenSecretRef.key }}
+          {{- end }}
+          volumeMounts:
+            - name: repos
+              mountPath: /repos
+      {{- end }}
+      containers:
+        - name: {{ include "a2a.name" . }}
+          image: "{{ .Values.a2a.image.repository }}:{{ .Values.a2a.image.tag }}"
+          imagePullPolicy: {{ .Values.a2a.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # Entrypoint is `python -m a2a.runtime` (the image CMD). The listen port comes
+          # from the values file (service.port), not an env var, so container port and
+          # the served port share one source.
+          ports:
+            - name: http
+              containerPort: {{ .Values.a2a.service.port }}
+          env:
+            # Bind all interfaces so the in-cluster Service reaches the pod (the server
+            # defaults to loopback). Everything else (auth, tenants, protocolVersion,
+            # card keyId) the server reads from A2A_VALUES_FILE — NOT per-var env.
+            - name: HOST
+              value: "0.0.0.0"
+            - name: A2A_VALUES_FILE
+              value: /config/values.json
+            - name: A2A_REPOS_DIR
+              value: /repos
+            - name: AGENT_PROVIDER
+              value: {{ .Values.deploy.agentProvider | quote }}
+            - name: FUZE_STATE_DIR
+              value: /state
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            {{- with .Values.deploy.providerApiKeySecretRef }}
+            # Managed-Agents API key for session provisioning (sync/common.py _api_key()).
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .key }}
+            {{- end }}
+          # The server exposes GET /healthz (verified against the built image's
+          # composed Starlette routes: /rpc, /.well-known/agent-card.json,
+          # /extendedAgentCard, /healthz).
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          volumeMounts:
+            - name: values
+              mountPath: /config
+              readOnly: true
+            - name: repos
+              mountPath: /repos
+            {{- with .Values.deploy.stateConfigMap }}
+            - name: state
+              mountPath: /state
+              readOnly: true
+            {{- end }}
+            {{- if and .Values.a2a.auth .Values.a2a.auth.mtls }}
+            {{- if and .Values.a2a.auth.mtls.enabled .Values.a2a.auth.mtls.caSecretRef }}
+            - name: mtls-ca
+              mountPath: /etc/a2a/mtls
+              readOnly: true
+            {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.deploy.resources | nindent 12 }}
+      volumes:
+        - name: values
+          configMap:
+            name: {{ include "a2a.name" . }}-values
+        - name: repos
+          emptyDir: {}
+        {{- with .Values.deploy.stateConfigMap }}
+        - name: state
+          configMap:
+            name: {{ . }}
+        {{- end }}
+        {{- if and .Values.a2a.auth .Values.a2a.auth.mtls }}
+        {{- if and .Values.a2a.auth.mtls.enabled .Values.a2a.auth.mtls.caSecretRef }}
+        - name: mtls-ca
+          secret:
+            secretName: {{ .Values.a2a.auth.mtls.caSecretRef.name }}
+            items:
+              - key: {{ .Values.a2a.auth.mtls.caSecretRef.key }}
+                path: ca.crt
+        {{- end }}
+        {{- end }}
+{{- end }}

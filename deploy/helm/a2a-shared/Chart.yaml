@@ -1,0 +1,13 @@
+apiVersion: v2
+name: a2a-shared
+description: >-
+  The ONE shared A2A (agent-to-agent) server for the FuzeOne family. A single
+  Deployment/Service fronts every product and exec role; onboarding a repo is a
+  `a2a.tenants[]` entry (DATA), never a new chart or pod. Values honour the frozen
+  contract interface agent-templates/contracts/a2a/v1/schema/values-interface.schema.json.
+  Deployed onto the shared FuzeInfra Contabo k3s cluster (namespace `fuzeagent`)
+  via GitOps (Argo CD), in-cluster HTTP + Cloudflare-tunnel-only external surface.
+type: application
+version: 0.1.0
+# A2A protocol version served (binding.md — frozen for contract v1).
+appVersion: "1.0"

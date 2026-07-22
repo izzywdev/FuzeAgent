@@ -8,3 +8,8 @@ uvicorn>=0.30
 PyJWT>=2.8
 # Card schema/profile validation.
 jsonschema>=4.0
+# Asymmetric verification backend for PyJWT — runtime._build_verifier decodes RS256/ES256
+# JWKS-signed OIDC tokens, which PyJWT can only do with `cryptography` present. Added by
+# devops for the deployed image (unit tests never construct the verifier, so main's
+# server-owned deps omit it). See PR #85.
+cryptography>=42

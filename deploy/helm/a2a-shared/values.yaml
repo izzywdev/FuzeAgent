@@ -1,0 +1,101 @@
+# =============================================================================
+# a2a-shared — default values (local/dev shape; server DISABLED by default).
+#
+# The `a2a:` block below is the OPERATOR/TENANT surface and mirrors EXACTLY the
+# frozen contract (no invented keys, no invented defaults):
+#   agent-templates/contracts/a2a/v1/schema/values-interface.schema.json
+# It is additionalProperties:false there, so `a2a` carries ONLY the contract's
+# properties. Pure deployment mechanics that the interface deliberately leaves to
+# devops (it defines no templates) live under the separate `deploy:` block and are
+# NOT part of the operator contract.
+#
+# Design invariant (schema): ONE shared server, so per-repo config is DATA
+# (`a2a.tenants[]`), never a chart-per-repo. Production shape lives in values-prod.yaml.
+# =============================================================================
+a2a:
+  # The gate. false = the shared A2A server is not deployed at all.
+  enabled: false
+
+  image:
+    repository: ghcr.io/izzywdev/fuzeagent-a2a
+    # Immutable tag; prod values bump this (release.yml). Never `latest` in prod.
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    # MUST be ClusterIP — ingress is Cloudflare-tunnel-only (no LB/NodePort).
+    type: ClusterIP
+    port: 8080
+
+  # A2A protocol version served. Frozen for contract v1.
+  protocolVersion: "1.0"
+
+  # Identity config for callee-side enforcement (authz.md). `auth` is optional in
+  # the interface, but oidcIssuerUrl is REQUIRED whenever `auth` is set, so real
+  # deployments supply it in the prod overlay. Omitted here (server disabled).
+  # auth:
+  #   oidcIssuerUrl: ""          # issuer projected into the card's `fuze-oidc` scheme
+  #   audience: ""               # expected `aud` claim
+  #   callerClaim: sub           # token claim carrying caller repo identity (authz.md §2)
+  #   mtls:
+  #     enabled: false
+  #     caSecretRef: { name: "", key: "" }
+
+  # JWS signing key for the Agent Card (Fuze profile requires non-empty signatures[]).
+  # keySecretRef is REQUIRED when `cardSigning` is present — supplied in prod overlay
+  # from a SealedSecret. Secret VALUES never appear in git.
+  # cardSigning:
+  #   keySecretRef: { name: a2a-card-signing, key: jws.key }
+  #   keyId: a2a-v1
+
+  # One entry per served product/exec agent. THIS array is how a repo onboards
+  # onto A2A — no new chart, no new pod. Empty by default.
+  # Shape (see $defs/tenant in the interface schema):
+  #   - tenant: FuzePlan               # routing key; == card AgentInterface.tenant
+  #     repo: izzywdev/FuzePlan        # projection source (owner/name)
+  #     ref: main                      # git ref manifest/roles are read from
+  #     enabled: true                  # per-tenant gate (independent of server gate)
+  #     entryRole: product-manager     # overrides manifest.a2a.entryRole
+  #     servingRoles: []               # overrides manifest.a2a.servingRoles
+  #     external: false                # tunnel-publish w/ https interface (MUST be false for exec)
+  #     provider:
+  #       name: anthropic
+  #       environmentId: ""
+  #       apiKeySecretRef: { name: "", key: "" }
+  #       vaultIds: []                 # NEVER projected onto the card
+  #       memoryResources: []
+  #     env:
+  #       - name: SOME_VAR
+  #         valueFrom: { name: some-secret, key: some-key }   # secretRef only, never inline
+  tenants: []
+
+# --- Deployment mechanics (devops slice; NOT part of the contract interface) ---
+# Kept OUT of `a2a` so that block stays byte-conformant to the frozen operator
+# interface. These are chart-internal knobs devops sets, not values a tenant/product
+# sets to be served.
+deploy:
+  replicas: 1
+  # GHCR pull secret (sealed; name must match the SealedSecret). Empty for local
+  # charts that use public/locally-built images.
+  imagePullSecrets: []
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  # External (opt-in) tunnel host domain for tenants with `external: true`
+  # (card-projection.md §2: https://a2a.<repo-slug>.<externalDomain>/rpc).
+  externalDomain: prod.fuzefront.com
+  ingressClassName: traefik
+  # Managed-Agents provider id set as AGENT_PROVIDER (runtime.build_from_env default).
+  agentProvider: anthropic
+  # Init-container image that shallow-clones each enabled tenant's repo into /repos
+  # (runtime.LocalRepoResolver reads the projection inputs from there).
+  gitImage: alpine/git:latest
+  # Optional token (SealedSecret ref {name,key}) for cloning PRIVATE tenant repos in
+  # the repo-sync init container. Unset = anonymous clone (public repos only).
+  reposGitTokenSecretRef: null
+  # Optional Managed-Agents API key (SealedSecret ref {name,key}) exported as
+  # ANTHROPIC_API_KEY for session provisioning (sync/common.py). Unset = not injected.
+  providerApiKeySecretRef: null
+  # Optional ConfigMap name holding the Managed-Agents id-state (agent/vault/memory/
+  # environment ids) mounted at FUZE_STATE_DIR=/state, same pattern as handoff-mcp.
+  stateConfigMap: null
