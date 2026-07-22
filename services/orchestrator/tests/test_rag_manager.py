@@ -14,7 +14,6 @@ import pytest
 pytestmark = pytest.mark.skip(
     reason="aspirational RAGManager API not yet built; see #80"
 )
-pytest.skip("aspirational RAGManager API; see #80", allow_module_level=True)
 
 """
 Test cases for RAG Manager functionality

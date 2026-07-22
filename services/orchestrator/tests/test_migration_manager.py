@@ -12,7 +12,6 @@ import pytest
 pytestmark = pytest.mark.skip(
     reason="aspirational MigrationManager API not yet built; see #80"
 )
-pytest.skip("aspirational MigrationManager API; see #80", allow_module_level=True)
 
 """
 Test cases for Migration Manager functionality
