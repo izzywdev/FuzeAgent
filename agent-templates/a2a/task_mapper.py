@@ -28,9 +28,32 @@ from ._contract import (
     Part,
     Role,
     Task,
+    TaskArtifactUpdateEvent,
     TaskState,
     TaskStatus,
+    TaskStatusUpdateEvent,
 )
+
+__all__ = [
+    "Artifact",
+    "Message",
+    "Part",
+    "Role",
+    "Task",
+    "TaskArtifactUpdateEvent",
+    "TaskState",
+    "TaskStatus",
+    "TaskStatusUpdateEvent",
+    "now_iso",
+    "agent_message",
+    "classify_pause",
+    "pending_tool_use_id",
+    "map_result",
+    "submitted_task",
+    "working_status",
+    "rejected_task",
+    "canceled_task",
+]
 
 # Signals in a pending tool descriptor that mark a pause as a CREDENTIAL / AUTH grant
 # request rather than an ordinary decision. Discriminating these two is the most
