@@ -1,0 +1,66 @@
+{
+  "name": "FuzePlan agent",
+  "description": "Planning and delivery-coordination agent for FuzePlan. Give it a goal about tickets, backlog, sprints or delivery status and it will accomplish it using its own tooling and credentials; callers need no planning tools of their own. Consults the fuzeplan-expert for repo context.",
+  "provider": {
+    "organization": "FuzeOne",
+    "url": "https://github.com/izzywdev"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://github.com/izzywdev/FuzePlan",
+  "supportedInterfaces": [
+    {
+      "url": "http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0",
+      "tenant": "FuzePlan"
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "extendedAgentCard": true
+  },
+  "securitySchemes": {
+    "fuze-oidc": {
+      "openIdConnectSecurityScheme": {
+        "description": "FuzeKeys OIDC. The validated subject is the calling repo identity.",
+        "openIdConnectUrl": "https://auth.prod.fuzefront.com/.well-known/openid-configuration"
+      }
+    },
+    "fuze-mtls": {
+      "mtlsSecurityScheme": {
+        "description": "In-cluster mutual TLS, defence in depth alongside the bearer token."
+      }
+    }
+  },
+  "securityRequirements": [{ "fuze-oidc": [] }],
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "skills": [
+    {
+      "id": "product-manager",
+      "name": "FuzePlan product-manager",
+      "description": "Turns requirements and discussion into well-formed tickets, epics and sprint plans in Jira, and reports delivery status.",
+      "tags": ["product-manager", "product", "github", "planning", "jira"],
+      "examples": [
+        "Create Jira tickets for the requirements in this discussion.",
+        "Break this epic into sprint-sized stories with acceptance criteria.",
+        "What is the current delivery status of the billing epic?"
+      ]
+    },
+    {
+      "id": "ux-designer",
+      "name": "FuzePlan ux-designer",
+      "description": "Produces user-flow and interaction specifications for a described feature, aligned to the family design system.",
+      "tags": ["ux-designer", "product", "design", "github"],
+      "examples": ["Draft the user flow for self-registration with email OTP."]
+    }
+  ],
+  "signatures": [
+    {
+      "protected": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZ1emUtYTJhLTIwMjYtMDcifQ",
+      "signature": "PLACEHOLDER-jws-signature-emitted-by-the-card-generator",
+      "header": { "kid": "fuze-a2a-2026-07" }
+    }
+  ]
+}

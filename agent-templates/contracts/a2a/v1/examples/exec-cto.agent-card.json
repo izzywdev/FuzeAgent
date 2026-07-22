@@ -1,0 +1,60 @@
+{
+  "name": "FuzeOne CTO agent",
+  "description": "Executive technical-authority agent. Give it an architecture question, a standards conflict, or a cross-repo technical decision and it will rule on it or escalate to the human CTO via their digital persona. Binding decisions pause the task in TASK_STATE_INPUT_REQUIRED while a human is reached — callers must not impose short timeouts.",
+  "provider": {
+    "organization": "FuzeOne",
+    "url": "https://github.com/izzywdev"
+  },
+  "version": "1.0.0",
+  "documentationUrl": "https://github.com/izzywdev/FuzeInfra",
+  "supportedInterfaces": [
+    {
+      "url": "http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0",
+      "tenant": "Exec-cto"
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "extendedAgentCard": true
+  },
+  "securitySchemes": {
+    "fuze-oidc": {
+      "openIdConnectSecurityScheme": {
+        "description": "FuzeKeys OIDC. The validated subject is the calling repo identity.",
+        "openIdConnectUrl": "https://auth.prod.fuzefront.com/.well-known/openid-configuration"
+      }
+    },
+    "fuze-mtls": {
+      "mtlsSecurityScheme": {
+        "description": "In-cluster mutual TLS. Exec agents are never published externally."
+      }
+    }
+  },
+  "securityRequirements": [{ "fuze-oidc": [] }],
+  "defaultInputModes": ["text/plain", "application/json"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "skills": [
+    {
+      "id": "cto",
+      "name": "FuzeOne CTO",
+      "description": "Technical strategy, architecture standards and engineering governance across FuzeOne. Reviews cross-repo architecture, rules on standards conflicts, and escalates binding technical decisions to the human CTO.",
+      "tags": ["cto", "exec", "executive", "architecture", "governance", "github", "cloud"],
+      "examples": [
+        "We need to choose between adopting the open A2A standard and extending our bespoke protocol. Rule on it.",
+        "Does introducing a second message broker conflict with the platform standards?",
+        "Escalate this breaking-change decision to the human CTO for sign-off."
+      ],
+      "securityRequirements": [{ "fuze-oidc": ["a2a.exec.escalate"] }]
+    }
+  ],
+  "signatures": [
+    {
+      "protected": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZ1emUtYTJhLTIwMjYtMDcifQ",
+      "signature": "PLACEHOLDER-jws-signature-emitted-by-the-card-generator",
+      "header": { "kid": "fuze-a2a-2026-07" }
+    }
+  ]
+}

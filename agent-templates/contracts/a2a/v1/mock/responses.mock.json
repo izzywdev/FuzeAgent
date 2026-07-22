@@ -1,0 +1,196 @@
+{
+  "SendMessage.completed": {
+    "jsonrpc": "2.0",
+    "id": "req-1",
+    "result": {
+      "task": {
+        "id": "sess-01HZ",
+        "contextId": "ctx-01HZ",
+        "status": {
+          "state": "TASK_STATE_COMPLETED",
+          "timestamp": "2026-07-20T10:00:00Z",
+          "message": {
+            "messageId": "m-1",
+            "role": "ROLE_AGENT",
+            "parts": [
+              {
+                "text": "Created 3 Jira tickets: FP-101, FP-102, FP-103."
+              }
+            ]
+          }
+        },
+        "artifacts": [
+          {
+            "artifactId": "art-1",
+            "name": "created-tickets",
+            "parts": [
+              {
+                "data": {
+                  "tickets": [
+                    "FP-101",
+                    "FP-102",
+                    "FP-103"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "SendMessage.inputRequired": {
+    "jsonrpc": "2.0",
+    "id": "req-2",
+    "result": {
+      "task": {
+        "id": "sess-02HZ",
+        "contextId": "ctx-02HZ",
+        "status": {
+          "state": "TASK_STATE_INPUT_REQUIRED",
+          "timestamp": "2026-07-20T10:01:00Z",
+          "message": {
+            "messageId": "m-2",
+            "role": "ROLE_AGENT",
+            "parts": [
+              {
+                "text": "An always_ask pause: I am about to create 12 tickets in the FP project, which exceeds the bulk threshold. Confirm to proceed, or reply with a reduced scope."
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "SendMessage.authRequired": {
+    "jsonrpc": "2.0",
+    "id": "req-3",
+    "result": {
+      "task": {
+        "id": "sess-03HZ",
+        "contextId": "ctx-03HZ",
+        "status": {
+          "state": "TASK_STATE_AUTH_REQUIRED",
+          "timestamp": "2026-07-20T10:02:00Z",
+          "message": {
+            "messageId": "m-3",
+            "role": "ROLE_AGENT",
+            "parts": [
+              {
+                "text": "I need an Atlassian credential with write scope for the FP project. It may be supplied out-of-band; this task will continue automatically once it arrives."
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "SendMessage.rejected": {
+    "jsonrpc": "2.0",
+    "id": "req-4",
+    "result": {
+      "task": {
+        "id": "sess-04HZ",
+        "contextId": "ctx-04HZ",
+        "status": {
+          "state": "TASK_STATE_REJECTED",
+          "timestamp": "2026-07-20T10:03:00Z",
+          "message": {
+            "messageId": "m-4",
+            "role": "ROLE_AGENT",
+            "parts": [
+              {
+                "text": "Not authorized."
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "GetTask.working": {
+    "jsonrpc": "2.0",
+    "id": "req-5",
+    "result": {
+      "id": "sess-05HZ",
+      "contextId": "ctx-05HZ",
+      "status": {
+        "state": "TASK_STATE_WORKING",
+        "timestamp": "2026-07-20T10:04:00Z"
+      }
+    }
+  },
+  "CancelTask.canceled": {
+    "jsonrpc": "2.0",
+    "id": "req-6",
+    "result": {
+      "id": "sess-05HZ",
+      "contextId": "ctx-05HZ",
+      "status": {
+        "state": "TASK_STATE_CANCELED",
+        "timestamp": "2026-07-20T10:05:00Z"
+      }
+    }
+  },
+  "ListTasks.empty": {
+    "jsonrpc": "2.0",
+    "id": "req-7",
+    "result": {
+      "tasks": []
+    }
+  },
+  "error.taskNotFound": {
+    "jsonrpc": "2.0",
+    "id": "req-8",
+    "error": {
+      "code": -32001,
+      "message": "Task not found",
+      "data": [
+        {
+          "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+          "reason": "TASK_NOT_FOUND",
+          "domain": "a2a-protocol.org",
+          "metadata": {
+            "note": "Returned identically for unknown, forbidden and other-caller tasks (authz.md 6)."
+          }
+        }
+      ]
+    }
+  },
+  "error.pushNotSupported": {
+    "jsonrpc": "2.0",
+    "id": "req-9",
+    "error": {
+      "code": -32003,
+      "message": "Push notifications are not supported",
+      "data": [
+        {
+          "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+          "reason": "PUSH_NOTIFICATION_NOT_SUPPORTED",
+          "domain": "a2a-protocol.org",
+          "metadata": {
+            "contractVersion": "1.0.0"
+          }
+        }
+      ]
+    }
+  },
+  "error.versionNotSupported": {
+    "jsonrpc": "2.0",
+    "id": "req-10",
+    "error": {
+      "code": -32009,
+      "message": "A2A protocol version not supported",
+      "data": [
+        {
+          "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+          "reason": "VERSION_NOT_SUPPORTED",
+          "domain": "a2a-protocol.org",
+          "metadata": {
+            "supported": "1.0"
+          }
+        }
+      ]
+    }
+  }
+}
