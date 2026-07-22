@@ -504,8 +504,9 @@ async def create_agent(agent_data: AgentCreate):
 async def create_agent_from_template(template_data: CreateAgentFromTemplate):
     """Create agent from template"""
     try:
-        template = template_manager.get_template(template_data.template_id)
-        if not template:
+        try:
+            template = template_manager.get_template(template_data.template_id)
+        except ValueError:
             raise HTTPException(status_code=404, detail="Template not found")
 
         # Get team_id from overrides or use default
@@ -527,7 +528,7 @@ async def create_agent_from_template(template_data: CreateAgentFromTemplate):
             "backstory": template_data.overrides.get(
                 "backstory", template.default_backstory
             ),
-            "model": template.model,
+            "model": template.default_model,
             "temperature": template_data.overrides.get(
                 "temperature", template.default_temperature
             ),
@@ -538,8 +539,8 @@ async def create_agent_from_template(template_data: CreateAgentFromTemplate):
         agent_id = await DatabaseManager.insert_agent(
             team_id=team_id,
             name=template_data.overrides.get("name", f"{template.name} Agent"),
-            role=template.role,
-            type=template.type,
+            role=template.name,
+            type=template.template_id,
             config=config,
             template_id=template.template_id,
         )
