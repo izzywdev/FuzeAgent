@@ -132,6 +132,22 @@ def main() -> int:
     passed &= check("cancel_task.canceled", r, status="canceled",
                     session_id="sess-05HZ", pending=None)
 
+    # 7b. ask_agent-style continuation: after start, the task is known and a
+    #     follow-up resolves to the SAME client/tenant (continue_task).
+    _bind("FuzePlan", _mk_client(["SendMessage.inputRequired", "SendMessage.completed"]))
+    r = t.start("FuzePlan", "Create 12 tickets")
+    ok = t.is_known_task(r["session_id"]) and r["status"] == "blocked"
+    r2 = t.continue_task(r["session_id"], "APPROVE: proceed.")
+    ok = ok and r2["status"] == "idle" and "FP-101" in r2["reply"]
+    print(f"[{'PASS' if ok else 'FAIL'}] continue_task.resolves_pause  {r['status']}->{r2['status']}")
+    passed &= ok
+
+    # 7c. relay hop: _run_hop drives a paused task to completion under --auto allow.
+    import relay
+    _bind("FuzePlan", _mk_client(["SendMessage.inputRequired", "SendMessage.completed"]))
+    hop = relay._run_hop("FuzePlan", "Plan the rollout", "allow")
+    passed &= check("relay._run_hop.auto_allow", hop, status="idle")
+
     # 8. taskNotFound (-32001) surfaces as the typed error from the generated client.
     _bind("FuzePlan", _mk_client(["error.taskNotFound"]))
     t._task_target["ghost"] = "FuzePlan"
