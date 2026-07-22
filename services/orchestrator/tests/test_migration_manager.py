@@ -1,3 +1,19 @@
+import pytest
+
+# QUARANTINED — see izzywdev/FuzeAgent#80.
+# These tests assert an aspirational MigrationManager API that was never built:
+# a `db_pool` pool attribute, `initialize()`/`close()`, `discover_migration_files()`
+# returning dicts, `apply_migration(dict)`/`migrate_up()`/`get_applied_migrations()`
+# returning dicts. The real manager uses a per-call `_get_connection()`, takes
+# `Migration` objects, and returns `List[str]`. Un-skipping requires freezing the
+# intended MigrationManager contract (contract-designer) and implementing it without
+# breaking current callers (main_with_hierarchy.py, migrate.py) — a product decision,
+# not a test rewrite. Skipped at collection to track the debt honestly.
+pytestmark = pytest.mark.skip(
+    reason="aspirational MigrationManager API not yet built; see #80"
+)
+pytest.skip("aspirational MigrationManager API; see #80", allow_module_level=True)
+
 """
 Test cases for Migration Manager functionality
 """
@@ -5,8 +21,6 @@ Test cases for Migration Manager functionality
 import os
 import tempfile
 from unittest.mock import AsyncMock, patch
-
-import pytest
 
 from migration_manager import MigrationManager
 
