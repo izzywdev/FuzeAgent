@@ -23,10 +23,19 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # Matches the image's non-root USER 10001 (agent-templates/a2a/Dockerfile).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
       containers:
         - name: {{ include "a2a.name" . }}
           image: "{{ .Values.a2a.image.repository }}:{{ .Values.a2a.image.tag }}"
           imagePullPolicy: {{ .Values.a2a.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           # TODO(server-entrypoint): the shared A2A server image (built by
           # backend-engineer under agent-templates/a2a/) owns its own CMD. The
           # contract fixes only the port/paths (binding.md): POST /rpc and

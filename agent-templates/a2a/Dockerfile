@@ -29,6 +29,12 @@ RUN pip install --no-cache-dir /app/contract-client
 # The shared A2A server implementation (agent-templates/a2a/).
 COPY a2a/ /app/a2a/
 
+# Run as a non-root user (defence in depth; also satisfies a runAsNonRoot
+# PodSecurity policy). Code is read-only at runtime; config is mounted at /config.
+RUN useradd --system --uid 10001 --home-dir /app --shell /usr/sbin/nologin a2a \
+    && chown -R a2a:a2a /app
+USER 10001
+
 ENV HOST=0.0.0.0 \
     PORT=8080 \
     A2A_PROTOCOL_VERSION=1.0 \
