@@ -53,7 +53,15 @@ class AgentProvider(ABC):
     @abstractmethod
     def run_until_block(self, session_id, prompt=None):
         """Run until idle OR a required approval. Returns
-        {'text', 'status': 'idle'|'blocked'|'error', 'pending': {...}|None}."""
+        {'text', 'status': 'idle'|'blocked'|'error', 'pending': {...}|None}.
+
+        MAY also carry 'artifacts': a list of the structured outputs the callee
+        produced (files/records), each a plain dict shaped like an A2A Artifact
+        ({'artifactId'?, 'name'?, 'description'?, 'parts': [{...}], 'metadata'?}).
+        The A2A adapter lifts these onto Task.artifacts (state-mapping.md §6) so a
+        caller receives them without holding the callee's tools. The key is OPTIONAL
+        and backward-compatible: absent/empty means a task with no structured output,
+        which behaves exactly as before."""
 
     @abstractmethod
     def resume_session(self, session_id, summary, context_ref=""):

@@ -13,8 +13,11 @@ drives exactly the state-machine transitions the acceptance suite grades:
 * a long/background goal blocks long enough to be cancelled (-> CANCELED);
 * everything else completes immediately (-> COMPLETED).
 
-It deliberately does NOT fabricate cross-product side effects (e.g. Jira tickets):
-the pending descriptors carry no credential/auth signals, and no artifacts are
+To exercise the ARTIFACT CHANNEL end-to-end in CI it returns a single generic
+``echo-output`` artifact on an ordinary completion (state-mapping.md §6: idle ->
+structured outputs -> Artifacts). That artifact only echoes the caller's own request;
+it deliberately does NOT fabricate cross-product side effects (e.g. Jira tickets):
+the pending descriptors carry no credential/auth signals, and no domain content is
 invented. The motivating cross-product ticket-creation acceptance needs a REAL
 FuzePlan agent holding real Atlassian credentials and is a STAGING gate, not pure CI.
 
@@ -139,12 +142,30 @@ class EchoProvider(AgentProvider):
                 return self._completed("Cancelled.")
             return self._completed("Long task completed.")
 
-        # ordinary goal -> COMPLETED immediately.
-        return self._completed(f"Echo: {text[:280]}")
+        # ordinary goal -> COMPLETED immediately, WITH a representative artifact so the
+        # artifact channel (provider -> adapter -> task_mapper -> Task.artifacts) is
+        # exercisable in CI. Generic echo only; no fabricated tickets/side effects.
+        echoed = text[:280]
+        return self._completed(
+            f"Echo: {echoed}",
+            artifacts=[
+                {
+                    "name": "echo-output",
+                    "description": "Deterministic echo of the caller's request (channel probe).",
+                    "parts": [
+                        {"text": f"Echo: {echoed}"},
+                        {"data": {"echoed": echoed, "provider": "echo"}},
+                    ],
+                }
+            ],
+        )
 
     @staticmethod
-    def _completed(text: str) -> dict:
-        return {"text": text, "status": "idle", "pending": None}
+    def _completed(text: str, artifacts: list[dict] | None = None) -> dict:
+        result: dict = {"text": text, "status": "idle", "pending": None}
+        if artifacts:
+            result["artifacts"] = artifacts
+        return result
 
     def confirm_tool(self, session_id, tool_use_id, allow=True, deny_message=None):
         sess = self._session(session_id)

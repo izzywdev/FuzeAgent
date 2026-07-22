@@ -47,6 +47,7 @@ __all__ = [
     "TaskStatusUpdateEvent",
     "now_iso",
     "agent_message",
+    "build_artifacts",
     "classify_pause",
     "pending_tool_use_id",
     "map_result",
@@ -85,6 +86,39 @@ def agent_message(
         contextId=context_id,
         taskId=task_id,
     )
+
+
+# --------------------------------------------------------------------------- #
+# artifacts (state-mapping.md §6 — "structured outputs -> Artifacts")
+# --------------------------------------------------------------------------- #
+def build_artifacts(raw: Any) -> list[Artifact] | None:
+    """Lift a provider result's ``artifacts`` payload into wire ``Artifact`` models.
+
+    Providers below the ``providers/base.py`` seam are contract-neutral, so they hand
+    back plain dicts (``{'artifactId'?, 'name'?, 'description'?, 'parts': [...],
+    'metadata'?, 'extensions'?}``) — the same ``Part`` content shapes the wire accepts.
+    This is the ONLY place those become ``Artifact`` objects, so there is one definition
+    of the mapping and pydantic validates every field against the frozen client models.
+
+    Returns ``None`` for a missing/empty payload — a completed task with no structured
+    output stays exactly as it was before (``artifacts`` omitted), so the no-artifact
+    path is untouched. An ``Artifact`` is passed through unchanged; a dict is validated
+    into one (a missing ``artifactId`` is filled with a fresh id — the schema requires it
+    and v1 non-stream results never ``append``, so per-call stability is sufficient).
+    """
+    if not raw:
+        return None
+    out: list[Artifact] = []
+    for item in raw:
+        if isinstance(item, Artifact):
+            out.append(item)
+            continue
+        data = dict(item)
+        data.setdefault("artifactId", f"art-{uuid.uuid4().hex[:16]}")
+        parts = data.get("parts") or []
+        data["parts"] = [p if isinstance(p, Part) else Part(root=p) for p in parts]
+        out.append(Artifact(**data))
+    return out or None
 
 
 # --------------------------------------------------------------------------- #
@@ -153,10 +187,16 @@ def map_result(
     """Map a ``run_until_block`` result onto a settled/interrupted ``Task``.
 
     ``Task.id`` IS the session id (state-mapping.md §1); no side table.
+
+    A provider's structured outputs travel back as ``result['artifacts']`` and surface
+    as ``Task.artifacts`` (state-mapping.md §6). An explicit ``artifacts`` kwarg wins;
+    otherwise they are lifted from the result. Absent either -> ``artifacts`` omitted.
     """
     status = result.get("status")
     text = result.get("text", "") or ""
     pending = result.get("pending")
+    if artifacts is None:
+        artifacts = build_artifacts(result.get("artifacts"))
 
     if status == "idle":
         state = TaskState.TASK_STATE_COMPLETED

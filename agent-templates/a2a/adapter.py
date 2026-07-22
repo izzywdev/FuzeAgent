@@ -238,7 +238,13 @@ class A2AAdapter:
 
     def _run_and_store(self, session_id: str, context_id: str, prompt: str | None):
         result = self.provider.run_until_block(session_id, prompt=prompt)
-        task = tm.map_result(result, session_id=session_id, context_id=context_id)
+        # Structured outputs the callee produced flow back on the result and surface as
+        # Task.artifacts (state-mapping.md §6). This is the artifact channel: without it
+        # a caller can never receive what the callee made (e.g. created tickets).
+        artifacts = tm.build_artifacts(result.get("artifacts"))
+        task = tm.map_result(
+            result, session_id=session_id, context_id=context_id, artifacts=artifacts
+        )
         terminal = task.status.state in _TERMINAL
         self.store.update(
             session_id,
