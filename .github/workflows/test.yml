@@ -274,7 +274,7 @@ jobs:
     
     - name: Test Docker image
       run: |
-        docker run --rm fuzeagent-orchestrator:test python -c "import main_with_hierarchy; print('Docker image works!')"
+        docker run --rm --entrypoint python fuzeagent-orchestrator:test -c "import main_with_hierarchy; print('Docker image works!')"
 
   test-frontend:
     runs-on: ubuntu-latest
