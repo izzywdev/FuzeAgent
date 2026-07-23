@@ -89,7 +89,7 @@ async def downgrade(conn):
     await conn.execute(
         "DELETE FROM agents WHERE template_id = 'ai_human_manager' AND name = 'IzzyAI CEO';"
     )
-    await conn.execute(f"DELETE FROM teams WHERE id = '{DEFAULT_TEAM_ID}';")
-    await conn.execute(f"DELETE FROM organizations WHERE id = '{DEFAULT_ORG_ID}';")
+    await conn.execute("DELETE FROM teams WHERE id = $1;", DEFAULT_TEAM_ID)
+    await conn.execute("DELETE FROM organizations WHERE id = $1;", DEFAULT_ORG_ID)
 
     print("✅ Removed seeded initial data")

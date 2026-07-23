@@ -359,16 +359,20 @@ class ConversationManager:
             params.append([mt.value for mt in message_types])
 
         where_clause = " AND ".join(conditions)
-        limit_clause = f"LIMIT {limit}" if limit else ""
+        limit_clause = ""
+        if limit:
+            param_count += 1
+            limit_clause = f"LIMIT ${param_count}"
+            params.append(limit)
 
         async with get_db_connection() as conn:
             rows = await conn.fetch(
                 f"""
-                SELECT * FROM claude_conversations 
+                SELECT * FROM claude_conversations
                 WHERE {where_clause}
                 ORDER BY created_at ASC
                 {limit_clause}
-            """,
+            """,  # nosec B608 -- where/limit clauses are fixed fragments with $N placeholders; all values bound as query params
                 *params,
             )
 
@@ -507,18 +511,19 @@ class ConversationManager:
         if time_range_hours:
             param_count += 1
             conditions.append(
-                f"measured_at >= NOW() - INTERVAL '{time_range_hours} hours'"
+                f"measured_at >= NOW() - (INTERVAL '1 hour' * ${param_count})"
             )
+            params.append(time_range_hours)
 
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
         async with get_db_connection() as conn:
             rows = await conn.fetch(
                 f"""
-                SELECT * FROM agent_performance_metrics 
+                SELECT * FROM agent_performance_metrics
                 {where_clause}
                 ORDER BY measured_at DESC
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values (incl. interval multiplier) bound as query params
                 *params,
             )
 

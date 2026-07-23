@@ -120,6 +120,10 @@ class DatabaseManager:
     @staticmethod
     async def update_organization(org_id: str, **kwargs) -> bool:
         """Update organization"""
+        # Strict allowlist of columns that may be updated. Column identifiers
+        # cannot be bound as query params, so validate them against this fixed
+        # set to prevent SQL injection via **kwargs keys.
+        allowed_columns = {"name", "description", "settings"}
         async with get_db_connection() as conn:
             set_clauses = []
             params = []
@@ -127,6 +131,10 @@ class DatabaseManager:
 
             for key, value in kwargs.items():
                 if value is not None:
+                    if key not in allowed_columns:
+                        raise ValueError(
+                            f"Invalid column for organizations update: {key!r}"
+                        )
                     set_clauses.append(f"{key} = ${param_count}")
                     params.append(value)
                     param_count += 1
@@ -139,10 +147,10 @@ class DatabaseManager:
             params.append(org_id)
 
             query = f"""
-                UPDATE organizations 
+                UPDATE organizations
                 SET {', '.join(set_clauses)}
                 WHERE id = ${param_count + 1}
-            """
+            """  # nosec B608 -- SET columns validated against a fixed allowlist above; all values bound as $N params
 
             result = await conn.execute(query, *params)
             return result != "UPDATE 0"
@@ -238,6 +246,16 @@ class DatabaseManager:
     @staticmethod
     async def update_team(team_id: str, **kwargs) -> bool:
         """Update team"""
+        # Strict allowlist of columns that may be updated. Column identifiers
+        # cannot be bound as query params, so validate them against this fixed
+        # set to prevent SQL injection via **kwargs keys.
+        allowed_columns = {
+            "organization_id",
+            "name",
+            "description",
+            "team_type",
+            "settings",
+        }
         async with get_db_connection() as conn:
             set_clauses = []
             params = []
@@ -245,6 +263,8 @@ class DatabaseManager:
 
             for key, value in kwargs.items():
                 if value is not None:
+                    if key not in allowed_columns:
+                        raise ValueError(f"Invalid column for teams update: {key!r}")
                     set_clauses.append(f"{key} = ${param_count}")
                     params.append(value)
                     param_count += 1
@@ -257,10 +277,10 @@ class DatabaseManager:
             params.append(team_id)
 
             query = f"""
-                UPDATE teams 
+                UPDATE teams
                 SET {', '.join(set_clauses)}
                 WHERE id = ${param_count + 1}
-            """
+            """  # nosec B608 -- SET columns validated against a fixed allowlist above; all values bound as $N params
 
             result = await conn.execute(query, *params)
             return result != "UPDATE 0"
