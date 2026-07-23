@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schema/role-manifest.schema.json",
+  "role": "agent-orchestrator",
+  "extends": "_base",
+  "name": "FuzeAgent agent-orchestrator",
+  "description": "Accepts a delegated goal and runs a managed Claude agent to accomplish it, returning the outcome and any artifacts. FuzeAgent selects and dispatches the appropriate managed-agent role, drives it to completion (pausing for human approval on always_ask/production actions), and hands the result back — the caller needs no agent-runtime knowledge, tools, or credentials of its own.",
+  "model": "claude-opus-4-8",
+  "skills": [],
+  "services": { "github": "none", "k8s": "none", "cloud": "none" },
+  "a2a": {
+    "examples": [
+      "Run an agent to triage the failing CI on this PR and open a fix branch.",
+      "Spawn a research agent to compare the options for X and return a recommendation with sources.",
+      "Orchestrate a multi-step refactor: plan it, execute it on a branch, and report the resulting PR.",
+      "Dispatch an agent to draft the release notes for the latest changes and return them."
+    ],
+    "tags": ["orchestration", "managed-agents", "agent-dispatch"]
+  },
+  "metadata": { "managed_by": "agent-templates" }
+}

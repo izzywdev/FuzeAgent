@@ -11,12 +11,16 @@ on:
       - 'agent-templates/a2a/**'
       - 'agent-templates/contracts/a2a/**'
       - 'agent-templates/providers/base.py'
+      - 'agent-templates/roles/**'
+      - 'agent-templates/schema/role-manifest.schema.json'
       - '.github/workflows/a2a-unit.yml'
   pull_request:
     paths:
       - 'agent-templates/a2a/**'
       - 'agent-templates/contracts/a2a/**'
       - 'agent-templates/providers/base.py'
+      - 'agent-templates/roles/**'
+      - 'agent-templates/schema/role-manifest.schema.json'
       - '.github/workflows/a2a-unit.yml'
 
 jobs:
