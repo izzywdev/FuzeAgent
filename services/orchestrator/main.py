@@ -5343,13 +5343,13 @@ async def stream_agent_container_logs(websocket: WebSocket, agent_id: str):
         logger.error(f"Error in log stream for agent {agent_id}: {e}")
         try:
             await websocket.send_json({"error": str(e)})
-        except:
-            pass
+        except Exception:
+            logger.debug("Failed to send error frame on closing websocket")
         finally:
             try:
                 await websocket.close()
-            except:
-                pass
+            except Exception:
+                logger.debug("Failed to close websocket cleanly")
 
 
 # ============================================================================
@@ -5695,8 +5695,9 @@ async def websocket_agent_conversation(
                         for conn in active_conversations.get(conversation_id, []):
                             try:
                                 await conn.send_json(message_data)
-                            except:
-                                pass  # Connection might be closed
+                            except Exception:
+                                # Connection might be closed; skip this subscriber
+                                logger.debug("Skipped broadcast to a closed websocket")
 
                         # TODO: Here we would trigger agent response generation
                         # For now, send a simple acknowledgment after a delay
@@ -5717,8 +5718,9 @@ async def websocket_agent_conversation(
                         for conn in active_conversations.get(conversation_id, []):
                             try:
                                 await conn.send_json(agent_response)
-                            except:
-                                pass
+                            except Exception:
+                                # Connection might be closed; skip this subscriber
+                                logger.debug("Skipped broadcast to a closed websocket")
 
                         # Store agent response in database
                         async with get_db_connection() as conn:

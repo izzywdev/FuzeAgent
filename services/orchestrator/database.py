@@ -122,22 +122,25 @@ class DatabaseManager:
         """Update organization"""
         # Strict allowlist of columns that may be updated. Column identifiers
         # cannot be bound as query params, so validate them against this fixed
-        # set to prevent SQL injection via **kwargs keys.
+        # set (fail-fast, before opening a connection) to prevent SQL injection
+        # via **kwargs keys.
         allowed_columns = {"name", "description", "settings"}
+        updates = {k: v for k, v in kwargs.items() if v is not None}
+        invalid = set(updates) - allowed_columns
+        if invalid:
+            raise ValueError(
+                f"Invalid column(s) for organizations update: {sorted(invalid)}"
+            )
+
         async with get_db_connection() as conn:
             set_clauses = []
             params = []
             param_count = 1
 
-            for key, value in kwargs.items():
-                if value is not None:
-                    if key not in allowed_columns:
-                        raise ValueError(
-                            f"Invalid column for organizations update: {key!r}"
-                        )
-                    set_clauses.append(f"{key} = ${param_count}")
-                    params.append(value)
-                    param_count += 1
+            for key, value in updates.items():
+                set_clauses.append(f"{key} = ${param_count}")
+                params.append(value)
+                param_count += 1
 
             if not set_clauses:
                 return False
@@ -248,7 +251,8 @@ class DatabaseManager:
         """Update team"""
         # Strict allowlist of columns that may be updated. Column identifiers
         # cannot be bound as query params, so validate them against this fixed
-        # set to prevent SQL injection via **kwargs keys.
+        # set (fail-fast, before opening a connection) to prevent SQL injection
+        # via **kwargs keys.
         allowed_columns = {
             "organization_id",
             "name",
@@ -256,18 +260,20 @@ class DatabaseManager:
             "team_type",
             "settings",
         }
+        updates = {k: v for k, v in kwargs.items() if v is not None}
+        invalid = set(updates) - allowed_columns
+        if invalid:
+            raise ValueError(f"Invalid column(s) for teams update: {sorted(invalid)}")
+
         async with get_db_connection() as conn:
             set_clauses = []
             params = []
             param_count = 1
 
-            for key, value in kwargs.items():
-                if value is not None:
-                    if key not in allowed_columns:
-                        raise ValueError(f"Invalid column for teams update: {key!r}")
-                    set_clauses.append(f"{key} = ${param_count}")
-                    params.append(value)
-                    param_count += 1
+            for key, value in updates.items():
+                set_clauses.append(f"{key} = ${param_count}")
+                params.append(value)
+                param_count += 1
 
             if not set_clauses:
                 return False
