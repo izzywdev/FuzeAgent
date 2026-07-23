@@ -513,7 +513,7 @@ class TeamKnowledgeManager:
             {where_clause}
             ORDER BY similarity_score DESC, effectiveness_score DESC
             LIMIT ${param_idx}
-        """,
+        """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
             *params,
             limit,
         )

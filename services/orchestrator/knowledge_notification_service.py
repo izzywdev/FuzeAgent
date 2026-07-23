@@ -448,7 +448,7 @@ class KnowledgeNotificationService:
                         END DESC,
                         created_at DESC
                     LIMIT ${param_idx}
-                """,
+                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                     *params,
                     limit,
                 )
@@ -487,10 +487,10 @@ class KnowledgeNotificationService:
 
                 result = await conn.execute(
                     f"""
-                    UPDATE knowledge_notifications 
+                    UPDATE knowledge_notifications
                     SET {', '.join(update_fields)}
                     WHERE id = $1
-                """,
+                """,  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
                     *params,
                 )
 
@@ -508,9 +508,7 @@ class KnowledgeNotificationService:
         try:
             async with self.pool.acquire() as conn:
                 # Basic notification statistics
-                where_conditions = [
-                    "created_at >= NOW() - INTERVAL '%s days'" % days_back
-                ]
+                where_conditions = []
                 params = []
 
                 if organization_id:
@@ -520,12 +518,19 @@ class KnowledgeNotificationService:
                             UNION ALL
                             SELECT id FROM teams WHERE organization_id = $1
                             UNION ALL
-                            SELECT a.id FROM agents a 
-                            JOIN teams t ON a.team_id = t.id 
+                            SELECT a.id FROM agents a
+                            JOIN teams t ON a.team_id = t.id
                             WHERE t.organization_id = $1
                         )
                     """)
                     params.append(organization_id)
+
+                # Parameterize the time window; days_back is bound, not interpolated.
+                days_param_idx = len(params) + 1
+                params.append(days_back)
+                where_conditions.append(
+                    f"created_at >= NOW() - (INTERVAL '1 day' * ${days_param_idx})"
+                )
 
                 where_clause = "WHERE " + " AND ".join(where_conditions)
 
@@ -541,7 +546,7 @@ class KnowledgeNotificationService:
                         COUNT(CASE WHEN requires_action = true THEN 1 END) as requiring_action
                     FROM knowledge_notifications
                     {where_clause}
-                """,
+                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                     *params,
                 )
 
@@ -557,7 +562,7 @@ class KnowledgeNotificationService:
                     {where_clause}
                     GROUP BY notification_type
                     ORDER BY count DESC
-                """,
+                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                     *params,
                 )
 
@@ -578,7 +583,7 @@ class KnowledgeNotificationService:
                             WHEN 'medium' THEN 2
                             ELSE 1
                         END DESC
-                """,
+                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                     *params,
                 )
 

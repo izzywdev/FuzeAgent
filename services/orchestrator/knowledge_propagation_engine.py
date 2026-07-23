@@ -471,9 +471,7 @@ class KnowledgePropagationEngine:
         """Get comprehensive propagation statistics"""
 
         async with self.pool.acquire() as conn:
-            where_conditions = [
-                "propagated_at >= NOW() - INTERVAL '%s days'" % days_back
-            ]
+            where_conditions = []
             params = []
 
             if organization_id:
@@ -486,6 +484,13 @@ class KnowledgePropagationEngine:
                     "(target_id = $1 OR source_id = $1) AND ('team' = ANY(ARRAY[target_type, source_type]))"
                 )
                 params.append(team_id)
+
+            # Parameterize the time window; days_back is bound, not interpolated.
+            days_param_idx = len(params) + 1
+            params.append(days_back)
+            where_conditions.append(
+                f"propagated_at >= NOW() - (INTERVAL '1 day' * ${days_param_idx})"
+            )
 
             where_clause = "WHERE " + " AND ".join(where_conditions)
 
@@ -502,7 +507,7 @@ class KnowledgePropagationEngine:
                     AVG(confidence_score) as avg_confidence
                 FROM knowledge_propagation_log
                 {where_clause}
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
             )
 
@@ -518,7 +523,7 @@ class KnowledgePropagationEngine:
                 {where_clause}
                 GROUP BY source_type, target_type
                 ORDER BY count DESC
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
             )
 
@@ -533,7 +538,7 @@ class KnowledgePropagationEngine:
                 {where_clause}
                 GROUP BY propagation_trigger
                 ORDER BY count DESC
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
             )
 
