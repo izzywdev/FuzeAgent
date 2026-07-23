@@ -145,3 +145,43 @@ def test_discovery_without_jwks_uri_is_a_config_error():
 
 def test_no_auth_returns_none_fail_closed():
     assert _build_verifier(ServerConfig(auth=None)) is None
+
+
+@pytest.mark.parametrize(
+    "bad_url",
+    [
+        "file:///etc/passwd",
+        "ftp://authentik/discovery",
+        "/etc/passwd",  # no scheme
+    ],
+)
+def test_non_http_discovery_url_is_rejected_before_any_fetch(bad_url):
+    # A file://-style oidcDiscoveryUrl must raise the config error, and the discovery
+    # fetch must NEVER happen (Semgrep dynamic-urllib-use-detected hardening).
+    fetched: list[str] = []
+
+    def discovery_fetcher(url: str) -> dict:
+        fetched.append(url)
+        return {"jwks_uri": IN_CLUSTER_JWKS}
+
+    with pytest.raises(RuntimeError):
+        _build_verifier(
+            _config(discovery_url=bad_url),
+            jwk_client_factory=_FakeJwkClient,
+            discovery_fetcher=discovery_fetcher,
+            decoder=_claims_decoder({"iss": ISSUER}),
+        )
+    assert fetched == []  # fetch never happened
+    assert _FakeJwkClient.instances == []  # no JWKS client constructed
+
+
+def test_non_http_jwks_uri_from_discovery_is_rejected():
+    # Even a valid http(s) discovery URL must not yield a file:// jwks_uri.
+    with pytest.raises(RuntimeError):
+        _build_verifier(
+            _config(discovery_url=DISCOVERY),
+            jwk_client_factory=_FakeJwkClient,
+            discovery_fetcher=lambda url: {"jwks_uri": "file:///etc/shadow"},
+            decoder=_claims_decoder({"iss": ISSUER}),
+        )
+    assert _FakeJwkClient.instances == []
