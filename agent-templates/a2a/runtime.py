@@ -103,7 +103,12 @@ def _http_get_json(url: str) -> dict:  # pragma: no cover - network
     import urllib.request
 
     _require_http_url(url, "fetched URL")
-    with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 - scheme-guarded above
+    # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected -- scheme validated
+    # to http/https by _require_http_url above (file://ftp:// rejected); URL is trusted
+    # operator config (values-prod oidcDiscoveryUrl / oidcIssuerUrl), never user input.
+    with urllib.request.urlopen(  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected
+        url, timeout=10
+    ) as resp:  # noqa: S310 - scheme-guarded by _require_http_url above
         return json.loads(resp.read().decode("utf-8"))
 
 
