@@ -95,7 +95,8 @@ class TestClaudeCodeWrapper:
             task_id="task-456",
         )
 
-        assert wrapper.workspace_path == "/tmp/does-not-need-to-exist"  # nosec B108 -- test-only literal path assertion
+        # Literal is a test-only path assertion, never created/written.
+        assert wrapper.workspace_path == "/tmp/does-not-need-to-exist"  # nosec B108
         assert wrapper.agent_id == "agent-123"
         assert wrapper.task_id == "task-456"
         # repository_context is initialised as a fresh dict per instance.

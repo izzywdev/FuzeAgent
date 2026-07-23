@@ -25,6 +25,7 @@ def _fake_db_connection(mock_conn):
 
 
 @pytest.mark.database
+@pytest.mark.asyncio
 class TestUpdateColumnAllowlist:
     async def test_update_organization_rejects_unknown_column(self):
         # A non-allowlisted key (here even carrying a SQL payload) must be
