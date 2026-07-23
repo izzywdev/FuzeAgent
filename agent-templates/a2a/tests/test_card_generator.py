@@ -33,7 +33,7 @@ def test_product_card_identity_and_interface(fuzeplan_repo):
 
     assert card["name"] == "FuzePlan agent"
     assert card["provider"] == {"organization": "FuzeOne", "url": "https://github.com/izzywdev"}
-    assert card["version"] == "1.0.0"
+    assert card["version"] == cg.contract_version()  # tracks contracts/a2a/v1/VERSION (card-projection.md §version); not hard-coded
     assert card["documentationUrl"] == "https://github.com/izzywdev/FuzePlan"
 
     iface = card["supportedInterfaces"]
