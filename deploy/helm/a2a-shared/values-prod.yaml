@@ -33,17 +33,17 @@ a2a:
   # uses the app.fuzefront.com host (Host-forwarding), not the auth.fuzefront.com admin host.
   auth:
     oidcIssuerUrl: https://app.fuzefront.com/application/o/fuzefront/
-    # NOTE (confirm with FuzeFront): A2A callers are MACHINE agents. FuzeFront's
-    # machine-identity service registers a client_credentials OAuth2 app per machine in
-    # Authentik. Two things depend on that and must be settled before this authenticates:
-    #   - `audience`: must equal what those machine tokens carry (the Authentik client_id /
-    #     configured audience), NOT a literal "a2a" unless a dedicated A2A app is created.
-    #   - `callerClaim`: for client_credentials, `sub` is the client_id (a UUID), not the
-    #     repo name authz.md expects. Needs a claim that carries the repo name (or the
-    #     server introspects, as FuzeFront's machine-identity.ts does) so the caller
-    #     resolves to `FuzeAgent`/`FuzePlan`/… . See GO-LIVE.md item 1b.
-    audience: fuzefront
-    callerClaim: sub
+    # ⚠️ AUTH MODEL UNRESOLVED — DO NOT MERGE until settled (see GO-LIVE.md §1b).
+    # FuzeFront's machine identity (backend/security/src/services/machine-identity.ts) is
+    # INTROSPECTION-based, not JWT/JWKS: client_credentials apps, sub_mode=hashed_user_id (so
+    # `sub` is NOT the repo name), validated via Authentik token introspection. The fields
+    # below (oidcIssuerUrl/audience/callerClaim) are the JWT shape and DO NOT fit that model:
+    #   - callerClaim `sub` is a hashed id, not the repo name → the server must introspect and
+    #     map the token's client_id → repo name (backend-engineer work; diverges from authz.md).
+    #   - there is no single `audience` (each machine has its own client_id).
+    # Reconcile introspection-vs-JWT (a CTO/contract decision) before wiring real values here.
+    audience: fuzefront          # PLACEHOLDER — invalid under the introspection model
+    callerClaim: sub             # PLACEHOLDER — `sub` is hashed, not the repo name
     # mTLS is in-cluster defence-in-depth. Set enabled:false to drop the a2a-mtls-ca
     # SealedSecret for a lighter first bring-up (OIDC alone still enforces authz).
     mtls:

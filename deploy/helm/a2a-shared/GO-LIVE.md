@@ -15,27 +15,43 @@ owner (or the sealed-secrets flow) can provide. The rollout PR leaves `REPLACE_M
 | `a2a.auth.oidcIssuerUrl` | **Set** to FuzeFront's prod Authentik issuer `https://app.fuzefront.com/application/o/fuzefront/` (from FuzeFront `deploy/helm/fuzefront/values-prod.yaml`). Already filled in `values-prod.yaml`. |
 | `a2a.tenants[0].entryRole` | **Set** to `agent-orchestrator` (the serving role added in #94). Already filled. |
 
-### 1b. Machine-identity integration with FuzeFront (BLOCKER — coordinate with FuzeFront)
+### 1b. Machine-identity integration with FuzeFront (BLOCKER — auth model needs reconciliation)
 
-A2A callers are **machine agents**, and FuzeFront owns identity (Authentik OIDC). Before A2A auth
-actually works end-to-end, FuzeFront must supply/confirm:
+**Derived from FuzeFront `backend/security/src/services/machine-identity.ts` (FuzeFront#364 — the
+@claude handler no-op'd, so these are read from the code, to be confirmed by FuzeFront):**
 
-1. **Register each A2A agent as a machine identity** in prod Authentik (FuzeFront's
-   `machine-identity` service registers a `client_credentials` OAuth2 app per machine). At minimum
-   register `FuzeAgent`; add each tenant as it is onboarded. Each gets a client_id/secret — the
-   secret is sealed as the caller's credential.
-2. **Caller-identity claim → repo name.** For `client_credentials`, `sub` is the client_id (a UUID),
-   but `authz.md` requires the caller to resolve to a **repo name** (`FuzeAgent`, `FuzePlan`). Either
-   Authentik must emit a claim carrying the repo name (then set `a2a.auth.callerClaim` to it), or the
-   A2A server must introspect (as FuzeFront's `machine-identity.ts` already does). Confirm which.
-3. **`audience`** must equal what those machine tokens carry (the Authentik client_id / configured
-   audience). `values-prod.yaml` currently guesses `fuzefront` — correct it to the real value.
-4. **JWKS reachability**: the A2A server fetches `<issuer>/.well-known/openid-configuration`. Confirm
-   `app.fuzefront.com` is resolvable from the `fuzeagent` namespace (or provide an in-cluster
-   Authentik URL for JWKS while keeping the `iss` claim host).
+FuzeFront's machine identity is **introspection-based, not JWT/JWKS**:
+- Machines register as **`client_credentials`** OAuth2 apps (`registerMachineClient(name)` →
+  `{clientId, clientSecret}`; app slug = the machine name; `meta_description: "Machine identity for
+  <name>"`). `issuer_mode: global`, **`sub_mode: hashed_user_id`**.
+- Tokens are validated by **introspection** (`introspectMachineToken` → POST the Authentik
+  introspection endpoint with the *validator's own* `AUTHENTIK_CLIENT_ID/SECRET`, fail-closed), NOT
+  by local JWT signature/JWKS verification.
 
-This is a cross-repo item — best delegated to **FuzeFront via a `@claude` issue** (register the A2A
-machine identities + confirm the claim/audience), since FuzeFront owns the identity provider.
+**Consequences for the A2A auth block (the current `oidcIssuerUrl`/`audience`/`callerClaim` shape is
+WRONG for this model):**
+1. **`callerClaim: sub` is wrong** — `sub` is a *hashed user id*, not the repo name. The caller must
+   be resolved by **introspecting** the token and mapping the returned `client_id` → the registered
+   machine name (= repo name). This is A2A-server work (backend-engineer), and it **diverges from the
+   frozen contract's assumption** (authz.md §2: identity = the token's validated `sub`/claim). Either
+   the A2A server gains an introspection path + `client_id`→repo map, **or** FuzeFront issues these
+   agents JWTs carrying a repo-name claim. **This is a CTO-level contract/identity design decision.**
+2. **No single `audience`** — each machine has its own `client_id`; there is no one `aud` to check.
+   The introspection response's `active` + `client_id` is the check.
+3. **No JWKS needed** — introspection is a server-to-server call; drop the JWKS/issuer-fetch concern.
+   The A2A server instead needs its OWN registered machine identity (an
+   `AUTHENTIK_CLIENT_ID/SECRET`) to call introspection, plus the Authentik introspection URL
+   (reachable in-cluster).
+
+**Still owner/FuzeFront actions:** (a) register `FuzeAgent` (then each tenant) as a machine identity
+in **prod** Authentik — seal each `client_secret`; (b) provide the A2A server's own introspection
+credential + endpoint; (c) confirm the `client_id`→repo-name mapping source. Because the @claude
+handler stubbed, this is re-nudged on FuzeFront#364 with the specific finding; if it stays unengaged,
+escalate to the CTO (it is a cross-product identity-architecture decision).
+
+> The `auth:` block in `values-prod.yaml` is left as-is with a pointer here — **do not merge #93
+> until the introspection-vs-JWT decision is made**, since the current OIDC-JWT config would not
+> authenticate a FuzeFront machine token.
 
 ## 2. SealedSecrets that must exist in namespace `fuzeagent` before Argo sync
 
