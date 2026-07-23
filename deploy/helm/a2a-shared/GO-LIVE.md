@@ -5,14 +5,21 @@ hand-deployed. This overlay is staged to `enabled: true` in the rollout PR, but 
 once the PR **merges to `main`** — and it will not run correctly until the items below exist.
 
 **None of these can be done by an automated agent** — they are real credentials/config that only the
-owner (or the sealed-secrets flow) can provide. The rollout PR leaves `REPLACE_ME` placeholders and
-`secretRef` names; you fill the values and seal the secrets.
+owner (or the sealed-secrets flow) can provide. The rollout PR fills all config values (§1) and leaves
+`secretRef` names; you seal the secrets (§2) and confirm the token (§1b step 6).
+
+> **⛔ DO NOT MERGE #93 until (a) the 4 SealedSecrets in §2 exist in the `fuzeagent` namespace AND
+> (b) a real minted token has been decoded to confirm the exact `iss` / `aud` / `repo` claim strings
+> and the `fuzefront` app slug.** Until then #93 is not on `main`, so Argo renders nothing.
 
 ## 1. Owner-supplied config (edit `values-prod.yaml`)
 
 | Field | What to set |
 |---|---|
-| `a2a.auth.oidcIssuerUrl` | **Set** to FuzeFront's prod Authentik issuer `https://app.fuzefront.com/application/o/fuzefront/` (from FuzeFront `deploy/helm/fuzefront/values-prod.yaml`). Already filled in `values-prod.yaml`. |
+| `a2a.auth.oidcIssuerUrl` | **Set** to FuzeFront's prod Authentik issuer `https://app.fuzefront.com/application/o/fuzefront/` (from FuzeFront `deploy/helm/fuzefront/values-prod.yaml`). The `iss` anchor. Already filled in `values-prod.yaml`. |
+| `a2a.auth.oidcDiscoveryUrl` | **Set** to the in-cluster discovery URL `http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/fuzefront/.well-known/openid-configuration`. The server fetches JWKS/discovery from HERE while still validating `iss` against `oidcIssuerUrl`. Added to the frozen interface in **contract v1.1.0** (FuzeAgent#96, optional + additive). Already filled. |
+| `a2a.auth.audience` | `a2a` (dedicated M2M audience). Already filled. |
+| `a2a.auth.callerClaim` | `repo` (custom claim carrying the exact repo name — the allowlist key). Already filled. |
 | `a2a.tenants[0].entryRole` | **Set** to `agent-orchestrator` (the serving role added in #94). Already filled. |
 
 ### 1b. Machine-identity integration with FuzeFront — RESOLVED (FuzeFront#364)
@@ -30,50 +37,64 @@ provider and published at the issuer's JWKS, so standard validation works.
 **Resolved A2A `auth` values (now in `values-prod.yaml`):**
 - `callerClaim: repo` — the custom claim carrying the exact repo name (the allowlist key).
 - `audience: a2a` — one dedicated M2M audience across all A2A providers (NOT the human `fuzefront` app).
-- `oidcIssuerUrl` (the `iss`) stays the public `https://app.fuzefront.com/application/o/fuzefront/`
+- `oidcIssuerUrl` (the `iss` anchor) stays the public `https://app.fuzefront.com/application/o/fuzefront/`
   (`issuer_mode: global`), **but JWKS/discovery is fetched in-cluster** to avoid a Cloudflare-tunnel
-  hairpin (FuzeFront hit 17–34 s hairpin timeouts before):
-  `http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/<app-slug>/.well-known/openid-configuration`.
-  - The values-interface schema exposes only `oidcIssuerUrl`; a separate **`oidcDiscoveryUrl`**
-    override likely needs adding (a small contract/schema touch) so `iss` and the fetch URL can differ.
+  hairpin (FuzeFront hit 17–34 s hairpin timeouts before), via **`oidcDiscoveryUrl`**:
+  `http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/fuzefront/.well-known/openid-configuration`.
+  - The `oidcDiscoveryUrl` override is now a **first-class field in the frozen interface as of
+    contract v1.1.0** (FuzeAgent#96 — optional + purely additive; the server validates `iss` against
+    `oidcIssuerUrl` while fetching keys from `oidcDiscoveryUrl`). It is set in `values-prod.yaml`.
+    App slug is **`fuzefront`** (confirm against a real minted token before go-live).
 
 **Critical-path work items (in order — #93 stays DO-NOT-MERGE until all done):**
-1. **FuzeFront PR (backend-engineer):** extend M2M provisioning to attach the `a2a` scope mapping
+1. **Contract v1.1.0 (contract-designer) — DONE:** `auth.oidcDiscoveryUrl` added to the frozen
+   values-interface (FuzeAgent#96, merged to `main`). #93 is rebased onto it, so helm-validate sees
+   a schema that accepts `oidcDiscoveryUrl`.
+2. **Server `oidcDiscoveryUrl` support (backend-engineer, parallel):** the A2A server must honour the
+   `oidcDiscoveryUrl` override — fetch discovery/JWKS from it while validating `iss` against
+   `oidcIssuerUrl`. Tracked separately; NOT part of this devops PR.
+3. **FuzeFront PR (backend-engineer):** extend M2M provisioning to attach the `a2a` scope mapping
    emitting `{"repo": <name>, "aud": "a2a"}` on A2A machine providers — mirror the existing
    `provisionM2MClients()` / `ensureScopeMapping()` (`backend/src/authentik/provision-m2m-clients.ts`,
    already does this shape for `fuzefront:apps`). Without it, a registered `FuzeAgent` gets tokens
-   that FAIL A2A validation. The #364 handler offered to open this PR on confirmation.
-2. **In-cluster registration** of `FuzeAgent` (operator / one-shot Job in the fuzefront ns, where
+   that FAIL A2A validation.
+4. **In-cluster registration** of `FuzeAgent` (operator / one-shot Job in the fuzefront ns, where
    `AUTHENTIK_ADMIN_TOKEN` + `AUTHENTIK_BASE_URL=http://authentik-server:9000` already live) →
    returns `client_id`; seal the returned `client_secret` on the FuzeAgent side. Repeat per tenant.
-3. **NetworkPolicy — FuzeFront chart (FuzeFront#368):** allow `fuzeagent → authentik-server:9000`
-   for the cross-namespace JWKS fetch. Re-routed FuzeInfra#372 → FuzeFront#368: a NetworkPolicy's
-   `podSelector` only matches its own namespace, and the `fuzeinfra` AppProject can't target
-   `fuzefront` — so it lives in FuzeFront's chart. **Correctness caveat:** `fuzefront` has no
-   default-deny, so a *standalone* allow-policy would flip `authentik-server` to
-   deny-all-except-fuzeagent and break Traefik→Authentik login — the rule must be authored
-   ALONGSIDE Authentik's existing ingress allowances.
-4. **FuzeAgent #93 finalize:** confirm the exact `iss`/`aud`/`repo` strings by decoding one real
-   minted token, wire the in-cluster discovery URL (+ any `oidcDiscoveryUrl` schema field), then
-   merge with the secrets sealed.
-
-Handler branch: `claude/issue-364-20260723-1718` (no PR opened yet — awaiting Option-2 confirmation).
+5. **NetworkPolicy — FuzeFront chart (FuzeFront#373) — ALREADY ENABLED:** the cross-namespace
+   `fuzeagent → authentik-server:9000` JWKS path is admitted by FuzeFront's own chart
+   (`networkPolicy.enabled: true` in `fuzefront` prod values, `fuzeagentNamespace: fuzeagent`).
+   It lives in FuzeFront's chart (not FuzeInfra) because a NetworkPolicy's `podSelector` only matches
+   its own namespace and the `fuzeinfra` AppProject can't target `fuzefront`. The rule is authored
+   ALONGSIDE Authentik's existing ingress allowances so it does NOT flip `authentik-server` to
+   deny-all (which would break Traefik→Authentik login). **Operator: nothing to do here — verify only.**
+6. **FuzeAgent #93 finalize (this devops PR):** `oidcDiscoveryUrl` is set in `values-prod.yaml`; the
+   hardened secret set is referenced. Before merge, **decode one real minted token** to confirm the
+   exact `iss`/`aud`/`repo` strings and the `fuzefront` app slug, then seal the §2 secrets and merge
+   with a CLEAN squash message (§4). This PR does NOT create the secrets or decode the token — those
+   are operator steps.
 
 ## 2. SealedSecrets that must exist in namespace `fuzeagent` before Argo sync
 
-Seal each with `kubeseal` against the **prod cluster's** sealed-secrets controller cert. Names/keys
-must match `values-prod.yaml` exactly:
+This is the **hardened (Option B) bring-up** — mTLS + card-signing stay ON. Seal each with `kubeseal`
+against the **prod cluster's** sealed-secrets controller cert. Names/keys must match `values-prod.yaml`
+exactly. **Exactly these 4 SealedSecrets are required for the FuzeAgent-first rollout:**
 
 | SealedSecret `name` | key | Purpose | Required? |
 |---|---|---|---|
-| `a2a-provider-anthropic` | `api-key` | Anthropic API key the server's provider uses | **Yes** |
-| `ghcr-pull` | (dockerconfigjson) | Pull the private `fuzeagent-a2a` image from GHCR | **Yes** |
-| `a2a-mtls-ca` | `ca.crt` | In-cluster mTLS CA (defence-in-depth) | Only if `a2a.auth.mtls.enabled: true` — set `false` to skip |
-| `a2a-card-signing` | `jws.key` | JWS key to sign Agent Cards | Only if the `a2a.cardSigning` block is kept — comment it out to skip (unsigned in-cluster) |
-| `a2a-repos-git` | `token` | Git token to clone **private** tenant repos | Only if a tenant repo is private |
+| `a2a-provider-anthropic` | `api-key` | Anthropic API key the server's provider uses (also exported as `ANTHROPIC_API_KEY` for session provisioning) | **Yes** |
+| `ghcr-pull` | `.dockerconfigjson` | Pull the private `fuzeagent-a2a` image from GHCR (`kubernetes.io/dockerconfigjson` type) | **Yes** |
+| `a2a-mtls-ca` | `ca.crt` | In-cluster mTLS CA (defence-in-depth) — `a2a.auth.mtls.enabled: true` | **Yes (Option B)** |
+| `a2a-card-signing` | `jws.key` | JWS key to sign Agent Cards — `a2a.cardSigning` kept | **Yes (Option B)** |
 
-> Minimal first bring-up: keep only `a2a-provider-anthropic` + `ghcr-pull`, set `mtls.enabled:false`,
-> and comment out the `cardSigning` block. Add mTLS + signing later.
+> **`a2a-repos-git` is NOT needed for this bring-up.** The only tenant (`izzywdev/FuzeAgent`) is a
+> PUBLIC repo, so the repo-sync init container clones anonymously and `deploy.reposGitTokenSecretRef`
+> is `null`. Seal an `a2a-repos-git` (`token`) and repoint that ref ONLY when a PRIVATE tenant repo is
+> onboarded.
+>
+> Lighter (non-hardened) alternative: set `a2a.auth.mtls.enabled: false` and comment out the
+> `a2a.cardSigning` block to drop `a2a-mtls-ca` + `a2a-card-signing` (down to 2 secrets). Option B
+> keeps them for defence-in-depth.
 
 ## 3. `providesTo` backfill (authz — fail-closed)
 
@@ -95,10 +116,14 @@ user/packages/container/fuzeagent-a2a/versions`.
 
 ## 5. Merge → verify
 
-1. Fill §1, seal §2, confirm §3 for the first tenant.
-2. Merge the rollout PR (clean squash message).
-3. `release.yml` builds the image + bumps `tag`; Argo syncs the `a2a-shared` Application.
-4. Verify: pod healthy (`GET /healthz`), card resolves at the well-known path, and the
+1. Config §1 is already filled (`oidcIssuerUrl`, `oidcDiscoveryUrl`, `audience`, `callerClaim`,
+   `entryRole`). Seal the 4 SealedSecrets in §2; confirm §3 for the first tenant.
+2. **Decode a real minted token** (§1b step 6) and confirm the `iss` == `oidcIssuerUrl`,
+   `aud` == `a2a`, and the `repo` claim carries the exact repo name (`FuzeAgent`), and that the
+   Authentik app slug in the discovery URL is `fuzefront`. Only proceed if they match.
+3. Merge the rollout PR with a **CLEAN squash message (no `[skip ci]`)** — see §4.
+4. `release.yml` builds the image + bumps `tag`; Argo syncs the `a2a-shared` Application.
+5. Verify: pod healthy (`GET /healthz`), card resolves at the well-known path, and the
    `a2a-acceptance.yml` gate run against the live URL is green.
 
 ## Rollout order (this PR = step 1 only)

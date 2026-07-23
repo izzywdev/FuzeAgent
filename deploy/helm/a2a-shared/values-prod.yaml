@@ -41,14 +41,17 @@ a2a:
     #   {"repo": "<RepoName>", "aud": "a2a"}. A2A validates the JWT normally and reads `repo`.
     audience: a2a                # dedicated M2M audience (NOT the human `fuzefront` app)
     callerClaim: repo            # custom claim carrying the exact repo name (FuzeAgent, FuzePlan, Exec-cto…)
-    # JWKS/discovery override — in-cluster, cross-namespace to the fuzefront ns (confirm exact ns
-    # with devops). Requires a FuzeInfra NetworkPolicy: fuzeagent -> authentik-server:9000.
-    #   http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/<app-slug>/.well-known/openid-configuration
-    # NOTE: the values-interface schema currently exposes only oidcIssuerUrl; a separate
-    #   `oidcDiscoveryUrl` override may need adding (contract touch) — tracked in GO-LIVE §1b.
-    # ⚠️ STILL DO NOT MERGE: gated on the FuzeFront provisioning PR + FuzeAgent registration +
-    #   the FuzeInfra NetworkPolicy (GO-LIVE §1b sequence). Decode a real minted token to confirm
-    #   the exact iss/aud/claim strings before freezing.
+    # JWKS/discovery override — in-cluster, cross-namespace to the fuzefront ns. The server fetches
+    # OIDC discovery + JWKS from HERE (no Cloudflare-tunnel hairpin) while STILL validating the token
+    # `iss` claim against oidcIssuerUrl above. Added to the frozen interface in contract v1.1.0
+    # (FuzeAgent#96, optional + additive). App slug is `fuzefront` (issuer_mode=global).
+    # JWKS is fetched in-cluster via the FuzeFront NetworkPolicy (FuzeFront#373:
+    #   networkPolicy.enabled: true in fuzefront prod values, fuzeagentNamespace: fuzeagent),
+    # which admits fuzeagent -> authentik-server:9000 cross-namespace.
+    oidcDiscoveryUrl: http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/fuzefront/.well-known/openid-configuration
+    # ⚠️ STILL DO NOT MERGE: gated on the SealedSecrets existing in the fuzeagent ns and on
+    #   decoding a REAL minted token to confirm the exact iss/aud/repo strings + the `fuzefront`
+    #   app slug before freezing (GO-LIVE §1b sequence).
     # mTLS is in-cluster defence-in-depth. Set enabled:false to drop the a2a-mtls-ca
     # SealedSecret for a lighter first bring-up (OIDC alone still enforces authz).
     mtls:
@@ -88,7 +91,10 @@ deploy:
   ingressClassName: traefik
   agentProvider: anthropic
   gitImage: alpine/git:latest
-  # SealedSecret-provisioned at go-live (names must match the sealed resources exactly).
-  reposGitTokenSecretRef: { name: a2a-repos-git, key: token }          # private tenant repos
+  # FuzeAgent-first bring-up: the only tenant (izzywdev/FuzeAgent) is a PUBLIC repo, so the
+  # repo-sync init container clones anonymously — no a2a-repos-git SealedSecret needed. Set this
+  # to { name: a2a-repos-git, key: token } (+ seal that secret) ONLY when a PRIVATE tenant repo
+  # is onboarded. Keeping the hardened operator secret set to exactly 4 (GO-LIVE §2).
+  reposGitTokenSecretRef: null                                         # public tenant → anonymous clone
   providerApiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
   stateConfigMap: a2a-state                                            # Managed-Agents id-state
