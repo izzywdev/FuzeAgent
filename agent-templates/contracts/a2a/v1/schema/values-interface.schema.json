@@ -54,6 +54,11 @@
               "format": "uri",
               "description": "Issuer whose discovery document is projected into the card's `fuze-oidc` scheme."
             },
+            "oidcDiscoveryUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Optional override for where the A2A server fetches OIDC discovery + JWKS. When set (typically an in-cluster URL, e.g. `http://authentik-server.<ns>.svc.cluster.local:9000/application/o/<slug>/.well-known/openid-configuration`), the server fetches keys from HERE while STILL validating the token `iss` claim against `oidcIssuerUrl`. When UNSET, discovery is derived from `oidcIssuerUrl` (public issuer). Purely additive: existing configs that omit it behave exactly as before."
+            },
             "audience": { "type": "string", "description": "Expected `aud` claim." },
             "callerClaim": {
               "type": "string",

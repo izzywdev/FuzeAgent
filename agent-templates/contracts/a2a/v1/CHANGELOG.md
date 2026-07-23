@@ -14,6 +14,23 @@ protocol version appears in the card as `AgentInterface.protocolVersion` and on 
 
 ---
 
+## 1.1.0 — 2026-07-24
+
+Additive, backward-compatible MINOR bump within v1.
+
+### Added
+
+- `schema/values-interface.schema.json` — optional `a2a.auth.oidcDiscoveryUrl` (`string`,
+  `format: uri`). Overrides where the shared A2A server fetches OIDC discovery + JWKS (typically an
+  in-cluster URL for hardened bring-up), while the token `iss` claim is STILL validated against
+  `oidcIssuerUrl`. When unset, discovery is derived from `oidcIssuerUrl` exactly as before.
+
+Not `required`; existing configs that omit it are unchanged. No wire/card change, so the generated
+`fuze_a2a_client` (wire/card models only) is not affected. Motivated by the hardened A2A bring-up
+(in-cluster JWKS fetch) decided on FuzeFront#364.
+
+---
+
 ## 1.0.0 — 2026-07-20
 
 Initial frozen contract. Adopts the **open A2A standard**; supersedes the bespoke
