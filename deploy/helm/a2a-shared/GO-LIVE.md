@@ -12,8 +12,30 @@ owner (or the sealed-secrets flow) can provide. The rollout PR leaves `REPLACE_M
 
 | Field | What to set |
 |---|---|
-| `a2a.auth.oidcIssuerUrl` | The family **Authentik/Keycloak** issuer for the `a2a` OIDC application (e.g. `https://auth.prod.fuzefront.com/application/o/a2a/`, trailing `/`). Register an `a2a` client/audience if it doesn't exist. |
-| `a2a.tenants[0].entryRole` | FuzeAgent's A2A-serving role key from `agent-templates/roles/` — the coordinator/entry role that receives an un-skilled `SendMessage`. |
+| `a2a.auth.oidcIssuerUrl` | **Set** to FuzeFront's prod Authentik issuer `https://app.fuzefront.com/application/o/fuzefront/` (from FuzeFront `deploy/helm/fuzefront/values-prod.yaml`). Already filled in `values-prod.yaml`. |
+| `a2a.tenants[0].entryRole` | **Set** to `agent-orchestrator` (the serving role added in #94). Already filled. |
+
+### 1b. Machine-identity integration with FuzeFront (BLOCKER — coordinate with FuzeFront)
+
+A2A callers are **machine agents**, and FuzeFront owns identity (Authentik OIDC). Before A2A auth
+actually works end-to-end, FuzeFront must supply/confirm:
+
+1. **Register each A2A agent as a machine identity** in prod Authentik (FuzeFront's
+   `machine-identity` service registers a `client_credentials` OAuth2 app per machine). At minimum
+   register `FuzeAgent`; add each tenant as it is onboarded. Each gets a client_id/secret — the
+   secret is sealed as the caller's credential.
+2. **Caller-identity claim → repo name.** For `client_credentials`, `sub` is the client_id (a UUID),
+   but `authz.md` requires the caller to resolve to a **repo name** (`FuzeAgent`, `FuzePlan`). Either
+   Authentik must emit a claim carrying the repo name (then set `a2a.auth.callerClaim` to it), or the
+   A2A server must introspect (as FuzeFront's `machine-identity.ts` already does). Confirm which.
+3. **`audience`** must equal what those machine tokens carry (the Authentik client_id / configured
+   audience). `values-prod.yaml` currently guesses `fuzefront` — correct it to the real value.
+4. **JWKS reachability**: the A2A server fetches `<issuer>/.well-known/openid-configuration`. Confirm
+   `app.fuzefront.com` is resolvable from the `fuzeagent` namespace (or provide an in-cluster
+   Authentik URL for JWKS while keeping the `iss` claim host).
+
+This is a cross-repo item — best delegated to **FuzeFront via a `@claude` issue** (register the A2A
+machine identities + confirm the claim/audience), since FuzeFront owns the identity provider.
 
 ## 2. SealedSecrets that must exist in namespace `fuzeagent` before Argo sync
 

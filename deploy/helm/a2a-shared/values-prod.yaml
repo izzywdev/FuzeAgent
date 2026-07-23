@@ -28,12 +28,21 @@ a2a:
 
   protocolVersion: "1.0"
 
-  # Identity (authz.md). oidcIssuerUrl is REQUIRED when `auth` is present.
+  # Identity (authz.md). The family OIDC issuer is FuzeFront's Authentik.
+  # Source: FuzeFront deploy/helm/fuzefront/values-prod.yaml (issuerUrl). Prod token `iss`
+  # uses the app.fuzefront.com host (Host-forwarding), not the auth.fuzefront.com admin host.
   auth:
-    # OWNER-SUPPLIED: the family Authentik/Keycloak issuer for the `a2a` application,
-    # e.g. https://auth.prod.fuzefront.com/application/o/a2a/  (must end with '/').
-    oidcIssuerUrl: REPLACE_ME
-    audience: a2a
+    oidcIssuerUrl: https://app.fuzefront.com/application/o/fuzefront/
+    # NOTE (confirm with FuzeFront): A2A callers are MACHINE agents. FuzeFront's
+    # machine-identity service registers a client_credentials OAuth2 app per machine in
+    # Authentik. Two things depend on that and must be settled before this authenticates:
+    #   - `audience`: must equal what those machine tokens carry (the Authentik client_id /
+    #     configured audience), NOT a literal "a2a" unless a dedicated A2A app is created.
+    #   - `callerClaim`: for client_credentials, `sub` is the client_id (a UUID), not the
+    #     repo name authz.md expects. Needs a claim that carries the repo name (or the
+    #     server introspects, as FuzeFront's machine-identity.ts does) so the caller
+    #     resolves to `FuzeAgent`/`FuzePlan`/… . See GO-LIVE.md item 1b.
+    audience: fuzefront
     callerClaim: sub
     # mTLS is in-cluster defence-in-depth. Set enabled:false to drop the a2a-mtls-ca
     # SealedSecret for a lighter first bring-up (OIDC alone still enforces authz).
