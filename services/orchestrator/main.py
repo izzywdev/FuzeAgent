@@ -5343,12 +5343,12 @@ async def stream_agent_container_logs(websocket: WebSocket, agent_id: str):
         logger.error(f"Error in log stream for agent {agent_id}: {e}")
         try:
             await websocket.send_json({"error": str(e)})
-        except:
+        except:  # nosec B110 -- best-effort error send; WebSocket may already be closed
             pass
         finally:
             try:
                 await websocket.close()
-            except:
+            except:  # nosec B110 -- best-effort close; WebSocket may already be closed
                 pass
 
 
@@ -5695,7 +5695,7 @@ async def websocket_agent_conversation(
                         for conn in active_conversations.get(conversation_id, []):
                             try:
                                 await conn.send_json(message_data)
-                            except:
+                            except:  # nosec B110 -- best-effort broadcast; individual connections may be closed
                                 pass  # Connection might be closed
 
                         # TODO: Here we would trigger agent response generation
@@ -5717,7 +5717,7 @@ async def websocket_agent_conversation(
                         for conn in active_conversations.get(conversation_id, []):
                             try:
                                 await conn.send_json(agent_response)
-                            except:
+                            except:  # nosec B110 -- best-effort broadcast; individual connections may be closed
                                 pass
 
                         # Store agent response in database

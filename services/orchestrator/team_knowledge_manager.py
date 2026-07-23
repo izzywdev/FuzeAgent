@@ -504,19 +504,16 @@ class TeamKnowledgeManager:
 
         where_clause = "WHERE " + " AND ".join(where_conditions)
 
-        results = await conn.fetch(
-            f"""
-            SELECT 
+        _query = f"""
+            SELECT
                 *,
                 (1 - (embedding <=> $1)) as similarity_score
-            FROM team_knowledge_base 
+            FROM team_knowledge_base
             {where_clause}
             ORDER BY similarity_score DESC, effectiveness_score DESC
             LIMIT ${param_idx}
-        """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-            *params,
-            limit,
-        )
+        """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+        results = await conn.fetch(_query, *params, limit)
 
         search_results = []
         for row in results:

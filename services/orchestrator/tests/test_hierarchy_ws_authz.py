@@ -34,7 +34,7 @@ import pytest
 # Environment — set BEFORE importing auth/hierarchy_endpoints so the module
 # evaluates with the correct JWT config (fail-closed, no bypass).
 # ---------------------------------------------------------------------------
-os.environ["JWT_SECRET"] = "test-secret-hierarchy-ws-authz"
+os.environ["JWT_SECRET"] = "test-secret-hierarchy-ws-authz"  # nosec B105 -- test-only secret, never used in production
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ.pop("AUTH_DISABLED", None)
 os.environ.pop("JWT_AUDIENCE", None)

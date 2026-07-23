@@ -366,15 +366,13 @@ class ConversationManager:
             params.append(limit)
 
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                f"""
+            _query = f"""
                 SELECT * FROM claude_conversations
                 WHERE {where_clause}
                 ORDER BY created_at ASC
                 {limit_clause}
-            """,  # nosec B608 -- where/limit clauses are fixed fragments with $N placeholders; all values bound as query params
-                *params,
-            )
+            """  # nosec B608 -- where/limit clauses are fixed fragments with $N placeholders; all values bound as query params
+            rows = await conn.fetch(_query, *params)
 
         return [dict(row) for row in rows]
 
@@ -469,14 +467,12 @@ class ConversationManager:
         where_clause = " AND ".join(conditions)
 
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                f"""
+            _query = f"""
                 SELECT * FROM code_generations
                 WHERE {where_clause}
                 ORDER BY generated_at ASC
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            rows = await conn.fetch(_query, *params)
 
         return [dict(row) for row in rows]
 
@@ -518,14 +514,12 @@ class ConversationManager:
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
 
         async with get_db_connection() as conn:
-            rows = await conn.fetch(
-                f"""
+            _query = f"""
                 SELECT * FROM agent_performance_metrics
                 {where_clause}
                 ORDER BY measured_at DESC
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values (incl. interval multiplier) bound as query params
-                *params,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values (incl. interval multiplier) bound as query params
+            rows = await conn.fetch(_query, *params)
 
         return [dict(row) for row in rows]
 

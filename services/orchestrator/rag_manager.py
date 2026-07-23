@@ -361,21 +361,17 @@ class RAGManager:
             else:
                 param_offset = 3
 
-            messages = await conn.fetch(
-                f"""
-                SELECT 
+            _msg_query = f"""
+                SELECT
                     id, session_id, message_type, content, metadata, created_at,
                     1 - (embedding <=> $1) as similarity
-                FROM agent_conversations 
+                FROM agent_conversations
                 {where_clause}
                 AND 1 - (embedding <=> $1) > ${param_offset}
                 ORDER BY similarity DESC
                 LIMIT ${param_offset + 1}
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-                similarity_threshold,
-                limit,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            messages = await conn.fetch(_msg_query, *params, similarity_threshold, limit)
 
             results = []
             for msg in messages:
@@ -394,21 +390,17 @@ class RAGManager:
 
             # Search conversation summaries if requested
             if include_summaries:
-                summaries = await conn.fetch(
-                    f"""
-                    SELECT 
+                _summary_query = f"""
+                    SELECT
                         id, session_id, summary_text, message_count, time_range, created_at,
                         1 - (summary_embedding <=> $1) as similarity
-                    FROM conversation_summaries 
+                    FROM conversation_summaries
                     {where_clause}
                     AND 1 - (summary_embedding <=> $1) > ${param_offset}
                     ORDER BY similarity DESC
                     LIMIT ${param_offset + 1}
-                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    *params,
-                    similarity_threshold,
-                    limit // 2,
-                )
+                """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+                summaries = await conn.fetch(_summary_query, *params, similarity_threshold, limit // 2)
 
                 for summary in summaries:
                     results.append(
@@ -496,20 +488,17 @@ class RAGManager:
 
             where_clause = "WHERE " + " AND ".join(where_conditions)
 
-            results = await conn.fetch(
-                f"""
-                SELECT 
-                    id, content, content_type, source_type, metadata, tags, 
+            _kb_query = f"""
+                SELECT
+                    id, content, content_type, source_type, metadata, tags,
                     access_count, created_at,
                     1 - (embedding <=> $1) as similarity
-                FROM agent_knowledge_base 
+                FROM agent_knowledge_base
                 {where_clause}
                 ORDER BY similarity DESC
                 LIMIT ${param_count}
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-                limit,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            results = await conn.fetch(_kb_query, *params, limit)
 
             # Update access count for retrieved items
             if results:

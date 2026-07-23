@@ -442,20 +442,18 @@ class A2AProtocolManager:
                 "WHERE " + " AND ".join(where_conditions) if where_conditions else ""
             )
 
-            results = await conn.fetch(
-                f"""
-                SELECT card_data FROM a2a_agent_cards 
+            _query = f"""
+                SELECT card_data FROM a2a_agent_cards
                 {where_clause}
-                ORDER BY 
-                    CASE availability_status 
-                        WHEN 'available' THEN 1 
-                        WHEN 'busy' THEN 2 
-                        ELSE 3 
+                ORDER BY
+                    CASE availability_status
+                        WHEN 'available' THEN 1
+                        WHEN 'busy' THEN 2
+                        ELSE 3
                     END,
                     current_task_count ASC
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            results = await conn.fetch(_query, *params)
 
             return [AgentCard(**result["card_data"]) for result in results]
 
@@ -740,16 +738,13 @@ class A2AProtocolManager:
 
             where_clause = " AND ".join(where_conditions)
 
-            results = await conn.fetch(
-                f"""
-                SELECT task_data FROM a2a_tasks 
+            _query = f"""
+                SELECT task_data FROM a2a_tasks
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT ${param_count}
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-                limit,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            results = await conn.fetch(_query, *params, limit)
 
             return [A2ATask(**result["task_data"]) for result in results]
 
@@ -770,15 +765,12 @@ class A2AProtocolManager:
 
             where_clause = " AND ".join(where_conditions)
 
-            results = await conn.fetch(
-                f"""
-                SELECT message_data FROM a2a_messages 
+            _query = f"""
+                SELECT message_data FROM a2a_messages
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT ${param_count}
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-                limit,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            results = await conn.fetch(_query, *params, limit)
 
             return [A2AMessage(**result["message_data"]) for result in results]

@@ -125,7 +125,7 @@ class ModelConfigurationManager:
 
     def _get_or_create_encryption_key(self) -> bytes:
         """Get or create encryption key for API credentials"""
-        key_file = "/tmp/fuzeagent_encryption.key"
+        key_file = "/tmp/fuzeagent_encryption.key"  # nosec B108 -- tmp path for ephemeral container key storage
 
         if os.path.exists(key_file):
             with open(key_file, "rb") as f:

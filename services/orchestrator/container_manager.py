@@ -534,7 +534,7 @@ class ContainerManager:
                     started = datetime.fromisoformat(
                         state["StartedAt"].replace("Z", "+00:00")
                     )
-                except:
+                except:  # nosec B110 -- intentional bare except for datetime parsing of Docker timestamps
                     pass
 
             if state.get("FinishedAt"):
@@ -542,7 +542,7 @@ class ContainerManager:
                     finished = datetime.fromisoformat(
                         state["FinishedAt"].replace("Z", "+00:00")
                     )
-                except:
+                except:  # nosec B110 -- intentional bare except for datetime parsing of Docker timestamps
                     pass
 
             # Get resource usage (if available)
@@ -586,7 +586,7 @@ class ContainerManager:
                     if host_bindings:
                         for binding in host_bindings:
                             ports[container_port] = (
-                                f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"
+                                f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"  # nosec B104 -- container port mapping from Docker API, not user input
                             )
 
             # Get health status

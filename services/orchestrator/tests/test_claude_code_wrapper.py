@@ -90,12 +90,12 @@ class TestClaudeCodeWrapper:
     def test_constructor_accepts_agent_context(self, mock_anthropic_client):
         """Optional agent/task/workspace context is stored on the instance."""
         wrapper = ClaudeCodeWrapper(
-            workspace_path="/tmp/does-not-need-to-exist",
+            workspace_path="/tmp/does-not-need-to-exist",  # nosec B108 -- test-only tmp path
             agent_id="agent-123",
             task_id="task-456",
         )
 
-        assert wrapper.workspace_path == "/tmp/does-not-need-to-exist"
+        assert wrapper.workspace_path == "/tmp/does-not-need-to-exist"  # nosec B108 -- test-only tmp path
         assert wrapper.agent_id == "agent-123"
         assert wrapper.task_id == "task-456"
         # repository_context is initialised as a fresh dict per instance.

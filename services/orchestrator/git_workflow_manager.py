@@ -14,7 +14,7 @@ import base64
 import json
 import logging
 import os
-import subprocess
+import subprocess  # nosec B404 -- subprocess used only for git commands with fixed args
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime

@@ -623,8 +623,7 @@ class GoalConversationService:
 
                 where_clause = " AND ".join(where_conditions)
 
-                conversations = await conn.fetch(
-                    """
+                _query = f"""
                     SELECT id, conversation_type, conversation_title, conversation_summary,
                            status, last_activity_at, created_at,
                            COALESCE(array_length(string_to_array(messages::text, '}}'), 1), 0) as message_count,
@@ -633,12 +632,8 @@ class GoalConversationService:
                     WHERE {where_clause}
                     ORDER BY last_activity_at DESC, created_at DESC
                     LIMIT ${param_idx}
-                """.format(  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    where_clause=where_clause, param_idx=param_idx
-                ),
-                    *params,
-                    limit,
-                )
+                """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+                conversations = await conn.fetch(_query, *params, limit)
 
                 return [dict(conv) for conv in conversations]
 

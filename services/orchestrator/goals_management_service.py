@@ -371,16 +371,13 @@ class GoalsManagementService:
 
                 where_clause = " AND ".join(where_conditions)
 
-                rows = await conn.fetch(
-                    f"""
-                    SELECT * FROM organization_goals 
+                _query = f"""
+                    SELECT * FROM organization_goals
                     WHERE {where_clause}
                     ORDER BY priority_level DESC, created_at DESC
                     LIMIT ${param_idx}
-                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    *params,
-                    limit,
-                )
+                """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+                rows = await conn.fetch(_query, *params, limit)
 
                 return [self._row_to_goal(row) for row in rows]
 
@@ -423,14 +420,12 @@ class GoalsManagementService:
 
                 if update_fields:
                     update_fields.append("updated_at = NOW()")
-                    await conn.execute(
-                        f"""
+                    _query = f"""
                         UPDATE organization_goals
                         SET {', '.join(update_fields)}
                         WHERE id = $1
-                    """,  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
-                        *params,
-                    )
+                    """  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
+                    await conn.execute(_query, *params)
 
                     # Record progress tracking entry
                     await conn.execute(

@@ -270,16 +270,12 @@ class OrganizationRAGManager:
             where_clause = "WHERE " + " AND ".join(where_conditions)
 
             # Execute search
-            knowledge_results = await conn.fetch(
-                f"""
+            _search_query = f"""
                 SELECT * FROM search_organization_knowledge(
                     $2, $1, null, ${param_idx}, ${param_idx}
                 )
-            """,  # nosec B608 -- only $N placeholder indices are interpolated; all values bound as query params
-                *params,
-                limit,
-                min_similarity,
-            )
+            """  # nosec B608 -- only $N placeholder indices are interpolated; all values bound as query params
+            knowledge_results = await conn.fetch(_search_query, *params, limit, min_similarity)
 
             # Convert to result objects
             results = []
@@ -405,14 +401,12 @@ class OrganizationRAGManager:
         params.append(knowledge_id)
 
         async with self.pool.acquire() as conn:
-            result = await conn.execute(
-                f"""
+            _query = f"""
                 UPDATE organization_knowledge_base
                 SET {', '.join(updates)}
                 WHERE id = ${param_idx}
-            """,  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
-                *params,
-            )
+            """  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
+            result = await conn.execute(_query, *params)
 
             return result == "UPDATE 1"
 

@@ -435,12 +435,11 @@ class KnowledgeNotificationService:
 
                 where_clause = "WHERE " + " AND ".join(where_conditions)
 
-                notifications = await conn.fetch(
-                    f"""
+                _query = f"""
                     SELECT * FROM knowledge_notifications
                     {where_clause}
-                    ORDER BY 
-                        CASE priority 
+                    ORDER BY
+                        CASE priority
                             WHEN 'urgent' THEN 4
                             WHEN 'high' THEN 3
                             WHEN 'medium' THEN 2
@@ -448,10 +447,8 @@ class KnowledgeNotificationService:
                         END DESC,
                         created_at DESC
                     LIMIT ${param_idx}
-                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    *params,
-                    limit,
-                )
+                """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+                notifications = await conn.fetch(_query, *params, limit)
 
                 return [self._row_to_notification(row) for row in notifications]
 
@@ -485,14 +482,12 @@ class KnowledgeNotificationService:
                     params.append(json.dumps(action_taken))
                     param_idx += 1
 
-                result = await conn.execute(
-                    f"""
+                _query = f"""
                     UPDATE knowledge_notifications
                     SET {', '.join(update_fields)}
                     WHERE id = $1
-                """,  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
-                    *params,
-                )
+                """  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
+                result = await conn.execute(_query, *params)
 
                 return result == "UPDATE 1"
 
@@ -534,9 +529,8 @@ class KnowledgeNotificationService:
 
                 where_clause = "WHERE " + " AND ".join(where_conditions)
 
-                basic_stats = await conn.fetchrow(
-                    f"""
-                    SELECT 
+                _basic_query = f"""
+                    SELECT
                         COUNT(*) as total_notifications,
                         COUNT(CASE WHEN status = 'unread' THEN 1 END) as unread,
                         COUNT(CASE WHEN status = 'read' THEN 1 END) as read,
@@ -546,14 +540,12 @@ class KnowledgeNotificationService:
                         COUNT(CASE WHEN requires_action = true THEN 1 END) as requiring_action
                     FROM knowledge_notifications
                     {where_clause}
-                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    *params,
-                )
+                """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+                basic_stats = await conn.fetchrow(_basic_query, *params)
 
                 # Notification type breakdown
-                type_stats = await conn.fetch(
-                    f"""
-                    SELECT 
+                _type_query = f"""
+                    SELECT
                         notification_type,
                         COUNT(*) as count,
                         COUNT(CASE WHEN status = 'acted_upon' THEN 1 END) as acted_upon_count,
@@ -562,30 +554,27 @@ class KnowledgeNotificationService:
                     {where_clause}
                     GROUP BY notification_type
                     ORDER BY count DESC
-                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    *params,
-                )
+                """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+                type_stats = await conn.fetch(_type_query, *params)
 
                 # Priority distribution
-                priority_stats = await conn.fetch(
-                    f"""
-                    SELECT 
+                _priority_query = f"""
+                    SELECT
                         priority,
                         COUNT(*) as count,
                         AVG(CASE WHEN read_at IS NOT NULL THEN EXTRACT(EPOCH FROM read_at - created_at) END) / 3600 as avg_time_to_read_hours
                     FROM knowledge_notifications
                     {where_clause}
                     GROUP BY priority
-                    ORDER BY 
-                        CASE priority 
+                    ORDER BY
+                        CASE priority
                             WHEN 'urgent' THEN 4
                             WHEN 'high' THEN 3
                             WHEN 'medium' THEN 2
                             ELSE 1
                         END DESC
-                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    *params,
-                )
+                """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+                priority_stats = await conn.fetch(_priority_query, *params)
 
                 return {
                     "time_period_days": days_back,

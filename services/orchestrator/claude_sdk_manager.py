@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import re
-import subprocess
+import subprocess  # nosec B404 -- subprocess used only for running Claude SDK processes
 import time
 from dataclasses import dataclass
 from datetime import datetime

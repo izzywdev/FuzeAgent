@@ -232,9 +232,8 @@ class KnowledgeAnalyticsService:
 
                 where_clause = " AND ".join(where_conditions)
 
-                knowledge_items = await conn.fetch(
-                    f"""
-                    SELECT 
+                _query = f"""
+                    SELECT
                         kb.id,
                         kb.title,
                         kb.knowledge_category,
@@ -243,25 +242,22 @@ class KnowledgeAnalyticsService:
                         kb.quality_score,
                         kb.created_at,
                         kb.updated_at,
-                        -- Calculate agent adoption rate
                         COALESCE(agent_usage.adoption_rate, 0.0) as agent_adoption_rate,
-                        -- Calculate team adoption rate  
                         COALESCE(team_usage.adoption_rate, 0.0) as team_adoption_rate,
-                        -- Calculate average relevance from recent usage
                         COALESCE(recent_relevance.avg_relevance, 0.0) as average_relevance
                     FROM organization_knowledge_base kb
                     LEFT JOIN (
-                        SELECT 
+                        SELECT
                             knowledge_id,
                             COUNT(DISTINCT agent_id)::float / NULLIF(total_agents.count, 0) as adoption_rate
                         FROM agent_memory am
-                        JOIN (SELECT COUNT(*) as count FROM agents WHERE team_id IN 
+                        JOIN (SELECT COUNT(*) as count FROM agents WHERE team_id IN
                               (SELECT id FROM teams WHERE organization_id = $1)) total_agents ON true
                         WHERE knowledge_id IS NOT NULL
                         GROUP BY knowledge_id
                     ) agent_usage ON kb.id::text = agent_usage.knowledge_id
                     LEFT JOIN (
-                        SELECT 
+                        SELECT
                             source_knowledge_id,
                             COUNT(DISTINCT team_id)::float / NULLIF(total_teams.count, 0) as adoption_rate
                         FROM team_knowledge_base tkb
@@ -270,7 +266,7 @@ class KnowledgeAnalyticsService:
                         GROUP BY source_knowledge_id
                     ) team_usage ON kb.id::text = team_usage.source_knowledge_id
                     LEFT JOIN (
-                        SELECT 
+                        SELECT
                             knowledge_id,
                             AVG(relevance_score) as avg_relevance
                         FROM agent_memory am
@@ -280,9 +276,8 @@ class KnowledgeAnalyticsService:
                     ) recent_relevance ON kb.id::text = recent_relevance.knowledge_id
                     WHERE {where_clause}
                     ORDER BY kb.usage_count DESC, kb.success_correlation DESC
-                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    *params,
-                )
+                """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+                knowledge_items = await conn.fetch(_query, *params)
 
                 effectiveness_metrics = []
 

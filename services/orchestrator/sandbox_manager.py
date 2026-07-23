@@ -397,7 +397,7 @@ class AgentSandboxManager:
             "cap_drop": config.capabilities["drop"],
             "cap_add": config.capabilities["add"],
             "read_only": False,  # Need write access for development
-            "tmpfs": {"/tmp": "rw,noexec,nosuid,size=1g"},
+            "tmpfs": {"/tmp": "rw,noexec,nosuid,size=1g"},  # nosec B108 -- /tmp is the Docker tmpfs mount for sandbox containers
             "labels": {
                 "fuzeagent.sandbox": "true",
                 "fuzeagent.agent_id": sandbox.agent_id,

@@ -495,9 +495,8 @@ class KnowledgePropagationEngine:
             where_clause = "WHERE " + " AND ".join(where_conditions)
 
             # Basic statistics
-            stats = await conn.fetchrow(
-                f"""
-                SELECT 
+            _stats_query = f"""
+                SELECT
                     COUNT(*) as total_propagations,
                     COUNT(CASE WHEN propagation_status = 'completed' THEN 1 END) as completed,
                     COUNT(CASE WHEN propagation_status = 'failed' THEN 1 END) as failed,
@@ -507,14 +506,12 @@ class KnowledgePropagationEngine:
                     AVG(confidence_score) as avg_confidence
                 FROM knowledge_propagation_log
                 {where_clause}
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            stats = await conn.fetchrow(_stats_query, *params)
 
             # Propagation flow statistics
-            flow_stats = await conn.fetch(
-                f"""
-                SELECT 
+            _flow_query = f"""
+                SELECT
                     source_type || ' → ' || target_type as flow_type,
                     COUNT(*) as count,
                     AVG(confidence_score) as avg_confidence,
@@ -523,14 +520,12 @@ class KnowledgePropagationEngine:
                 {where_clause}
                 GROUP BY source_type, target_type
                 ORDER BY count DESC
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            flow_stats = await conn.fetch(_flow_query, *params)
 
             # Trigger analysis
-            trigger_stats = await conn.fetch(
-                f"""
-                SELECT 
+            _trigger_query = f"""
+                SELECT
                     propagation_trigger,
                     COUNT(*) as count,
                     AVG(confidence_score) as avg_confidence
@@ -538,9 +533,8 @@ class KnowledgePropagationEngine:
                 {where_clause}
                 GROUP BY propagation_trigger
                 ORDER BY count DESC
-            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                *params,
-            )
+            """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
+            trigger_stats = await conn.fetch(_trigger_query, *params)
 
             return {
                 "time_period_days": days_back,
