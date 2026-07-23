@@ -634,8 +634,8 @@ class GoalConversationService:
                     ORDER BY last_activity_at DESC, created_at DESC
                     LIMIT ${param_idx}
                 """.format(  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
-                    where_clause=where_clause, param_idx=param_idx
-                ),
+                        where_clause=where_clause, param_idx=param_idx
+                    ),
                     *params,
                     limit,
                 )
