@@ -15,43 +15,44 @@ owner (or the sealed-secrets flow) can provide. The rollout PR leaves `REPLACE_M
 | `a2a.auth.oidcIssuerUrl` | **Set** to FuzeFront's prod Authentik issuer `https://app.fuzefront.com/application/o/fuzefront/` (from FuzeFront `deploy/helm/fuzefront/values-prod.yaml`). Already filled in `values-prod.yaml`. |
 | `a2a.tenants[0].entryRole` | **Set** to `agent-orchestrator` (the serving role added in #94). Already filled. |
 
-### 1b. Machine-identity integration with FuzeFront (BLOCKER — auth model needs reconciliation)
+### 1b. Machine-identity integration with FuzeFront — RESOLVED (FuzeFront#364)
 
-**Derived from FuzeFront `backend/security/src/services/machine-identity.ts` (FuzeFront#364 — the
-@claude handler no-op'd, so these are read from the code, to be confirmed by FuzeFront):**
+FuzeFront (identity owner) decided **Option 2: issue repo-name JWTs**, not introspection. Rationale:
+it fits the frozen A2A contract (standard stateless JWT validation, no `authz.md §2` amendment),
+avoids handing every A2A pod its own introspection credential + a round-trip per call, and removes
+the `client_id → repo` lookup that introspection would still require (`sub` is
+`hashed_user_id`; the only stable key today is the opaque `client_id`).
 
-FuzeFront's machine identity is **introspection-based, not JWT/JWKS**:
-- Machines register as **`client_credentials`** OAuth2 apps (`registerMachineClient(name)` →
-  `{clientId, clientSecret}`; app slug = the machine name; `meta_description: "Machine identity for
-  <name>"`). `issuer_mode: global`, **`sub_mode: hashed_user_id`**.
-- Tokens are validated by **introspection** (`introspectMachineToken` → POST the Authentik
-  introspection endpoint with the *validator's own* `AUTHENTIK_CLIENT_ID/SECRET`, fail-closed), NOT
-  by local JWT signature/JWKS verification.
+**Mechanism:** an Authentik **scope mapping** on each A2A machine provider emits a stable claim,
+`{"repo": "<RepoName>", "aud": "a2a"}`. Authentik OAuth2 access tokens are JWTs signed by the
+provider and published at the issuer's JWKS, so standard validation works.
 
-**Consequences for the A2A auth block (the current `oidcIssuerUrl`/`audience`/`callerClaim` shape is
-WRONG for this model):**
-1. **`callerClaim: sub` is wrong** — `sub` is a *hashed user id*, not the repo name. The caller must
-   be resolved by **introspecting** the token and mapping the returned `client_id` → the registered
-   machine name (= repo name). This is A2A-server work (backend-engineer), and it **diverges from the
-   frozen contract's assumption** (authz.md §2: identity = the token's validated `sub`/claim). Either
-   the A2A server gains an introspection path + `client_id`→repo map, **or** FuzeFront issues these
-   agents JWTs carrying a repo-name claim. **This is a CTO-level contract/identity design decision.**
-2. **No single `audience`** — each machine has its own `client_id`; there is no one `aud` to check.
-   The introspection response's `active` + `client_id` is the check.
-3. **No JWKS needed** — introspection is a server-to-server call; drop the JWKS/issuer-fetch concern.
-   The A2A server instead needs its OWN registered machine identity (an
-   `AUTHENTIK_CLIENT_ID/SECRET`) to call introspection, plus the Authentik introspection URL
-   (reachable in-cluster).
+**Resolved A2A `auth` values (now in `values-prod.yaml`):**
+- `callerClaim: repo` — the custom claim carrying the exact repo name (the allowlist key).
+- `audience: a2a` — one dedicated M2M audience across all A2A providers (NOT the human `fuzefront` app).
+- `oidcIssuerUrl` (the `iss`) stays the public `https://app.fuzefront.com/application/o/fuzefront/`
+  (`issuer_mode: global`), **but JWKS/discovery is fetched in-cluster** to avoid a Cloudflare-tunnel
+  hairpin (FuzeFront hit 17–34 s hairpin timeouts before):
+  `http://authentik-server.<fuzefront-ns>.svc.cluster.local:9000/application/o/<app-slug>/.well-known/openid-configuration`.
+  - The values-interface schema exposes only `oidcIssuerUrl`; a separate **`oidcDiscoveryUrl`**
+    override likely needs adding (a small contract/schema touch) so `iss` and the fetch URL can differ.
 
-**Still owner/FuzeFront actions:** (a) register `FuzeAgent` (then each tenant) as a machine identity
-in **prod** Authentik — seal each `client_secret`; (b) provide the A2A server's own introspection
-credential + endpoint; (c) confirm the `client_id`→repo-name mapping source. Because the @claude
-handler stubbed, this is re-nudged on FuzeFront#364 with the specific finding; if it stays unengaged,
-escalate to the CTO (it is a cross-product identity-architecture decision).
+**Critical-path work items (in order — #93 stays DO-NOT-MERGE until all done):**
+1. **FuzeFront PR (backend-engineer):** extend M2M provisioning to attach the `a2a` scope mapping
+   emitting `{"repo": <name>, "aud": "a2a"}` on A2A machine providers — mirror the existing
+   `provisionM2MClients()` / `ensureScopeMapping()` (`backend/src/authentik/provision-m2m-clients.ts`,
+   already does this shape for `fuzefront:apps`). Without it, a registered `FuzeAgent` gets tokens
+   that FAIL A2A validation. The #364 handler offered to open this PR on confirmation.
+2. **In-cluster registration** of `FuzeAgent` (operator / one-shot Job in the fuzefront ns, where
+   `AUTHENTIK_ADMIN_TOKEN` + `AUTHENTIK_BASE_URL=http://authentik-server:9000` already live) →
+   returns `client_id`; seal the returned `client_secret` on the FuzeAgent side. Repeat per tenant.
+3. **FuzeInfra `@claude`:** a NetworkPolicy allowing `fuzeagent → authentik-server:9000` in the
+   fuzefront namespace (cross-namespace JWKS fetch). Not editable from FuzeFront/FuzeAgent.
+4. **FuzeAgent #93 finalize:** confirm the exact `iss`/`aud`/`repo` strings by decoding one real
+   minted token, wire the in-cluster discovery URL (+ any `oidcDiscoveryUrl` schema field), then
+   merge with the secrets sealed.
 
-> The `auth:` block in `values-prod.yaml` is left as-is with a pointer here — **do not merge #93
-> until the introspection-vs-JWT decision is made**, since the current OIDC-JWT config would not
-> authenticate a FuzeFront machine token.
+Handler branch: `claude/issue-364-20260723-1718` (no PR opened yet — awaiting Option-2 confirmation).
 
 ## 2. SealedSecrets that must exist in namespace `fuzeagent` before Argo sync
 

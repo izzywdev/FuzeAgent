@@ -32,18 +32,23 @@ a2a:
   # Source: FuzeFront deploy/helm/fuzefront/values-prod.yaml (issuerUrl). Prod token `iss`
   # uses the app.fuzefront.com host (Host-forwarding), not the auth.fuzefront.com admin host.
   auth:
+    # `iss` claim (public, issuer_mode=global). Keep this string for iss validation, but the
+    # A2A OIDC client fetches JWKS/discovery from the IN-CLUSTER Authentik service (below) to
+    # avoid a Cloudflare-tunnel hairpin — FuzeFront's decision on FuzeFront#364.
     oidcIssuerUrl: https://app.fuzefront.com/application/o/fuzefront/
-    # ⚠️ AUTH MODEL UNRESOLVED — DO NOT MERGE until settled (see GO-LIVE.md §1b).
-    # FuzeFront's machine identity (backend/security/src/services/machine-identity.ts) is
-    # INTROSPECTION-based, not JWT/JWKS: client_credentials apps, sub_mode=hashed_user_id (so
-    # `sub` is NOT the repo name), validated via Authentik token introspection. The fields
-    # below (oidcIssuerUrl/audience/callerClaim) are the JWT shape and DO NOT fit that model:
-    #   - callerClaim `sub` is a hashed id, not the repo name → the server must introspect and
-    #     map the token's client_id → repo name (backend-engineer work; diverges from authz.md).
-    #   - there is no single `audience` (each machine has its own client_id).
-    # Reconcile introspection-vs-JWT (a CTO/contract decision) before wiring real values here.
-    audience: fuzefront          # PLACEHOLDER — invalid under the introspection model
-    callerClaim: sub             # PLACEHOLDER — `sub` is hashed, not the repo name
+    # RESOLVED by FuzeFront#364 — Option 2 (repo-name JWTs, standard validation; NOT introspection):
+    #   FuzeFront attaches an Authentik scope mapping to each A2A machine provider emitting
+    #   {"repo": "<RepoName>", "aud": "a2a"}. A2A validates the JWT normally and reads `repo`.
+    audience: a2a                # dedicated M2M audience (NOT the human `fuzefront` app)
+    callerClaim: repo            # custom claim carrying the exact repo name (FuzeAgent, FuzePlan, Exec-cto…)
+    # JWKS/discovery override — in-cluster, cross-namespace to the fuzefront ns (confirm exact ns
+    # with devops). Requires a FuzeInfra NetworkPolicy: fuzeagent -> authentik-server:9000.
+    #   http://authentik-server.<fuzefront-ns>.svc.cluster.local:9000/application/o/<app-slug>/.well-known/openid-configuration
+    # NOTE: the values-interface schema currently exposes only oidcIssuerUrl; a separate
+    #   `oidcDiscoveryUrl` override may need adding (contract touch) — tracked in GO-LIVE §1b.
+    # ⚠️ STILL DO NOT MERGE: gated on the FuzeFront provisioning PR + FuzeAgent registration +
+    #   the FuzeInfra NetworkPolicy (GO-LIVE §1b sequence). Decode a real minted token to confirm
+    #   the exact iss/aud/claim strings before freezing.
     # mTLS is in-cluster defence-in-depth. Set enabled:false to drop the a2a-mtls-ca
     # SealedSecret for a lighter first bring-up (OIDC alone still enforces authz).
     mtls:
