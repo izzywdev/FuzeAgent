@@ -15,6 +15,12 @@ from typing import Any
 @dataclass(frozen=True)
 class AuthConfig:
     oidc_issuer_url: str
+    #: OPTIONAL override for where the server fetches OIDC discovery + JWKS
+    #: (values-interface auth.oidcDiscoveryUrl). Typically an in-cluster URL. When set,
+    #: keys are fetched from HERE while the token ``iss`` is STILL validated against
+    #: ``oidc_issuer_url`` (the public issuer). When None, discovery is derived from
+    #: ``oidc_issuer_url`` — the unchanged default path.
+    oidc_discovery_url: str | None = None
     audience: str | None = None
     #: the token claim carrying the caller repo identity — its value is the ONLY
     #: trusted caller identity (authz.md §2 / values-interface auth.callerClaim).
@@ -91,6 +97,7 @@ def load_config(values: dict[str, Any]) -> ServerConfig:
         mtls = auth_raw.get("mtls") or {}
         auth = AuthConfig(
             oidc_issuer_url=auth_raw["oidcIssuerUrl"],
+            oidc_discovery_url=auth_raw.get("oidcDiscoveryUrl"),
             audience=auth_raw.get("audience"),
             caller_claim=auth_raw.get("callerClaim", "sub"),
             mtls_enabled=bool(mtls.get("enabled", False)),
