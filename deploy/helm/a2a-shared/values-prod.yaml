@@ -56,7 +56,7 @@ a2a:
       enabled: true
       # OWNER/devops: FuzeAgent's A2A-serving role key from agent-templates/roles/
       # (the coordinator/entry role that receives an un-skilled SendMessage).
-      entryRole: REPLACE_ME
+      entryRole: agent-orchestrator
       external: false
       provider:
         name: anthropic
