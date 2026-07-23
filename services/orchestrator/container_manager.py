@@ -534,16 +534,16 @@ class ContainerManager:
                     started = datetime.fromisoformat(
                         state["StartedAt"].replace("Z", "+00:00")
                     )
-                except:
-                    pass
+                except (ValueError, TypeError):
+                    logger.debug("Could not parse container StartedAt timestamp")
 
             if state.get("FinishedAt"):
                 try:
                     finished = datetime.fromisoformat(
                         state["FinishedAt"].replace("Z", "+00:00")
                     )
-                except:
-                    pass
+                except (ValueError, TypeError):
+                    logger.debug("Could not parse container FinishedAt timestamp")
 
             # Get resource usage (if available)
             cpu_usage = None
@@ -586,7 +586,7 @@ class ContainerManager:
                     if host_bindings:
                         for binding in host_bindings:
                             ports[container_port] = (
-                                f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"
+                                f"{binding.get('HostIp', '0.0.0.0')}:{binding.get('HostPort')}"  # nosec B104 -- not a bind; formats the HostIp Docker already reported for a port mapping ('0.0.0.0' is only a display default)
                             )
 
             # Get health status

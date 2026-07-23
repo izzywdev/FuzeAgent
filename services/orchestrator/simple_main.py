@@ -459,4 +459,8 @@ async def get_agent_documents(agent_id: str):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host=os.getenv("HOST", "0.0.0.0"),  # nosec B104 -- container service binds all interfaces by default; override via HOST env
+        port=int(os.getenv("PORT", "8000")),
+    )
