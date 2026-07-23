@@ -76,3 +76,31 @@ def test_load_config_accepts_inner_block():
 def test_default_caller_claim_is_sub():
     cfg = load_config({"a2a": {"enabled": True, "auth": {"oidcIssuerUrl": "https://x"}}})
     assert cfg.auth.caller_claim == "sub"
+
+
+def test_oidc_discovery_url_defaults_to_none():
+    # Purely additive: existing configs that omit it behave exactly as before.
+    cfg = load_config(VALUES)
+    assert cfg.auth.oidc_discovery_url is None
+
+
+def test_oidc_discovery_url_parsed_when_set():
+    cfg = load_config(
+        {
+            "a2a": {
+                "enabled": True,
+                "auth": {
+                    "oidcIssuerUrl": "https://auth.prod.fuzefront.com",
+                    "oidcDiscoveryUrl": (
+                        "http://authentik-server.identity.svc.cluster.local:9000"
+                        "/application/o/fuzeagent-a2a/.well-known/openid-configuration"
+                    ),
+                },
+            }
+        }
+    )
+    assert cfg.auth.oidc_issuer_url == "https://auth.prod.fuzefront.com"
+    assert cfg.auth.oidc_discovery_url == (
+        "http://authentik-server.identity.svc.cluster.local:9000"
+        "/application/o/fuzeagent-a2a/.well-known/openid-configuration"
+    )

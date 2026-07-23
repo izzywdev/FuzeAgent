@@ -68,34 +68,134 @@ def build_from_env():
     return config, build_app(adapter, authenticator)
 
 
-def _build_verifier(config: ServerConfig):
+class _TokenIssuerMismatch(Exception):
+    """Raised when a token's ``iss`` does not match the configured public issuer.
+
+    Trust is anchored to ``oidcIssuerUrl`` even when the signing keys were fetched from an
+    in-cluster ``oidcDiscoveryUrl`` override (FuzeFront#364 "Option B").
+    """
+
+
+#: Only network schemes are ever fetched. ``urllib`` also honours ``file://``/``ftp://``
+#: which, on a config-supplied URL, would let a discovery URL read local files (Semgrep
+#: ``dynamic-urllib-use-detected``). ``oidcDiscoveryUrl`` is trusted operator config, but
+#: rejecting non-http(s) schemes up front is cheap, correct hardening.
+_ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
+
+
+def _require_http_url(url: str, what: str) -> str:
+    """Return ``url`` if it is an ``http(s)`` URL, else raise a config error.
+
+    Guards every fetch of a config-supplied URL against ``file://``/``ftp://``/etc. so a
+    dynamic URL can never be coerced into reading local files or other schemes.
+    """
+    from urllib.parse import urlparse
+
+    scheme = urlparse(url).scheme.lower()
+    if scheme not in _ALLOWED_URL_SCHEMES:
+        raise RuntimeError(
+            f"{what} must be an http(s) URL (got scheme {scheme or '(none)'!r}): {url!r}"
+        )
+    return url
+
+
+def _http_get_json(url: str) -> dict:  # pragma: no cover - network
+    import urllib.request
+
+    _require_http_url(url, "fetched URL")
+    with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 - scheme-guarded above
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _resolve_jwks_url(auth, discovery_fetcher) -> str:
+    """Decide where signing keys are fetched from.
+
+    * ``oidc_discovery_url`` set  -> fetch that discovery document and use its
+      ``jwks_uri`` (typically an in-cluster Authentik URL). Keys come from in-cluster.
+    * ``oidc_discovery_url`` unset -> issuer-derived certs path — the UNCHANGED default.
+
+    Both the discovery URL and the ``jwks_uri`` it yields are scheme-guarded to http(s)
+    BEFORE any fetch, so a ``file://`` config value never reaches ``urllib``.
+    """
+    if auth.oidc_discovery_url:
+        _require_http_url(auth.oidc_discovery_url, "auth.oidcDiscoveryUrl")
+        discovery = discovery_fetcher(auth.oidc_discovery_url)
+        jwks_uri = discovery.get("jwks_uri")
+        if not jwks_uri:
+            raise RuntimeError(
+                f"OIDC discovery at {auth.oidc_discovery_url} has no jwks_uri"
+            )
+        return _require_http_url(jwks_uri, "OIDC discovery jwks_uri")
+    return auth.oidc_issuer_url.rstrip("/") + "/protocol/openid-connect/certs"
+
+
+def _build_verifier(
+    config: ServerConfig,
+    *,
+    jwk_client_factory=None,
+    discovery_fetcher=None,
+    decoder=None,
+):
     """Construct a JWKS-backed token verifier for the configured issuer.
 
     Uses ``PyJWT`` + ``PyJWKClient`` if available; returns ``None`` (fail-closed: every
     request unauthenticated) when neither a verifier lib nor issuer is configured, so a
     misconfiguration denies rather than silently trusting tokens.
+
+    Key source honors ``auth.oidcDiscoveryUrl`` (see :func:`_resolve_jwks_url`), but the
+    token's ``iss`` is ALWAYS validated against ``oidc_issuer_url`` — trust is anchored to
+    the public issuer regardless of where the keys were fetched.
+
+    The three collaborators are injectable so this is unit-testable without a network or a
+    real signing key; production wiring falls back to PyJWT + urllib.
     """
     auth = config.auth
     if auth is None:
         return None
-    try:  # pragma: no cover - exercised only in a real deployment
-        import jwt
-        from jwt import PyJWKClient
-    except Exception:
-        return None
 
-    jwks_url = auth.oidc_issuer_url.rstrip("/") + "/protocol/openid-connect/certs"
-    jwk_client = PyJWKClient(jwks_url)
+    if jwk_client_factory is None or decoder is None:
+        try:
+            import jwt
+            from jwt import PyJWKClient
+        except Exception:
+            return None
+        if jwk_client_factory is None:
+            jwk_client_factory = PyJWKClient
+        if decoder is None:
 
-    def verify(token: str) -> dict:  # pragma: no cover
+            def decoder(token, key, *, audience, issuer):  # pragma: no cover - needs PyJWT
+                return jwt.decode(
+                    token,
+                    key,
+                    algorithms=["RS256", "ES256"],
+                    audience=audience,
+                    issuer=issuer,
+                    options={"require": ["exp"]},
+                )
+
+    if discovery_fetcher is None:
+        discovery_fetcher = _http_get_json
+
+    jwks_url = _resolve_jwks_url(auth, discovery_fetcher)
+    jwk_client = jwk_client_factory(jwks_url)
+
+    def verify(token: str) -> dict:
         signing_key = jwk_client.get_signing_key_from_jwt(token).key
-        return jwt.decode(
+        claims = decoder(
             token,
             signing_key,
-            algorithms=["RS256", "ES256"],
             audience=auth.audience,
-            options={"require": ["exp"]},
+            issuer=auth.oidc_issuer_url,
         )
+        # Anchor trust to the PUBLIC issuer even when keys came from the in-cluster
+        # discovery override. Explicit belt-and-suspenders on top of the decoder's own
+        # issuer check (values-interface auth.oidcDiscoveryUrl normative behavior).
+        if claims.get("iss") != auth.oidc_issuer_url:
+            raise _TokenIssuerMismatch(
+                f"token iss {claims.get('iss')!r} != configured oidcIssuerUrl "
+                f"{auth.oidc_issuer_url!r}"
+            )
+        return claims
 
     return verify
 
