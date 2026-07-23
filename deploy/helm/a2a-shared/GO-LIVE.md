@@ -33,7 +33,7 @@ provider and published at the issuer's JWKS, so standard validation works.
 - `oidcIssuerUrl` (the `iss`) stays the public `https://app.fuzefront.com/application/o/fuzefront/`
   (`issuer_mode: global`), **but JWKS/discovery is fetched in-cluster** to avoid a Cloudflare-tunnel
   hairpin (FuzeFront hit 17–34 s hairpin timeouts before):
-  `http://authentik-server.<fuzefront-ns>.svc.cluster.local:9000/application/o/<app-slug>/.well-known/openid-configuration`.
+  `http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/<app-slug>/.well-known/openid-configuration`.
   - The values-interface schema exposes only `oidcIssuerUrl`; a separate **`oidcDiscoveryUrl`**
     override likely needs adding (a small contract/schema touch) so `iss` and the fetch URL can differ.
 

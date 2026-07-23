@@ -43,7 +43,7 @@ a2a:
     callerClaim: repo            # custom claim carrying the exact repo name (FuzeAgent, FuzePlan, Exec-cto…)
     # JWKS/discovery override — in-cluster, cross-namespace to the fuzefront ns (confirm exact ns
     # with devops). Requires a FuzeInfra NetworkPolicy: fuzeagent -> authentik-server:9000.
-    #   http://authentik-server.<fuzefront-ns>.svc.cluster.local:9000/application/o/<app-slug>/.well-known/openid-configuration
+    #   http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/<app-slug>/.well-known/openid-configuration
     # NOTE: the values-interface schema currently exposes only oidcIssuerUrl; a separate
     #   `oidcDiscoveryUrl` override may need adding (contract touch) — tracked in GO-LIVE §1b.
     # ⚠️ STILL DO NOT MERGE: gated on the FuzeFront provisioning PR + FuzeAgent registration +
