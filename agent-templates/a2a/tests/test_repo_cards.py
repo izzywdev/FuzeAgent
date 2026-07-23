@@ -19,7 +19,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 def _fuzeagent_card() -> dict:
     manifest, roles = load_repo(REPO_ROOT)
-    cards = dict(cg.generate_cards(manifest, roles, sign=False))
+    # default sign=True — the fuze-profile schema requires a `signatures` field
+    # (keyless signing in tests still populates it, matching the other card tests).
+    cards = dict(cg.generate_cards(manifest, roles))
     assert "FuzeAgent" in cards, f"expected a FuzeAgent product card, got tenants {list(cards)}"
     return cards["FuzeAgent"]
 
