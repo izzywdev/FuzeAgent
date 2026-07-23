@@ -377,7 +377,7 @@ class GoalsManagementService:
                     WHERE {where_clause}
                     ORDER BY priority_level DESC, created_at DESC
                     LIMIT ${param_idx}
-                """,
+                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                     *params,
                     limit,
                 )
@@ -425,10 +425,10 @@ class GoalsManagementService:
                     update_fields.append("updated_at = NOW()")
                     await conn.execute(
                         f"""
-                        UPDATE organization_goals 
+                        UPDATE organization_goals
                         SET {', '.join(update_fields)}
                         WHERE id = $1
-                    """,
+                    """,  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
                         *params,
                     )
 

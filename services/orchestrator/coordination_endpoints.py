@@ -314,7 +314,7 @@ async def list_coordination_requests(
                 END,
                 created_at DESC
             LIMIT ${param_count}
-        """
+        """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
 
         async with get_db_connection() as conn:
             requests = await conn.fetch(query, *params)
@@ -532,7 +532,7 @@ async def list_resource_allocations(
             LEFT JOIN product_registry pr ON ra.product_id = pr.id
             {where_clause}
             ORDER BY ra.created_at DESC
-        """
+        """  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
 
         async with get_db_connection() as conn:
             allocations = await conn.fetch(query, *params)

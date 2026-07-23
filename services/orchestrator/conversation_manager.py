@@ -471,10 +471,10 @@ class ConversationManager:
         async with get_db_connection() as conn:
             rows = await conn.fetch(
                 f"""
-                SELECT * FROM code_generations 
+                SELECT * FROM code_generations
                 WHERE {where_clause}
                 ORDER BY generated_at ASC
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
             )
 

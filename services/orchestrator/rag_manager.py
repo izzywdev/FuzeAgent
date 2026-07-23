@@ -371,7 +371,7 @@ class RAGManager:
                 AND 1 - (embedding <=> $1) > ${param_offset}
                 ORDER BY similarity DESC
                 LIMIT ${param_offset + 1}
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
                 similarity_threshold,
                 limit,
@@ -404,7 +404,7 @@ class RAGManager:
                     AND 1 - (summary_embedding <=> $1) > ${param_offset}
                     ORDER BY similarity DESC
                     LIMIT ${param_offset + 1}
-                """,
+                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                     *params,
                     similarity_threshold,
                     limit // 2,
@@ -506,7 +506,7 @@ class RAGManager:
                 {where_clause}
                 ORDER BY similarity DESC
                 LIMIT ${param_count}
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
                 limit,
             )
