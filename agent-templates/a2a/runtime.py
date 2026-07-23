@@ -76,10 +76,34 @@ class _TokenIssuerMismatch(Exception):
     """
 
 
+#: Only network schemes are ever fetched. ``urllib`` also honours ``file://``/``ftp://``
+#: which, on a config-supplied URL, would let a discovery URL read local files (Semgrep
+#: ``dynamic-urllib-use-detected``). ``oidcDiscoveryUrl`` is trusted operator config, but
+#: rejecting non-http(s) schemes up front is cheap, correct hardening.
+_ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
+
+
+def _require_http_url(url: str, what: str) -> str:
+    """Return ``url`` if it is an ``http(s)`` URL, else raise a config error.
+
+    Guards every fetch of a config-supplied URL against ``file://``/``ftp://``/etc. so a
+    dynamic URL can never be coerced into reading local files or other schemes.
+    """
+    from urllib.parse import urlparse
+
+    scheme = urlparse(url).scheme.lower()
+    if scheme not in _ALLOWED_URL_SCHEMES:
+        raise RuntimeError(
+            f"{what} must be an http(s) URL (got scheme {scheme or '(none)'!r}): {url!r}"
+        )
+    return url
+
+
 def _http_get_json(url: str) -> dict:  # pragma: no cover - network
     import urllib.request
 
-    with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 - fixed in-cluster URL
+    _require_http_url(url, "fetched URL")
+    with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 - scheme-guarded above
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -89,15 +113,19 @@ def _resolve_jwks_url(auth, discovery_fetcher) -> str:
     * ``oidc_discovery_url`` set  -> fetch that discovery document and use its
       ``jwks_uri`` (typically an in-cluster Authentik URL). Keys come from in-cluster.
     * ``oidc_discovery_url`` unset -> issuer-derived certs path — the UNCHANGED default.
+
+    Both the discovery URL and the ``jwks_uri`` it yields are scheme-guarded to http(s)
+    BEFORE any fetch, so a ``file://`` config value never reaches ``urllib``.
     """
     if auth.oidc_discovery_url:
+        _require_http_url(auth.oidc_discovery_url, "auth.oidcDiscoveryUrl")
         discovery = discovery_fetcher(auth.oidc_discovery_url)
         jwks_uri = discovery.get("jwks_uri")
         if not jwks_uri:
             raise RuntimeError(
                 f"OIDC discovery at {auth.oidc_discovery_url} has no jwks_uri"
             )
-        return jwks_uri
+        return _require_http_url(jwks_uri, "OIDC discovery jwks_uri")
     return auth.oidc_issuer_url.rstrip("/") + "/protocol/openid-connect/certs"
 
 
