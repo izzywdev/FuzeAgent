@@ -19,10 +19,44 @@
     "mcp-engineer",
     "cli-engineer"
   ],
-  "channels": ["mcp", "cli"],
+  "channels": [
+    "mcp",
+    "cli"
+  ],
   "hardening": {
     "ruleset": true,
     "requireSignatures": true,
     "deployOnPush": false
-  }
+  },
+  "providesTo": [
+    "Exec-ceo",
+    "Exec-cfo",
+    "Exec-ciso",
+    "Exec-cto",
+    "FuzeBI",
+    "FuzeCall",
+    "FuzeContact",
+    "FuzeDeploy",
+    "FuzeExecutive",
+    "FuzeFront",
+    "FuzeHub",
+    "FuzeKeys",
+    "FuzeMarket",
+    "FuzeMerchandize",
+    "FuzePicker",
+    "FuzePlan",
+    "FuzeSales",
+    "FuzeService",
+    "FuzeSocial",
+    "FuzeX",
+    "MendysRobotics",
+    "MendysRoboticsWP"
+  ],
+  "dependsOn": [
+    "FuzeBI",
+    "FuzeDeploy",
+    "FuzeFront",
+    "FuzeKeys",
+    "FuzePlan"
+  ]
 }
