@@ -46,8 +46,13 @@ provider and published at the issuer's JWKS, so standard validation works.
 2. **In-cluster registration** of `FuzeAgent` (operator / one-shot Job in the fuzefront ns, where
    `AUTHENTIK_ADMIN_TOKEN` + `AUTHENTIK_BASE_URL=http://authentik-server:9000` already live) →
    returns `client_id`; seal the returned `client_secret` on the FuzeAgent side. Repeat per tenant.
-3. **FuzeInfra `@claude`:** a NetworkPolicy allowing `fuzeagent → authentik-server:9000` in the
-   fuzefront namespace (cross-namespace JWKS fetch). Not editable from FuzeFront/FuzeAgent.
+3. **NetworkPolicy — FuzeFront chart (FuzeFront#368):** allow `fuzeagent → authentik-server:9000`
+   for the cross-namespace JWKS fetch. Re-routed FuzeInfra#372 → FuzeFront#368: a NetworkPolicy's
+   `podSelector` only matches its own namespace, and the `fuzeinfra` AppProject can't target
+   `fuzefront` — so it lives in FuzeFront's chart. **Correctness caveat:** `fuzefront` has no
+   default-deny, so a *standalone* allow-policy would flip `authentik-server` to
+   deny-all-except-fuzeagent and break Traefik→Authentik login — the rule must be authored
+   ALONGSIDE Authentik's existing ingress allowances.
 4. **FuzeAgent #93 finalize:** confirm the exact `iss`/`aud`/`repo` strings by decoding one real
    minted token, wire the in-cluster discovery URL (+ any `oidcDiscoveryUrl` schema field), then
    merge with the secrets sealed.
