@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import re
-import subprocess
+import subprocess  # nosec B404 -- used with asyncio.create_subprocess_exec (shell=False) and a static arg list
 import time
 from dataclasses import dataclass
 from datetime import datetime

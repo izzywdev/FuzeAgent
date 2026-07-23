@@ -17,6 +17,7 @@ import base64
 import json
 import logging
 import os
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -125,7 +126,10 @@ class ModelConfigurationManager:
 
     def _get_or_create_encryption_key(self) -> bytes:
         """Get or create encryption key for API credentials"""
-        key_file = "/tmp/fuzeagent_encryption.key"
+        # Avoid a hard-coded world-readable /tmp path; allow override and fall
+        # back to the platform temp dir (still /tmp inside the Linux container).
+        key_dir = os.getenv("FUZEAGENT_KEY_DIR", tempfile.gettempdir())
+        key_file = os.path.join(key_dir, "fuzeagent_encryption.key")
 
         if os.path.exists(key_file):
             with open(key_file, "rb") as f:
