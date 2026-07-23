@@ -27,7 +27,9 @@ import pytest
 
 # Configure verification material before importing the auth module so that
 # get_current_user runs in its prod-like (fail-closed) mode.
-os.environ["JWT_SECRET"] = "test-secret-for-issue-6-authz"  # nosec B105 -- test-only JWT secret fixture, not a real credential
+os.environ["JWT_SECRET"] = (
+    "test-secret-for-issue-6-authz"  # nosec B105 -- test-only JWT secret fixture, not a real credential
+)
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ.pop("AUTH_DISABLED", None)
 os.environ.pop("JWT_AUDIENCE", None)

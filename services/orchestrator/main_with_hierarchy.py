@@ -1411,6 +1411,8 @@ if __name__ == "__main__":
 
     uvicorn.run(
         app,
-        host=os.getenv("HOST", "0.0.0.0"),  # nosec B104 -- container service binds all interfaces by default; override via HOST env
+        host=os.getenv(
+            "HOST", "0.0.0.0"
+        ),  # nosec B104 -- container service binds all interfaces by default; override via HOST env
         port=int(os.getenv("PORT", "8000")),
     )
