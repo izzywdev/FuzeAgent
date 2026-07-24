@@ -165,7 +165,7 @@ jobs:
         python -m pytest tests/ -m "goals" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v7
       with:
         file: services/orchestrator/coverage.xml
         flags: backend
@@ -314,7 +314,7 @@ jobs:
       run: npm run test:coverage
     
     - name: Upload frontend coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v7
       with:
         file: services/ui-react/coverage/coverage-summary.json
         flags: frontend
