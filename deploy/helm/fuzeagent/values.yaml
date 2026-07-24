@@ -128,7 +128,7 @@ resourceGovernance:
   quota:
     requestsCpu: "2"
     requestsMemory: 4Gi
-    limitsCpu: "4"
+    limitsCpu: "6"   # was 4; +room for a2a-shared (500m) + its rolling-update surge (go-live #93)
     limitsMemory: 8Gi
     pods: "20"
   limitRange:
