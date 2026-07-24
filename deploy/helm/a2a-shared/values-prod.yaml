@@ -1,20 +1,21 @@
 # =============================================================================
 # Production overlay (Contabo k3s), consumed by the Argo CD `a2a-shared` Application.
 #
-# SHIPS DISABLED. Enabling A2A in prod has hard PRECONDITIONS that are out of this
-# chart's scope (see deploy/helm/a2a-shared/README.md go-live steps):
-#   1. The shared A2A server image exists on GHCR (backend-engineer + release.yml).
-#   2. `providesTo` is backfilled on every served repo's manifest — authz.md §3
-#      fail-closed: absent == DENY, so enabling before backfill is safe but useless.
-#   3. The card-signing SealedSecret is provisioned.
-# Until then this stays enabled:false → the Argo app renders nothing (inert).
+# ROLLOUT STATE: staged to enabled:true for the FuzeAgent-FIRST bring-up.
+# DO NOT MERGE until the go-live checklist in GO-LIVE.md is satisfied:
+#   - every REPLACE_ME below is set (oidcIssuerUrl, tenant entryRole),
+#   - every referenced SealedSecret exists in the fuzeagent namespace,
+#   - and the merge uses a CLEAN squash message (no "[skip ci]" — otherwise
+#     release.yml will NOT build/push the fuzeagent-a2a image or bump the tag).
+# Until merged, this file is not on main, so Argo continues to render nothing.
 #
 # The single `tag:` line below is rewritten to the built commit SHA by
-# .github/workflows/release.yml — keep it the ONLY `tag:` key in this file.
+# .github/workflows/release.yml on the merge to main — keep it the ONLY `tag:` key.
 # All secrets come from SealedSecrets — never inline here.
 # =============================================================================
 a2a:
-  enabled: false
+  # ROLLOUT: FuzeAgent-first. See GO-LIVE.md. Merge only when secrets + OIDC issuer exist.
+  enabled: true
 
   image:
     repository: ghcr.io/izzywdev/fuzeagent-a2a
@@ -27,34 +28,56 @@ a2a:
 
   protocolVersion: "1.0"
 
-  # Identity config (authz.md). REQUIRED before flipping enabled:true — supply the
-  # family OIDC issuer (Authentik/Keycloak) at go-live. oidcIssuerUrl is REQUIRED
-  # whenever `auth` is present, so it stays commented while disabled.
-  # auth:
-  #   oidcIssuerUrl: https://<family-oidc-issuer>/application/o/a2a/
-  #   audience: a2a
-  #   callerClaim: sub
-  #   mtls:
-  #     enabled: true
-  #     caSecretRef: { name: a2a-mtls-ca, key: ca.crt }
+  # Identity (authz.md). The family OIDC issuer is FuzeFront's Authentik.
+  # Source: FuzeFront deploy/helm/fuzefront/values-prod.yaml (issuerUrl). Prod token `iss`
+  # uses the app.fuzefront.com host (Host-forwarding), not the auth.fuzefront.com admin host.
+  auth:
+    # `iss` claim (public, issuer_mode=global). Keep this string for iss validation, but the
+    # A2A OIDC client fetches JWKS/discovery from the IN-CLUSTER Authentik service (below) to
+    # avoid a Cloudflare-tunnel hairpin — FuzeFront's decision on FuzeFront#364.
+    oidcIssuerUrl: https://app.fuzefront.com/application/o/fuzefront/
+    # RESOLVED by FuzeFront#364 — Option 2 (repo-name JWTs, standard validation; NOT introspection):
+    #   FuzeFront attaches an Authentik scope mapping to each A2A machine provider emitting
+    #   {"repo": "<RepoName>", "aud": "a2a"}. A2A validates the JWT normally and reads `repo`.
+    audience: a2a                # dedicated M2M audience (NOT the human `fuzefront` app)
+    callerClaim: repo            # custom claim carrying the exact repo name (FuzeAgent, FuzePlan, Exec-cto…)
+    # JWKS/discovery override — in-cluster, cross-namespace to the fuzefront ns. The server fetches
+    # OIDC discovery + JWKS from HERE (no Cloudflare-tunnel hairpin) while STILL validating the token
+    # `iss` claim against oidcIssuerUrl above. Added to the frozen interface in contract v1.1.0
+    # (FuzeAgent#96, optional + additive). App slug is `fuzefront` (issuer_mode=global).
+    # JWKS is fetched in-cluster via the FuzeFront NetworkPolicy (FuzeFront#373:
+    #   networkPolicy.enabled: true in fuzefront prod values, fuzeagentNamespace: fuzeagent),
+    # which admits fuzeagent -> authentik-server:9000 cross-namespace.
+    oidcDiscoveryUrl: http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/fuzefront/.well-known/openid-configuration
+    # ⚠️ STILL DO NOT MERGE: gated on the SealedSecrets existing in the fuzeagent ns and on
+    #   decoding a REAL minted token to confirm the exact iss/aud/repo strings + the `fuzefront`
+    #   app slug before freezing (GO-LIVE §1b sequence).
+    # mTLS is in-cluster defence-in-depth. Set enabled:false to drop the a2a-mtls-ca
+    # SealedSecret for a lighter first bring-up (OIDC alone still enforces authz).
+    mtls:
+      enabled: true
+      caSecretRef: { name: a2a-mtls-ca, key: ca.crt }   # SealedSecret
 
-  # JWS Agent-Card signing key (SealedSecret-provisioned at go-live).
-  # cardSigning:
-  #   keySecretRef: { name: a2a-card-signing, key: jws.key }
-  #   keyId: a2a-v1
+  # JWS Agent-Card signing. Optional per the values-interface schema — comment this
+  # whole block out for an unsigned-in-cluster first bring-up (drops a2a-card-signing).
+  cardSigning:
+    keySecretRef: { name: a2a-card-signing, key: jws.key }   # SealedSecret
+    keyId: a2a-v1
 
-  # Tenants onboard here at go-live — one entry per served product/exec agent,
-  # only AFTER that repo's `providesTo` is backfilled. No new pod per tenant.
-  tenants: []
-  #   - tenant: FuzePlan
-  #     repo: izzywdev/FuzePlan
-  #     ref: main
-  #     enabled: true
-  #     entryRole: product-manager
-  #     external: false
-  #     provider:
-  #       name: anthropic
-  #       apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
+  # Tenants: one entry per served agent, added only AFTER that repo's `providesTo`
+  # is backfilled (FuzeSDLC#54 graph). FuzeAgent first; FuzePlan + the rest follow.
+  tenants:
+    - tenant: FuzeAgent
+      repo: izzywdev/FuzeAgent
+      ref: main
+      enabled: true
+      # OWNER/devops: FuzeAgent's A2A-serving role key from agent-templates/roles/
+      # (the coordinator/entry role that receives an un-skilled SendMessage).
+      entryRole: agent-orchestrator
+      external: false
+      provider:
+        name: anthropic
+        apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }   # SealedSecret
 
 deploy:
   replicas: 1
@@ -68,10 +91,10 @@ deploy:
   ingressClassName: traefik
   agentProvider: anthropic
   gitImage: alpine/git:latest
-  # Go-live: seal these and reference them here (all SealedSecret-provisioned).
-  #   reposGitTokenSecretRef: { name: a2a-repos-git, key: token }        # private tenant repos
-  #   providerApiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
-  #   stateConfigMap: a2a-state                                          # Managed-Agents id-state
-  reposGitTokenSecretRef: null
-  providerApiKeySecretRef: null
-  stateConfigMap: null
+  # FuzeAgent-first bring-up: the only tenant (izzywdev/FuzeAgent) is a PUBLIC repo, so the
+  # repo-sync init container clones anonymously — no a2a-repos-git SealedSecret needed. Set this
+  # to { name: a2a-repos-git, key: token } (+ seal that secret) ONLY when a PRIVATE tenant repo
+  # is onboarded. Keeping the hardened operator secret set to exactly 4 (GO-LIVE §2).
+  reposGitTokenSecretRef: null                                         # public tenant → anonymous clone
+  providerApiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
+  stateConfigMap: a2a-state                                            # Managed-Agents id-state
