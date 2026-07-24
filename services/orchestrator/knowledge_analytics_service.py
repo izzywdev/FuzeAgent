@@ -280,7 +280,7 @@ class KnowledgeAnalyticsService:
                     ) recent_relevance ON kb.id::text = recent_relevance.knowledge_id
                     WHERE {where_clause}
                     ORDER BY kb.usage_count DESC, kb.success_correlation DESC
-                """,
+                """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                     *params,
                 )
 

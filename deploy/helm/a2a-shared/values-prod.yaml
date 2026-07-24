@@ -19,7 +19,7 @@ a2a:
 
   image:
     repository: ghcr.io/izzywdev/fuzeagent-a2a
-    tag: dd531f2a6400   # release.yml rewrites this to the built SHA on merge to main
+    tag: 65bb02a62b5d
     pullPolicy: IfNotPresent
 
   service:

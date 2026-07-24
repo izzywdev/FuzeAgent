@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-import subprocess
+import subprocess  # nosec B404 -- used only with static executable names + arg lists and shell=False (see _run_tests)
 import tempfile
 import time
 from pathlib import Path
@@ -440,7 +440,7 @@ Please ensure the code is production-ready and follows industry standards.
         try:
             if language == "python":
                 # Try to run pytest
-                result = subprocess.run(
+                result = subprocess.run(  # nosec B603 B607 -- shell=False, static argv; runs pytest on generated code inside an isolated tmpdir
                     ["python", "-m", "pytest", tmpdir, "-v"],
                     capture_output=True,
                     text=True,
@@ -458,7 +458,7 @@ Please ensure the code is production-ready and follows industry standards.
                 # Try to run with node
                 test_files = [f for f in os.listdir(tmpdir) if f.startswith("test_")]
                 if test_files:
-                    result = subprocess.run(
+                    result = subprocess.run(  # nosec B603 B607 -- shell=False, static argv; runs a generated test file inside an isolated tmpdir
                         ["node", test_files[0]],
                         capture_output=True,
                         text=True,

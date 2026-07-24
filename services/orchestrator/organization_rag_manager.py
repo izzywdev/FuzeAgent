@@ -275,7 +275,7 @@ class OrganizationRAGManager:
                 SELECT * FROM search_organization_knowledge(
                     $2, $1, null, ${param_idx}, ${param_idx}
                 )
-            """,
+            """,  # nosec B608 -- only $N placeholder indices are interpolated; all values bound as query params
                 *params,
                 limit,
                 min_similarity,
@@ -407,10 +407,10 @@ class OrganizationRAGManager:
         async with self.pool.acquire() as conn:
             result = await conn.execute(
                 f"""
-                UPDATE organization_knowledge_base 
+                UPDATE organization_knowledge_base
                 SET {', '.join(updates)}
                 WHERE id = ${param_idx}
-            """,
+            """,  # nosec B608 -- SET built only from fixed column fragments; all values bound as $N params
                 *params,
             )
 

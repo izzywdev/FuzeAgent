@@ -453,7 +453,7 @@ class A2AProtocolManager:
                         ELSE 3 
                     END,
                     current_task_count ASC
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
             )
 
@@ -744,9 +744,9 @@ class A2AProtocolManager:
                 f"""
                 SELECT task_data FROM a2a_tasks 
                 WHERE {where_clause}
-                ORDER BY created_at DESC 
+                ORDER BY created_at DESC
                 LIMIT ${param_count}
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
                 limit,
             )
@@ -774,9 +774,9 @@ class A2AProtocolManager:
                 f"""
                 SELECT message_data FROM a2a_messages 
                 WHERE {where_clause}
-                ORDER BY created_at DESC 
+                ORDER BY created_at DESC
                 LIMIT ${param_count}
-            """,
+            """,  # nosec B608 -- where clause is fixed fragments with $N placeholders; all values bound as query params
                 *params,
                 limit,
             )

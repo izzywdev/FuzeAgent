@@ -14,7 +14,7 @@ import base64
 import json
 import logging
 import os
-import subprocess
+import subprocess  # nosec B404 -- used for CompletedProcess/CalledProcessError types and create_subprocess_exec (shell=False) with static arg lists
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime
