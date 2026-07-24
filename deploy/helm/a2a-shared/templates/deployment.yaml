@@ -49,7 +49,7 @@ spec:
               {{- end }}
               {{- range .Values.a2a.tenants }}
               {{- if .enabled }}
-              name="{{ include "a2a.repoSlug" .repo }}"
+              name="{{ .tenant }}"   # server resolves /repos/<tenant> (case-preserved), NOT the repo slug
               echo "cloning {{ .repo }}@{{ .ref | default "main" }} -> /repos/${name}"
               rm -rf "/repos/${name}"
               git clone --depth 1 --branch "{{ .ref | default "main" }}" \
