@@ -78,6 +78,16 @@ a2a:
       provider:
         name: anthropic
         apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }   # SealedSecret
+    # FuzeFront — public repo (clones tokenless), default branch master, shared app-layer role.
+    - tenant: FuzeFront
+      repo: izzywdev/FuzeFront
+      ref: master
+      enabled: true
+      entryRole: app-shell-platform
+      external: false
+      provider:
+        name: anthropic
+        apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }   # SealedSecret
 
 deploy:
   replicas: 1
