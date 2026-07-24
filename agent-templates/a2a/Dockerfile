@@ -37,6 +37,10 @@ RUN pip install --no-cache-dir /app/contract-client
 COPY a2a/ /app/a2a/
 COPY providers/ /app/providers/
 COPY sync/ /app/sync/
+# The frozen contract at its canonical path — card_generator.contract_version() reads
+# /app/contracts/a2a/v1/VERSION and the card validator reads schema/ from here at runtime.
+# (The client/ subtree is ALSO pip-installed above; this copy is what runtime file reads need.)
+COPY contracts/a2a/v1/ /app/contracts/a2a/v1/
 
 # Run as a non-root user (defence in depth; also satisfies a runAsNonRoot
 # PodSecurity policy). Code is read-only; config at /config, repo checkouts at /repos.
