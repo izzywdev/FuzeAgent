@@ -43,7 +43,7 @@ jobs:
       run: npm run test:coverage
       
     - name: Upload frontend coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v7
       with:
         file: ./services/ui-react/coverage/coverage-summary.json
         flags: frontend
