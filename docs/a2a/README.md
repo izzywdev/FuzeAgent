@@ -15,8 +15,15 @@ links back to it:
 - [`state-mapping.md`](../../agent-templates/contracts/a2a/v1/state-mapping.md) — task states, `INPUT_REQUIRED`/`AUTH_REQUIRED`, `reach_human`.
 - [`values-interface.schema.json`](../../agent-templates/contracts/a2a/v1/schema/values-interface.schema.json) — the Helm values interface you set to be served.
 
-> **Contract version:** v1.0.0, frozen against A2A specification 1.0.0. If something
-> below looks wrong, the contract wins — file it, don't work around it.
+> **Contract version:** v1.1.0 (additive `auth.oidcDiscoveryUrl`), frozen against A2A
+> specification 1.0.0. If something below looks wrong, the contract wins — file it,
+> don't work around it.
+
+> **Status: LIVE in prod.** The shared A2A server runs on contabo-prod and serves
+> FuzeAgent's **signed** Agent Card (`/.well-known/agent-card.json`) — skills
+> `[agent-orchestrator]`, security schemes `fuze-oidc` + `fuze-mtls`, capabilities
+> `streaming` + `extendedAgentCard`. Onboarding another product is **data** (a
+> `tenants` entry) — see [go-live-checklist.md](go-live-checklist.md).
 
 ## The pages
 
@@ -24,6 +31,8 @@ links back to it:
 |---|---|
 | [enable-your-pod.md](enable-your-pod.md) | Make your product (or an exec role) reachable over A2A — the values you set, the `enabled` gate, and the precondition you must satisfy first. |
 | [call-another-agent.md](call-another-agent.md) | Hand a goal to another product's agent — resolve its card, `SendMessage`, and handle `INPUT_REQUIRED`/`AUTH_REQUIRED` coming back. |
+| [example-fuzefront-plans-via-fuzeplan.md](example-fuzefront-plans-via-fuzeplan.md) | See the whole flow end-to-end — a FuzeFront agent gets FuzePlan to plan its work over A2A, holding no Jira tools of its own. |
+| [go-live-checklist.md](go-live-checklist.md) | Actually turn a product's pod on in prod — secrets, caller registration, and the deployment gotchas we hit. |
 | [mcp-pod-vs-a2a-pod.md](mcp-pod-vs-a2a-pod.md) | Decide whether you want a tool surface (MCP) or an agent surface (A2A) — and why exec roles get A2A pods. |
 | [authz-for-integrators.md](authz-for-integrators.md) | Understand who is allowed to call whom, and why "it just returns not-found" is the intended behaviour. |
 
