@@ -128,11 +128,8 @@ spec:
               readOnly: true
             - name: repos
               mountPath: /repos
-            {{- with .Values.deploy.stateConfigMap }}
             - name: state
               mountPath: /state
-              readOnly: true
-            {{- end }}
             {{- if and .Values.a2a.auth .Values.a2a.auth.mtls }}
             {{- if and .Values.a2a.auth.mtls.enabled .Values.a2a.auth.mtls.caSecretRef }}
             - name: mtls-ca
@@ -148,11 +145,11 @@ spec:
             name: {{ include "a2a.name" . }}-values
         - name: repos
           emptyDir: {}
-        {{- with .Values.deploy.stateConfigMap }}
+        # writable scratch for FUZE_STATE_DIR — the server persists in-flight session
+        # state here (run_until_block). Must be writable, so emptyDir, not a read-only
+        # ConfigMap. Ephemeral is fine for v1 (in-flight tasks don't survive a restart).
         - name: state
-          configMap:
-            name: {{ . }}
-        {{- end }}
+          emptyDir: {}
         {{- if and .Values.a2a.auth .Values.a2a.auth.mtls }}
         {{- if and .Values.a2a.auth.mtls.enabled .Values.a2a.auth.mtls.caSecretRef }}
         - name: mtls-ca
