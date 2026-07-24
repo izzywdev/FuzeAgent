@@ -19,7 +19,7 @@ If the caller ever needs Jira knowledge of its own, the design has failed. That
 | **FuzeFront-context agent** | A Managed-Agents role running on **FuzeAgent's runtime**. It knows FuzeFront's goal; it knows nothing about Jira. |
 | **handoff MCP** | The **client** side of A2A. The agent calls `ask_agent`/`spawn_agent`; the MCP resolves the target card and speaks the wire for it. It is a thin transport, not a second brain. |
 | **shared A2A server** | The one family server (`a2a-shared.fuzeagent.svc.cluster.local:8080`). It serves **each tenant's** card and dispatches `SendMessage` into that tenant's role. FuzePlan is one tenant. |
-| **FuzePlan planning role** | FuzePlan's serving role (the `product-manager` skill in [`examples/fuzeplan.agent-card.json`](../../agent-templates/contracts/a2a/v1/examples/fuzeplan.agent-card.json)). Owns the Atlassian MCP + Jira credentials. |
+| **FuzePlan planning role** | FuzePlan's serving role (the `product-manager` skill in [`examples/fuzeplan.agent-card.json`](../../agent-templates/contracts/a2a/v1/examples/fuzeplan.agent-card.json)). Is **authenticated to the *target* (the caller's) Jira site as itself** — an Atlassian Connect/Forge **app install** or a scoped token it holds for that site, per caller. It never runs with the caller's credentials. |
 | **Authentik** | Mints the caller's OIDC token carrying `repo=FuzeFront`, `aud=a2a` (see [go-live-checklist.md](go-live-checklist.md)). |
 
 There is **no** separate "FuzePlan deployment" — the same shared server serves FuzePlan
@@ -35,7 +35,8 @@ FuzePlan's card through that shared server and the discovery registry.
    needs a plan for a feature.
 2. **It asks, it doesn't do.** The agent calls the handoff MCP:
    `ask_agent(target="FuzePlan", goal="Produce a delivery plan + Jira epics/stories for <feature>")`.
-   It passes **only a goal** — no Jira project, no board, no credentials.
+   It passes **the goal + the target board** ("plan this, on the FuzeFront board") as
+   **data** — never a credential.
 3. **Discover FuzePlan's card.** The A2A client resolves the target from the discovery
    registry → the shared server, and fetches
    `GET {base}/.well-known/agent-card.json` (tenant `FuzePlan`). The card advertises the
@@ -49,9 +50,11 @@ FuzePlan's card through that shared server and the discovery registry.
    §3/§6).
 6. **`SendMessage`.** The client sends the goal to the shared server with the `FuzePlan`
    tenant echoed (binding.md). The server dispatches it into FuzePlan's planning role.
-7. **FuzePlan does the work with its own credentials.** The planning role uses
-   **FuzePlan's** Atlassian MCP + Jira creds to create the epics/stories. The FuzeFront
-   agent is not in this loop and holds none of it.
+7. **FuzePlan does the work, authenticated to the *target* site as itself.** The
+   planning role creates the epics/stories on **FuzeFront's Jira site** using the grant
+   **FuzePlan** holds for that site (its app install or scoped token there) — not the
+   caller's credentials, and not some separate FuzePlan site. The FuzeFront agent is not
+   in this loop and holds none of it.
 8. **Tickets come back as artifacts.** Created ticket keys/links are returned as
    `Task.artifacts` on the completed task (state-mapping.md); the FuzeFront agent reads
    them and proceeds with its work.
@@ -62,13 +65,35 @@ it pauses to `INPUT_REQUIRED`/`AUTH_REQUIRED` and the caller resolves it via
 
 ---
 
+## Credential model (read this before building the role)
+
+The subtle part is **whose Jira, and with whose credentials**. The A2A rule is fixed
+(authz.md §1): **the callee uses its own credentials, never the caller's** — passing a
+credential over A2A would delegate it to the callee and destroy the encapsulation A2A
+exists for. So:
+
+- FuzePlan must be **authenticated to the *target* Jira site — FuzeFront's site — as
+  itself**. Because sites are per-product, that means FuzePlan is **installed on
+  FuzeFront's site** (an Atlassian Connect/Forge app) or holds a **scoped token** for it.
+  Either way it acts as *FuzePlan*, with its own grant on that site.
+- The caller sends **only data**: the goal and which board. It sends **no credential**,
+  and FuzePlan never runs with the caller's (or FuzeAgent's) creds.
+- Therefore onboarding *"FuzePlan can plan for FuzeFront"* has a real step beyond A2A:
+  **grant/install FuzePlan on FuzeFront's Jira site**, and store that credential
+  **FuzePlan-side, keyed to the caller**. Repeat per product FuzePlan serves.
+
+This is the same shape as A2A's own principle — the callee holds what it needs — applied
+to the downstream system: FuzePlan's "tools + credentials" include a **per-target-site**
+Atlassian grant, not one shared token and not the caller's.
+
 ## What this depends on being in place
 
 | Dependency | State |
 |---|---|
 | FuzeAgent shared A2A server live | ✅ live in prod (serves the signed card) |
 | FuzePlan `providesTo` ⊇ `FuzeFront` | ✅ already declared |
-| FuzePlan **serving role** (`agent-templates/roles/product-manager/`) | ⛔ **gap** — FuzePlan has no serving role yet, so its card can't project. This is FuzePlan product work + real Atlassian creds. |
+| FuzePlan **serving role** (`agent-templates/roles/product-manager/`) | ⛔ **gap** — FuzePlan has no serving role yet, so its card can't project. FuzePlan product work. |
+| FuzePlan's **per-site Jira grant** on FuzeFront's site (app install / scoped token) | ⛔ **gap** — the credential-model step above; set up per caller FuzePlan serves. |
 | FuzePlan **tenant** in the shared server's values | ⛔ **gap** — a `tenants` entry (kept `enabled:false` until the serving role ships). |
 | handoff MCP + discovery registry **deployed** | ⛔ **gap** — the client exists in `agent-templates/orchestration/handoff_mcp/` but isn't running in prod yet. |
 | FuzeFront **caller identity** registered in Authentik | ⛔ **gap** — run `register-a2a-cli FuzeFront` (go-live-checklist.md) so step 4's token exists. |
