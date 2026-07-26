@@ -105,8 +105,11 @@ deploy:
   imagePullSecrets:
     - name: ghcr-pull
   resources:
-    requests: { cpu: 100m, memory: 256Mi }
-    limits: { cpu: 500m, memory: 512Mi }
+    # Bumped for multi-tenant serving under cluster strain: more memory headroom (repo
+    # clones + Managed-Agents + serving several tenant cards) + CPU burst so /healthz
+    # stays responsive. Requests kept modest to still schedule on the strained durable nodes.
+    requests: { cpu: 150m, memory: 384Mi }
+    limits: { cpu: 1000m, memory: 896Mi }
   externalDomain: prod.fuzefront.com
   ingressClassName: traefik
   agentProvider: anthropic

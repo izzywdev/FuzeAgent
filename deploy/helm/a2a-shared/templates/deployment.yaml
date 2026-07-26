@@ -109,19 +109,31 @@ spec:
           # The server exposes GET /healthz (verified against the built image's
           # composed Starlette routes: /rpc, /.well-known/agent-card.json,
           # /extendedAgentCard, /healthz).
+          # Tuned for a slow-start server under load. A startupProbe gives it time to
+          # clone tenants + boot before liveness/readiness apply; liveness is tolerant
+          # (5s timeout, 6 failures × 30s) so a briefly-slow /healthz doesn't restart it
+          # (was killing the pod on the default 1s timeout under cluster strain).
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30        # up to ~5min to become healthy (repo clones + boot)
           readinessProbe:
             httpGet:
               path: /healthz
               port: http
-            initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /healthz
               port: http
-            initialDelaySeconds: 20
-            periodSeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6         # ~3min of unresponsiveness before restart
           volumeMounts:
             - name: values
               mountPath: /config
