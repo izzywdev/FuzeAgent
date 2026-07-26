@@ -105,6 +105,6 @@ deploy:
   # repo-sync init container clones anonymously — no a2a-repos-git SealedSecret needed. Set this
   # to { name: a2a-repos-git, key: token } (+ seal that secret) ONLY when a PRIVATE tenant repo
   # is onboarded. Keeping the hardened operator secret set to exactly 4 (GO-LIVE §2).
-  reposGitTokenSecretRef: null                                         # public tenant → anonymous clone
+  reposGitTokenSecretRef: { name: a2a-repos-git, key: token }          # PRIVATE tenants (FuzeAgent, FuzePlan, …) — sealed gh token
   providerApiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
   stateConfigMap: a2a-state                                            # Managed-Agents id-state
