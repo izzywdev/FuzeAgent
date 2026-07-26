@@ -88,6 +88,16 @@ a2a:
       provider:
         name: anthropic
         apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }   # SealedSecret
+    # FuzePlan — PRIVATE (a2a-repos-git token), default branch main, product-manager role.
+    - tenant: FuzePlan
+      repo: izzywdev/FuzePlan
+      ref: main
+      enabled: true
+      entryRole: product-manager
+      external: false
+      provider:
+        name: anthropic
+        apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }   # SealedSecret
 
 deploy:
   replicas: 1
