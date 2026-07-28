@@ -29,6 +29,26 @@
     "requireSignatures": true,
     "deployOnPush": false
   },
+  "a2a": {
+    "enabled": false,
+    "servingRoles": [
+      "agent-orchestrator"
+    ],
+    "entryRole": "agent-orchestrator",
+    "note": "The A2A surface here is REAL, not a scaffold: agent-templates/a2a/ implements card_generator, adapter, authz and identity, and agent-templates/roles/agent-orchestrator/role.json is a fully-described serving role. Left enabled:false only because flipping it requires verifying the card projects schema-valid against the frozen contract \u2014 a2a-maintainer's call, not a manifest edit's."
+  },
+  "mcp": {
+    "enabled": true,
+    "servers": [
+      {
+        "name": "fuzeagent",
+        "transport": "stdio",
+        "entry": "mcp-servers/fuzeagent-server/server.py"
+      }
+    ],
+    "entryServer": "fuzeagent",
+    "note": "REAL, not a scaffold \u2014 mcp-servers/fuzeagent-server/ already serves 15+ tools over the hierarchy API. Outstanding: a tools.json declaring `mutates` per tool. Several tools mutate (assign_task, deploy_agent, create_custom_agent, update_task_status, create_organizational_goal, update_goal_progress) and MUST be classified mutates:true; the read tools (list_*, get_*) are mutates:false. Classification is mcp-maintainer's to reconcile."
+  },
   "providesTo": [
     "Exec-ceo",
     "Exec-cfo",
