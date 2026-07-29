@@ -6,6 +6,12 @@ on:
   check_suite:
     types: [completed]
 
+# The default GITHUB_TOKEN is read-only, so `gh pr merge --auto` fails with
+# "Resource not accessible by integration".
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   auto-merge:
     name: Auto Merge PR
