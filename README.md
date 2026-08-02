@@ -335,7 +335,16 @@ See `.env.example` for all configuration options:
 - `ANTHROPIC_API_KEY`: Your Claude API key (required)
 - `POSTGRES_PASSWORD`: Database password (auto-generated)
 - `RABBITMQ_PASSWORD`: Message queue password (auto-generated)
-- `JWT_SECRET`: Security token secret (auto-generated)
+- `FUZEFRONT_SECURITY_BASE_URL`: FuzeFront API base **including `/api`** (e.g.
+  `http://fuzefront-backend.fuzefront.svc.cluster.local:3001/api`). When set,
+  identity and authorization come from the FuzeFront Security API — FuzeAgent
+  resolves callers via `GET /v1/security/session` and asks
+  `POST /v1/security/authz/check` for every decision, so it holds no signing key
+  and knows nothing about whichever identity or policy engine sits behind it.
+- `FUZEFRONT_SECURITY_SERVICE_TOKEN`: optional machine-to-machine token for calls
+  FuzeAgent makes on its **own** behalf (not a user's). Distinct from user identity.
+- `JWT_SECRET`: legacy local-verification fallback, used **only** when
+  `FUZEFRONT_SECURITY_BASE_URL` is empty (standalone/offline) (auto-generated)
 
 ### Claude Code Configuration
 The system uses both global and project-specific Claude Code configurations:

@@ -28,7 +28,31 @@ a2a:
 
   protocolVersion: "1.0"
 
-  # Identity (authz.md). The family OIDC issuer is FuzeFront's Authentik.
+  # ===========================================================================
+  # MACHINE-TO-MACHINE identity — NOT user identity.
+  # ===========================================================================
+  # These values authenticate OTHER AGENTS calling this A2A server (caller `repo`
+  # claim, `aud: a2a`). That is a different problem from user sign-in, which is
+  # delegated wholesale to the FuzeFront Security API and names no vendor
+  # (services/orchestrator/fuze_security.py, services/ui-react/src/lib/security/).
+  # Conflating the two would be a security mistake: a machine credential is not a
+  # user session and must never be traded for one.
+  #
+  # This block is the one place FuzeAgent still names an identity product, and it
+  # is DEPLOYMENT CONFIG, not code — agent-templates/a2a/{config,identity}.py are
+  # already provider-neutral (`oidcIssuerUrl` / `oidcDiscoveryUrl` / `callerClaim`).
+  #
+  # WHY IT CANNOT MOVE TO THE SECURITY CONTRACT YET — a genuine contract gap:
+  # the A2A server validates JWTs offline by fetching OIDC discovery + JWKS, and
+  # the FuzeFront Security contract (v0.4.0) exposes NO discovery or JWKS endpoint.
+  # It does publish POST /v1/security/tokens/introspect, which would remove this
+  # coupling entirely — but introspection is a per-request network call AND a
+  # change to the FROZEN values-interface (contract v1.1.0), so it is
+  # contract-designer's + a2a-maintainer's call, not a config edit. Either add a
+  # JWKS/discovery endpoint to the Security contract, or land an additive
+  # `auth.introspectionUrl` the way `oidcDiscoveryUrl` was added in v1.1.0.
+  #
+  # Identity (authz.md). The family OIDC issuer is FuzeFront's.
   # Source: FuzeFront deploy/helm/fuzefront/values-prod.yaml (issuerUrl). Prod token `iss`
   # uses the app.fuzefront.com host (Host-forwarding), not the auth.fuzefront.com admin host.
   auth:

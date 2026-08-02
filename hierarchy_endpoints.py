@@ -22,12 +22,21 @@ import os
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5434/ai_context")
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
 
+# Identity + authorization come from the FuzeFront Security API when the platform is
+# configured (services/orchestrator/fuze_security.py); `require_org_permission` asks it
+# for the decision using FuzeAgent's own bare policy keys from registration/policy.json,
+# and degrades to the legacy claim check only when the platform is absent.
 try:
-    from auth import get_current_user, require_user, require_org_access, CurrentUser, authenticate_websocket
+    from auth import (
+        ACTION_READ, RESOURCE_ORGANIZATION, RESOURCE_TEAM,
+        get_current_user, require_user, require_org_access, require_org_permission,
+        CurrentUser, authenticate_websocket,
+    )
 except Exception:  # pragma: no cover - allow import from repo root or service dir
     from services.orchestrator.auth import (  # type: ignore
-        get_current_user, require_user, require_org_access, CurrentUser,
-        authenticate_websocket,
+        ACTION_READ, RESOURCE_ORGANIZATION, RESOURCE_TEAM,
+        get_current_user, require_user, require_org_access, require_org_permission,
+        CurrentUser, authenticate_websocket,
     )
 
 @asynccontextmanager
@@ -205,8 +214,11 @@ async def get_organization(
     user: CurrentUser = Depends(require_user),
 ):
     # SECURITY (issue #6 HIGH-2 / BOLA): authorize the specific org id from the
-    # path; bare ``WHERE id = $1`` is not an authorization boundary.
-    require_org_access(organization_id, user)
+    # path; bare ``WHERE id = $1`` is not an authorization boundary. The decision is
+    # the platform's — Organization:read scoped to this org id as the tenant.
+    await require_org_permission(
+        organization_id, user, ACTION_READ, resource=RESOURCE_ORGANIZATION
+    )
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow("""
             SELECT 
@@ -321,8 +333,15 @@ async def get_team(
 
         if not row:
             raise HTTPException(status_code=404, detail="Team not found")
-        # SECURITY (issue #6 HIGH-2): authorize via the team's parent org.
-        require_org_access(row['organization_id'], user)
+        # SECURITY (issue #6 HIGH-2): authorize via the team's parent org — the org
+        # is the tenant scope, the team instance is the resource key.
+        await require_org_permission(
+            row['organization_id'],
+            user,
+            ACTION_READ,
+            resource=RESOURCE_TEAM,
+            resource_key=team_id,
+        )
         return Team(
             id=row['id'],
             organization_id=row['organization_id'],
