@@ -69,12 +69,25 @@ def _join_parts(parts: list[dict]) -> str:
     return "\n".join(chunks)
 
 
+# A caller may allow a paused always_ask tool call ONLY with an explicit
+# affirmative. Everything else — silence, "sounds good", "let me check with the
+# team" — denies. The previous default was allow, which let an ambiguous reply
+# authorise a production/third-party mutation inside the callee (state-mapping.md
+# §4 is updated to match). The deeper point: over A2A the principal answering is
+# the *calling agent*, not a human, so a prod-affecting approval should route to
+# reach_human on the callee's side rather than be resolvable here at all.
+_AFFIRMATIVE = ("allow", "approve", "yes", "confirm")
+
+
 def _parse_decision(text: str) -> tuple[bool, str | None]:
-    """A caller's reply to an always_ask pause -> (allow, deny_message)."""
+    """A caller's reply to an always_ask pause -> (allow, deny_message).
+
+    Deny-by-default: allow only on an explicit affirmative prefix.
+    """
     head = (text or "").strip().lower()
-    if head.startswith(("deny", "no", "reject", "decline", "disallow")):
-        return False, (text.strip() or "denied by caller")
-    return True, None
+    if head.startswith(_AFFIRMATIVE):
+        return True, None
+    return False, (text.strip() or "denied by caller (no explicit approval)")
 
 
 class A2AAdapter:
@@ -113,7 +126,12 @@ class A2AAdapter:
                 role_key, role, manifest, issuer_url=self._issuer(), signer=self.signer
             )
         return cg.project_product_card(
-            manifest, roles, issuer_url=self._issuer(), visibility=visibility, signer=self.signer
+            manifest,
+            roles,
+            tenant=tenant.tenant,
+            issuer_url=self._issuer(),
+            visibility=visibility,
+            signer=self.signer,
         )
 
     def well_known_card(self, tenant_name: str) -> dict:
@@ -138,15 +156,52 @@ class A2AAdapter:
     # ------------------------------------------------------------------ #
     # SendMessage / SendStreamingMessage
     # ------------------------------------------------------------------ #
+    def _serving_set(self, manifest: dict, roles: dict, tenant: TenantConfig) -> set[str]:
+        """The role keys a caller may actually dispatch to for this tenant.
+
+        This is the card's published serving set, NOT every role.json in the checkout.
+        Without it, `metadata.skillId` resolves against the whole tree, so any
+        allowlisted caller could invoke `_base`, a coordinator, an `a2a.publish:false`
+        role, or any role a tenant does not serve — `servingRoles`/`publish`/
+        `extendedOnly` would gate only card *visibility*, never dispatch.
+
+        Exec tenants (`Exec-<role>`) serve exactly their one exec role — which
+        `select_serving_roles` deliberately excludes from product cards, so they are
+        special-cased here. `tenant.servingRoles`, when set, overrides
+        `manifest.a2a.servingRoles`. A malformed serving list denies (empty set)
+        rather than raising.
+        """
+        if tenant.tenant.startswith("Exec-"):
+            return {tenant.tenant[len("Exec-") :]}
+        m = manifest
+        if tenant.serving_roles:
+            m = {
+                **manifest,
+                "a2a": {**(manifest.get("a2a") or {}), "servingRoles": list(tenant.serving_roles)},
+            }
+        try:
+            # visibility="extended" is the widest published set; per-caller card
+            # visibility is enforced separately in projection (authz.md §5).
+            return set(cg.select_serving_roles(m, roles, visibility="extended"))
+        except cg.CardProjectionError:
+            return set()
+
     def _resolve_role(self, roles: dict, manifest: dict, tenant: TenantConfig, message: dict):
-        """(skill_id, role_dict, known) from message.metadata.skillId or the entry role."""
+        """(skill_id, role_dict, known) from message.metadata.skillId or the entry role.
+
+        `known` is True ONLY when the resolved skill is in this tenant's published
+        serving set. A skill that exists in the checkout but is not served returns
+        `known=False` -> DENY -> the same generic REJECTED as an unknown tenant
+        (non-disclosure, authz.md §6)."""
         skill_id = (message.get("metadata") or {}).get("skillId")
         if not skill_id:
             skill_id = tenant.entry_role or (manifest.get("a2a") or {}).get("entryRole")
         if tenant.tenant.startswith("Exec-") and not skill_id:
             skill_id = tenant.tenant[len("Exec-") :]
-        role = roles.get(skill_id) if skill_id else None
-        return skill_id, role, role is not None
+        if skill_id and skill_id in self._serving_set(manifest, roles, tenant):
+            role = roles.get(skill_id)
+            return skill_id, role, role is not None
+        return skill_id, None, False
 
     def _provision(self, tenant: TenantConfig, role: dict):
         agent = self.provider.ensure_agent(role)
