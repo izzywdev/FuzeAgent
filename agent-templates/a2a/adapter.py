@@ -69,12 +69,25 @@ def _join_parts(parts: list[dict]) -> str:
     return "\n".join(chunks)
 
 
+# A caller may allow a paused always_ask tool call ONLY with an explicit
+# affirmative. Everything else — silence, "sounds good", "let me check with the
+# team" — denies. The previous default was allow, which let an ambiguous reply
+# authorise a production/third-party mutation inside the callee (state-mapping.md
+# §4 is updated to match). The deeper point: over A2A the principal answering is
+# the *calling agent*, not a human, so a prod-affecting approval should route to
+# reach_human on the callee's side rather than be resolvable here at all.
+_AFFIRMATIVE = ("allow", "approve", "yes", "confirm")
+
+
 def _parse_decision(text: str) -> tuple[bool, str | None]:
-    """A caller's reply to an always_ask pause -> (allow, deny_message)."""
+    """A caller's reply to an always_ask pause -> (allow, deny_message).
+
+    Deny-by-default: allow only on an explicit affirmative prefix.
+    """
     head = (text or "").strip().lower()
-    if head.startswith(("deny", "no", "reject", "decline", "disallow")):
-        return False, (text.strip() or "denied by caller")
-    return True, None
+    if head.startswith(_AFFIRMATIVE):
+        return True, None
+    return False, (text.strip() or "denied by caller (no explicit approval)")
 
 
 class A2AAdapter:
