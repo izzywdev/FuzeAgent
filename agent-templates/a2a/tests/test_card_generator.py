@@ -44,6 +44,23 @@ def test_product_card_identity_and_interface(fuzeplan_repo):
     assert iface[0]["tenant"] == "FuzePlan"
 
 
+def test_interface_tenant_overrides_repo_name(fuzeplan_repo):
+    """The card's AgentInterface.tenant is the ROUTING key, which is the tenant name,
+    not the repo name. When a tenant is served from a differently-named repo (e.g.
+    ``FuzeInfraOps`` over ``izzywdev/FuzePlan``) the card must advertise the tenant,
+    else the values-interface rule 'tenant key == AgentInterface.tenant' is violated
+    and dispatch to that tenant is unroutable."""
+    manifest, roles = load_repo(fuzeplan_repo)
+
+    default = cg.project_product_card(manifest, roles)
+    assert default["supportedInterfaces"][0]["tenant"] == "FuzePlan"  # defaults to repo
+
+    card = cg.project_product_card(manifest, roles, tenant="FuzeInfraOps")
+    assert card["supportedInterfaces"][0]["tenant"] == "FuzeInfraOps"
+    # only the routing tenant changes; the card identity still names the repo
+    assert card["name"] == "FuzePlan agent"
+
+
 def test_product_capabilities_and_security(fuzeplan_repo):
     manifest, roles = load_repo(fuzeplan_repo)
     card = cg.project_product_card(manifest, roles)

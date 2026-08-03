@@ -257,6 +257,7 @@ def project_product_card(
     manifest: dict,
     roles: dict[str, dict],
     *,
+    tenant: str | None = None,
     issuer_url: str = DEFAULT_ISSUER,
     version: str | None = None,
     visibility: str = "public",
@@ -264,8 +265,17 @@ def project_product_card(
     sign: bool = True,
     signer: Signer | None = None,
 ) -> dict:
-    """Project a product/infra repo into ONE Agent Card (card-projection.md §1–4)."""
+    """Project a product/infra repo into ONE Agent Card (card-projection.md §1–4).
+
+    ``tenant`` is the routing key advertised in the card's ``AgentInterface.tenant``.
+    It defaults to the repo name (the single-tenant-per-repo case), but MUST be passed
+    when a tenant's name differs from its repo — otherwise a distinct tenant over an
+    existing repo (e.g. ``FuzeInfraOps`` over ``izzywdev/FuzeAgent``) would advertise
+    ``tenant: "FuzeAgent"``, violating the values-interface rule that the tenant key
+    equals ``AgentInterface.tenant``.
+    """
     repo = repo_name(manifest["repo"])
+    interface_tenant = tenant or repo
     a2a = _a2a(manifest.get("a2a"))
     external = a2a.get("external", False) if external is None else external
 
@@ -281,7 +291,7 @@ def project_product_card(
         description=_product_description(manifest, roles, serving),
         version=version or contract_version(),
         doc_url=_doc_url(manifest),
-        interface=_interface(repo, external=external, repo_slug=repo),
+        interface=_interface(interface_tenant, external=external, repo_slug=repo),
         external=external,
         issuer_url=issuer_url,
         skills=skills,

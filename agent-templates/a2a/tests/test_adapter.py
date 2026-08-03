@@ -409,3 +409,89 @@ def test_extended_card_requires_authorization(fuzeplan_cfg, resolver):
     # non-allowlisted caller cannot enumerate -> not found
     with pytest.raises(TaskNotFoundError):
         a.extended_card("FuzePlan", _ctx(caller="FuzeMalory"))
+
+
+# --- FA-1 safety additions ---------------------------------------------------
+from a2a.adapter import _parse_decision  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "reply,expect_allow",
+    [
+        ("allow", True),
+        ("approve it", True),
+        ("YES please", True),
+        ("confirm", True),
+        ("sounds good", False),   # ambiguous -> deny (was allow before)
+        ("let me check with the team", False),
+        ("", False),
+        ("   ", False),
+        ("no", False),
+        ("deny: too risky", False),
+    ],
+)
+def test_parse_decision_defaults_to_deny(reply, expect_allow):
+    allow, deny_message = _parse_decision(reply)
+    assert allow is expect_allow
+    if not expect_allow:
+        assert deny_message  # a non-empty reason is always carried
+
+
+def _serving_override_cfg():
+    # A tenant that serves ONLY product-manager, even though the repo manifest also
+    # publishes ux-designer. tenant.servingRoles overrides manifest.a2a.servingRoles.
+    return ServerConfig(
+        enabled=True,
+        tenants=(
+            TenantConfig(
+                tenant="FuzePlan",
+                repo="izzywdev/FuzePlan",
+                enabled=True,
+                entry_role="product-manager",
+                serving_roles=("product-manager",),
+                provider=ProviderBinding(name="fake", vault_ids=("v1",)),
+            ),
+        ),
+    )
+
+
+def _dispatch(a, skill_id):
+    params = {
+        "tenant": "FuzePlan",
+        "message": {
+            "messageId": "m",
+            "role": "ROLE_USER",
+            "parts": [{"text": "x"}],
+            "metadata": {"skillId": skill_id},
+        },
+    }
+    return a.send_message(params, _ctx())["task"]
+
+
+def test_dispatch_gated_on_serving_set(resolver):
+    """A role that exists in the checkout but is not served is NOT dispatchable, and
+    its denial is indistinguishable from an unknown tenant (non-disclosure)."""
+    cfg = _serving_override_cfg()
+    a = _adapter(cfg, FakeProvider(), resolver)
+
+    # ux-designer exists in the repo and is in manifest.a2a.servingRoles, but the
+    # tenant serves only product-manager -> must be rejected.
+    served = _dispatch(_adapter(cfg, FakeProvider(), resolver), "product-manager")
+    assert served["status"]["state"] == "TASK_STATE_COMPLETED"
+
+    unserved = _dispatch(a, "ux-designer")
+    assert unserved["status"]["state"] == "TASK_STATE_REJECTED"
+
+    # same shape as an unknown skill and an unknown tenant (all generic REJECTED)
+    unknown_skill = _dispatch(_adapter(cfg, FakeProvider(), resolver), "nope")
+    assert unknown_skill["status"]["state"] == "TASK_STATE_REJECTED"
+
+    # Non-disclosure: the caller cannot tell an unserved-but-existing role apart from
+    # an unknown one. The generated ids (messageId/contextId/taskId) differ per task, so
+    # compare the stable, caller-visible payload: the human-readable status text.
+    def _status_text(task):
+        parts = ((task["status"].get("message") or {}).get("parts")) or []
+        return "".join(p.get("text", "") for p in parts)
+
+    assert _status_text(unserved) == _status_text(unknown_skill)
+    assert _status_text(unserved)  # non-empty generic reason
