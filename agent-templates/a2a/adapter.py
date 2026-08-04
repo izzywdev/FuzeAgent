@@ -23,10 +23,15 @@ from . import task_mapper as tm
 from . import wire_errors as we
 from .authz import AuthContext, Decision, authorize
 from .config import ServerConfig, TenantConfig
+from .environments import EnvironmentResolver
 from .session_store import SessionStore
 
 #: Resolve a tenant's projection inputs (manifest, roles) from its git ref.
 RepoResolver = Callable[[TenantConfig], "tuple[dict, dict]"]
+
+#: Resolve a role's ``environment`` BASENAME (never called with an empty/absent one) to
+#: a provider environment id, or raise ``environments.EnvironmentResolutionError``.
+EnvironmentIdResolver = Callable[[str], str]
 
 
 class AgentProviderLike(Protocol):
@@ -98,12 +103,20 @@ class A2AAdapter:
         repo_resolver: RepoResolver,
         *,
         signer: cg.Signer | None = None,
+        environment_resolver: EnvironmentIdResolver | None = None,
     ):
         self.config = config
         self.provider = provider
         self.resolve_repo = repo_resolver
         self.signer = signer
         self.store = SessionStore()
+        # Constructed once per adapter/process (caches both the environments/*.json
+        # basename->name reads and the environment-ids.json id-state read) — never
+        # built or re-read per call (FA-14 AC3). Callers that already loaded/mocked an
+        # id source may pass their own resolver callable instead.
+        self.resolve_environment_id: EnvironmentIdResolver = (
+            environment_resolver if environment_resolver is not None else EnvironmentResolver()
+        )
 
     # ------------------------------------------------------------------ #
     # cards
@@ -205,8 +218,26 @@ class A2AAdapter:
 
     def _provision(self, tenant: TenantConfig, role: dict):
         agent = self.provider.ensure_agent(role)
-        environment_id = tenant.provider.environment_id or agent.get("environment_id")
+        environment_id = self._resolve_environment_id(tenant, role, agent)
         return agent["id"], agent.get("version"), environment_id
+
+    def _resolve_environment_id(self, tenant: TenantConfig, role: dict, agent: dict):
+        """FA-14 precedence — never silently fall back to null for a NAMED environment:
+
+        1. ``tenant.provider.environment_id`` (values ``provider.environmentId``) wins
+           outright — an explicit per-tenant override.
+        2. Else, if the role names an ``environment``, resolve it
+           (``environments.EnvironmentResolver``) — this RAISES rather than returning
+           ``None`` when the name can't be resolved (AC2).
+        3. Else (the role names no environment at all — legitimately no error) fall
+           back to whatever the provider's ``ensure_agent`` response carried, if any.
+        """
+        if tenant.provider.environment_id:
+            return tenant.provider.environment_id
+        env_name = (role or {}).get("environment")
+        if env_name:
+            return self.resolve_environment_id(env_name)
+        return agent.get("environment_id")
 
     def send_message(self, params: dict, ctx: AuthContext) -> dict:
         task = self._send(params, ctx, streaming=False)
