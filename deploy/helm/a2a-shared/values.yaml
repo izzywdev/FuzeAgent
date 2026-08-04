@@ -99,3 +99,19 @@ deploy:
   # Optional ConfigMap name holding the Managed-Agents id-state (agent/vault/memory/
   # environment ids) mounted at FUZE_STATE_DIR=/state, same pattern as handoff-mcp.
   stateConfigMap: null
+  # MCP endpoints exported into the container env so every provisioned agent's _base
+  # github/handoff servers (url: ${GITHUB_MCP_URL} / ${HANDOFF_MCP_URL}) RESOLVE instead
+  # of being dropped. Each endpoint takes EITHER a plain in-cluster `url` OR a
+  # `urlSecretRef` {name,key} (use the secretRef when the URL embeds a credential), plus
+  # an optional `tokenSecretRef` {name,key} exported as <NAME>_MCP_TOKEN. All unset by
+  # default -> role_loader logs each drop at WARNING; the agent still starts, just without
+  # those tools. Secret VALUES never appear in git.
+  mcp:
+    github:
+      url: ""
+      urlSecretRef: null
+      tokenSecretRef: null
+    handoff:
+      url: ""
+      urlSecretRef: null
+      tokenSecretRef: null

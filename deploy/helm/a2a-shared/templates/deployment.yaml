@@ -106,6 +106,52 @@ spec:
                   name: {{ .name }}
                   key: {{ .key }}
             {{- end }}
+            {{- with .Values.deploy.mcp }}
+            # MCP endpoints for every provisioned agent's _base servers
+            # (roles/_base/role.json: github url ${GITHUB_MCP_URL}, handoff url
+            # ${HANDOFF_MCP_URL}). Each takes EITHER a plain `url` OR a `urlSecretRef`
+            # (use the secretRef when the URL embeds a credential), plus an optional
+            # `tokenSecretRef` exported as <NAME>_MCP_TOKEN. Unset -> role_loader logs
+            # the drop at WARNING and the agent starts WITHOUT those tools (never silent).
+            {{- with .github }}
+            {{- if .urlSecretRef }}
+            - name: GITHUB_MCP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .urlSecretRef.name }}
+                  key: {{ .urlSecretRef.key }}
+            {{- else if .url }}
+            - name: GITHUB_MCP_URL
+              value: {{ .url | quote }}
+            {{- end }}
+            {{- with .tokenSecretRef }}
+            - name: GITHUB_MCP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .key }}
+            {{- end }}
+            {{- end }}
+            {{- with .handoff }}
+            {{- if .urlSecretRef }}
+            - name: HANDOFF_MCP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .urlSecretRef.name }}
+                  key: {{ .urlSecretRef.key }}
+            {{- else if .url }}
+            - name: HANDOFF_MCP_URL
+              value: {{ .url | quote }}
+            {{- end }}
+            {{- with .tokenSecretRef }}
+            - name: HANDOFF_MCP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .key }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
           # The server exposes GET /healthz (verified against the built image's
           # composed Starlette routes: /rpc, /.well-known/agent-card.json,
           # /extendedAgentCard, /healthz).
