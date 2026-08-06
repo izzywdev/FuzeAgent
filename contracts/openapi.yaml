@@ -1,0 +1,5649 @@
+openapi: 3.1.0
+info:
+  title: FuzeAgent Orchestrator API
+  version: 0.1.0
+  summary: The HTTP surface the deployed FuzeAgent orchestrator actually serves.
+  description: >-
+    FuzeAgent orchestrates autonomous AI agents: it creates agents, assigns them tasks,
+    EXECUTES those tasks in containers and sandboxes, brokers agent-to-agent
+    communication, and manages the knowledge and goal state behind all of it.
+
+
+    WHAT THIS DOCUMENT IS. It describes the routes served by
+    `services/orchestrator/main.py` — the FastAPI application the Helm chart deploys as
+    the `orchestrator` pod on port 8000, reachable in-cluster at
+    http://orchestrator:8000. Every path was read off an `@app.<method>` decorator by
+    static analysis; the summaries are the handlers' own docstrings. Nothing here is
+    aspirational.
+
+
+    THE ONE THING TO UNDERSTAND BEFORE CALLING ANYTHING. FuzeAgent is not a CRUD API
+    with a dangerous corner. Its core purpose is to DISPATCH AGENTS THAT TAKE REAL
+    ACTIONS — they write files, run shell commands in containers, call third-party
+    APIs and spend money on model inference. `POST /tasks/{task_id}/execute` is the
+    canonical case: it returns quickly, and by the time it has, an agent is running.
+    Cancelling it stops future work; it does not undo work already done. Operations of
+    that shape are marked irreversible in `mcp/tools.overrides.yaml` regardless of
+    their HTTP verb, because the verb says nothing about whether the effect can be
+    taken back.
+
+
+    WHAT IT IS NOT. FuzeAgent deploys a SECOND backend, `services/hierarchy_API`
+    (the `hierarchy-api` pod, port 8006), with roughly forty of its own routes for
+    organizations, teams and agent hierarchy. It is a separate FastAPI application on
+    a separate Service and is NOT covered by this document; a single OpenAPI document
+    maps to a single upstream base URL, so it would need its own contract and its own
+    gateway pod. See `contracts/README.md`.
+
+
+    AUTHENTICATION. Bearer token, resolved through the FuzeFront Security API when
+    `SECURITY_BASE_URL` is configured (`services/orchestrator/fuze_security.py`), with
+    a local JWT fallback otherwise. `main:app` fails closed at boot without either.
+  contact:
+    name: FuzeAgent
+    url: https://github.com/izzywdev/FuzeAgent
+  license:
+    name: UNLICENSED
+servers:
+  - url: /
+    description: >-
+      The orchestrator serves absolute paths with no common prefix, so the base URL
+      carries no path segment. In-cluster: http://orchestrator:8000.
+tags:
+  - name: Platform
+    description: Health, websocket stats and system dashboards.
+  - name: Agents
+    description: Creating, inspecting and configuring agents.
+  - name: Tasks
+    description: >-
+      Assigning and EXECUTING work. The operations here are the ones that make an
+      agent act on the world.
+  - name: Containers
+    description: Per-agent container lifecycle and in-container command execution.
+  - name: Sandboxes
+    description: Sandbox lifecycle and arbitrary command execution inside one.
+  - name: Coordination
+    description: Multi-agent coordination sessions and agent-to-agent messaging.
+  - name: Conversations
+    description: Agent conversations and the derived artefacts (milestones, action items).
+  - name: Goals
+    description: Organizational goals, milestones and progress tracking.
+  - name: Knowledge
+    description: Documents, RAG index and knowledge analytics.
+  - name: Context
+    description: Agent interaction context.
+  - name: MCP passthrough
+    description: >-
+      The orchestrator's own MCP client surface — listing and calling tools of MCP
+      servers the AGENTS use. Not to be confused with FuzeAgent's MCP gateway pod,
+      which exposes THIS API as MCP tools.
+  - name: Organizations
+    description: Organization-scoped model, provider and dashboard configuration.
+paths:
+  "/health":
+    get:
+      operationId: healthCheck
+      tags: ["Platform"]
+      summary: "Health Check"
+      description:
+        |-
+          Health check endpoint that returns the current status of the orchestrator service.
+
+          Returns:
+          dict: Service health status and basic information
+      security: []
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents":
+    post:
+      operationId: createAgent
+      tags: ["Agents"]
+      summary: "Create AI Agent"
+      description:
+        |-
+          Create a new AI agent with repository and sandbox settings
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "AgentCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    get:
+      operationId: listAgents
+      tags: ["Agents"]
+      summary: "List All Agents"
+      description:
+        |-
+          List all agents and their status
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/tasks":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: assignTask
+      tags: ["Tasks"]
+      summary: "Assign Task to Agent"
+      description:
+        |-
+          Assign a task to an agent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "TaskCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    get:
+      operationId: getAgentTasks
+      tags: ["Tasks"]
+      summary: "Get tasks assigned to an agent"
+      description:
+        |-
+          Get tasks assigned to an agent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/status":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentStatus
+      tags: ["Agents"]
+      summary: "Get detailed agent status"
+      description:
+        |-
+          Get detailed agent status
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/teams":
+    get:
+      operationId: listTeams
+      tags: ["Platform"]
+      summary: "List all teams"
+      description:
+        |-
+          List all teams
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agent-templates":
+    get:
+      operationId: listAgentTemplates
+      tags: ["Agents"]
+      summary: "List available agent templates"
+      description:
+        |-
+          List available agent templates
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks":
+    get:
+      operationId: listTasks
+      tags: ["Tasks"]
+      summary: "List all tasks"
+      description:
+        |-
+          List all tasks
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getTask
+      tags: ["Tasks"]
+      summary: "Get task details"
+      description:
+        |-
+          Get task details
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      operationId: updateTask
+      tags: ["Tasks"]
+      summary: "Update task status and result"
+      description:
+        |-
+          Update task status and result
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/from-template":
+    post:
+      operationId: createAgentFromTemplate
+      tags: ["Agents"]
+      summary: "Create agent from template with repository settings"
+      description:
+        |-
+          Create agent from template with repository settings
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/templates":
+    get:
+      operationId: getAgentTemplates
+      tags: ["Agents"]
+      summary: "Get available agent templates"
+      description:
+        |-
+          Get available agent templates
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/execute":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    post:
+      operationId: startTaskExecution
+      tags: ["Tasks"]
+      summary: "Start Autonomous Task Execution"
+      description:
+        |-
+          Start autonomous execution of a task
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/status":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getTaskExecutionStatus
+      tags: ["Tasks"]
+      summary: "Get detailed task execution status"
+      description:
+        |-
+          Get detailed task execution status
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      operationId: updateTaskStatus
+      tags: ["Tasks"]
+      summary: "Update Task Status"
+      description:
+        |-
+          Update task status - used by memory-enabled agents to report progress
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/iterations":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getTaskIterations
+      tags: ["Tasks"]
+      summary: "Get task iteration history"
+      description:
+        |-
+          Get task iteration history
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/sandbox":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentSandbox
+      tags: ["Agents"]
+      summary: "Get agent sandbox information"
+      description:
+        |-
+          Get agent sandbox information
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/context/interactions":
+    post:
+      operationId: storeInteraction
+      tags: ["Context"]
+      summary: "Store agent interaction"
+      description:
+        |-
+          Store agent interaction
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/context":
+    get:
+      operationId: getContext
+      tags: ["Context"]
+      summary: "Get relevant context for a query"
+      description:
+        |-
+          Get relevant context for a query
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/memory":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentMemory
+      tags: ["Agents"]
+      summary: "Get agent memory"
+      description:
+        |-
+          Get agent memory
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      operationId: stopMemoryEnabledAgent
+      tags: ["Agents"]
+      summary: "Stop Memory-Enabled Agent"
+      description:
+        |-
+          Stop and clean up a memory-enabled agent container
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/conversations":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentConversations
+      tags: ["Conversations"]
+      summary: "Get Agent Conversations"
+      description:
+        |-
+          Get all conversations for a specific agent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      operationId: createAgentConversation
+      tags: ["Conversations"]
+      summary: "Create New Agent Conversation"
+      description:
+        |-
+          Create a new conversation with an agent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "ConversationCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/conversations/{conversation_id}/messages":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+      - name: conversation_id
+        in: path
+        required: true
+        description: "Conversation id."
+        schema: { type: string }
+    get:
+      operationId: getConversationMessages
+      tags: ["Conversations"]
+      summary: "Get Conversation Messages"
+      description:
+        |-
+          Get all messages in a conversation
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      operationId: sendMessageToAgent
+      tags: ["Conversations"]
+      summary: "Send Message to Agent"
+      description:
+        |-
+          Send a message to an agent in a conversation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "ChatMessageRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/search":
+    get:
+      operationId: searchKnowledge
+      tags: ["Knowledge"]
+      summary: "Search knowledge base"
+      description:
+        |-
+          Search knowledge base
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/human-response":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    post:
+      operationId: submitHumanResponse
+      tags: ["Tasks"]
+      summary: "Submit Human Response"
+      description:
+        |-
+          Submit human response to a task question
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "HumanResponseRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/cancel":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    post:
+      operationId: cancelTaskExecution
+      tags: ["Tasks"]
+      summary: "Cancel autonomous execution of a task"
+      description:
+        |-
+          Cancel autonomous execution of a task
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/messages":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getTaskMessages
+      tags: ["Tasks"]
+      summary: "Get task messages and chat history"
+      description:
+        |-
+          Get task messages and chat history
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/sandboxes":
+    get:
+      operationId: listSandboxes
+      tags: ["Sandboxes"]
+      summary: "List active sandboxes"
+      description:
+        |-
+          List active sandboxes
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/sandboxes/{sandbox_id}/execute":
+    parameters:
+      - name: sandbox_id
+        in: path
+        required: true
+        description: "Sandbox id."
+        schema: { type: string }
+    post:
+      operationId: executeCommandInSandbox
+      tags: ["Sandboxes"]
+      summary: "Execute a command in a sandbox"
+      description:
+        |-
+          Execute a command in a sandbox
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/sandboxes/{sandbox_id}":
+    parameters:
+      - name: sandbox_id
+        in: path
+        required: true
+        description: "Sandbox id."
+        schema: { type: string }
+    delete:
+      operationId: destroySandbox
+      tags: ["Sandboxes"]
+      summary: "Destroy a sandbox"
+      description:
+        |-
+          Destroy a sandbox
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/register":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: registerAgent
+      tags: ["Agents"]
+      summary: "Register an agent running in a sandbox container"
+      description:
+        |-
+          Register an agent running in a sandbox container
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/next-task":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getNextTaskForAgent
+      tags: ["Agents"]
+      summary: "Get the next task for an agent to execute"
+      description:
+        |-
+          Get the next task for an agent to execute
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/error":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: reportAgentError
+      tags: ["Agents"]
+      summary: "Report an error from an agent"
+      description:
+        |-
+          Report an error from an agent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/conversation":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getTaskConversation
+      tags: ["Tasks"]
+      summary: "Get conversation history for a task"
+      description:
+        |-
+          Get conversation history for a task
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/conversation/summary":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getConversationSummary
+      tags: ["Tasks"]
+      summary: "Get conversation summary with statistics"
+      description:
+        |-
+          Get conversation summary with statistics
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/code-generations":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getTaskCodeGenerations
+      tags: ["Tasks"]
+      summary: "Get code generations for a task"
+      description:
+        |-
+          Get code generations for a task
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/performance":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentPerformance
+      tags: ["Agents"]
+      summary: "Get agent performance metrics"
+      description:
+        |-
+          Get agent performance metrics
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/file-operations":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getTaskFileOperations
+      tags: ["Tasks"]
+      summary: "Get File Operations"
+      description:
+        |-
+          Get file operations for a task
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/file-operations/{batch_id}/preview":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+      - name: batch_id
+        in: path
+        required: true
+        description: "Batch id."
+        schema: { type: string }
+    get:
+      operationId: getFileOperationsPreview
+      tags: ["Tasks"]
+      summary: "Get preview of file changes for a batch"
+      description:
+        |-
+          Get preview of file changes for a batch
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/file-operations/{batch_id}/approve":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+      - name: batch_id
+        in: path
+        required: true
+        description: "Batch id."
+        schema: { type: string }
+    post:
+      operationId: approveFileOperations
+      tags: ["Tasks"]
+      summary: "Approve File Operations"
+      description:
+        |-
+          Approve or reject file operations
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "FileOperationApprovalRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/file-operations/{batch_id}/rollback":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+      - name: batch_id
+        in: path
+        required: true
+        description: "Batch id."
+        schema: { type: string }
+    post:
+      operationId: rollbackFileOperations
+      tags: ["Tasks"]
+      summary: "Rollback applied file operations"
+      description:
+        |-
+          Rollback applied file operations
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/claude-session":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getClaudeSessionStatus
+      tags: ["Tasks"]
+      summary: "Get Claude SDK session status for a task"
+      description:
+        |-
+          Get Claude SDK session status for a task
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/claude-session/input":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    post:
+      operationId: sendClaudeSessionInput
+      tags: ["Tasks"]
+      summary: "Send input to Claude SDK session"
+      description:
+        |-
+          Send input to Claude SDK session
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/mcp/tools":
+    get:
+      operationId: getMcpTools
+      tags: ["MCP passthrough"]
+      summary: "Get available MCP tools"
+      description:
+        |-
+          Get available MCP tools
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/mcp/call-tool":
+    post:
+      operationId: callMcpTool
+      tags: ["MCP passthrough"]
+      summary: "Call MCP Tool"
+      description:
+        |-
+          Call an MCP tool
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "MCPToolRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/mcp/resources":
+    get:
+      operationId: getMcpResources
+      tags: ["MCP passthrough"]
+      summary: "Get available MCP resources"
+      description:
+        |-
+          Get available MCP resources
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/mcp/resource":
+    get:
+      operationId: getMcpResource
+      tags: ["MCP passthrough"]
+      summary: "Get an MCP resource by URI"
+      description:
+        |-
+          Get an MCP resource by URI
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/mcp-context":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    get:
+      operationId: getTaskMcpContext
+      tags: ["Tasks"]
+      summary: "Get MCP context for a task"
+      description:
+        |-
+          Get MCP context for a task
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/mcp-setup":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: setupAgentMcp
+      tags: ["Agents"]
+      summary: "Setup Agent MCP Integration"
+      description:
+        |-
+          Set up MCP integration for an agent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "AgentMCPSetupRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/tasks/{task_id}/coordinate":
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        description: "Task id."
+        schema: { type: string }
+    post:
+      operationId: initiateTaskCoordination
+      tags: ["Tasks"]
+      summary: "Initiate Multi-Agent Coordination"
+      description:
+        |-
+          Initiate multi-agent coordination for a complex task
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "CoordinationRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/coordination/{session_id}":
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        description: "Session id."
+        schema: { type: string }
+    get:
+      operationId: getCoordinationStatus
+      tags: ["Coordination"]
+      summary: "Get status of a coordination session"
+      description:
+        |-
+          Get status of a coordination session
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/coordination/{session_id}/cancel":
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        description: "Session id."
+        schema: { type: string }
+    post:
+      operationId: cancelCoordination
+      tags: ["Coordination"]
+      summary: "Cancel a coordination session"
+      description:
+        |-
+          Cancel a coordination session
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{from_agent_id}/communicate/{to_agent_id}":
+    parameters:
+      - name: from_agent_id
+        in: path
+        required: true
+        description: "From agent id."
+        schema: { type: string }
+      - name: to_agent_id
+        in: path
+        required: true
+        description: "To agent id."
+        schema: { type: string }
+    post:
+      operationId: sendAgentCommunication
+      tags: ["Agents"]
+      summary: "Send communication between agents"
+      description:
+        |-
+          Send communication between agents
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/coordination/active":
+    get:
+      operationId: getActiveCoordinations
+      tags: ["Coordination"]
+      summary: "Get all active coordination sessions"
+      description:
+        |-
+          Get all active coordination sessions
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/organizations/{organization_id}/providers/{provider}/credentials":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+      - name: provider
+        in: path
+        required: true
+        description: "Provider."
+        schema: { type: string }
+    post:
+      operationId: storeProviderCredentials
+      tags: ["Organizations"]
+      summary: "Store Provider API Credentials"
+      description:
+        |-
+          Store encrypted API credentials for a model provider at organization level
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "ProviderCredentialsRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/organizations/{organization_id}/models":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: getAvailableModels
+      tags: ["Organizations"]
+      summary: "Get Available Models"
+      description:
+        |-
+          Get available AI models with provider credential validation
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/model-configuration":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: configureAgentModel
+      tags: ["Agents"]
+      summary: "Configure Agent Model Settings"
+      description:
+        |-
+          Configure model settings for an AI agent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "AgentModelConfigRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    get:
+      operationId: getAgentModelConfiguration
+      tags: ["Agents"]
+      summary: "Get Agent Model Configuration"
+      description:
+        |-
+          Get model configuration for an AI agent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/tasks/cost-estimate":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: estimateTaskCost
+      tags: ["Tasks"]
+      summary: "Estimate Task Cost"
+      description:
+        |-
+          Estimate cost for task execution based on agent's model configuration
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "TaskCostEstimateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/organizations/{organization_id}/model-usage":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: getOrganizationModelUsage
+      tags: ["Organizations"]
+      summary: "Get Model Usage Statistics"
+      description:
+        |-
+          Get model usage statistics and costs for an organization
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/model-recommendations":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getModelRecommendations
+      tags: ["Agents"]
+      summary: "Get Model Recommendations"
+      description:
+        |-
+          Get model recommendations based on task capabilities and cost constraints
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/notifications/{recipient_type}/{recipient_id}":
+    parameters:
+      - name: recipient_type
+        in: path
+        required: true
+        description: "Recipient type."
+        schema: { type: string }
+      - name: recipient_id
+        in: path
+        required: true
+        description: "Recipient id."
+        schema: { type: string }
+    get:
+      operationId: getKnowledgeNotifications
+      tags: ["Knowledge"]
+      summary: "Get Knowledge Notifications"
+      description:
+        |-
+          Get knowledge notifications for a recipient
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/notifications/{notification_id}/status":
+    parameters:
+      - name: notification_id
+        in: path
+        required: true
+        description: "Notification id."
+        schema: { type: string }
+    put:
+      operationId: updateNotificationStatus
+      tags: ["Knowledge"]
+      summary: "Update Notification Status"
+      description:
+        |-
+          Update notification status and optional action taken
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/notifications/statistics":
+    get:
+      operationId: getNotificationStatistics
+      tags: ["Knowledge"]
+      summary: "Get Notification Statistics"
+      description:
+        |-
+          Get notification statistics and analytics
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/organizations/{organization_id}/add":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    post:
+      operationId: addOrganizationalKnowledge
+      tags: ["Knowledge"]
+      summary: "Add Organizational Knowledge"
+      description:
+        |-
+          Add knowledge to organization-level knowledge base
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/organizations/{organization_id}/search":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: searchOrganizationalKnowledge
+      tags: ["Knowledge"]
+      summary: "Search Organizational Knowledge"
+      description:
+        |-
+          Search organization-level knowledge base
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/context-enhancement/{agent_id}":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getEnhancedContextForAgent
+      tags: ["Knowledge"]
+      summary: "Get Enhanced Context for Agent"
+      description:
+        |-
+          Get enhanced context with relevant knowledge for agent task execution
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/analytics/organizations/{organization_id}/insights":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: getOrganizationalKnowledgeInsights
+      tags: ["Knowledge"]
+      summary: "Get Organizational Knowledge Insights"
+      description:
+        |-
+          Get comprehensive organizational knowledge insights and analytics
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/analytics/organizations/{organization_id}/effectiveness":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: analyzeKnowledgeEffectiveness
+      tags: ["Knowledge"]
+      summary: "Analyze Knowledge Effectiveness"
+      description:
+        |-
+          Analyze effectiveness of knowledge items in the organization
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/analytics/agents/{agent_id}/profile":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentKnowledgeProfile
+      tags: ["Knowledge"]
+      summary: "Get Agent Knowledge Profile"
+      description:
+        |-
+          Get detailed knowledge profile for an agent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/analytics/organizations/{organization_id}/optimization":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: getKnowledgeOptimizationRecommendations
+      tags: ["Knowledge"]
+      summary: "Get Knowledge Optimization Recommendations"
+      description:
+        |-
+          Generate comprehensive knowledge optimization recommendations
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/analytics/organizations/{organization_id}/trends":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: getKnowledgeTrendsAnalysis
+      tags: ["Knowledge"]
+      summary: "Get Knowledge Trends Analysis"
+      description:
+        |-
+          Get comprehensive knowledge trends analysis
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/deploy-memory":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: deployMemoryEnabledAgent
+      tags: ["Agents"]
+      summary: "Deploy Memory-Enabled Agent"
+      description:
+        |-
+          Deploy a memory-enabled autonomous agent container
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/memory-status":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentMemoryStatus
+      tags: ["Agents"]
+      summary: "Get Agent Memory Status"
+      description:
+        |-
+          Get agent memory status, expertise metrics, and insights
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/memory-tasks":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: assignTaskToMemoryAgent
+      tags: ["Agents"]
+      summary: "Assign Task to Memory Agent"
+      description:
+        |-
+          Assign a task to a memory-enabled agent for autonomous execution
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/system/expertise-dashboard":
+    get:
+      operationId: getSystemExpertiseDashboard
+      tags: ["Platform"]
+      summary: "Get System Expertise Dashboard"
+      description:
+        |-
+          Get comprehensive dashboard of system expertise and memory analytics
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/tasks/pending":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getPendingTasksForAgent
+      tags: ["Tasks"]
+      summary: "Get Pending Tasks for Agent"
+      description:
+        |-
+          Get pending tasks that a memory-enabled agent can pick up
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/statistics":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: updateAgentStatistics
+      tags: ["Agents"]
+      summary: "Agent Statistics Update"
+      description:
+        |-
+          Update agent statistics - used by memory-enabled agents for performance tracking
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/organizations/{organization_id}/goals":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    post:
+      operationId: createGoal
+      tags: ["Goals"]
+      summary: "Create organizational goal"
+      description:
+        |-
+          Create a new organizational goal
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "GoalCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    get:
+      operationId: listOrganizationGoals
+      tags: ["Goals"]
+      summary: "List organization goals"
+      description:
+        |-
+          List goals for an organization
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    get:
+      operationId: getGoal
+      tags: ["Goals"]
+      summary: "Get goal details"
+      description:
+        |-
+          Get goal details
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/overview":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    get:
+      operationId: getGoalOverview
+      tags: ["Goals"]
+      summary: "Get goal overview"
+      description:
+        |-
+          Get comprehensive goal overview
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/progress":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    put:
+      operationId: updateGoalProgress
+      tags: ["Goals"]
+      summary: "Update goal progress"
+      description:
+        |-
+          Update goal progress
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "GoalUpdateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/milestones":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    post:
+      operationId: createMilestone
+      tags: ["Goals"]
+      summary: "Create milestone"
+      description:
+        |-
+          Create milestone for goal
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "MilestoneCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/milestones/{milestone_id}/tasks":
+    parameters:
+      - name: milestone_id
+        in: path
+        required: true
+        description: "Milestone id."
+        schema: { type: string }
+    post:
+      operationId: createTaskFromMilestone
+      tags: ["Goals"]
+      summary: "Create task from milestone"
+      description:
+        |-
+          Create task from milestone
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "TaskFromMilestoneRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/generate-execution-plan":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    post:
+      operationId: generateExecutionPlan
+      tags: ["Goals"]
+      summary: "Generate execution plan"
+      description:
+        |-
+          Generate execution plan with milestones and tasks
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/generate-monthly-milestones":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    post:
+      operationId: generateMonthlyMilestones
+      tags: ["Goals"]
+      summary: "Generate monthly milestones"
+      description:
+        |-
+          Generate monthly milestones for goal
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/milestones/{milestone_id}/generate-weekly-tasks":
+    parameters:
+      - name: milestone_id
+        in: path
+        required: true
+        description: "Milestone id."
+        schema: { type: string }
+    post:
+      operationId: generateWeeklyTasks
+      tags: ["Goals"]
+      summary: "Generate weekly tasks"
+      description:
+        |-
+          Generate weekly tasks for milestone
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/generate-cross-functional-tasks":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    post:
+      operationId: generateCrossFunctionalTasks
+      tags: ["Goals"]
+      summary: "Generate cross-functional tasks"
+      description:
+        |-
+          Generate cross-functional tasks for goal
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/conversations":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    post:
+      operationId: createGoalConversation
+      tags: ["Goals"]
+      summary: "Create goal conversation"
+      description:
+        |-
+          Create goal conversation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "GoalConversationCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    get:
+      operationId: getGoalConversations
+      tags: ["Goals"]
+      summary: "Get goal conversations"
+      description:
+        |-
+          Get conversations for a goal
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/conversations/{conversation_id}":
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        description: "Conversation id."
+        schema: { type: string }
+    get:
+      operationId: getGoalConversation
+      tags: ["Conversations"]
+      summary: "Get goal conversation"
+      description:
+        |-
+          Get goal conversation
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/conversations/{conversation_id}/messages":
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        description: "Conversation id."
+        schema: { type: string }
+    post:
+      operationId: addMessageToConversation
+      tags: ["Conversations"]
+      summary: "Add message to conversation"
+      description:
+        |-
+          Add message to conversation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "ConversationMessageRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/conversations/{conversation_id}/generate-milestones":
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        description: "Conversation id."
+        schema: { type: string }
+    post:
+      operationId: generatePlanningMilestones
+      tags: ["Conversations"]
+      summary: "Generate milestones from conversation"
+      description:
+        |-
+          Generate planning milestones from conversation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/conversations/{conversation_id}/conduct-progress-review":
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        description: "Conversation id."
+        schema: { type: string }
+    post:
+      operationId: conductProgressReview
+      tags: ["Conversations"]
+      summary: "Conduct progress review"
+      description:
+        |-
+          Conduct progress review
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/conversations/{conversation_id}/extract-action-items":
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        description: "Conversation id."
+        schema: { type: string }
+    post:
+      operationId: extractActionItems
+      tags: ["Conversations"]
+      summary: "Extract action items"
+      description:
+        |-
+          Extract action items from conversation
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/track-progress":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    post:
+      operationId: recordProgressTracking
+      tags: ["Goals"]
+      summary: "Record progress tracking update"
+      description:
+        |-
+          Record progress tracking update
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "ProgressUpdateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/deadline-risk":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    get:
+      operationId: assessDeadlineRisk
+      tags: ["Goals"]
+      summary: "Assess deadline risk"
+      description:
+        |-
+          Assess deadline risk for goal
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/goals/{goal_id}/progress-report":
+    parameters:
+      - name: goal_id
+        in: path
+        required: true
+        description: "Goal id."
+        schema: { type: string }
+    get:
+      operationId: generateProgressReport
+      tags: ["Goals"]
+      summary: "Generate progress report"
+      description:
+        |-
+          Generate progress report for goal
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/organizations/{organization_id}/goals-dashboard":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: getOrganizationGoalsDashboard
+      tags: ["Goals"]
+      summary: "Get organization goals dashboard"
+      description:
+        |-
+          Get organization goals dashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/organizations/{organization_id}/tracking-dashboard":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    get:
+      operationId: getTrackingDashboard
+      tags: ["Organizations"]
+      summary: "Get tracking dashboard"
+      description:
+        |-
+          Get organization tracking dashboard
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/organizations/{organization_id}/documents":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    post:
+      operationId: uploadOrganizationDocument
+      tags: ["Knowledge"]
+      summary: "Upload Organizational Document"
+      description:
+        |-
+          Upload a document to organizational knowledge base
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "UploadFile (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    get:
+      operationId: listOrganizationDocuments
+      tags: ["Knowledge"]
+      summary: "List Organizational Documents"
+      description:
+        |-
+          Get list of organizational documents
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/organizations/{organization_id}/url":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+    post:
+      operationId: addOrganizationUrl
+      tags: ["Knowledge"]
+      summary: "Add URL to Organizational Knowledge"
+      description:
+        |-
+          Add URL content to organizational knowledge base
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/organizations/{organization_id}/documents/{doc_id}":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+      - name: doc_id
+        in: path
+        required: true
+        description: "Doc id."
+        schema: { type: string }
+    get:
+      operationId: getOrganizationDocument
+      tags: ["Knowledge"]
+      summary: "Get Organizational Document"
+      description:
+        |-
+          Get organizational document metadata
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      operationId: updateOrganizationDocument
+      tags: ["Knowledge"]
+      summary: "Update Organizational Document"
+      description:
+        |-
+          Update organizational document metadata
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      operationId: deleteOrganizationDocument
+      tags: ["Knowledge"]
+      summary: "Delete Organizational Document"
+      description:
+        |-
+          Delete organizational document
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/organizations/{organization_id}/documents/{doc_id}/content":
+    parameters:
+      - name: organization_id
+        in: path
+        required: true
+        description: "Organization id."
+        schema: { type: string }
+      - name: doc_id
+        in: path
+        required: true
+        description: "Doc id."
+        schema: { type: string }
+    get:
+      operationId: getOrganizationDocumentContent
+      tags: ["Knowledge"]
+      summary: "Get Organizational Document Content"
+      description:
+        |-
+          Get full content of organizational document
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/teams/{team_id}/documents":
+    parameters:
+      - name: team_id
+        in: path
+        required: true
+        description: "Team id."
+        schema: { type: string }
+    post:
+      operationId: uploadTeamDocument
+      tags: ["Knowledge"]
+      summary: "Upload Team Document"
+      description:
+        |-
+          Upload a document to team knowledge base
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "UploadFile (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    get:
+      operationId: listTeamDocuments
+      tags: ["Knowledge"]
+      summary: "List Team Documents"
+      description:
+        |-
+          Get list of team documents
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/teams/{team_id}/url":
+    parameters:
+      - name: team_id
+        in: path
+        required: true
+        description: "Team id."
+        schema: { type: string }
+    post:
+      operationId: addTeamUrl
+      tags: ["Knowledge"]
+      summary: "Add URL to Team Knowledge"
+      description:
+        |-
+          Add URL content to team knowledge base
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/teams/{team_id}/documents/{doc_id}":
+    parameters:
+      - name: team_id
+        in: path
+        required: true
+        description: "Team id."
+        schema: { type: string }
+      - name: doc_id
+        in: path
+        required: true
+        description: "Doc id."
+        schema: { type: string }
+    get:
+      operationId: getTeamDocument
+      tags: ["Knowledge"]
+      summary: "Get Team Document"
+      description:
+        |-
+          Get team document metadata
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      operationId: updateTeamDocument
+      tags: ["Knowledge"]
+      summary: "Update Team Document"
+      description:
+        |-
+          Update team document metadata
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      operationId: deleteTeamDocument
+      tags: ["Knowledge"]
+      summary: "Delete Team Document"
+      description:
+        |-
+          Delete team document
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/teams/{team_id}/documents/{doc_id}/content":
+    parameters:
+      - name: team_id
+        in: path
+        required: true
+        description: "Team id."
+        schema: { type: string }
+      - name: doc_id
+        in: path
+        required: true
+        description: "Doc id."
+        schema: { type: string }
+    get:
+      operationId: getTeamDocumentContent
+      tags: ["Knowledge"]
+      summary: "Get Team Document Content"
+      description:
+        |-
+          Get full content of team document
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/agents/{agent_id}/documents":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: uploadAgentDocument
+      tags: ["Knowledge"]
+      summary: "Upload Agent Document"
+      description:
+        |-
+          Upload a document to agent knowledge base
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "UploadFile (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
+              additionalProperties: true
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    get:
+      operationId: listAgentDocuments
+      tags: ["Knowledge"]
+      summary: "List Agent Documents"
+      description:
+        |-
+          Get list of agent documents
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/agents/{agent_id}/url":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: addAgentUrl
+      tags: ["Knowledge"]
+      summary: "Add URL to Agent Knowledge"
+      description:
+        |-
+          Add URL content to agent knowledge base
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/agents/{agent_id}/documents/{doc_id}":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+      - name: doc_id
+        in: path
+        required: true
+        description: "Doc id."
+        schema: { type: string }
+    get:
+      operationId: getAgentDocument
+      tags: ["Knowledge"]
+      summary: "Get Agent Document"
+      description:
+        |-
+          Get agent document metadata
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      operationId: updateAgentDocument
+      tags: ["Knowledge"]
+      summary: "Update Agent Document"
+      description:
+        |-
+          Update agent document metadata
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      operationId: deleteAgentDocument
+      tags: ["Knowledge"]
+      summary: "Delete Agent Document"
+      description:
+        |-
+          Delete agent document
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/knowledge/agents/{agent_id}/documents/{doc_id}/content":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+      - name: doc_id
+        in: path
+        required: true
+        description: "Doc id."
+        schema: { type: string }
+    get:
+      operationId: getAgentDocumentContent
+      tags: ["Knowledge"]
+      summary: "Get Agent Document Content"
+      description:
+        |-
+          Get full content of agent document
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/container/create":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: createAgentContainer
+      tags: ["Containers"]
+      summary: "Create Agent Container"
+      description:
+        |-
+          Create a new container for an AI agent
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/container/start":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: startAgentContainer
+      tags: ["Containers"]
+      summary: "Start Agent Container"
+      description:
+        |-
+          Start an agent container
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/container/stop":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: stopAgentContainer
+      tags: ["Containers"]
+      summary: "Stop Agent Container"
+      description:
+        |-
+          Stop an agent container
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/container/restart":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: restartAgentContainer
+      tags: ["Containers"]
+      summary: "Restart Agent Container"
+      description:
+        |-
+          Restart an agent container
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/container":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    delete:
+      operationId: removeAgentContainer
+      tags: ["Containers"]
+      summary: "Remove Agent Container"
+      description:
+        |-
+          Remove an agent container
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/container/status":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentContainerStatus
+      tags: ["Containers"]
+      summary: "Get Agent Container Status"
+      description:
+        |-
+          Get container status for an agent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/containers/agents":
+    get:
+      operationId: listAgentContainers
+      tags: ["Containers"]
+      summary: "List Agent Containers"
+      description:
+        |-
+          List all agent containers
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/container/logs":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    get:
+      operationId: getAgentContainerLogs
+      tags: ["Containers"]
+      summary: "Get Agent Container Logs"
+      description:
+        |-
+          Get container logs for an agent
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/agents/{agent_id}/container/execute":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: executeContainerCommand
+      tags: ["Containers"]
+      summary: "Execute Command in Container"
+      description:
+        |-
+          Execute a command in the agent container
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/rag/search":
+    post:
+      operationId: searchKnowledgeContext
+      tags: ["Knowledge"]
+      summary: "Search for relevant knowledge context using RAG"
+      description:
+        |-
+          Search for relevant knowledge context using RAG
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/rag/enhance-prompt":
+    post:
+      operationId: enhancePromptWithContext
+      tags: ["Knowledge"]
+      summary: "Enhance a prompt with relevant context using RAG"
+      description:
+        |-
+          Enhance a prompt with relevant context using RAG
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/rag/reindex":
+    post:
+      operationId: reindexKnowledgeBase
+      tags: ["Knowledge"]
+      summary: "Reindex all documents in a scope for RAG"
+      description:
+        |-
+          Reindex all documents in a scope for RAG
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/rag/stats":
+    get:
+      operationId: getRagIndexStats
+      tags: ["Knowledge"]
+      summary: "Get statistics about the RAG index"
+      description:
+        |-
+          Get statistics about the RAG index
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/rag/documents/{doc_id}/reindex":
+    parameters:
+      - name: doc_id
+        in: path
+        required: true
+        description: "Doc id."
+        schema: { type: string }
+    post:
+      operationId: reindexDocument
+      tags: ["Knowledge"]
+      summary: "Reindex a specific document for RAG"
+      description:
+        |-
+          Reindex a specific document for RAG
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/ws/stats":
+    get:
+      operationId: getWebsocketStats
+      tags: ["Platform"]
+      summary: "Get WebSocket connection statistics"
+      description:
+        |-
+          Get WebSocket connection statistics
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/ws/test/agent/{agent_id}/status":
+    parameters:
+      - name: agent_id
+        in: path
+        required: true
+        description: "Agent id."
+        schema: { type: string }
+    post:
+      operationId: testAgentStatusNotification
+      tags: ["Platform"]
+      summary: "Test endpoint to send agent status notifications"
+      description:
+        |-
+          Test endpoint to send agent status notifications
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  "/openapi.yaml":
+    get:
+      operationId: getOpenapiDocument
+      tags: ["Platform"]
+      summary: "This OpenAPI document"
+      description:
+        |-
+          Unauthenticated. Serves contracts/openapi.yaml — the document you are reading — from the copy baked into the image, so what the API publishes is always the contract this build was compiled against.
+
+          This is NOT /openapi.json. That endpoint is FastAPI's auto-generated schema: it is derived from the code at import time and carries no curated descriptions, no tags beyond the decorators, and — critically — none of the irreversibility guidance in mcp/tools.overrides.yaml. Both are served; this one is the contract.
+
+          Answers 503 if the image was built without its contract. A missing document is degraded, not fatal — no restart can conjure a file the image lacks.
+      security: []
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema: { type: object }
+        "401":
+          description: Not authenticated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Bearer token. Resolved through the FuzeFront Security API when
+        SECURITY_BASE_URL is set; local JWT verification otherwise.
+  schemas:
+    Error:
+      type: object
+      description: FastAPI's error shape.
+      properties:
+        detail:
+          description: Human-readable error, or a validation-error array.
+security:
+  - bearerAuth: []
