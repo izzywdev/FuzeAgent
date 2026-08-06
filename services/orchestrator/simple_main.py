@@ -6,10 +6,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from agent_templates import AgentCategory, template_manager
+from auth import get_current_user
 
 # Simple in-memory storage for demonstration
 agents_db = {}
@@ -66,11 +67,27 @@ app = FastAPI(
     description="AI Team Orchestration Platform - Simple Version",
     version="1.0.0",
     lifespan=lifespan,
+    # Authenticated by default. `get_current_user` short-circuits the small public
+    # allowlist (health/readiness/docs) and 401s everything else without a valid
+    # token — identity being resolved by the FuzeFront Security API when the platform
+    # is configured, locally otherwise. See services/orchestrator/auth.py.
+    dependencies=[Depends(get_current_user)],
 )
+
+# CORS allowlist from the environment. NEVER "*" together with credentials: a
+# wildcard reflected with `allow_credentials=True` lets any origin ride the user's
+# session. Defaults to the local dev UI origins only.
+_CORS_ALLOW_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:3031"
+    ).split(",")
+    if origin.strip() and origin.strip() != "*"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=_CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

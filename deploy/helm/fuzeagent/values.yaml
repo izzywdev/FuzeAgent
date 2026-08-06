@@ -40,8 +40,18 @@ orchestrator:
     fileOps: false
     mcp: true
   runMigrations: true
-  # main:app fails closed without JWT material; CORS must be non-wildcard.
+  # Identity + authorization come from the FuzeFront Security API when
+  # `securityBaseUrl` is set: the orchestrator resolves callers via
+  # GET /v1/security/session and asks POST /v1/security/authz/check for every
+  # decision, so it holds no signing key and names no identity/policy vendor.
+  # Empty here because the default chart is the standalone/local shape — the
+  # platform value lives in values-prod.yaml.
+  # main:app fails closed without EITHER a security base URL or JWT material;
+  # CORS must be non-wildcard.
   auth:
+    securityBaseUrl: ""
+    securityTimeoutSeconds: 5
+    # Legacy local-verification fallback — used only when securityBaseUrl is empty.
     jwtAlgorithm: HS256
     jwtAudience: ""
     jwtIssuer: ""
