@@ -15,9 +15,9 @@ links back to it:
 - [`state-mapping.md`](../../agent-templates/contracts/a2a/v1/state-mapping.md) — task states, `INPUT_REQUIRED`/`AUTH_REQUIRED`, `reach_human`.
 - [`values-interface.schema.json`](../../agent-templates/contracts/a2a/v1/schema/values-interface.schema.json) — the Helm values interface you set to be served.
 
-> **Contract version:** v1.1.0 (additive `auth.oidcDiscoveryUrl`), frozen against A2A
-> specification 1.0.0. If something below looks wrong, the contract wins — file it,
-> don't work around it.
+> **Contract version:** v1.2.0 (additive `a2a.inClusterUrl`, which is what makes a
+> per-product pod deployable), frozen against A2A specification 1.0.0. If something below
+> looks wrong, the contract wins — file it, don't work around it.
 
 > **Status: LIVE in prod.** The shared A2A server runs on contabo-prod and serves
 > FuzeAgent's **signed** Agent Card (`/.well-known/agent-card.json`) — skills
@@ -30,6 +30,7 @@ links back to it:
 | Page | Read it when you want to… |
 |---|---|
 | [enable-your-pod.md](enable-your-pod.md) | Make your product (or an exec role) reachable over A2A — the values you set, the `enabled` gate, and the precondition you must satisfy first. |
+| [per-product-pod.md](per-product-pod.md) | Run your **own** A2A pod instead of a tenant row on the shared server — the values, secrets and repo contents a product chart needs, and the one value that makes the card point at your pod. |
 | [call-another-agent.md](call-another-agent.md) | Hand a goal to another product's agent — resolve its card, `SendMessage`, and handle `INPUT_REQUIRED`/`AUTH_REQUIRED` coming back. |
 | [example-fuzefront-plans-via-fuzeplan.md](example-fuzefront-plans-via-fuzeplan.md) | See the whole flow end-to-end — a FuzeFront agent gets FuzePlan to plan its work over A2A, holding no Jira tools of its own. |
 | [go-live-checklist.md](go-live-checklist.md) | Actually turn a product's pod on in prod — secrets, caller registration, and the deployment gotchas we hit. |

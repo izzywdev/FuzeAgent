@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/izzywdev/FuzeAgent/agent-templates/contracts/a2a/v1/schema/values-interface.schema.json",
-  "title": "Shared A2A server — Helm values INTERFACE (contract only)",
-  "description": "The values contract a product or exec role sets to be served by the SHARED A2A server. This file is the INTERFACE, not the chart: it defines the value names, types, defaults and invariants that devops-engineer's chart MUST honour. No templates, no Deployment, no Service, no Argo Application is defined or implied here — those are devops-engineer's slice, gated on this contract.\n\nDesign constraint that shapes everything below: there is ONE shared server (decision #2), so per-repo configuration is DATA, not a chart per repo. Adding a product to A2A must be an entry in `tenants`, never a new deployment.",
+  "title": "A2A server — Helm values INTERFACE (contract only)",
+  "description": "The values contract a product or exec role sets to be served by an A2A server. This file is the INTERFACE, not the chart: it defines the value names, types, defaults and invariants that devops-engineer's chart MUST honour. No templates, no Deployment, no Service, no Argo Application is defined or implied here — those are devops-engineer's slice, gated on this contract.\n\nTOPOLOGY (amended in contract v1.2.0). v1.0 assumed exactly ONE shared server (decision #2), so per-repo configuration was DATA and onboarding a product meant an entry in `tenants`, never a new deployment. That remains the DEFAULT and is unchanged for the existing `a2a-shared` deployment. It is no longer the ONLY topology: a product may instead run its OWN A2A pod serving a single tenant, for compartmentalisation and blast-radius containment. The two shapes use the SAME values document and differ only in (a) how many entries `tenants` carries and (b) `inClusterUrl`, which a per-product pod MUST set to its own Service — the card is the callable contract, so a pod that does not advertise its own address is unreachable no matter how healthy it looks.",
   "type": "object",
   "additionalProperties": false,
   "required": ["a2a"],
@@ -42,6 +42,12 @@
           "const": "1.0",
           "default": "1.0",
           "description": "A2A protocol version served. Frozen for contract v1."
+        },
+        "inClusterUrl": {
+          "type": "string",
+          "format": "uri",
+          "default": "http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc",
+          "description": "The absolute in-cluster JSON-RPC endpoint THIS server instance advertises as `AgentInterface.url` on every non-external card it projects (card-projection.md §2). It MUST include scheme, Service DNS name, port and the `/rpc` path, and it MUST actually resolve to this deployment — a card whose `url` points elsewhere is a card no caller can follow.\n\nThis is a CARD-PROJECTION input, not a deployment knob, which is why it lives inside `a2a` (the block serialised verbatim into the `values.json` the server parses) rather than beside the chart-internal `deploy.*` mechanics: the server itself must read it to emit the card. Same shape and rationale as `auth.oidcIssuerUrl` — an address the projection publishes.\n\nWhen UNSET the default is the SHARED server's address, so an existing values file behaves exactly as before. A PER-PRODUCT pod (one A2A deployment per product, for compartmentalisation and blast-radius containment) MUST set this to its own Service, e.g. `http://a2a-fuzeplan.fuzeplan.svc.cluster.local:8080/rpc`; otherwise it boots healthy and advertises the SHARED server, and callers following its card never reach it. Ignored for tenants with `external: true`, whose URL is the tunnel host derived from the repo slug."
         },
         "auth": {
           "type": "object",
@@ -87,7 +93,7 @@
         },
         "tenants": {
           "type": "array",
-          "description": "One entry per served product/exec agent. This array IS how a repo onboards onto A2A — no new chart, no new pod.",
+          "description": "One entry per served agent. On the SHARED server this array IS how a repo onboards — no new chart, no new pod. A PER-PRODUCT pod carries exactly ONE entry (plus, if it also serves them, that repo's `Exec-<role>` tenants); the server code is identical either way, and `/.well-known/agent-card.json` needs no `?tenant=` when exactly one tenant is enabled.",
           "items": { "$ref": "#/$defs/tenant" }
         }
       }

@@ -1,10 +1,21 @@
-# `agent-templates/a2a` — shared A2A server + card generator
+# `agent-templates/a2a` — A2A server + card generator
 
 The **callee side** of the frozen A2A contract v1
-(`agent-templates/contracts/a2a/v1`). ONE server fronts every product and exec-tier
-agent in the family; a repo onboards by adding a `tenant` entry to the Helm values —
-never a new pod. This package is a **thin adapter** over the existing Managed-Agents
-runtime (`agent-templates/providers` + `orchestration`); it holds **no task engine**.
+(`agent-templates/contracts/a2a/v1`). This package is a **thin adapter** over the existing
+Managed-Agents runtime (`agent-templates/providers` + `orchestration`); it holds **no task
+engine**.
+
+Two deployment topologies, **one codebase and one values document**:
+
+- **Shared server** (`a2a-shared`, namespace `fuzeagent`) — many `a2a.tenants[]`; a repo
+  onboards by adding an entry, never a new pod. Cards at one URL, disambiguated by
+  `AgentInterface.tenant`, which callers echo.
+- **Per-product pod** (contract v1.2.0) — one deployment per product serving a single
+  tenant, for compartmentalisation. It differs ONLY in `len(tenants) == 1` and in setting
+  `a2a.inClusterUrl` to its own Service. That key is what made it possible: the advertised
+  endpoint used to be a constant in `card_generator.py`, so a per-product pod started
+  healthy and published the *shared* server's address — every caller that followed its card
+  missed it. See `docs/a2a/per-product-pod.md`.
 
 > Scope note: this is backend-engineer's slice. The image/Dockerfile, Helm chart,
 > Argo Application and CI image build are **devops-engineer's**; independent

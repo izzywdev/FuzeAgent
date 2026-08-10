@@ -1,10 +1,12 @@
 {{- if .Values.a2a.enabled }}
 a2a-shared (the ONE shared A2A server) is ENABLED.
 
-In-cluster interface (frozen contract — card-projection.md §2):
-  http://a2a-shared.fuzeagent.svc.cluster.local:{{ .Values.a2a.service.port }}/rpc
+In-cluster interface ADVERTISED in every non-external card (card-projection.md §2 —
+`a2a.inClusterUrl`, default = the shared server). It MUST resolve to THIS deployment:
+  {{ .Values.a2a.inClusterUrl | default (printf "http://a2a-shared.fuzeagent.svc.cluster.local:%v/rpc" .Values.a2a.service.port) }}
 Agent Card discovery (binding.md §1, unauthenticated):
   http://a2a-shared.fuzeagent.svc.cluster.local:{{ .Values.a2a.service.port }}/.well-known/agent-card.json
+  (a single-tenant pod needs no `?tenant=`; a multi-tenant one does)
 
 Tenants served (a2a.tenants[]):
 {{- range .Values.a2a.tenants }}
