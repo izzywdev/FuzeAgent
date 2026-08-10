@@ -129,6 +129,12 @@ class A2AAdapter:
 
     def _card_for(self, tenant: TenantConfig, *, visibility: str) -> dict:
         manifest, roles = self.resolve_repo(tenant)
+        # Every card THIS pod serves must advertise THIS pod's endpoint. On the shared
+        # server `in_cluster_url` is unset and the generator falls back to the shared
+        # address (unchanged behaviour); a per-product pod declares `a2a.inClusterUrl` and
+        # its cards point at its own Service. Without threading it through here, the card
+        # names the shared server whichever pod produced it — card-projection.md §2.
+        in_cluster_url = self.config.in_cluster_url
         # exec tenants (Exec-<role>) project a single exec role card
         if tenant.tenant.startswith("Exec-"):
             role_key = tenant.tenant[len("Exec-") :]
@@ -136,7 +142,12 @@ class A2AAdapter:
             if role is None:
                 raise we.task_not_found()
             return cg.project_exec_card(
-                role_key, role, manifest, issuer_url=self._issuer(), signer=self.signer
+                role_key,
+                role,
+                manifest,
+                issuer_url=self._issuer(),
+                in_cluster_url=in_cluster_url,
+                signer=self.signer,
             )
         return cg.project_product_card(
             manifest,
@@ -144,6 +155,7 @@ class A2AAdapter:
             tenant=tenant.tenant,
             issuer_url=self._issuer(),
             visibility=visibility,
+            in_cluster_url=in_cluster_url,
             signer=self.signer,
         )
 

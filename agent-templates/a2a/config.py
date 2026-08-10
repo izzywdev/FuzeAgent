@@ -1,9 +1,10 @@
 """Server configuration, parsed from the ``values-interface.schema.json`` shape.
 
 This is the DATA that lets ONE shared server front many product/exec agents: a repo
-onboards by adding an entry to ``a2a.tenants`` — never a new pod (values-interface
-§description). We parse only; the Helm chart that supplies these values is
-devops-engineer's slice.
+onboards by adding an entry to ``a2a.tenants`` (values-interface §description). The same
+document ALSO describes a PER-PRODUCT pod — a single-entry ``tenants`` plus its own
+``inClusterUrl`` (contract v1.2.0); the server code is identical in both topologies. We
+parse only; the Helm chart that supplies these values is devops-engineer's slice.
 """
 
 from __future__ import annotations
@@ -56,6 +57,13 @@ class ServerConfig:
     image_tag: str | None = None
     auth: AuthConfig | None = None
     card_key_id: str | None = None
+    #: OPTIONAL in-cluster JSON-RPC endpoint this instance advertises as
+    #: ``AgentInterface.url`` on non-external cards (values-interface ``a2a.inClusterUrl``,
+    #: contract v1.2.0). ``None`` = not declared -> the card generator falls back to
+    #: ``card_generator.DEFAULT_IN_CLUSTER_URL`` (the SHARED server), so an unchanged values
+    #: file projects a byte-identical card. A per-product pod MUST set it to its OWN Service
+    #: or it advertises the shared server and is unreachable through its own card.
+    in_cluster_url: str | None = None
     tenants: tuple[TenantConfig, ...] = ()
 
     def tenant(self, name: str) -> TenantConfig | None:
@@ -111,5 +119,6 @@ def load_config(values: dict[str, Any]) -> ServerConfig:
         image_tag=image.get("tag"),
         auth=auth,
         card_key_id=signing.get("keyId"),
+        in_cluster_url=a2a.get("inClusterUrl") or None,
         tenants=tuple(_tenant(t) for t in (a2a.get("tenants") or [])),
     )

@@ -124,8 +124,10 @@ Standard JSON-RPC codes (`-32700`, `-32600`, `-32601`, `-32602`, `-32603`) plus 
 
 ## 4. Transport and network
 
-- **In-cluster (default):** plain HTTP over Kubernetes service DNS
-  (`a2a-shared.fuzeagent.svc.cluster.local:8080`). Confidentiality comes from the cluster network
+- **In-cluster (default):** plain HTTP over Kubernetes service DNS — whatever
+  `a2a.inClusterUrl` declares, defaulting to the shared server
+  (`a2a-shared.fuzeagent.svc.cluster.local:8080`); a per-product pod declares its own
+  Service (card-projection.md §2). Confidentiality comes from the cluster network
   boundary; identity comes from the OIDC bearer token, never from network position (authz.md §2).
 - **External (opt-in, `manifest.a2a.external: true`):** HTTPS only, through the **Cloudflare tunnel**
   to Traefik (`ClusterIP`, tunnel-only — there is no LoadBalancer/NodePort surface), with Cloudflare

@@ -1,4 +1,6 @@
-# Shared A2A server image (the ONE server that fronts every tenant).
+# A2A server image. ONE image for BOTH topologies — the shared server that fronts every
+# tenant, and a per-product pod serving a single tenant. They differ only in the mounted
+# values.json (`tenants` length + `a2a.inClusterUrl`), never in the image or the env.
 #
 # Build context = agent-templates/  (mirrors orchestration/handoff_mcp/Dockerfile):
 #   docker build -f a2a/Dockerfile -t ghcr.io/izzywdev/fuzeagent-a2a:dev .   # ctx = agent-templates/
@@ -51,7 +53,9 @@ USER 10001
 # Only vars runtime.py / the provider actually read. HOST is set explicitly so the
 # in-cluster Service can reach the pod (server defaults to loopback, CWE-605-safe).
 # The listen PORT is NOT an env var — the server reads it from the values file
-# (service.port), so image and chart stay consistent via one source.
+# (service.port), so image and chart stay consistent via one source. Same rule for the
+# ADVERTISED endpoint: a per-product pod declares `a2a.inClusterUrl` in that values file
+# (contract v1.2.0), never an env var.
 ENV HOST=0.0.0.0 \
     A2A_VALUES_FILE=/config/values.json \
     A2A_REPOS_DIR=/repos \

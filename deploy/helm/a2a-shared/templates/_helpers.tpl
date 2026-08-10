@@ -1,8 +1,17 @@
 {{/*
-Fixed workload name. binding.md §1/§4 and card-projection.md §2 HARDCODE the
-in-cluster interface URL `http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc`,
-so the Service (and thus this name) MUST be `a2a-shared`. Do not derive it from
-.Release.Name — the card projection is a frozen contract value.
+Fixed workload name for THIS (shared) deployment.
+
+The in-cluster interface URL is no longer a generator constant: as of contract v1.2.0
+it is `a2a.inClusterUrl`, defaulting to
+`http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc` (card-projection.md §2). The
+invariant is now an AGREEMENT rather than a hardcode — whatever this Service resolves
+to MUST equal what `a2a.inClusterUrl` advertises, because callers follow the CARD, not
+the Service object.
+
+This chart leaves `a2a.inClusterUrl` unset, so the default applies and the Service MUST
+stay `a2a-shared` in namespace `fuzeagent`. Do not derive it from .Release.Name. A
+PER-PRODUCT pod is a separate deployment in the product's own repo and namespace; it
+sets `a2a.inClusterUrl` to its own Service (docs/a2a/per-product-pod.md).
 */}}
 {{- define "a2a.name" -}}
 a2a-shared
