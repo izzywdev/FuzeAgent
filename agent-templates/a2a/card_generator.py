@@ -26,7 +26,22 @@ from ._contract import CONTRACT_ROOT
 
 PROVIDER_ORG = "FuzeOne"
 PROVIDER_URL = "https://github.com/izzywdev"
-IN_CLUSTER_URL = "http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc"
+
+#: Fallback for ``AgentInterface.url`` on a non-external card when the values document
+#: declares no ``a2a.inClusterUrl`` (values-interface, contract v1.2.0). It is the SHARED
+#: server's address, so an unchanged values file projects a byte-identical card.
+#:
+#: This was an unconditional CONSTANT through contract v1.1.0, and that is the whole reason
+#: a per-product A2A pod could not be deployed: it would start, pass its probes, and publish
+#: the shared server's endpoint, so every caller that followed its card reached the wrong
+#: pod. A per-product deployment MUST therefore set ``a2a.inClusterUrl`` to its own Service
+#: (see card-projection.md §2) — the card is the callable contract, not the Service object.
+DEFAULT_IN_CLUSTER_URL = "http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc"
+
+#: Back-compat alias for the pre-v1.2.0 name. Prefer ``DEFAULT_IN_CLUSTER_URL``: the value
+#: is a DEFAULT now, not the endpoint every card carries.
+IN_CLUSTER_URL = DEFAULT_IN_CLUSTER_URL
+
 DEFAULT_INPUT_MODES = ["text/plain", "application/json"]
 DEFAULT_OUTPUT_MODES = ["text/plain", "application/json"]
 DEFAULT_ISSUER = "https://auth.prod.fuzefront.com"
@@ -142,11 +157,20 @@ def _security_schemes(external: bool, issuer_url: str) -> dict:
     return schemes
 
 
-def _interface(tenant: str, *, external: bool, repo_slug: str) -> dict:
+def _interface(
+    tenant: str, *, external: bool, repo_slug: str, in_cluster_url: str | None = None
+) -> dict:
+    """The single ``AgentInterface`` (card-projection.md §2).
+
+    ``in_cluster_url`` is ``a2a.inClusterUrl`` from the values document — the endpoint THIS
+    server instance is reachable at. ``None`` means "not declared" and falls back to the
+    shared server's address, so an unchanged values file is unchanged on the wire. It is
+    ignored for ``external`` tenants, whose URL is the tunnel host derived from the slug.
+    """
     if external:
         url = f"https://a2a.{repo_slug.lower()}.prod.fuzefront.com/rpc"
     else:
-        url = IN_CLUSTER_URL
+        url = in_cluster_url or DEFAULT_IN_CLUSTER_URL
     return {
         "url": url,
         "protocolBinding": "JSONRPC",
@@ -262,6 +286,7 @@ def project_product_card(
     version: str | None = None,
     visibility: str = "public",
     external: bool | None = None,
+    in_cluster_url: str | None = None,
     sign: bool = True,
     signer: Signer | None = None,
 ) -> dict:
@@ -273,6 +298,10 @@ def project_product_card(
     existing repo (e.g. ``FuzeInfraOps`` over ``izzywdev/FuzeAgent``) would advertise
     ``tenant: "FuzeAgent"``, violating the values-interface rule that the tenant key
     equals ``AgentInterface.tenant``.
+
+    ``in_cluster_url`` is ``a2a.inClusterUrl`` — the endpoint this server advertises for a
+    non-external tenant. Unset falls back to the shared server (see
+    :data:`DEFAULT_IN_CLUSTER_URL`); a per-product pod MUST pass its own Service URL.
     """
     repo = repo_name(manifest["repo"])
     interface_tenant = tenant or repo
@@ -291,7 +320,12 @@ def project_product_card(
         description=_product_description(manifest, roles, serving),
         version=version or contract_version(),
         doc_url=_doc_url(manifest),
-        interface=_interface(interface_tenant, external=external, repo_slug=repo),
+        interface=_interface(
+            interface_tenant,
+            external=external,
+            repo_slug=repo,
+            in_cluster_url=in_cluster_url,
+        ),
         external=external,
         issuer_url=issuer_url,
         skills=skills,
@@ -315,6 +349,7 @@ def project_exec_card(
     *,
     issuer_url: str = DEFAULT_ISSUER,
     version: str | None = None,
+    in_cluster_url: str | None = None,
     sign: bool = True,
     signer: Signer | None = None,
 ) -> dict:
@@ -334,7 +369,12 @@ def project_exec_card(
         description=_exec_description(role_key, role),
         version=version or contract_version(),
         doc_url=_doc_url(manifest),
-        interface=_interface(tenant, external=False, repo_slug=repo_name(manifest["repo"])),
+        interface=_interface(
+            tenant,
+            external=False,
+            repo_slug=repo_name(manifest["repo"]),
+            in_cluster_url=in_cluster_url,
+        ),
         external=False,  # exec agents are never published externally
         issuer_url=issuer_url,
         skills=[skill],
@@ -349,6 +389,7 @@ def generate_cards(
     *,
     issuer_url: str = DEFAULT_ISSUER,
     version: str | None = None,
+    in_cluster_url: str | None = None,
     sign: bool = True,
     signer: Signer | None = None,
 ) -> list[tuple[str, dict]]:
@@ -358,6 +399,9 @@ def generate_cards(
     (``metadata.tier == "executive"``), yields one card per exec role. A
     product/infra repo yields a single card keyed by its repo name. A repo may yield
     both (product skills + exec roles) — each exec role is always its own card.
+
+    ``in_cluster_url`` applies to EVERY card produced here: they are all served by the
+    same pod, so they all advertise that pod's endpoint.
     """
     out: list[tuple[str, dict]] = []
     exec_keys = sorted(k for k, r in roles.items() if is_exec_role(r))
@@ -365,7 +409,13 @@ def generate_cards(
     product_roles = select_serving_roles(manifest, roles, visibility="public")
     if product_roles:
         card = project_product_card(
-            manifest, roles, issuer_url=issuer_url, version=version, sign=sign, signer=signer
+            manifest,
+            roles,
+            issuer_url=issuer_url,
+            version=version,
+            in_cluster_url=in_cluster_url,
+            sign=sign,
+            signer=signer,
         )
         out.append((repo_name(manifest["repo"]), card))
 
@@ -376,6 +426,7 @@ def generate_cards(
             manifest,
             issuer_url=issuer_url,
             version=version,
+            in_cluster_url=in_cluster_url,
             sign=sign,
             signer=signer,
         )

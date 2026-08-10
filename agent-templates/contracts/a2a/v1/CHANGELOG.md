@@ -14,6 +14,41 @@ protocol version appears in the card as `AgentInterface.protocolVersion` and on 
 
 ---
 
+## 1.2.0 — 2026-08-10
+
+Additive, backward-compatible MINOR bump within v1. **Per-product A2A pods become deployable.**
+
+### Added
+
+- `schema/values-interface.schema.json` — optional `a2a.inClusterUrl` (`string`, `format: uri`,
+  default `http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc`). The in-cluster JSON-RPC
+  endpoint the server advertises as `AgentInterface.url` on every non-external card it projects.
+
+  Until now that URL was a **constant in the generator**
+  (`agent-templates/a2a/card_generator.py`), so any second A2A deployment started healthy and
+  published the *shared* server's address — callers following its card never reached it. That single
+  constant, not the protocol and not the chart, is why every product's A2A pod shipped disabled.
+
+  It is placed **inside the `a2a` block, not beside the chart-internal `deploy.*` mechanics**,
+  because the block is what the chart serialises verbatim into the `values.json` the server parses
+  (`config.load_config`); a key under `deploy:` is invisible to the server and would need an invented
+  env var to reach it. Substantively it is a *card-projection input* — the published callable
+  endpoint — of the same kind as `auth.oidcIssuerUrl`, not a chart knob like `replicas`.
+
+### Changed (documentation only — no wire, card or schema constraint changed)
+
+- Schema `description` and `tenants` description: the "ONE shared server" constraint is now stated as
+  the **default** topology rather than the only one. Owner decision: each product gets its own A2A
+  agent pod for compartmentalisation and robustness. The shared server is unchanged.
+- `card-projection.md` §2: the in-cluster `url` row now names `a2a.inClusterUrl` as its source, with
+  the shared address as the default.
+
+Not `required`; **an unchanged values file produces a byte-identical card**, so the live `a2a-shared`
+deployment (tenants FuzeAgent, FuzeFront, FuzePlan) is unaffected. No wire/card *shape* change, so
+the generated `fuze_a2a_client` (wire/card models only) is not affected.
+
+---
+
 ## 1.1.0 — 2026-07-24
 
 Additive, backward-compatible MINOR bump within v1.
