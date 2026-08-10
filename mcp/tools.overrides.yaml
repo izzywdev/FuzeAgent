@@ -1,0 +1,258 @@
+# =============================================================================
+# FuzeAgent — MCP tool mutation overrides.
+#
+# Consumed by @fuzefront/mcp-gateway. The gateway derives `mutates` from the HTTP
+# method (GET/HEAD/OPTIONS = read; POST to a path ending /search, /query or
+# /preview = read; DELETE = irreversible write; everything else = reversible
+# write) and only needs this file where the method alone gets it WRONG.
+#
+# ON THIS API THE METHOD GETS IT WRONG A LOT, and the reason is the whole point
+# of FuzeAgent: it DISPATCHES AGENTS THAT TAKE REAL ACTIONS. An agent writes
+# files, runs shell commands in a container, calls third-party APIs and spends
+# money on model inference. The HTTP response to "execute this task" arrives in
+# milliseconds; the consequences do not stop there.
+#
+# So the classification here is on EFFECT, never on verb:
+#
+#   * a POST that starts an agent is IRREVERSIBLE, even though POST defaults to
+#     reversible — cancelling stops FUTURE work, it does not undo work done;
+#   * a POST ending /search is a read, and the gateway already knows that;
+#   * a DELETE of a container is REVERSIBLE, because the container is
+#     re-creatable from the same agent definition.
+#
+# `reversibility` means, precisely: is there an operation IN THIS CONTRACT that
+# the caller can invoke to undo the effect? Not "could a human repair it".
+#
+# The gateway REFUSES TO START if an entry declares something irreversible while
+# also declaring it a read, or relabels a non-query-shaped POST as a read.
+#
+# VERIFIED, not asserted: this file was loaded by the real @fuzefront/mcp-gateway
+# from the exact ConfigMap bytes `helm template` renders. 142 tools enumerate,
+# 74 reads / 68 writes, 16 irreversible, no tool is both a read and
+# irreversible, and startTaskExecution's description reaches the model prefixed
+# "[WRITE — IRREVERSIBLE]".
+#
+# STANDING FACTS about this API that shape the list below:
+#   1. There is NO `DELETE /agents/{agent_id}` and NO `DELETE /tasks/{task_id}`.
+#      A created agent and a created task are permanent as far as this API is
+#      concerned.
+#   2. The only genuine undo operation anywhere in the contract is
+#      POST /tasks/{task_id}/file-operations/{batch_id}/rollback. It undoes an
+#      approved FILE batch and nothing else.
+# =============================================================================
+
+tools:
+  # =========================================================================
+  # IRREVERSIBLE — dispatches an agent, or executes a command
+  # =========================================================================
+
+  # THE canonical case, and the reason this file is written the way it is.
+  # Starting execution hands the task to an agent that writes files, runs
+  # commands and calls external APIs. POST /tasks/{task_id}/cancel exists and is
+  # NOT an undo: it stops further work. Everything already done stays done, and
+  # the model spend is already spent.
+  startTaskExecution:
+    reversibility: irreversible
+    reason: >-
+      Dispatches an autonomous agent that writes files, runs commands and calls
+      external APIs; cancel stops future work but undoes nothing already done
+
+  # Arbitrary command execution in a sandbox. Whatever the command did — wrote,
+  # deleted, pushed, called — is done. Destroying the sandbox afterwards does not
+  # reach anything the command touched outside it.
+  executeCommandInSandbox:
+    reversibility: irreversible
+    reason: >-
+      Runs an arbitrary command; its effects are not confined to the sandbox and
+      nothing in this API undoes them
+
+  # Same thing, in an agent's own container.
+  executeContainerCommand:
+    reversibility: irreversible
+    reason: >-
+      Runs an arbitrary command inside the agent container; no operation in this
+      API undoes what the command did
+
+  # Feeds input into a LIVE Claude Code session that is acting on a repository.
+  # There is no un-send, and the session acts on the input immediately.
+  sendClaudeSessionInput:
+    reversibility: irreversible
+    reason: >-
+      Injects input into a live agent session that acts on it immediately; there
+      is no recall
+
+  # Starts a multi-agent coordination session — i.e. dispatches SEVERAL agents.
+  # POST /coordination/{session_id}/cancel is the same non-undo as task cancel.
+  initiateTaskCoordination:
+    reversibility: irreversible
+    reason: >-
+      Dispatches multiple coordinating agents; cancelling the session does not
+      undo what they already did
+
+  # Delivers a message from one agent to another, which the receiving agent acts
+  # on. No unsend, and the recipient may already have started work.
+  sendAgentCommunication:
+    reversibility: irreversible
+    reason: >-
+      Delivers a message another agent acts on; there is no unsend and the
+      recipient may already have acted
+
+  # Posting to an agent conversation is how a human or another system TASKS that
+  # agent conversationally. Same shape as the above.
+  sendMessageToAgent:
+    reversibility: irreversible
+    reason: >-
+      A message to an agent is a request it acts on; nothing in this API recalls
+      it or undoes the resulting work
+
+  # Answering an agent's blocked question unblocks it and it resumes acting.
+  submitHumanResponse:
+    reversibility: irreversible
+    reason: >-
+      Unblocks a waiting agent, which resumes acting immediately; the response
+      cannot be withdrawn
+
+  # Provisions and starts a memory-enabled agent — a deployment, not a record.
+  deployMemoryEnabledAgent:
+    reversibility: irreversible
+    reason: >-
+      Provisions and starts a running agent; this API has no delete-agent
+      operation to reverse it
+
+  # =========================================================================
+  # IRREVERSIBLE — creates something the API cannot remove
+  # =========================================================================
+
+  # There is no DELETE /agents/{agent_id} anywhere in the contract. An agent,
+  # once created, is permanent from a caller's point of view.
+  createAgent:
+    reversibility: irreversible
+    reason: >-
+      This API has no delete-agent operation, so a created agent cannot be
+      removed by the caller
+  createAgentFromTemplate:
+    reversibility: irreversible
+    reason: >-
+      This API has no delete-agent operation, so a created agent cannot be
+      removed by the caller
+
+  # There is no DELETE /tasks/{task_id}. Assigning a task also puts it in the
+  # agent's queue, so it can begin executing without a further call.
+  assignTask:
+    reversibility: irreversible
+    reason: >-
+      This API has no delete-task operation, and an assigned task enters the
+      agent's queue where it may begin executing
+
+  # Stores a provider credential for an organization. There is no
+  # delete-credential operation, and the secret has left the caller's hands.
+  storeProviderCredentials:
+    reversibility: irreversible
+    reason: >-
+      Stores a provider secret with no corresponding delete operation in this
+      API
+
+  # =========================================================================
+  # EXPLICITLY REVERSIBLE — documented, not left to the default
+  # =========================================================================
+
+  # The one true undo in the contract. It restores a file batch that
+  # approveFileOperations applied. Marked reversible so it is not confused with
+  # the dispatch operations above.
+  rollbackFileOperations:
+    reversibility: reversible
+    reason: >-
+      This is the undo operation — it restores the files an approved batch
+      changed
+
+  # The interesting one. Approving a file batch WRITES FILES, which sounds
+  # irreversible — but this contract contains the exact compensating operation,
+  # POST /tasks/{task_id}/file-operations/{batch_id}/rollback, and
+  # /file-operations/{batch_id}/preview lets the caller see the diff first.
+  # A compensating operation that actually exists is what "reversible" means, so
+  # this stays reversible rather than being marked dangerous by association.
+  approveFileOperations:
+    reversibility: reversible
+    reason: >-
+      The contract contains an explicit rollback for exactly this batch, plus a
+      preview to inspect it beforehand
+
+  # DELETE defaults to irreversible; downgraded deliberately. A container is a
+  # runtime artefact re-created from the same agent definition by
+  # POST /agents/{agent_id}/container/create, so nothing is lost.
+  removeAgentContainer:
+    reversibility: reversible
+    reason: >-
+      A container is re-creatable from the same agent definition via
+      container/create; no durable state is destroyed
+  stopAgentContainer:
+    reversibility: reversible
+    reason: >-
+      container/start restarts it from the same definition
+
+  # DELETE defaults to irreversible; downgraded. A sandbox is ephemeral by
+  # definition and a new one is provisioned on demand. (Note the CONTENTS are
+  # not recoverable — but a sandbox is scratch space, and the operation that
+  # matters, executeCommandInSandbox, is already marked irreversible above.)
+  destroySandbox:
+    reversibility: reversible
+    reason: >-
+      A sandbox is ephemeral scratch space and a fresh one is provisioned on
+      demand
+
+  # DELETE defaults to irreversible; downgraded. Despite the DELETE verb and the
+  # /memory path, the handler STOPS the memory-enabled agent — it is the inverse
+  # of deployMemoryEnabledAgent, and that agent can be deployed again. Classified
+  # on what it does, not on the method or the path noun.
+  stopMemoryEnabledAgent:
+    reversibility: reversible
+    reason: >-
+      Despite the DELETE verb this stops a memory-enabled agent; it is the exact
+      inverse of deployMemoryEnabledAgent and the agent can be deployed again
+
+  # Cancelling stops future work. It is reversible in the narrow sense that the
+  # task can be executed again — but it is pinned here mainly so nobody reads
+  # "cancel" as the undo for startTaskExecution. IT IS NOT.
+  cancelTaskExecution:
+    reversibility: reversible
+    reason: >-
+      Stops future work and the task can be re-executed. NOTE this is not an
+      undo for startTaskExecution — work already performed by the agent stands
+  cancelCoordination:
+    reversibility: reversible
+    reason: >-
+      Stops the coordination session; it can be initiated again. Not an undo for
+      work the agents already performed
+
+  # =========================================================================
+  # NOT overridden, and why (recorded so the absences are deliberate)
+  # =========================================================================
+  #
+  # POST /rag/search (operationId searchKnowledgeContext) — already a read: the
+  #   gateway's query-shaped-POST allowlist is a SUFFIX match and this path ends
+  #   in /search. Confirmed by booting the gateway: mutates=false. No entry
+  #   needed, and adding one would be noise.
+  #
+  # DELETE /knowledge/**/documents/{doc_id} (three of them) — left at the DELETE
+  #   default, irreversible. Correct: there is no undelete, and a document's
+  #   content is not re-derivable from anything else in this API.
+  #
+  # POST /rag/reindex, /rag/documents/{doc_id}/reindex — reversible writes by
+  #   default, which is right: reindexing is idempotent and recomputable.
+  #
+  # POST /goals/**/generate-*, /conversations/**/extract-*, /milestones/**/
+  #   generate-* — reversible writes by default. They consume model spend and
+  #   persist generated artefacts, so they are NOT reads; but the artefacts are
+  #   product-internal records with no external effect, so not irreversible.
+  #
+  # POST /agents/{agent_id}/register, /agents/{agent_id}/error — reversible
+  #   writes by default. Both are agent-lifecycle callbacks, idempotent by
+  #   design.
+  #
+  # POST /mcp/call-tool — deliberately NOT downgraded and deliberately NOT
+  #   marked irreversible. It is a PASSTHROUGH to whatever MCP server an agent
+  #   has configured, so its reversibility is a property of the downstream tool
+  #   and is unknowable from this contract. It keeps the reversible-write
+  #   default, which is the least-wrong claim available; treating a passthrough
+  #   as safe would be worse, and asserting irreversible for every call would
+  #   dilute the label. Flagged in the PR body as a genuine gap.
