@@ -1,19 +1,61 @@
-# Argo CD wiring for FuzeAgent — a FuzeInfra delegation
+# Argo CD wiring for FuzeAgent — owned by this repo
 
-**FuzeInfra owns Argo `Application` and `AppProject` resources.** A product repo
-does not author them; two repos independently declaring an Application for the
-same workload is the competing-unrestricted-app failure FuzeMarket PR #61
-removed. This file is the **handoff spec**, not a manifest.
+`deploy/argocd/` holds FuzeAgent's app-of-apps and its three child Applications,
+and this repo owns them. FuzeInfra registers this directory once; ArgoCD
+self-syncs it thereafter.
 
-> **The manifests already in this directory are live wiring. This change
-> neither adds, edits nor removes any of them.**
+## Who owns what — correcting an earlier claim in this file
 
-| Existing manifest | Deploys |
+An earlier revision opened *"FuzeInfra owns Argo `Application` and `AppProject`
+resources. A product repo does not author them ... This file is the handoff spec,
+not a manifest."* **That is wrong**, and this directory already contradicted it —
+it has carried four Application manifests the whole time, and FuzeInfra's
+`argocd/applications/fuzeagent.yaml` is a *root* app-of-apps that points **at**
+them, i.e. it is built on the assumption that this repo authors them.
+
+FuzeInfra's own onboarding contract
+([`docs/CONSUMER_ONBOARDING_SHARED_CLUSTER.md`](https://github.com/izzywdev/FuzeInfra/blob/main/docs/CONSUMER_ONBOARDING_SHARED_CLUSTER.md)):
+
+> Boundary: the consumer owns its `deploy/**` (Helm/kustomize + Argo Applications
+> + sealed secrets). FuzeInfra owns the cluster, Argo, the tunnel, and the shared
+> datastores.
+
+FuzeInfra's `argocd-register` workflow is built around it: it takes a *"Path in
+the consumer repo holding the Argo Application/AppProject manifests"*,
+`kubectl apply`s the directory **once**, and then
+
+> After the first registration, ArgoCD polls and self-syncs the consumer's
+> `deploy/argocd` manifests.
+
+Registration is a **one-time owner action** — never `kubectl apply` from CI or by
+hand from here.
+
+That mistaken claim was propagated to several sibling repos in the same session
+and used to delete their Applications outright (FuzeService #32, FuzeSales #44),
+leaving them with no path to prod. Those deletions are being reverted. **None of
+FuzeAgent's manifests were deleted**, so nothing here changes but the wording.
+
+## The invariant that IS real
+
+**One Application per workload.** FuzeContact #33 and FuzeMarket #61 removed
+*duplicates*: two Applications with `prune: true` + `selfHeal: true` on the same
+namespace with disagreeing values, each pruning what the other did not create.
+
+FuzeAgent's manifests are **not** that — the app-of-apps recurses into
+`applications/`, and each child owns a **different** chart:
+
+| Manifest | Deploys |
 |---|---|
 | `app-of-apps.yaml` | recursive discovery of `applications/` |
-| `applications/fuzeagent.yaml` | `deploy/helm/fuzeagent` — the product chart this change extends |
+| `applications/fuzeagent.yaml` | `deploy/helm/fuzeagent` — the product chart |
 | `applications/fuzeagent-sealed.yaml` | the sealed-secret bundle |
 | `applications/a2a-shared.yaml` | `deploy/helm/a2a-shared` — **the family's only A2A server** |
+
+All four use `project: fuzeagent`, the restricted AppProject FuzeInfra owns at
+`argocd/projects/fuzeagent.yaml`. That project **does** exist — verified.
+
+> **These four manifests are live wiring. Do not delete them, and do not add a
+> second Application for any chart already listed above.**
 
 ## The A2A finding — read this first
 
