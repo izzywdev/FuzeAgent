@@ -33,6 +33,14 @@ spec:
               containerPort: {{ .Values.orchestrator.port }}
           env:
             {{- include "fuzeagent.backendEnv" . | nindent 12 }}
+            # The contract GET /openapi.yaml serves. Baked into the IMAGE
+            # (services/orchestrator/contracts/openapi.yaml — a drift-checked
+            # copy, because the image is built with `context:
+            # services/orchestrator`, so the repo-root contracts/ tree is not in
+            # the build context) rather than mounted, so what the API publishes
+            # is always the spec this build was compiled against.
+            - name: OPENAPI_SPEC_PATH
+              value: /app/contracts/openapi.yaml
             - name: RUN_MIGRATIONS
               value: {{ .Values.orchestrator.runMigrations | quote }}
             - name: ENABLE_AUTONOMOUS_EXECUTION
