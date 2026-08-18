@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FuzeAgent Orchestrator API
-  version: 0.1.0
+  version: 0.2.0
   summary: The HTTP surface the deployed FuzeAgent orchestrator actually serves.
   description: >-
     FuzeAgent orchestrates autonomous AI agents: it creates agents, assigns them tasks,
@@ -123,8 +123,16 @@ paths:
           application/json:
             schema:
               type: object
-              description: "AgentCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "AgentCreateRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [name, role, type]
+              properties:
+                name: { type: string, description: "Agent name" }
+                role: { type: string, description: "Agent role (e.g., 'Senior React Developer')" }
+                type: { type: string, description: "Agent type (e.g., 'developer', 'executive')" }
+                config: { type: object, additionalProperties: true, description: "Agent configuration" }
+                repository_settings: { type: object, additionalProperties: true, description: "Repository settings" }
+                sandbox_settings: { type: object, additionalProperties: true, description: "Sandbox settings" }
       responses:
         "201":
           description: Success.
@@ -191,8 +199,14 @@ paths:
           application/json:
             schema:
               type: object
-              description: "TaskCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "TaskCreateRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [title, description]
+              properties:
+                title: { type: string, description: "Task title" }
+                description: { type: string, description: "Task description" }
+                priority: { type: string, default: medium, description: "Task priority (low, medium, high)" }
+                metadata: { type: object, additionalProperties: true, description: "Additional task metadata" }
       responses:
         "201":
           description: Success.
@@ -451,7 +465,14 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              description: "Fields read by services/orchestrator/main.py:create_agent_from_template."
+              additionalProperties: false
+              properties:
+                template_id: { type: string, description: "Template to instantiate" }
+                name: { type: string, description: "Agent name" }
+                team_id: { type: string, description: "Owning team id" }
+                overrides: { type: object, additionalProperties: true, description: "Config overrides merged onto the template" }
+                repository_settings: { type: object, additionalProperties: true, description: "Repository settings" }
       responses:
         "200":
           description: Success.
@@ -872,8 +893,12 @@ paths:
           application/json:
             schema:
               type: object
-              description: "ConversationCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "ConversationCreateRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              properties:
+                title: { type: string, default: "New Conversation", description: "Conversation title" }
+                initial_message: { type: string, description: "Optional first message to seed the conversation" }
+                context: { type: object, additionalProperties: true, description: "Optional conversation context" }
       responses:
         "201":
           description: Success.
@@ -955,8 +980,12 @@ paths:
           application/json:
             schema:
               type: object
-              description: "ChatMessageRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "ChatMessageRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [content]
+              properties:
+                content: { type: string, description: "Message content" }
+                metadata: { type: object, additionalProperties: true, description: "Optional message metadata" }
       responses:
         "201":
           description: Success.
@@ -1029,8 +1058,11 @@ paths:
           application/json:
             schema:
               type: object
-              description: "HumanResponseRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "HumanResponseRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [response]
+              properties:
+                response: { type: string, description: "Human response to agent question" }
       responses:
         "201":
           description: Success.
@@ -1271,7 +1303,9 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              description: "Reserved for future registration metadata; the handler does not read the body today (services/orchestrator/main.py:register_agent)."
+              additionalProperties: false
+              properties: {}
       responses:
         "200":
           description: Success.
@@ -1629,8 +1663,12 @@ paths:
           application/json:
             schema:
               type: object
-              description: "FileOperationApprovalRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "FileOperationApprovalRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [approved]
+              properties:
+                approved: { type: boolean, description: "Whether to approve the file operations" }
+                reason: { type: string, description: "Optional reason for approval/rejection" }
       responses:
         "201":
           description: Success.
@@ -1834,8 +1872,12 @@ paths:
           application/json:
             schema:
               type: object
-              description: "MCPToolRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "MCPToolRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [tool_name]
+              properties:
+                tool_name: { type: string, description: "Name of the MCP tool to call" }
+                arguments: { type: object, additionalProperties: true, description: "Tool arguments" }
       responses:
         "201":
           description: Success.
@@ -1964,8 +2006,12 @@ paths:
           application/json:
             schema:
               type: object
-              description: "AgentMCPSetupRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "AgentMCPSetupRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [task_id]
+              properties:
+                task_id: { type: string, description: "Task ID for MCP setup" }
+                session_id: { type: string, description: "Optional session ID" }
       responses:
         "201":
           description: Success.
@@ -2013,8 +2059,12 @@ paths:
           application/json:
             schema:
               type: object
-              description: "CoordinationRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "CoordinationRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              properties:
+                coordination_mode: { type: string, default: collaborative, description: "Coordination mode (sequential, parallel, hierarchical, collaborative)" }
+                required_agents: { type: array, items: { type: string }, description: "Specific agents to include" }
+                required_skills: { type: array, items: { type: string }, description: "Required skills for the task" }
       responses:
         "201":
           description: Success.
@@ -2229,8 +2279,14 @@ paths:
           application/json:
             schema:
               type: object
-              description: "ProviderCredentialsRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "ProviderCredentialsRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [provider, api_key]
+              properties:
+                provider: { type: string, description: "Model provider (anthropic, openai, google, etc.)" }
+                api_key: { type: string, description: "API key for the provider" }
+                endpoint_url: { type: string, description: "Custom endpoint URL" }
+                additional_config: { type: object, additionalProperties: true, description: "Additional provider configuration" }
       responses:
         "201":
           description: Success.
@@ -2314,8 +2370,21 @@ paths:
           application/json:
             schema:
               type: object
-              description: "AgentModelConfigRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "AgentModelConfigRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [primary_model]
+              properties:
+                primary_model: { type: string, description: "Primary model ID" }
+                fallback_models: { type: array, items: { type: string }, description: "Fallback model IDs" }
+                temperature: { type: number, description: "Model temperature", default: 0.7, minimum: 0, maximum: 2 }
+                max_tokens: { type: integer, description: "Maximum output tokens", default: 4096, minimum: 1, maximum: 200000 }
+                top_p: { type: number, description: "Top-p sampling", default: 1.0, minimum: 0, maximum: 1 }
+                frequency_penalty: { type: number, description: "Frequency penalty", default: 0.0, minimum: -2, maximum: 2 }
+                presence_penalty: { type: number, description: "Presence penalty", default: 0.0, minimum: -2, maximum: 2 }
+                custom_instructions: { type: string, default: "", description: "Custom instructions for the agent" }
+                use_function_calling: { type: boolean, description: "Enable function calling" }
+                streaming_enabled: { type: boolean, description: "Enable response streaming" }
+                cost_limit_per_task: { type: number, description: "Cost limit per task in USD", minimum: 0 }
       responses:
         "201":
           description: Success.
@@ -2392,8 +2461,12 @@ paths:
           application/json:
             schema:
               type: object
-              description: "TaskCostEstimateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "TaskCostEstimateRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [task_description]
+              properties:
+                task_description: { type: string, description: "Description of the task" }
+                estimated_complexity: { type: string, default: medium, description: "Estimated complexity (low, medium, high, very_high)" }
       responses:
         "201":
           description: Success.
@@ -2627,7 +2700,18 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              description: "Individual Body(...) fields read by services/orchestrator/main.py:add_organizational_knowledge."
+              additionalProperties: false
+              required: [title, content]
+              properties:
+                title: { type: string, description: "Knowledge title" }
+                content: { type: string, description: "Knowledge content" }
+                content_type: { type: string, default: documentation, description: "Content type" }
+                knowledge_category: { type: string, default: development, description: "Knowledge category" }
+                source_agent_id: { type: string, description: "Source agent ID" }
+                source_team_id: { type: string, description: "Source team ID" }
+                tags: { type: array, items: { type: string }, description: "Knowledge tags" }
+                metadata: { type: object, additionalProperties: true, description: "Additional metadata" }
       responses:
         "200":
           description: Success.
@@ -3168,8 +3252,23 @@ paths:
           application/json:
             schema:
               type: object
-              description: "GoalCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "GoalCreateRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [title, description]
+              properties:
+                title: { type: string, description: "Goal title" }
+                description: { type: string, description: "Goal description" }
+                goal_type: { type: string, default: business, description: "Goal type (business, technical, growth, operational)" }
+                target_value: { type: number, description: "Target value (e.g., 100000 for $100K)" }
+                target_unit: { type: string, description: "Target unit (e.g., 'USD', 'users', '%')" }
+                target_deadline: { type: string, format: date, description: "Target completion date" }
+                priority_level: { type: integer, description: "Priority level (1-10)", default: 5, minimum: 1, maximum: 10 }
+                success_criteria: { type: object, additionalProperties: true, description: "Success criteria" }
+                assigned_teams: { type: array, items: { type: string }, description: "Assigned team IDs" }
+                goal_owner_agent_id: { type: string, description: "Goal owner agent ID" }
+                stakeholder_agents: { type: array, items: { type: string }, description: "Stakeholder agent IDs" }
+                tags: { type: array, items: { type: string }, description: "Goal tags" }
+                metadata: { type: object, additionalProperties: true, description: "Additional metadata" }
       responses:
         "201":
           description: Success.
@@ -3367,8 +3466,21 @@ paths:
           application/json:
             schema:
               type: object
-              description: "MilestoneCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "MilestoneCreateRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [title, description, target_date]
+              properties:
+                title: { type: string, description: "Milestone title" }
+                description: { type: string, description: "Milestone description" }
+                target_date: { type: string, format: date, description: "Target completion date" }
+                milestone_type: { type: string, default: deliverable, description: "Milestone type" }
+                success_criteria: { type: object, additionalProperties: true, description: "Success criteria" }
+                deliverables: { type: array, items: { type: object, additionalProperties: true }, description: "Expected deliverables" }
+                dependencies: { type: array, items: { type: object, additionalProperties: true }, description: "Dependencies" }
+                assigned_teams: { type: array, items: { type: string }, description: "Assigned teams" }
+                responsible_agent_id: { type: string, description: "Responsible agent" }
+                priority_level: { type: integer, description: "Priority level", default: 5, minimum: 1, maximum: 10 }
+                weight_in_goal: { type: number, description: "Weight in goal (%)", minimum: 0, maximum: 100 }
       responses:
         "201":
           description: Success.
@@ -3416,8 +3528,22 @@ paths:
           application/json:
             schema:
               type: object
-              description: "TaskFromMilestoneRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "TaskFromMilestoneRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [title, description]
+              properties:
+                title: { type: string, description: "Task title" }
+                description: { type: string, description: "Task description" }
+                task_type: { type: string, default: development, description: "Task type" }
+                complexity_level: { type: string, default: medium, description: "Complexity level" }
+                estimated_hours: { type: number, description: "Estimated hours" }
+                due_date: { type: string, format: date, description: "Due date" }
+                assigned_team_id: { type: string, description: "Assigned team ID" }
+                assigned_agent_id: { type: string, description: "Assigned agent ID" }
+                priority: { type: integer, description: "Priority", default: 5, minimum: 1, maximum: 10 }
+                requirements: { type: object, additionalProperties: true, description: "Requirements" }
+                acceptance_criteria: { type: array, items: { type: object, additionalProperties: true }, description: "Acceptance criteria" }
+                dependencies: { type: array, items: { type: object, additionalProperties: true }, description: "Dependencies" }
       responses:
         "201":
           description: Success.
@@ -3657,8 +3783,14 @@ paths:
           application/json:
             schema:
               type: object
-              description: "GoalConversationCreateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "GoalConversationCreateRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [conversation_title]
+              properties:
+                conversation_type: { type: string, default: planning, description: "Conversation type" }
+                conversation_title: { type: string, description: "Conversation title" }
+                initial_context: { type: object, additionalProperties: true, description: "Initial context" }
+                participants: { type: array, items: { type: object, additionalProperties: true }, description: "Participants" }
       responses:
         "201":
           description: Success.
@@ -3771,8 +3903,15 @@ paths:
           application/json:
             schema:
               type: object
-              description: "ConversationMessageRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "ConversationMessageRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              required: [sender_name, content]
+              properties:
+                message_type: { type: string, default: human, description: "Message type" }
+                sender_name: { type: string, description: "Sender name" }
+                content: { type: string, description: "Message content" }
+                metadata: { type: object, additionalProperties: true, description: "Message metadata" }
+                references: { type: array, items: { type: string }, description: "Referenced message IDs" }
       responses:
         "201":
           description: Success.
@@ -3964,8 +4103,15 @@ paths:
           application/json:
             schema:
               type: object
-              description: "ProgressUpdateRequest (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "ProgressUpdateRequest (see services/orchestrator/main.py)."
+              additionalProperties: false
+              properties:
+                progress_percentage: { type: number, description: "Progress percentage", minimum: 0, maximum: 100 }
+                current_value: { type: number, description: "Current value" }
+                milestone_id: { type: string, description: "Associated milestone ID" }
+                notes: { type: string, description: "Progress notes" }
+                confidence_score: { type: number, description: "Confidence score", minimum: 0, maximum: 1 }
+                trigger_alerts: { type: boolean, default: true, description: "Whether to trigger alerts" }
       responses:
         "201":
           description: Success.
@@ -4154,11 +4300,16 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              description: "UploadFile (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "Multipart form read by services/orchestrator/main.py:upload_organization_document."
+              additionalProperties: false
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "Document file to upload" }
+                title: { type: string, description: "Document title" }
+                tags: { type: string, description: "Comma-separated tags" }
       responses:
         "201":
           description: Success.
@@ -4230,12 +4381,18 @@ paths:
           Add URL content to organizational knowledge base
       security: [{ bearerAuth: [] }]
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              description: "Body(embed=True) fields read by services/orchestrator/main.py:add_organization_url."
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: { type: string, description: "URL to fetch and index" }
+                title: { type: string, description: "Optional title" }
+                tags: { type: array, items: { type: string }, description: "Optional tags" }
       responses:
         "200":
           description: Success.
@@ -4432,11 +4589,16 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              description: "UploadFile (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "Multipart form read by services/orchestrator/main.py:upload_team_document."
+              additionalProperties: false
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "Document file to upload" }
+                title: { type: string, description: "Document title" }
+                tags: { type: string, description: "Comma-separated tags" }
       responses:
         "201":
           description: Success.
@@ -4508,12 +4670,18 @@ paths:
           Add URL content to team knowledge base
       security: [{ bearerAuth: [] }]
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              description: "Body(embed=True) fields read by services/orchestrator/main.py:add_team_url."
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: { type: string, description: "URL to fetch and index" }
+                title: { type: string, description: "Optional title" }
+                tags: { type: array, items: { type: string }, description: "Optional tags" }
       responses:
         "200":
           description: Success.
@@ -4710,11 +4878,16 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              description: "UploadFile (see services/orchestrator/main.py; the model is Pydantic and not reproduced here)."
-              additionalProperties: true
+              description: "Multipart form read by services/orchestrator/main.py:upload_agent_document."
+              additionalProperties: false
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "Document file to upload" }
+                title: { type: string, description: "Document title" }
+                tags: { type: string, description: "Comma-separated tags" }
       responses:
         "201":
           description: Success.
@@ -4786,12 +4959,18 @@ paths:
           Add URL content to agent knowledge base
       security: [{ bearerAuth: [] }]
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              description: "Body(embed=True) fields read by services/orchestrator/main.py:add_agent_url."
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: { type: string, description: "URL to fetch and index" }
+                title: { type: string, description: "Optional title" }
+                tags: { type: array, items: { type: string }, description: "Optional tags" }
       responses:
         "200":
           description: Success.
@@ -4991,7 +5170,23 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              description: "ContainerConfig (see services/orchestrator/container_manager.py). Omit the body to use the agent's default container configuration."
+              additionalProperties: false
+              required: [image, name]
+              properties:
+                image: { type: string, description: "Container image" }
+                name: { type: string, description: "Container name" }
+                environment: { type: object, additionalProperties: { type: string }, description: "Environment variables" }
+                ports: { type: object, additionalProperties: { type: integer }, description: "container_port -> host_port" }
+                volumes: { type: object, additionalProperties: { type: string }, description: "host_path -> container_path" }
+                memory_limit: { type: string, default: "1g", description: "Memory limit" }
+                cpu_limit: { type: number, description: "CPU limit", default: 1.0 }
+                restart_policy: { type: string, default: "unless-stopped", description: "Restart policy" }
+                command: { type: string, description: "Container start command" }
+                working_dir: { type: string, description: "Working directory" }
+                labels: { type: object, additionalProperties: { type: string }, description: "Container labels" }
+                network: { type: string, description: "Docker network" }
+                healthcheck: { type: object, additionalProperties: true, description: "Healthcheck definition" }
       responses:
         "200":
           description: Success.
