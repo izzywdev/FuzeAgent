@@ -1,6 +1,6 @@
 ---
 name: ui-runtime-validation
-description: Use when validating any UI work — the mandatory family gate that a change is rendered in a real Chromium via the Chrome DevTools MCP and the console is clean, before any UI agent reports done. Encodes the policy, the runtime gotchas, the MCP capability map, and the DONE-report gate; defers the mechanics to the chrome-devtools plugin skills. Applies to frontend-engineer (dev-time self-check), frontend-test-engineer (independent QA), and mobile-app-engineer (packaged PWA/native shell).
+description: Use when validating any UI work — the mandatory family gate that a change is rendered in a real Chromium via the Chrome DevTools MCP and the console is clean, before any UI agent reports done. Encodes the policy, the runtime gotchas, the MCP capability map, and the DONE-report gate; defers the mechanics to the `chrome-devtools-mcp` plugin's own skills (`chrome-devtools-mcp:chrome-devtools`, `chrome-devtools-mcp:a11y-debugging`). Applies to frontend-engineer (dev-time self-check), frontend-test-engineer (independent QA), and mobile-app-engineer (packaged PWA/native shell).
 ---
 
 # UI runtime validation — the console-clean gate
@@ -43,18 +43,20 @@ Be familiar with the whole surface and reach for the right tool — not only the
 
 | Need | MCP tool | Plugin skill for how-to |
 |------|----------|--------------------------|
-| Uncaught errors / warnings / CSP / mixed-content | `list_console_messages`, `get_console_message` | `chrome-devtools` |
-| Failed / cross-origin / 4xx-5xx requests, chunk & remote loads | `list_network_requests`, `get_network_request` | `chrome-devtools` |
-| Drive the app (click/type/navigate/wait) | `click`, `fill`, `fill_form`, `type_text`, `navigate_page`, `wait_for` | `chrome-devtools` |
-| Accessibility / DOM tree audit | `take_snapshot`, `lighthouse_audit` | `a11y-debugging` |
+| Uncaught errors / warnings / CSP / mixed-content | `list_console_messages`, `get_console_message` | `chrome-devtools-mcp:chrome-devtools` |
+| Failed / cross-origin / 4xx-5xx requests, chunk & remote loads | `list_network_requests`, `get_network_request` | `chrome-devtools-mcp:chrome-devtools` |
+| Drive the app (click/type/navigate/wait) | `click`, `fill`, `fill_form`, `type_text`, `navigate_page`, `wait_for` | `chrome-devtools-mcp:chrome-devtools` |
+| Accessibility / DOM tree audit | `take_snapshot`, `lighthouse_audit` | `chrome-devtools-mcp:a11y-debugging` |
 | Performance / Core Web Vitals / LCP | `performance_start_trace`, `performance_stop_trace`, `performance_analyze_insight`, `lighthouse_audit` | `debug-optimize-lcp` |
-| Mobile / responsive viewport | `emulate`, `resize_page` | `chrome-devtools` |
+| Mobile / responsive viewport | `emulate`, `resize_page` | `chrome-devtools-mcp:chrome-devtools` |
 | Memory leaks / OOM | `take_heapsnapshot` | `memory-leak-debugging` |
-| Visual evidence | `take_screenshot` | `chrome-devtools` |
+| Visual evidence | `take_screenshot` | `chrome-devtools-mcp:chrome-devtools` |
 | Server won't connect / no target | — | `troubleshooting` |
 
-The `chrome-devtools` and `a11y-debugging` skills carry the detailed mechanics; this skill is the
-**family policy** that wraps them.
+All "Plugin skill" entries above ship with the `chrome-devtools-mcp` plugin itself (marketplace
+`chrome-devtools-plugins`) — none of them are FuzeSDLC-authored `skills/<name>/SKILL.md` files.
+`chrome-devtools-mcp:chrome-devtools` and `chrome-devtools-mcp:a11y-debugging` carry the detailed
+mechanics for the two most-cited cases; this skill is the **family policy** that wraps them.
 
 ## Procedure
 

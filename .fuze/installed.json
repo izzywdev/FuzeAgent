@@ -19,8 +19,8 @@
       "capability": "core-agents",
       "mode": "managed",
       "sourcePath": "agents/backend-engineer.md",
-      "sourceSha256": "eefbb85cf686a6c0a0ecc8623af90ed2244c11821a5d033ece48a77ba3ee9868",
-      "renderedSha256": "eefbb85cf686a6c0a0ecc8623af90ed2244c11821a5d033ece48a77ba3ee9868"
+      "sourceSha256": "19d770b9133bff5fa199affe79e15d91c0eeeaef145cfff1fc39522a1f40a312",
+      "renderedSha256": "19d770b9133bff5fa199affe79e15d91c0eeeaef145cfff1fc39522a1f40a312"
     },
     ".claude/agents/cli-engineer.md": {
       "capability": "core-agents",
@@ -40,36 +40,36 @@
       "capability": "core-agents",
       "mode": "managed",
       "sourcePath": "agents/database-engineer.md",
-      "sourceSha256": "0eee2813a846910b220c4c586f910571750dbcea0ccf9622491a9644f0636dab",
-      "renderedSha256": "0eee2813a846910b220c4c586f910571750dbcea0ccf9622491a9644f0636dab"
+      "sourceSha256": "469c17a2e7eef16a5154128440630841bd8b52d6cc8ab0b36f13ba324b4660d7",
+      "renderedSha256": "469c17a2e7eef16a5154128440630841bd8b52d6cc8ab0b36f13ba324b4660d7"
     },
     ".claude/agents/devops-engineer.md": {
       "capability": "core-agents",
       "mode": "managed",
       "sourcePath": "agents/devops-engineer.md",
-      "sourceSha256": "282f60005144669906d7b96bc2e534f67d4e3db8f5df05e1a7b04baf47083be1",
-      "renderedSha256": "282f60005144669906d7b96bc2e534f67d4e3db8f5df05e1a7b04baf47083be1"
+      "sourceSha256": "4d67f10a83df88cd5cb4e3d0be2f70a364c8c0701009e167221f57e207ec97fe",
+      "renderedSha256": "4d67f10a83df88cd5cb4e3d0be2f70a364c8c0701009e167221f57e207ec97fe"
     },
     ".claude/agents/docs-maintainer.md": {
       "capability": "core-agents",
       "mode": "managed",
       "sourcePath": "agents/docs-maintainer.md",
-      "sourceSha256": "62581d7936a330055acc455d94f08fbe9ae97aa3f5023633f96062a23a5be01e",
-      "renderedSha256": "62581d7936a330055acc455d94f08fbe9ae97aa3f5023633f96062a23a5be01e"
+      "sourceSha256": "0bea0439212a2ef3bb1d612b67f7ea329ac3039bced4018b6079aa25754f367c",
+      "renderedSha256": "0bea0439212a2ef3bb1d612b67f7ea329ac3039bced4018b6079aa25754f367c"
     },
     ".claude/agents/frontend-engineer.md": {
       "capability": "core-agents",
       "mode": "managed",
       "sourcePath": "agents/frontend-engineer.md",
-      "sourceSha256": "c6e35d44bd6768c6d5969546d76a668e4ba3ef62d175763b25ac96a5b3d71ce4",
-      "renderedSha256": "c6e35d44bd6768c6d5969546d76a668e4ba3ef62d175763b25ac96a5b3d71ce4"
+      "sourceSha256": "a820c7c47eba65b24fbe9e878481c703a34fa43bae01c896e0d0bcc0971a71e9",
+      "renderedSha256": "a820c7c47eba65b24fbe9e878481c703a34fa43bae01c896e0d0bcc0971a71e9"
     },
     ".claude/agents/frontend-test-engineer.md": {
       "capability": "core-agents",
       "mode": "managed",
       "sourcePath": "agents/frontend-test-engineer.md",
-      "sourceSha256": "852dc7ee0010c5b76e7fa00a553502e61acf227f28d02866a16bfc1cccd17e4d",
-      "renderedSha256": "852dc7ee0010c5b76e7fa00a553502e61acf227f28d02866a16bfc1cccd17e4d"
+      "sourceSha256": "20e5941a3c292f52597b272b88ec2f8d98a2bdeedcc0a6bd5fd935d9340be57f",
+      "renderedSha256": "20e5941a3c292f52597b272b88ec2f8d98a2bdeedcc0a6bd5fd935d9340be57f"
     },
     ".claude/agents/mcp-engineer.md": {
       "capability": "core-agents",
@@ -89,8 +89,8 @@
       "capability": "core-agents",
       "mode": "managed",
       "sourcePath": "agents/test-engineer.md",
-      "sourceSha256": "07d19c4cd581e9a680014d8aceaf5ca02b70c6c2cd156b71a422be7abed69de1",
-      "renderedSha256": "07d19c4cd581e9a680014d8aceaf5ca02b70c6c2cd156b71a422be7abed69de1"
+      "sourceSha256": "13d5767b93bd23abb310c76d9f85fafbc4b32467af3a220d5cf985b2c016a9fb",
+      "renderedSha256": "13d5767b93bd23abb310c76d9f85fafbc4b32467af3a220d5cf985b2c016a9fb"
     },
     ".claude/skills/api-contract-first/SKILL.md": {
       "capability": "skills",
@@ -138,8 +138,8 @@
       "capability": "skills",
       "mode": "managed",
       "sourcePath": "skills/fuzefront-ui-package/SKILL.md",
-      "sourceSha256": "772c7031eca212e59f8509b8a4e773c975aeb5f63b6595d549c96f9c127af600",
-      "renderedSha256": "772c7031eca212e59f8509b8a4e773c975aeb5f63b6595d549c96f9c127af600"
+      "sourceSha256": "516db73f20f26cbf99f2b37b5adc48f2d7c192e61612092570f2ca97ee41b9b8",
+      "renderedSha256": "516db73f20f26cbf99f2b37b5adc48f2d7c192e61612092570f2ca97ee41b9b8"
     },
     ".claude/skills/logging/SKILL.md": {
       "capability": "skills",
@@ -355,15 +355,15 @@
       "capability": "skills",
       "mode": "managed",
       "sourcePath": "skills/ui-frame-contract/SKILL.md",
-      "sourceSha256": "42f37f74cc1d3e81feb72c2fdf123a40e4a90f1bc30045649fbadf4ac932f92d",
-      "renderedSha256": "42f37f74cc1d3e81feb72c2fdf123a40e4a90f1bc30045649fbadf4ac932f92d"
+      "sourceSha256": "6a8ae1935e5ad0cc95c7b5c908472eacd2008365a7a5e6028decfaedec264cc7",
+      "renderedSha256": "6a8ae1935e5ad0cc95c7b5c908472eacd2008365a7a5e6028decfaedec264cc7"
     },
     ".claude/skills/ui-runtime-validation/SKILL.md": {
       "capability": "skills",
       "mode": "managed",
       "sourcePath": "skills/ui-runtime-validation/SKILL.md",
-      "sourceSha256": "9a025e7dec7ddd21b72374676adea53d3e16136d4f6fec735f6b2b778540ec10",
-      "renderedSha256": "9a025e7dec7ddd21b72374676adea53d3e16136d4f6fec735f6b2b778540ec10"
+      "sourceSha256": "d4ece676018ede802b8e1432196181cd83985c7ba8212d465ca97bee7b105ee5",
+      "renderedSha256": "d4ece676018ede802b8e1432196181cd83985c7ba8212d465ca97bee7b105ee5"
     },
     ".claude/skills/verification-protocol/SKILL.md": {
       "capability": "skills",
@@ -408,11 +408,12 @@
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/auto-merge.yml",
-      "sourceSha256": "2d2d09380b72e9d56725a137205bc7351e91dc9feb20be41120d6e418d8b4027",
-      "renderedSha256": "2d2d09380b72e9d56725a137205bc7351e91dc9feb20be41120d6e418d8b4027",
+      "sourceSha256": "3d38bdde51b084cd7e56e3e746cbfbb688267cfb5b23940be0727211fbbb13bb",
+      "renderedSha256": "3d38bdde51b084cd7e56e3e746cbfbb688267cfb5b23940be0727211fbbb13bb",
       "renderVars": {
         "defaultBranch": "main",
-        "baselineRef": "v1"
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
       }
     },
     ".github/workflows/claude-auto-pr.yml": {
@@ -474,33 +475,36 @@
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/gate-frames-stamped.yml",
-      "sourceSha256": "69fd04a77f3dc79a15756aa43bc1b4cd2ae760952b6b6d85e6846cd4b81539da",
-      "renderedSha256": "69fd04a77f3dc79a15756aa43bc1b4cd2ae760952b6b6d85e6846cd4b81539da",
+      "sourceSha256": "cd6cba5c53b28f626ba18ca62497d0c171e0c4c8565c997ce54845e8d6903a8b",
+      "renderedSha256": "cd6cba5c53b28f626ba18ca62497d0c171e0c4c8565c997ce54845e8d6903a8b",
       "renderVars": {
         "defaultBranch": "main",
-        "baselineRef": "v1"
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
       }
     },
     ".github/workflows/gate-line-endings.yml": {
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/gate-line-endings.yml",
-      "sourceSha256": "474b74ef31a3c8fceacb6a420e66d4482df4996360b8e3f123e60c3084ce8f6e",
-      "renderedSha256": "474b74ef31a3c8fceacb6a420e66d4482df4996360b8e3f123e60c3084ce8f6e",
+      "sourceSha256": "ed07a43f50bfc50cc56980f81731ae1a10ea403b078e85792514c95663390eb3",
+      "renderedSha256": "ed07a43f50bfc50cc56980f81731ae1a10ea403b078e85792514c95663390eb3",
       "renderVars": {
         "defaultBranch": "main",
-        "baselineRef": "v1"
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
       }
     },
     ".github/workflows/governance-nightly.yml": {
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/governance-nightly.yml",
-      "sourceSha256": "8bc3fbb28fb307f33cf03ea04a71fb6a68c3d8e8ebd2f5920a41faa60f81343d",
-      "renderedSha256": "8bc3fbb28fb307f33cf03ea04a71fb6a68c3d8e8ebd2f5920a41faa60f81343d",
+      "sourceSha256": "9b3dbc9ace579d1125f69f1df0dc434ba3c70dca9dc4530da97f06b60536397f",
+      "renderedSha256": "9b3dbc9ace579d1125f69f1df0dc434ba3c70dca9dc4530da97f06b60536397f",
       "renderVars": {
         "defaultBranch": "main",
-        "baselineRef": "v1"
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
       }
     },
     ".github/workflows/governance-sync.yml": {
@@ -518,22 +522,24 @@
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/harden-gate.yml",
-      "sourceSha256": "2bacc78f5db4eedc4482f79dffb010c20cab9f2577c3a25afd71de99868d8c70",
-      "renderedSha256": "2bacc78f5db4eedc4482f79dffb010c20cab9f2577c3a25afd71de99868d8c70",
+      "sourceSha256": "8b9db8635ef252512c7e491f143989c5a781769a0bbe54b74e7431b921927c4e",
+      "renderedSha256": "8b9db8635ef252512c7e491f143989c5a781769a0bbe54b74e7431b921927c4e",
       "renderVars": {
         "defaultBranch": "main",
-        "baselineRef": "v1"
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
       }
     },
     ".github/workflows/helm-validate.yml": {
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/helm-validate.yml",
-      "sourceSha256": "ce2755ddb8bbc0649e84a9e51fb406f1936f2775c4310145124ff78432520fbf",
-      "renderedSha256": "ce2755ddb8bbc0649e84a9e51fb406f1936f2775c4310145124ff78432520fbf",
+      "sourceSha256": "7a98e937f900cca846cea4a74386c17ec500e859c215b06c95dd1d87c9f1f2d9",
+      "renderedSha256": "7a98e937f900cca846cea4a74386c17ec500e859c215b06c95dd1d87c9f1f2d9",
       "renderVars": {
         "defaultBranch": "main",
-        "baselineRef": "v1"
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
       }
     },
     ".github/workflows/label-sync.yml": {
@@ -562,11 +568,12 @@
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/nightly-integration.yml",
-      "sourceSha256": "6efaff8acf9a32a236f81da8a9beee5b05a5a7226d9df8178ddc0be7048edea5",
-      "renderedSha256": "6efaff8acf9a32a236f81da8a9beee5b05a5a7226d9df8178ddc0be7048edea5",
+      "sourceSha256": "5506418925629408a04b2492d98ab570a891139a33d0a61656778e57de1736dd",
+      "renderedSha256": "5506418925629408a04b2492d98ab570a891139a33d0a61656778e57de1736dd",
       "renderVars": {
         "defaultBranch": "main",
-        "baselineRef": "v1"
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
       }
     },
     ".github/workflows/pages-frames.yml": {
@@ -847,8 +854,8 @@
       "capability": "portal-registration",
       "mode": "managed",
       "sourcePath": "scripts/check-registration.mjs",
-      "sourceSha256": "82debe9d9c9ddfb24854a4a30a5d4602f13efa147209f5daa9698d187a922e0b",
-      "renderedSha256": "82debe9d9c9ddfb24854a4a30a5d4602f13efa147209f5daa9698d187a922e0b"
+      "sourceSha256": "fab83bb03d7505832d12095db184c019c7565d8e050c23b8f2482436c2302f30",
+      "renderedSha256": "fab83bb03d7505832d12095db184c019c7565d8e050c23b8f2482436c2302f30"
     },
     "scripts/gate_ds_conformance.py": {
       "capability": "design-system",
@@ -889,8 +896,8 @@
       "capability": "portal-registration",
       "mode": "managed",
       "sourcePath": "scripts/sync-chart-files.sh",
-      "sourceSha256": "1d6a570f53a8ad1b0fd76b383fe4d54329a6f6568a150d8d0a07d7d2c0bd8534",
-      "renderedSha256": "1d6a570f53a8ad1b0fd76b383fe4d54329a6f6568a150d8d0a07d7d2c0bd8534"
+      "sourceSha256": "b53985271e99279897baa5f3ae229e2676400e5ae2b2944a692cf0f54bde9d57",
+      "renderedSha256": "b53985271e99279897baa5f3ae229e2676400e5ae2b2944a692cf0f54bde9d57"
     },
     "services/ui-react/.npmrc": {
       "capability": "npm-registry",
@@ -906,6 +913,13 @@
       "sourceSha256": "a01d20bf1acfe700177632cc3209d285b6d7036300efa9b184319dda9c59e3ee",
       "renderedSha256": "a01d20bf1acfe700177632cc3209d285b6d7036300efa9b184319dda9c59e3ee"
     },
+    "services/ui-react/vite.config.ts": {
+      "capability": "mf-remote",
+      "mode": "derived",
+      "sourcePath": "",
+      "sourceSha256": "f283df6962b3731991ebf87502e89658886a47625a1f381bb8a74097fa560c40",
+      "renderedSha256": "f283df6962b3731991ebf87502e89658886a47625a1f381bb8a74097fa560c40"
+    },
     "services/ui/.npmrc": {
       "capability": "npm-registry",
       "mode": "seeded",
@@ -917,8 +931,8 @@
       "capability": "node-toolchain",
       "mode": "derived",
       "sourcePath": "",
-      "sourceSha256": "0270553a7ef61ad50109fc6961c852a78aeecd6c95660020f6240ab4b5b5d518",
-      "renderedSha256": "0270553a7ef61ad50109fc6961c852a78aeecd6c95660020f6240ab4b5b5d518"
+      "sourceSha256": "8b4ecf3497b2c46c3405c46c224394cb9a1eac6c5ca6cbb18d94b6db12ef83fb",
+      "renderedSha256": "8b4ecf3497b2c46c3405c46c224394cb9a1eac6c5ca6cbb18d94b6db12ef83fb"
     }
   }
 }

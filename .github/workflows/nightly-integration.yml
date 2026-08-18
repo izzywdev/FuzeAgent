@@ -12,7 +12,7 @@ name: Nightly Integration
 
 on:
   schedule:
-    - cron: '37 8 * * *'   # off-peak, off the :00 herd; per-repo offset set at install time
+    - cron: '23 8 * * *'   # fuze:spread-cron — off-peak; minute/hour are derived per repo at install time so the fleet does not fire together
   workflow_dispatch:        # manual run
 
 permissions:

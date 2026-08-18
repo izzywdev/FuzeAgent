@@ -20,7 +20,10 @@ export default defineConfig({
         './FuzeAgentApp': './src/App',
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      shared: ['react', 'react-dom'] as any,
+      shared: {
+        react: { singleton: true, requiredVersion: '^18.0.0' },
+        'react-dom': { singleton: true, requiredVersion: '^18.0.0' },
+      } as any,
     }),
   ],
   resolve: {

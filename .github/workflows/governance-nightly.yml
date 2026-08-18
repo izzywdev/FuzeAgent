@@ -7,7 +7,7 @@ name: Governance Nightly
 
 on:
   schedule:
-    - cron: '23 7 * * *'   # 07:23 UTC nightly (off-peak, off the :00 herd)
+    - cron: '31 5 * * *'   # fuze:spread-cron — off-peak; minute/hour are derived per repo at install time so the fleet does not fire together
   workflow_dispatch:        # manual run
 
 permissions:

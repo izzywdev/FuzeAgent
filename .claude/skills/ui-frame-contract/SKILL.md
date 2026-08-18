@@ -8,7 +8,7 @@ description: Use in the frontend-design phase, before feature-UI implementation.
 The frontend-design phase produces static **HTML frames** of the expected UI before any feature-UI is implemented. These approved frames are part of the contract freeze (alongside the OpenAPI/event contract) — the visual source of truth the implementation is checked against, so visual/structural drift is caught against a frozen artifact rather than discovered after the fact.
 
 ## When
-The frontend-design phase, **before** feature-UI implementation. Authored by `frontend-engineer`; part of the contract freeze the parallel fan-out depends on (the gate). Pairs with `api-contract-first` and `frontend-design`.
+The frontend-design phase, **before** feature-UI implementation. Authored by `frontend-engineer`; part of the contract freeze the parallel fan-out depends on (the gate). Pairs with `api-contract-first`.
 
 ## What a frame is
 A static, self-contained **HTML file** rendering the expected UI of one screen, **design-system-first** — it links the design system's stylesheet and uses only DS tokens/styles, **no raw hex/rgb, raw px spacing, or one-off type** (consistent with `design-system-conformance`). A feature may be a **single page** or an **ordered SEQUENCE** of frames demonstrating the process/flow — e.g. login → create-org → billing → checkout. The sequence shows the flow, not just isolated screens.
