@@ -1,0 +1,82 @@
+{
+  "name": "FuzeAgent",
+  "resources": [
+    {
+      "key": "Organization",
+      "name": "Organization",
+      "actions": {
+        "read": { "name": "Read" },
+        "create": { "name": "Create" },
+        "update": { "name": "Update" },
+        "delete": { "name": "Delete" }
+      }
+    },
+    {
+      "key": "Team",
+      "name": "Team",
+      "actions": {
+        "read": { "name": "Read" },
+        "create": { "name": "Create" },
+        "update": { "name": "Update" },
+        "delete": { "name": "Delete" }
+      }
+    },
+    {
+      "key": "Agent",
+      "name": "Agent",
+      "actions": {
+        "read": { "name": "Read" },
+        "create": { "name": "Create" },
+        "update": { "name": "Update" },
+        "delete": { "name": "Delete" },
+        "deploy": { "name": "Deploy" }
+      }
+    },
+    {
+      "key": "Task",
+      "name": "Task",
+      "actions": {
+        "read": { "name": "Read" },
+        "assign": { "name": "Assign" },
+        "update": { "name": "Update" }
+      }
+    },
+    {
+      "key": "Goal",
+      "name": "Organizational Goal",
+      "actions": {
+        "read": { "name": "Read" },
+        "create": { "name": "Create" },
+        "update": { "name": "Update" }
+      }
+    }
+  ],
+  "roles": [
+    {
+      "key": "viewer",
+      "name": "Viewer",
+      "permissions": ["Organization:read", "Team:read", "Agent:read", "Task:read", "Goal:read"]
+    },
+    {
+      "key": "operator",
+      "name": "Operator",
+      "permissions": [
+        "Organization:read", "Team:read",
+        "Agent:read", "Agent:deploy",
+        "Task:read", "Task:assign", "Task:update",
+        "Goal:read", "Goal:update"
+      ]
+    },
+    {
+      "key": "admin",
+      "name": "Admin",
+      "permissions": [
+        "Organization:read", "Organization:create", "Organization:update", "Organization:delete",
+        "Team:read", "Team:create", "Team:update", "Team:delete",
+        "Agent:read", "Agent:create", "Agent:update", "Agent:delete", "Agent:deploy",
+        "Task:read", "Task:assign", "Task:update",
+        "Goal:read", "Goal:create", "Goal:update"
+      ]
+    }
+  ]
+}
