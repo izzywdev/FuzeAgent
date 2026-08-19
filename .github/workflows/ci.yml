@@ -26,6 +26,11 @@ jobs:
         
     - name: Install dependencies
       run: npm ci
+      # services/ui-react depends on @izzywdev/fuzefront-identity, which lives on
+      # GitHub Packages. Without this the tarball download answers 401 and the whole
+      # job dies at install -- see services/ui-react/.npmrc.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
     - name: Run linting
       run: npm run lint
