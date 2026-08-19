@@ -292,6 +292,9 @@ jobs:
     - name: Install frontend dependencies
       working-directory: services/ui-react
       run: npm ci --legacy-peer-deps
+      # @izzywdev/fuzefront-identity is on GitHub Packages; see services/ui-react/.npmrc.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Run frontend linting
       working-directory: services/ui-react
