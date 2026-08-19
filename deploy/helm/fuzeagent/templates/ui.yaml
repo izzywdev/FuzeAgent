@@ -22,6 +22,22 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+        # Runs BEFORE the app container, so an unregistered app never serves traffic.
+        - name: fuzefront-register
+          image: curlimages/curl:8.8.0
+          command: ["/bin/sh", "/registration/register.sh"]
+          env:
+            - name: FUZEFRONT_API_URL
+              value: {{ .Values.fuzefront.apiUrl | quote }}
+            - name: FUZEFRONT_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: fuzefront-registration
+                  key: token
+          volumeMounts:
+            - name: registration
+              mountPath: /registration
       containers:
         - name: ui
           image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
@@ -47,6 +63,12 @@ spec:
             periodSeconds: 15
           resources:
             {{- toYaml .Values.ui.resources | nindent 12 }}
+      volumes:
+        - name: registration
+          configMap:
+            name: {{ include "fuzeagent.fullname" . }}-registration
+            # 0755 so register.sh is executable inside the init container.
+            defaultMode: 0755
 ---
 apiVersion: v1
 kind: Service
