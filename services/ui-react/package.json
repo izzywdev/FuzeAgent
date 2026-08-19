@@ -16,6 +16,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@izzywdev/fuzefront-identity": "^1.0.0",
     "@mdx-js/react": "^3.1.0",
     "@mdx-js/rollup": "^3.1.0",
     "@radix-ui/react-accordion": "^1.2.1",
