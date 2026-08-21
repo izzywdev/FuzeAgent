@@ -19,8 +19,19 @@ export default defineConfig({
       exposes: {
         './FuzeAgentApp': './src/App',
       },
+      // Explicit singleton config, byte-matching the FuzeFront host
+      // (frontend/vite.config.ts: react/react-dom singletons at ^19.0.0).
+      // The previous bare-array `shared: ['react', 'react-dom']` shorthand
+      // bundles this remote's OWN React copy rather than declaring a real
+      // singleton, so it worked only by accident (no runtime version check
+      // against the host at all). Declaring requiredVersion here is what
+      // makes a genuine host/remote mismatch fail loudly instead of silently
+      // shipping two React copies. See FuzeFront's MF-singleton-mismatch fix.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      shared: ['react', 'react-dom'] as any,
+      shared: {
+        react: { singleton: true, requiredVersion: '^19.0.0' },
+        'react-dom': { singleton: true, requiredVersion: '^19.0.0' },
+      } as any,
     }),
   ],
   resolve: {
