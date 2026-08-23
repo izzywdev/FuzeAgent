@@ -50,3 +50,11 @@ ingress:
   className: traefik
   host: fuzeagent.prod.fuzefront.com
   annotations: {}
+
+# federatedMount stays OFF here too (inherits values.yaml's disabled default —
+# deliberately no override). Its host would be FuzeFront's app.fuzefront.com,
+# not this repo's own ingress.host above: a second namespace's Ingress object
+# against a host this repo doesn't own is a cross-repo routing decision
+# (coordinate with FuzeFront's own app.fuzefront.com Ingress rules first),
+# exactly as FuzeX deferred enabling its own federatedMount for the same
+# reason. Flip it once that coordination has happened.
