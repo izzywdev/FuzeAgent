@@ -1,0 +1,13 @@
+# Line endings. gate-line-endings (.github/workflows/gate-line-endings.yml) HARD FAILS
+# a PR whose changed files are stored with CRLF. Without an attribute covering the
+# path, git happily re-offers CRLF on the very next edit, so the same PR gets blocked
+# again -- that recurrence is precisely why the gate exists rather than relying on
+# .gitattributes alone. This repo's entire CRLF backlog is Python, so cover *.py.
+#
+# This does NOT rewrite existing blobs; it only takes effect the next time a file is
+# staged. 20 pre-existing CRLF .py files under services/orchestrator/ remain and are
+# reported as warnings on pushes to main. Clean them with:
+#   git add --renormalize . && git commit -m "chore: normalise line endings to LF"
+# (deliberately not done here -- it would bury this security fix under ~20k
+# whitespace-only diff lines and collide with the PRs currently in flight).
+*.py text eol=lf
