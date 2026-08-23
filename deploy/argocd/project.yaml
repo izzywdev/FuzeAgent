@@ -1,0 +1,70 @@
+# Argo CD AppProject for FuzeAgent.
+#
+# MOVED FROM FuzeInfra (argocd/projects/fuzeagent.yaml) as part of the family's
+# decentralized-Argo migration — each repo now owns its own deploy/argocd/,
+# including its AppProject; FuzeInfra's argocd-register workflow applies this
+# directory ONCE and Argo self-syncs from here thereafter. FuzeX, FuzePlan,
+# FuzeDeploy, FuzeBI, FuzeCall, FuzeSocial and FuzeKeys already do this.
+# FuzeInfra's copy (argocd/projects/fuzeagent.yaml) must be deleted once this
+# PR lands — that deletion is a FuzeInfra-owned follow-up, not done here.
+#
+# ISOLATION BOUNDARY (FuzeInfra#99) — carried over verbatim, do not weaken:
+# consumer apps must NOT be able to deploy into FuzeInfra's own `fuzeinfra`
+# namespace. A consumer that grants itself the `fuzeinfra` namespace can
+# redeploy a *duplicate* FuzeInfra (split-brain Postgres/Kafka, control-plane
+# saturation, cluster-wide 502 — see FuzeInfra#93 / FuzeFront#95). This project
+# deliberately does NOT include `fuzeinfra`, and never should.
+#
+# GOVERNANCE RULE (updated for the decentralized model): the repo that owns a
+# workload owns its AppProject as the destination/security boundary; the
+# boundary contract itself (no `fuzeinfra` destination, narrow cluster-scoped
+# access) is still non-negotiable and enforced by review, not by FuzeInfra
+# authorship. Consumers reach FuzeInfra services via in-cluster service DNS
+# (cross-namespace networking) — that needs NO Argo destination into
+# `fuzeinfra`. FuzeAgent is additionally self-contained (namespaced
+# pgvector-Postgres/RabbitMQ/Redis, see deploy/helm/fuzeagent).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: fuzeagent
+  namespace: argocd
+spec:
+  description: FuzeAgent product (consumer of FuzeInfra) — may deploy ONLY into its own namespace.
+
+  # Only this repo may be a source for Applications in this project.
+  sourceRepos:
+    - https://github.com/izzywdev/FuzeAgent.git
+
+  destinations:
+    # The product's workloads (deploy/helm/fuzeagent, deploy/helm/a2a-shared,
+    # the sealed-secret bundle).
+    - namespace: fuzeagent
+      server: https://kubernetes.default.svc
+    # The app-of-apps (deploy/argocd/app-of-apps.yaml) recurses into
+    # deploy/argocd/applications/, whose child Application objects live here.
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    # NOTE: `fuzeinfra` is deliberately NOT a destination — that is FuzeInfra's
+    # namespace. A consumer that needs an infra service consumes it via DNS, it
+    # does not deploy into it.
+
+  # Narrowed from FuzeInfra's original `group: "*", kind: "*"` (which let this
+  # project create/modify ANY cluster-scoped object, including ClusterRoles,
+  # ClusterRoleBindings and other AppProjects — i.e. rewrite this very
+  # boundary). Checked every template under deploy/helm/{fuzeagent,a2a-shared}:
+  # every `kind:` emitted (Deployment, Service, ServiceAccount, ConfigMap,
+  # Ingress, SealedSecret, PersistentVolumeClaim, ResourceQuota, LimitRange,
+  # Role, RoleBinding) is namespace-scoped. The one cluster-scoped resource
+  # actually needed is Namespace itself: all three child Applications
+  # (fuzeagent.yaml, fuzeagent-sealed.yaml, a2a-shared.yaml) set
+  # `syncOptions: [CreateNamespace=true]`, which requires Argo to be allowed to
+  # create the Namespace object.
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+
+  # Left as FuzeInfra had it — this is scoped to the destinations above
+  # (fuzeagent, argocd), which are already the narrow boundary.
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
