@@ -197,28 +197,33 @@ jobs:
         python-version: ${{ env.PYTHON_VERSION }}
     
     - name: Install security tools
+      # `safety` 3.x requires an authenticated Safety-Platform session (it calls
+      # out to its own OIDC/JWKS endpoint even for `safety check`) -- unusable
+      # headless in CI without an account/API key. pip-audit (PyPA, backed by
+      # the OSV.dev database) does the same job with no login required and is
+      # actively maintained; this is a tool swap, not a scan skip.
       run: |
-        pip install bandit safety
-    
+        pip install bandit pip-audit
+
     - name: Run Bandit security scan
       working-directory: services/orchestrator
       run: |
         bandit -r . --skip B101 -f json -o bandit-report.json || true
         bandit -r . --skip B101 -f txt
-    
+
     - name: Check for known security vulnerabilities
       working-directory: services/orchestrator
       run: |
-        safety check --json --output safety-report.json || true
-        safety check
-    
+        pip-audit -r requirements.txt --format=json --output=pip-audit-report.json || true
+        pip-audit -r requirements.txt
+
     - name: Upload security reports
       uses: actions/upload-artifact@v7
       with:
         name: security-reports
         path: |
           services/orchestrator/bandit-report.json
-          services/orchestrator/safety-report.json
+          services/orchestrator/pip-audit-report.json
         retention-days: 30
 
   lint:
