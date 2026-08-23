@@ -122,6 +122,23 @@ ingress:
   host: fuzeagent.local
   annotations: {}
 
+# --- federatedMount: same-origin FuzeFront-portal route for the UI's
+# Module-Federation remote (templates/federated-mount-ingress.yaml). A SEPARATE
+# surface from `ingress` above: this one lives on FuzeFront's OWN host
+# (app.fuzefront.com), not fuzeagent's admin-console host, so the portal shell
+# can import remoteEntry.js same-origin. `path` MUST match the UI's vite build
+# `base` exactly (services/ui-react/vite.config.ts) or remoteEntry.js 200s and
+# every chunk it references 404s. Disabled + hostless by default (mirrors
+# FuzeX's deploy/helm/fuzex federatedMount): flipping `enabled` is a cross-repo
+# routing decision — coordinate with FuzeFront's app.fuzefront.com Ingress
+# rules first, same as FuzeX deferred it in its own values-prod.yaml.
+federatedMount:
+  enabled: false
+  className: traefik
+  host: ""
+  annotations: {}
+  path: /apps/fuzeagent
+
 # --- Namespace guardrails on the shared node ----------------------------------
 resourceGovernance:
   enabled: true
