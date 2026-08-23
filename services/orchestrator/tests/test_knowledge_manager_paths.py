@@ -282,3 +282,152 @@ async def test_upload_document_rejects_unsupported_extension(manager):
         await manager.upload_document(
             file_content=io.BytesIO(b"x"), filename="evil.sh", agent_id="agent-1"
         )
+
+
+# --------------------------------------------------------------------------
+# The (a)-vs-(b) test for the remaining CodeQL alerts.
+#
+# CodeQL still reports py/path-injection and py/full-ssrf on this file after the
+# fix. Three of those alerts sit *inside* `_ensure_within` itself -- the
+# sanitizer -- because CodeQL does not model a regex allowlist or
+# `Path.resolve()` + `is_relative_to()` as a barrier, so taint still "reaches"
+# the guard. The alert count actually went UP (17 -> 19) for exactly that
+# reason: `_ensure_within` is a shared confluence point that 21-27 separate
+# tainted flows now pass through.
+#
+# "CodeQL says so" is not evidence of a vulnerability, and "the tests pass" is
+# not evidence of its absence. So this test is the discriminator: it drives every
+# public entry point with every malicious input class and asserts the only thing
+# that actually matters -- that nothing is created, read, or deleted outside the
+# storage root. If a future change makes one of those alerts real, this goes red.
+# --------------------------------------------------------------------------
+
+_BAD_SCOPES = [
+    "../../../../etc",
+    "..",
+    "/etc",
+    "a/../../b",
+    "%2e%2e%2f",
+    "x" * 65,
+    "with space",
+    "n\x00ul",
+]
+_BAD_DOC_IDS = ["../../etc/passwd", "*", "**", "..", "a/b", "not-a-uuid", "?" * 8, ""]
+_BAD_FILENAMES = [
+    "../../../../tmp/pwned.txt",
+    "..%2f..%2fx.txt",
+    "a/b/c.txt",
+    "\x00.txt",
+]
+
+
+@pytest.mark.asyncio
+async def test_no_entry_point_can_touch_anything_outside_the_storage_root(
+    manager, tmp_path
+):
+    """Drive every public method with hostile input; assert zero escapes.
+
+    Deliberately tolerant of *how* each method refuses -- some raise
+    UnsafeInputError, some catch it internally and return None/False. What is
+    asserted is the outcome on the filesystem, not the shape of the rejection.
+    """
+    import io
+
+    outside = tmp_path.parent / "outside_canary"
+    outside.mkdir(exist_ok=True)
+    canary = outside / "canary.txt"
+    canary.write_text("SECRET")
+    outside_before = sorted(p.name for p in outside.iterdir())
+
+    escape_relative = os.path.relpath(outside, tmp_path / "agents")
+
+    async def _swallow(coro):
+        try:
+            await coro
+        except Exception:
+            pass
+
+    for scope in _BAD_SCOPES + [escape_relative]:
+        await _swallow(manager.get_documents(agent_id=scope))
+        await _swallow(manager.search_documents("q", agent_id=scope))
+        await _swallow(
+            manager.upload_document(
+                file_content=io.BytesIO(b"x"), filename="a.txt", agent_id=scope
+            )
+        )
+        try:
+            manager._get_storage_path(agent_id=scope)
+        except Exception:
+            pass
+
+    for doc_id in _BAD_DOC_IDS:
+        await _swallow(manager.get_document_metadata(doc_id, agent_id="agent-1"))
+        await _swallow(manager.get_document_content(doc_id, agent_id="agent-1"))
+        await _swallow(manager.update_document(doc_id, title="t", agent_id="agent-1"))
+        await _swallow(manager.delete_document(doc_id, agent_id="agent-1"))
+
+    for name in _BAD_FILENAMES:
+        await _swallow(
+            manager.upload_document(
+                file_content=io.BytesIO(b"x"), filename=name, agent_id="agent-1"
+            )
+        )
+
+    # The assertions that decide (a) vs (b).
+    assert canary.exists(), "a hostile input deleted a file outside the storage root"
+    assert canary.read_text() == "SECRET", "a hostile input overwrote an outside file"
+    assert (
+        sorted(p.name for p in outside.iterdir()) == outside_before
+    ), "a hostile input created a file outside the storage root"
+
+    # Everything that *was* written stayed in-scope and is named by doc_id only.
+    written = [p for p in tmp_path.rglob("*") if p.is_file()]
+    for path in written:
+        assert path.resolve().is_relative_to(
+            tmp_path.resolve()
+        ), f"{path} escaped the storage root"
+        assert (
+            path.parent.name == "agent-1"
+        ), f"{path} landed outside the caller's scope"
+
+
+def test_fetch_url_safely_is_the_only_outbound_call():
+    """A chokepoint one caller bypasses is not a chokepoint.
+
+    Pins the invariant that no direct `requests.get(url, ...)` is reintroduced
+    alongside the guarded helper -- the SSRF alert would then be real.
+    """
+    import inspect
+
+    source = inspect.getsource(km)
+    outbound = [
+        line.strip()
+        for line in source.splitlines()
+        if "requests." in line and not line.strip().startswith("#")
+    ]
+    assert outbound == [
+        "response = requests.get(current, timeout=timeout, allow_redirects=False)"
+    ], f"unexpected outbound HTTP call(s) outside _fetch_url_safely: {outbound}"
+
+
+def test_every_storage_path_goes_through_the_validating_chokepoint():
+    """No method may build a scope path without _get_storage_path()."""
+    import inspect
+
+    source = inspect.getsource(km.KnowledgeManager)
+    # `self.storage_path / ...` is only legitimate inside __init__ (fixed, trusted
+    # subdirectory names) and inside _get_storage_path itself (validated + contained).
+    offenders = []
+    current = None
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("def ") or stripped.startswith("async def "):
+            current = (
+                stripped.split("(")[0].replace("async def ", "").replace("def ", "")
+            )
+        if "self.storage_path /" in stripped and current not in (
+            "__init__",
+            "_get_storage_path",
+        ):
+            offenders.append((current, stripped))
+    assert not offenders, f"scope path built outside the chokepoint: {offenders}"
