@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 import markdown
 
 # Document processing imports
-import PyPDF2
+import pypdf
 import requests
 from bs4 import BeautifulSoup
 from docx import Document as DocxDocument
@@ -127,7 +127,7 @@ class KnowledgeManager:
         text = ""
         try:
             with open(file_path, "rb") as file:
-                reader = PyPDF2.PdfReader(file)
+                reader = pypdf.PdfReader(file)
                 for page in reader.pages:
                     text += page.extract_text() + "\n"
         except Exception as e:
