@@ -137,7 +137,7 @@ federatedMount:
   className: traefik
   host: ""
   annotations: {}
-  path: /apps/agent
+  path: /apps/fuzeagent
 
 # --- Namespace guardrails on the shared node ----------------------------------
 resourceGovernance:

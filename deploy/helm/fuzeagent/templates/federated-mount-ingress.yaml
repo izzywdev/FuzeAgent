@@ -2,7 +2,7 @@
 {{/*
 Same-origin FuzeFront-portal mount for the UI's Module-Federation remote.
 
-Routes {host}/apps/agent/* (e.g. /apps/agent/remoteEntry.js) to the `ui`
+Routes {host}/apps/fuzeagent/* (e.g. /apps/fuzeagent/remoteEntry.js) to the `ui`
 Service so the FuzeFront portal shell imports the remote SAME-ORIGIN — no
 iframe, no CORS, no mixed-content — sharing the host's React 19 singleton.
 
@@ -17,11 +17,15 @@ Service in its own namespace, and `ui` runs in `fuzeagent` (its own Argo
 Application). The cluster-wide Traefik controller routes it; no FuzeInfra
 change is needed.
 
-PASS-THROUGH, not rewrite: the UI's build `base` is /apps/agent/
+PASS-THROUGH, not rewrite: the UI's build `base` MUST be /apps/fuzeagent/
 (services/ui-react/vite.config.ts) so nginx already serves assets under that
-prefix — deliberately NO strip-prefix middleware/annotation here. The path
-below MUST match that `base` exactly, or remoteEntry.js 200s and every chunk
-it references 404s (blank portal panel, green healthcheck).
+prefix — deliberately NO strip-prefix middleware/annotation here. The slug is
+"fuzeagent", not "agent": the FuzeFront portal derives the mount path from the
+app's NAME in the portal database (backend/src/routes/appRegistry.ts:53 —
+`row.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')`), not from this repo's own
+manifest slug. "FuzeAgent" -> "fuzeagent". The path below MUST match the vite
+`base` exactly, or remoteEntry.js 200s and every chunk it references 404s
+(blank portal panel, green healthcheck).
 
 Disabled + hostless by default, mirroring FuzeX: `host` is `required` when
 enabled so a hostless Ingress can never match every request the controller
