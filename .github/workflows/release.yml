@@ -50,7 +50,7 @@ jobs:
         run: echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
       - name: Build & push orchestrator
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: services/orchestrator
           file: services/orchestrator/Dockerfile
@@ -62,7 +62,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=orchestrator
 
       - name: Build & push hierarchy-api
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile.hierarchy
@@ -74,7 +74,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=hierarchy
 
       - name: Build & push ui
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: services/ui-react
           file: services/ui-react/Dockerfile
@@ -89,7 +89,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=ui
 
       - name: Build & push mcp-server
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: mcp-servers/fuzeagent-server
           file: mcp-servers/fuzeagent-server/Dockerfile
@@ -105,7 +105,7 @@ jobs:
         # packages a2a/*.py + the frozen contract client. Chart ships enabled:false
         # until the server + providesTo backfill land, so this image is tagged but
         # not run in prod yet.
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: agent-templates
           file: agent-templates/a2a/Dockerfile
@@ -164,7 +164,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push claude-runner-base
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: containers/claude-runner-base
           push: true
@@ -204,7 +204,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push ${{ matrix.image.name }}
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ${{ matrix.image.context }}
           push: true
