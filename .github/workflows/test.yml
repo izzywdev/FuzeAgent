@@ -184,7 +184,14 @@ jobs:
         path: services/orchestrator/htmlcov/
         retention-days: 30
 
-  security-scan:
+  # Renamed from `security-scan`: ci.yml also has a job named `security-scan` (the
+  # unrelated repo-wide Trivy filesystem SARIF scan at ci.yml:96) and both surfaced as a
+  # check literally named "security-scan" with no way to tell them apart from the check
+  # name alone — a red one was ambiguous, and it cost real diagnostic time distinguishing
+  # "the bandit/pip-audit job broke" from "the Trivy fs scan broke" across three PRs.
+  # Neither name is a required status check (branch protection requires only the
+  # gate-* contexts from harden-gate.yml), so this rename does not un-gate anything.
+  backend-security-scan:
     runs-on: ubuntu-latest
     needs: test-backend
     
@@ -216,47 +223,56 @@ jobs:
       # The first run is the *record*: unfiltered, every finding, into the
       # uploaded artifact. The second run is the *gate*.
       #
-      # The gate carries exactly two per-advisory exceptions. Both are findings
-      # with NO upstream fix available -- not "noisy" findings, and not a way to
-      # reach green. This is deliberately an explicit ID allow-list rather than a
-      # blanket suppression or a `|| true`: any *new* advisory, and any new
-      # version of these same packages picking up a *different* advisory, still
+      # The gate carries exactly one per-advisory exception: a finding with NO
+      # upstream fix available -- not a "noisy" finding, and not a way to
+      # reach green. This is deliberately an explicit ID allow-list rather than
+      # a blanket suppression or a `|| true`: any *new* advisory, and any new
+      # version of this same package picking up a *different* advisory, still
       # fails this step. Every fixable finding must be fixed by bumping the pin.
       #
       # PYSEC-2026-311 / CVE-2026-45829 / GHSA-f4j7-r4q5-qw2c -- chromadb
       #   Pre-auth code injection in the ChromaDB *server*'s
       #   POST /api/v2/tenants/{tenant}/databases/{db}/collections handler
       #   (trust_remote_code against an attacker-supplied model repo).
-      #   No fix exists: `pip-audit` reports no fix version, and the current
-      #   latest release (1.5.9) is still listed as affected -- so a bump is not
-      #   on the table.
-      #   Not reachable from this service: services/orchestrator/rag_integration.py
-      #   uses chromadb.HttpClient() only -- FuzeAgent is a *client* of an
-      #   external Chroma server (CHROMA_HOST/CHROMA_PORT) and never serves the
-      #   vulnerable endpoint itself. Chroma appears in no Dockerfile, no compose
-      #   file and no Helm chart in this repo. Hardening the Chroma server is the
-      #   operator's (FuzeInfra's) responsibility, not this requirements file's.
-      #   Revisit if upstream ships a fix, or if this repo ever runs Chroma.
+      #   No fix exists: `pip-audit` reports no fix version. Re-verified
+      #   directly against pip-audit for both endpoints of the prior 1.1.1 ->
+      #   1.5.9 range: 1.1.1 shows `fix_versions: []`, and the current latest
+      #   release (1.5.9) *also* shows `fix_versions: []` -- upgrading does
+      #   not clear the advisory either way.
+      #   The requirements.txt range (`chromadb>=0.5.0,<2.0.0`) already
+      #   permits 1.5.9; what actually pins the resolved version to the
+      #   1.1.x line is `crewai` (a direct, necessary dependency for agent
+      #   orchestration), which has declared `chromadb~=1.1.0` in EVERY
+      #   release since 0.201.0, including the current latest (1.15.17) --
+      #   verified across the full crewai release history via the PyPI JSON
+      #   API. The last crewai release with an open chromadb range
+      #   (`chromadb>=0.5.23`) was 0.193.2, ~900 releases behind current.
+      #   Forcing chromadb up would mean pinning crewai back to 0.193.2, a
+      #   major, unrelated behavioural downgrade of the orchestration engine
+      #   this service depends on -- not a reasonable trade for an advisory
+      #   that, per the point above, does not clear either way. Revisit if
+      #   crewai relaxes its chromadb pin, or if chromadb ships a real fix.
+      #   Not reachable from this service either way:
+      #   services/orchestrator/rag_integration.py uses chromadb.HttpClient()
+      #   only -- FuzeAgent is a *client* of an external Chroma server
+      #   (CHROMA_HOST/CHROMA_PORT) and never serves the vulnerable endpoint
+      #   itself. Chroma appears in no Dockerfile, no compose file and no
+      #   Helm chart in this repo. Hardening the Chroma server is the
+      #   operator's (FuzeInfra's) responsibility, not this requirements
+      #   file's.
       #
       # PYSEC-2026-1325 / CVE-2024-23342 / GHSA-wj6h-64fc-37mp -- ecdsa
-      #   Minerva timing side-channel leaking the ECDSA nonce on P-256.
-      #   No fix will ever exist: upstream python-ecdsa treats side-channel
-      #   resistance as out of scope and has declined to fix; 0.19.2 is latest.
-      #   Not removable by pinning either: python-jose declares `ecdsa!=0.15` as
-      #   an unconditional install_requires, not behind an extra.
-      #   Not reachable from this service: the advisory affects signing, key
-      #   generation and ECDH, and explicitly states that signature
-      #   *verification* is unaffected. services/orchestrator/auth.py only ever
-      #   calls jwt.decode() -- verification -- with JWT_ALGORITHM defaulting to
-      #   HS256. Nothing in this service signs with, or generates, an EC key.
-      #   Real removal (tracked follow-up, deliberately not done in this PR
-      #   because it edits authentication code): port auth.py from python-jose
-      #   to PyJWT, already a declared dependency, which drops ecdsa entirely.
+      #   RESOLVED, not ignored: auth.py was ported from python-jose to
+      #   PyJWT (already a declared dependency; auth.py only ever calls
+      #   jwt.decode() -- verification, which the advisory explicitly states
+      #   is unaffected). python-jose was the sole source of the unconditional
+      #   `ecdsa!=0.15` install_requires in this dependency tree -- verified
+      #   by resolving the full, updated requirements.txt: no `ecdsa` package
+      #   appears anywhere in the resolved set. No ignore needed.
       run: |
         pip-audit -r requirements.txt --format=json --output=pip-audit-report.json || true
         pip-audit -r requirements.txt \
-          --ignore-vuln PYSEC-2026-311 \
-          --ignore-vuln PYSEC-2026-1325
+          --ignore-vuln PYSEC-2026-311
 
     - name: Upload security reports
       uses: actions/upload-artifact@v7
@@ -283,14 +299,20 @@ jobs:
         pip install black isort flake8 mypy
     
     - name: Check code formatting with Black
+      # Enforcing (was `|| true`): verified clean against the requirements.txt-pinned
+      # black range (>=23.11.0,<27.0.0) — `black --check .` passes with 0 files needing
+      # reformat. The `|| true` here was masking nothing; a stale locally-installed
+      # black (23.11.0, the range floor) produced spurious diffs during verification —
+      # the requirements-range-satisfying latest (26.5.1) is clean.
       working-directory: services/orchestrator
       run: |
-        black --check --diff . || true
-    
+        black --check --diff .
+
     - name: Check import sorting with isort
+      # Enforcing (was `|| true`): verified clean (isort --check-only reports 0 files).
       working-directory: services/orchestrator
       run: |
-        isort --check-only --diff . || true
+        isort --check-only --diff .
     
     - name: Run flake8 linting
       working-directory: services/orchestrator
@@ -299,6 +321,15 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     
     - name: Run mypy type checking
+      # Report-only, and NOT a decoration: verified 143 real errors across 29 files as
+      # of 2026-08-23 (rag_manager.py, knowledge_analytics_service.py and others —
+      # attr-defined / arg-type / var-annotated, not just missing annotations), plus a
+      # `mypy .` module-resolution config issue (a2a_protocol.py resolves under two
+      # names because services/orchestrator/__init__.py makes the scanned root itself
+      # a package). Fixing 143 findings across app logic is backend-engineer scope, not
+      # CI-wiring; tracked in governance/vacuous-check-policy.json (mode=ramp) so the
+      # forthcoming gate-vacuous-check gate (lands via FuzeSDLC canonical sync) does not
+      # immediately red this repo on arrival.
       working-directory: services/orchestrator
       run: |
         mypy . --ignore-missing-imports --no-strict-optional || true
@@ -422,6 +453,12 @@ jobs:
         pip install pytest pytest-benchmark
     
     - name: Run performance tests
+      # Report-only by design, not by omission: pytest-benchmark timing noise on shared
+      # CI runners is expected, and whether a perf regression should ever BLOCK a merge
+      # is a product decision this PR does not make. Tracked explicitly in
+      # governance/vacuous-check-policy.json (mode=ramp, owner backend-engineer) rather
+      # than left as an unexplained `|| true`, so the forthcoming gate-vacuous-check gate
+      # sees a deliberate, reviewed exception instead of a silent one.
       working-directory: services/orchestrator
       env:
         DATABASE_URL: postgresql://postgres:password@localhost:5434/ai_context_test

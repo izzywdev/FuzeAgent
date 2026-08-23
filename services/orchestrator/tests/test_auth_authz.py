@@ -38,9 +38,9 @@ os.environ.pop("JWT_ISSUER", None)
 # Ensure the orchestrator package dir is importable (tests run from there).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import jwt
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from jose import jwt
 from pydantic import BaseModel, ConfigDict
 
 import auth as auth_module
@@ -133,6 +133,51 @@ def test_execute_with_token_signed_by_wrong_secret_is_401(client):
         "/sandboxes/abc/execute",
         json={"command": "ls"},
         headers={"Authorization": f"Bearer {bad}"},
+    )
+    assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Algorithm confusion -- ``_decode_token`` pins ``algorithms=[JWT_ALGORITHM]``
+# explicitly (never derived from the token's own header). These prove that
+# pin actually rejects a mismatched algorithm rather than merely accepting a
+# correctly-signed one -- the trap being ported off python-jose to PyJWT: an
+# algorithm allow-list that isn't enforced is not a mitigation.
+# ---------------------------------------------------------------------------
+
+
+def test_execute_with_alg_none_token_is_401(client):
+    """A classic alg-confusion forgery: header declares "none" and the
+    signature segment is empty, so the payload is attacker-controlled with
+    no verification material required at all. Must never be accepted."""
+    import base64
+    import json
+
+    def _b64url(data: bytes) -> str:
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+    header = _b64url(json.dumps({"alg": "none", "typ": "JWT"}).encode())
+    payload = _b64url(json.dumps({"sub": "attacker", "is_admin": True}).encode())
+    forged = f"{header}.{payload}."
+
+    r = client.post(
+        "/sandboxes/abc/execute",
+        json={"command": "ls"},
+        headers={"Authorization": f"Bearer {forged}"},
+    )
+    assert r.status_code == 401
+
+
+def test_execute_with_token_signed_using_unexpected_algorithm_is_401(client):
+    """The server is configured for HS256 only (JWT_ALGORITHM=HS256). A token
+    correctly signed with the same secret but under a *different* algorithm
+    (HS512) must still be rejected -- the algorithm allow-list is not merely
+    advisory."""
+    wrong_alg = jwt.encode({"sub": "user-1"}, SECRET, algorithm="HS512")
+    r = client.post(
+        "/sandboxes/abc/execute",
+        json={"command": "ls"},
+        headers={"Authorization": f"Bearer {wrong_alg}"},
     )
     assert r.status_code == 401
 

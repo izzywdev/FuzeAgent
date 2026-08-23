@@ -17,6 +17,7 @@ import os
 import sys
 import uuid
 from pathlib import Path
+from typing import List
 
 import pytest
 
@@ -341,37 +342,49 @@ async def test_no_entry_point_can_touch_anything_outside_the_storage_root(
 
     escape_relative = os.path.relpath(outside, tmp_path / "agents")
 
-    async def _swallow(coro):
+    # Each vector is *expected* to be refused, but the methods disagree on how:
+    # some raise UnsafeInputError, some catch it internally and return None/False.
+    # So record the outcome instead of discarding it -- a bare `except: pass`
+    # throws away the evidence (and trips bandit B110, correctly: it is the
+    # pattern that hides real errors).
+    outcomes: List[object] = []
+
+    async def _record(coro):
         try:
-            await coro
-        except Exception:
-            pass
+            outcomes.append(await coro)
+        except Exception as exc:  # noqa: BLE001 - any refusal shape is acceptable
+            outcomes.append(exc)
 
     for scope in _BAD_SCOPES + [escape_relative]:
-        await _swallow(manager.get_documents(agent_id=scope))
-        await _swallow(manager.search_documents("q", agent_id=scope))
-        await _swallow(
+        await _record(manager.get_documents(agent_id=scope))
+        await _record(manager.search_documents("q", agent_id=scope))
+        await _record(
             manager.upload_document(
                 file_content=io.BytesIO(b"x"), filename="a.txt", agent_id=scope
             )
         )
         try:
-            manager._get_storage_path(agent_id=scope)
-        except Exception:
-            pass
+            outcomes.append(manager._get_storage_path(agent_id=scope))
+        except Exception as exc:  # noqa: BLE001 - any refusal shape is acceptable
+            outcomes.append(exc)
 
     for doc_id in _BAD_DOC_IDS:
-        await _swallow(manager.get_document_metadata(doc_id, agent_id="agent-1"))
-        await _swallow(manager.get_document_content(doc_id, agent_id="agent-1"))
-        await _swallow(manager.update_document(doc_id, title="t", agent_id="agent-1"))
-        await _swallow(manager.delete_document(doc_id, agent_id="agent-1"))
+        await _record(manager.get_document_metadata(doc_id, agent_id="agent-1"))
+        await _record(manager.get_document_content(doc_id, agent_id="agent-1"))
+        await _record(manager.update_document(doc_id, title="t", agent_id="agent-1"))
+        await _record(manager.delete_document(doc_id, agent_id="agent-1"))
 
     for name in _BAD_FILENAMES:
-        await _swallow(
+        await _record(
             manager.upload_document(
                 file_content=io.BytesIO(b"x"), filename=name, agent_id="agent-1"
             )
         )
+
+    # The sweep must actually have run every vector -- a loop that silently did
+    # nothing would satisfy the filesystem assertions below for the wrong reason.
+    expected = (len(_BAD_SCOPES) + 1) * 4 + len(_BAD_DOC_IDS) * 4 + len(_BAD_FILENAMES)
+    assert len(outcomes) == expected, f"sweep ran {len(outcomes)}/{expected} vectors"
 
     # The assertions that decide (a) vs (b).
     assert canary.exists(), "a hostile input deleted a file outside the storage root"

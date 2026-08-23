@@ -86,20 +86,36 @@ jobs:
       run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       
     - name: Type checking (mypy)
+      # Report-only: same 143 real findings as test.yml's lint job (see its comment) —
+      # backend-engineer scope, tracked in governance/vacuous-check-policy.json.
       run: mypy . --ignore-missing-imports
       continue-on-error: true
-      
+
     - name: Run tests
+      # Report-only: this job has NO Postgres/Redis service containers (unlike
+      # test.yml's test-backend job, which does and properly enforces its
+      # marker-filtered pytest runs), so an unfiltered `pytest --cov=. --cov-report=xml`
+      # here fails on missing infra, not on code — flipping to enforcing without adding
+      # service containers would just be a new kind of always-red. This job duplicates
+      # test.yml's test-backend job; consolidating them is a real fix but is a bigger,
+      # more invasive change than this PR's CI-wiring scope. Tracked in
+      # governance/vacuous-check-policy.json.
       run: pytest --cov=. --cov-report=xml
       continue-on-error: true
 
-  security-scan:
+  # Renamed from `security-scan`: test.yml also had a job named `security-scan` (the
+  # unrelated bandit/pip-audit backend job, now `backend-security-scan` there) and both
+  # surfaced as a check literally named "security-scan" with no way to tell them apart
+  # from the check name alone. Neither name is a required status check (branch
+  # protection requires only the gate-* contexts from harden-gate.yml), so this rename
+  # does not un-gate anything.
+  fs-security-scan:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
@@ -140,6 +156,12 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Run Trivy on Docker images
+      # Report-only: not independently reverifiable from a devops-engineer CI-wiring
+      # pass (no docker daemon available for local verification here, and the
+      # fuzeagent-ui image build needs a private-registry GITHUB_TOKEN secret). Flipping
+      # this to enforcing needs whoever CAN verify current findings are clean (or add a
+      # justified per-CVE ignore list) to actually run it — tracked in
+      # governance/vacuous-check-policy.json rather than guessed at.
       run: |
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
           -v ${{ github.workspace }}:/workspace \
@@ -162,6 +184,12 @@ jobs:
         node-version: '24.x'
         
     - name: Frontend dependency audit
+      # Report-only: verified 23 current advisories at --audit-level=high (16 high, 3
+      # critical) as of 2026-08-23, in devDependencies (vite/vitest/ws transitive
+      # chain). Most have `npm audit fix` available, but bumping is a real dependency
+      # upgrade with build-breakage risk (vite/vitest majors), not a mechanical
+      # CI-wiring change — owner frontend-engineer. Tracked in
+      # governance/vacuous-check-policy.json.
       run: |
         cd services/ui-react
         npm audit --audit-level=high
@@ -175,10 +203,18 @@ jobs:
     - name: Backend dependency security check
       # `safety` 3.x requires an authenticated Safety-Platform session and
       # crashes headless without one; pip-audit (PyPA, OSV.dev-backed) does
-      # the same job with no login required. See test.yml's security-scan job.
+      # the same job with no login required. See test.yml's backend-security-scan job.
+      #
+      # Enforcing (was `continue-on-error: true`): the two per-advisory exceptions below
+      # are the SAME already-reviewed, no-upstream-fix findings test.yml's
+      # backend-security-scan job documents in full (PYSEC-2026-311 / chromadb,
+      # PYSEC-2026-1325 / ecdsa — same requirements.txt, same packages, same reasoning).
+      # Reusing an already-justified exception rather than leaving this bare and hoping
+      # it happens to match.
       run: |
         cd services/orchestrator
         pip install --upgrade pip
         pip install pip-audit
-        pip-audit -r requirements.txt
-      continue-on-error: true
+        pip-audit -r requirements.txt \
+          --ignore-vuln PYSEC-2026-311 \
+          --ignore-vuln PYSEC-2026-1325

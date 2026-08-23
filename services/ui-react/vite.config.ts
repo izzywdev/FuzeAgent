@@ -7,14 +7,14 @@ import path from 'path'
 // Module Federation contract (must match registration/manifest.json — slug: "fuzeagent"):
 //   scope  = "fuzeagentApp"        (federation `name`)
 //   module = "./FuzeAgentApp"      (exposed module)
-//   remoteEntry served same-origin at /apps/fuzeagent/remoteEntry.js (the
-//   FuzeFront host mounts remotes under /apps/<slug>/, and the slug is
-//   PORTAL-DERIVED from this app's registered NAME, not this repo's own
-//   manifest field — izzywdev/FuzeFront backend/applications/src/
-//   app-registry/builtins.ts:35: FuzeAgent is one of the four genuine
-//   BUILTIN_MANIFESTS entries, slug: 'fuzeagent'. A remote built for "/apps/
-//   agent/" but served at "/apps/fuzeagent/" returns a 200 on remoteEntry.js
-//   and then 404s every chunk).
+//   remoteEntry served SAME-ORIGIN under the FuzeFront portal shell at
+//   https://app.fuzefront.com/apps/fuzeagent/remoteEntry.js — NOT the old
+//   cross-origin https://fuzeagent.prod.fuzefront.com/remoteEntry.js. That host
+//   sits behind the Cloudflare Access wall, so the browser's fetch of it (no
+//   Access session) got an HTML login page back instead of JS and Module
+//   Federation failed with "Failed to fetch dynamically imported module".
+//   Slug is 'fuzeagent' per registration/manifest.json and FuzeFront's builtin
+//   registry entry (app-registry/builtins.ts:35) — do not change it.
 // React / react-dom are shared singletons so FuzeFront's React instance is reused.
 export default defineConfig({
   plugins: [
@@ -46,17 +46,23 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Served under /apps/fuzeagent/ in prod (remoteEntry at
-  // /apps/fuzeagent/remoteEntry.js), matching registration/manifest.json's
-  // slug ("fuzeagent") and remoteEntry URL, and FuzeFront's builtin registry
-  // entry for this product (builtins.ts:35, slug: 'fuzeagent').
+  // MUST match deploy/helm/fuzeagent/values.yaml's federatedMount.path AND the
+  // vendored registration/manifest.json's integration.remoteEntry exactly, or
+  // remoteEntry.js 200s while every chunk it references 404s (blank portal
+  // panel, green healthcheck) -- see federated-mount-ingress.yaml's comment.
+  // This same build is ALSO served at the root of this app's own admin-console
+  // host (fuzeagent.prod.fuzefront.com/) -- nginx.conf aliases the
+  // /apps/fuzeagent/ prefix straight back to the flat docroot, so index.html's
+  // own asset references (also under this base) resolve there too.
   base: '/apps/fuzeagent/',
   build: {
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
-    // Output chunks to dist/ directly (not dist/assets/) so remoteEntry.js is
-    // served at /apps/fuzeagent/remoteEntry.js, matching the manifest's remoteEntry URL.
+    // Flat output (no nested assets/ subdir): the Dockerfile copies dist/
+    // straight to the nginx docroot and nginx.conf aliases /apps/fuzeagent/
+    // to that docroot, so every asset path under the base above must resolve
+    // one level down, not under an extra assets/ segment.
     assetsDir: '',
   },
   server: {
