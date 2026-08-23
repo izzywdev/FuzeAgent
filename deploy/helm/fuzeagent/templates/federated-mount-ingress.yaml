@@ -1,0 +1,58 @@
+{{- if and .Values.federatedMount.enabled .Values.ui.enabled }}
+{{/*
+Same-origin FuzeFront-portal mount for the UI's Module-Federation remote.
+
+Routes {host}/apps/agent/* (e.g. /apps/agent/remoteEntry.js) to the `ui`
+Service so the FuzeFront portal shell imports the remote SAME-ORIGIN — no
+iframe, no CORS, no mixed-content — sharing the host's React 19 singleton.
+
+DIFFERENT surface from the `ingress` block in ingress.yaml: that one is the
+public admin console at ingress.host (fuzeagent.prod.fuzefront.com / "/").
+This one is a second Ingress object, on FuzeFront's OWN host
+(app.fuzefront.com), path-routed to this namespace's `ui` Service — the same
+shape FuzeX uses for its design-frames-service remote
+(deploy/helm/fuzex/templates/federated-mount-ingress.yaml, path /apps/fuzex).
+It must live HERE, not in FuzeFront's chart: a k8s Ingress can only target a
+Service in its own namespace, and `ui` runs in `fuzeagent` (its own Argo
+Application). The cluster-wide Traefik controller routes it; no FuzeInfra
+change is needed.
+
+PASS-THROUGH, not rewrite: the UI's build `base` is /apps/agent/
+(services/ui-react/vite.config.ts) so nginx already serves assets under that
+prefix — deliberately NO strip-prefix middleware/annotation here. The path
+below MUST match that `base` exactly, or remoteEntry.js 200s and every chunk
+it references 404s (blank portal panel, green healthcheck).
+
+Disabled + hostless by default, mirroring FuzeX: `host` is `required` when
+enabled so a hostless Ingress can never match every request the controller
+sees. Enabling it is a cross-repo routing decision (a second namespace's
+Ingress object against FuzeFront's own app.fuzefront.com host) — coordinate
+with FuzeFront's Ingress rules before flipping `federatedMount.enabled` in
+any values-*.yaml overlay.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fuzeagent.fullname" . }}-federated-mount
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+  {{- with .Values.federatedMount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.federatedMount.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  rules:
+    - host: {{ required "federatedMount.host is required when federatedMount.enabled is true" .Values.federatedMount.host | quote }}
+      http:
+        paths:
+          - path: {{ .Values.federatedMount.path | quote }}
+            pathType: Prefix
+            backend:
+              service:
+                name: ui
+                port:
+                  number: {{ .Values.ui.port }}
+{{- end }}
