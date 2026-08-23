@@ -1,6 +1,6 @@
 {
   "manifestVersion": "1",
-  "slug": "agent",
+  "slug": "fuzeagent",
   "name": "Agent",
   "menuLabel": "Agents",
   "description": "AI team orchestration — autonomous agents (Claude Code SDK + CrewAI) organised into teams and coordinated by a digital CEO.",
@@ -10,7 +10,7 @@
   "builtin": false,
   "integration": {
     "type": "module-federation",
-    "remoteEntry": "/apps/agent/remoteEntry.js",
+    "remoteEntry": "/apps/fuzeagent/remoteEntry.js",
     "scope": "fuzeagentApp",
     "module": "./FuzeAgentApp"
   },

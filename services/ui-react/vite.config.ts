@@ -4,12 +4,17 @@ import mdx from '@mdx-js/rollup'
 import federation from '@originjs/vite-plugin-federation'
 import path from 'path'
 
-// Module Federation contract (must match registration/manifest.json — slug: "agent"):
+// Module Federation contract (must match registration/manifest.json — slug: "fuzeagent"):
 //   scope  = "fuzeagentApp"        (federation `name`)
 //   module = "./FuzeAgentApp"      (exposed module)
-//   remoteEntry served same-origin at /apps/agent/remoteEntry.js (the FuzeFront
-//   host mounts remotes under /apps/<slug>/ — a remote built for "/" but served
-//   at /apps/agent/ returns a 200 on remoteEntry.js and then 404s every chunk).
+//   remoteEntry served same-origin at /apps/fuzeagent/remoteEntry.js (the
+//   FuzeFront host mounts remotes under /apps/<slug>/, and the slug is
+//   PORTAL-DERIVED from this app's registered NAME, not this repo's own
+//   manifest field — izzywdev/FuzeFront backend/applications/src/
+//   app-registry/builtins.ts:35: FuzeAgent is one of the four genuine
+//   BUILTIN_MANIFESTS entries, slug: 'fuzeagent'. A remote built for "/apps/
+//   agent/" but served at "/apps/fuzeagent/" returns a 200 on remoteEntry.js
+//   and then 404s every chunk).
 // React / react-dom are shared singletons so FuzeFront's React instance is reused.
 export default defineConfig({
   plugins: [
@@ -41,15 +46,17 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Served under /apps/agent/ in prod (remoteEntry at /apps/agent/remoteEntry.js),
-  // matching registration/manifest.json's slug ("agent") and remoteEntry URL.
-  base: '/apps/agent/',
+  // Served under /apps/fuzeagent/ in prod (remoteEntry at
+  // /apps/fuzeagent/remoteEntry.js), matching registration/manifest.json's
+  // slug ("fuzeagent") and remoteEntry URL, and FuzeFront's builtin registry
+  // entry for this product (builtins.ts:35, slug: 'fuzeagent').
+  base: '/apps/fuzeagent/',
   build: {
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
     // Output chunks to dist/ directly (not dist/assets/) so remoteEntry.js is
-    // served at /apps/agent/remoteEntry.js, matching the manifest's remoteEntry URL.
+    // served at /apps/fuzeagent/remoteEntry.js, matching the manifest's remoteEntry URL.
     assetsDir: '',
   },
   server: {
