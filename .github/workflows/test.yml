@@ -184,7 +184,14 @@ jobs:
         path: services/orchestrator/htmlcov/
         retention-days: 30
 
-  security-scan:
+  # Renamed from `security-scan`: ci.yml also has a job named `security-scan` (the
+  # unrelated repo-wide Trivy filesystem SARIF scan at ci.yml:96) and both surfaced as a
+  # check literally named "security-scan" with no way to tell them apart from the check
+  # name alone — a red one was ambiguous, and it cost real diagnostic time distinguishing
+  # "the bandit/pip-audit job broke" from "the Trivy fs scan broke" across three PRs.
+  # Neither name is a required status check (branch protection requires only the
+  # gate-* contexts from harden-gate.yml), so this rename does not un-gate anything.
+  backend-security-scan:
     runs-on: ubuntu-latest
     needs: test-backend
     
@@ -283,14 +290,20 @@ jobs:
         pip install black isort flake8 mypy
     
     - name: Check code formatting with Black
+      # Enforcing (was `|| true`): verified clean against the requirements.txt-pinned
+      # black range (>=23.11.0,<27.0.0) — `black --check .` passes with 0 files needing
+      # reformat. The `|| true` here was masking nothing; a stale locally-installed
+      # black (23.11.0, the range floor) produced spurious diffs during verification —
+      # the requirements-range-satisfying latest (26.5.1) is clean.
       working-directory: services/orchestrator
       run: |
-        black --check --diff . || true
-    
+        black --check --diff .
+
     - name: Check import sorting with isort
+      # Enforcing (was `|| true`): verified clean (isort --check-only reports 0 files).
       working-directory: services/orchestrator
       run: |
-        isort --check-only --diff . || true
+        isort --check-only --diff .
     
     - name: Run flake8 linting
       working-directory: services/orchestrator
@@ -299,6 +312,15 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     
     - name: Run mypy type checking
+      # Report-only, and NOT a decoration: verified 143 real errors across 29 files as
+      # of 2026-08-23 (rag_manager.py, knowledge_analytics_service.py and others —
+      # attr-defined / arg-type / var-annotated, not just missing annotations), plus a
+      # `mypy .` module-resolution config issue (a2a_protocol.py resolves under two
+      # names because services/orchestrator/__init__.py makes the scanned root itself
+      # a package). Fixing 143 findings across app logic is backend-engineer scope, not
+      # CI-wiring; tracked in governance/vacuous-check-policy.json (mode=ramp) so the
+      # forthcoming gate-vacuous-check gate (lands via FuzeSDLC canonical sync) does not
+      # immediately red this repo on arrival.
       working-directory: services/orchestrator
       run: |
         mypy . --ignore-missing-imports --no-strict-optional || true
@@ -422,6 +444,12 @@ jobs:
         pip install pytest pytest-benchmark
     
     - name: Run performance tests
+      # Report-only by design, not by omission: pytest-benchmark timing noise on shared
+      # CI runners is expected, and whether a perf regression should ever BLOCK a merge
+      # is a product decision this PR does not make. Tracked explicitly in
+      # governance/vacuous-check-policy.json (mode=ramp, owner backend-engineer) rather
+      # than left as an unexplained `|| true`, so the forthcoming gate-vacuous-check gate
+      # sees a deliberate, reviewed exception instead of a silent one.
       working-directory: services/orchestrator
       env:
         DATABASE_URL: postgresql://postgres:password@localhost:5434/ai_context_test
