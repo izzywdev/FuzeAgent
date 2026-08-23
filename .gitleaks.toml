@@ -1,4 +1,42 @@
+# `[extend] useDefault = true` is load-bearing. Without it, a .gitleaks.toml that
+# declares no [[rules]] of its own loads ZERO rules, and gitleaks reports
+# "no leaks found" on a tree containing live credentials — the gate is green
+# because it is looking for nothing, not because the tree is clean.
+#
+# This file was in exactly that state, and the allowlist below is how it got
+# there: the `legacy-hs256` regex was added to suppress a false positive, and
+# because the file declared no rules and did not extend the default set, it
+# suppressed every rule instead. Verified with gitleaks 8.24.3 against a repo
+# holding a planted AWS access key: with the old config, "no leaks found"; with
+# these two lines added, the key is found.
+#
+# Never delete these two lines to silence a finding. Narrow the allowlist below
+# instead, and prove the narrowed config still fails on a real secret.
+[extend]
+useDefault = true
+
 [allowlist]
 description = "FuzeAgent allowlist — suppress known false positives"
-# "legacy-hs256" is an auth-mode identifier string, not an actual secret.
-regexes = ['''legacy-hs256''']
+
+# AUTH_MODE enum tokens from the platform auth layer. These are the literal
+# values of the AUTH_MODE setting, not credentials; generic-api-key flags them
+# on shape and entropy alone. Anchored with ^...$ so they can suppress nothing
+# else — a real secret sitting in the same position is still reported. The
+# previous unanchored '''legacy-hs256''' was a substring match.
+regexes = [
+  '''^legacy-hs256$''',
+  '''^oidc-jwks$''',
+  '''^federated-jwks$''',
+]
+
+# SealedSecret ciphertext — kubeseal output, encrypted, safe to commit. These
+# are the paths the default ruleset actually matches in this repo (measured,
+# not guessed): 8 hits under deploy/contabo/sealed/ and 4 in the a2a chart.
+paths = [
+  '''^deploy/contabo/sealed/''',
+  '''a2a-sealed-secrets\.yaml$''',
+  # A Kubernetes Secret example in a runbook. The manifest's own inline comment
+  # reads `# base64 encoded "your-password"`, so the value is a documented
+  # placeholder. Scoped to this one file rather than to *.md.
+  '''^services/orchestrator/DATABASE_RELEASE\.md$''',
+]

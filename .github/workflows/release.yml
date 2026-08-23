@@ -82,6 +82,13 @@ jobs:
           # No VITE_API_URL build-arg: config/api.ts derives the API base from
           # window.location.origin in production, and the UI's own nginx proxies
           # same-origin /api/orchestrator + /api/hierarchy to the backends.
+          # services/ui-react depends on the private @izzywdev/fuzefront-identity
+          # package (GitHub Packages); the Dockerfile's npm-ci layer reads it via
+          # a BuildKit secret (never a build-arg, which would bake it into image
+          # history) -- see services/ui-react/Dockerfile + .npmrc, and matches
+          # build-agent-images-base's npm_token secret below.
+          secrets: |
+            github_token=${{ secrets.GITHUB_TOKEN }}
           tags: |
             ghcr.io/izzywdev/fuzeagent-ui:${{ steps.tag.outputs.sha }}
             ghcr.io/izzywdev/fuzeagent-ui:latest
