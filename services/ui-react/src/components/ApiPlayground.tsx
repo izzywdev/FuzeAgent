@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { FiPlay, FiCopy, FiChevronDown, FiChevronRight } from 'react-icons/fi'
-import { CopyToClipboard } from 'react-copy-to-clipboard'
+import { FiPlay, FiCopy, FiCheck, FiChevronDown, FiChevronRight } from 'react-icons/fi'
 import CodeBlock from './CodeBlock'
 import { API_URL } from '../config/env'
 
@@ -165,6 +164,24 @@ export default function ApiPlayground() {
   const [response, setResponse] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['request']))
+  const [curlCopied, setCurlCopied] = useState(false)
+
+  const handleCopyCurl = () => {
+    if (!navigator.clipboard) {
+      // Insecure origin (plain http) or unsupported browser: surface the
+      // failure by leaving the "Copied!" state unset rather than lying.
+      return
+    }
+    navigator.clipboard.writeText(generateCurlCommand()).then(
+      () => {
+        setCurlCopied(true)
+        setTimeout(() => setCurlCopied(false), 2000)
+      },
+      () => {
+        // Copy failed — leave curlCopied unset so the UI stays honest.
+      }
+    )
+  }
 
   const currentEndpoint = apiEndpoints.find(ep => ep.id === selectedEndpoint)!
 
@@ -348,12 +365,22 @@ export default function ApiPlayground() {
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">cURL Command</label>
-                  <CopyToClipboard text={generateCurlCommand()}>
-                    <button className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800">
-                      <FiCopy className="w-3 h-3" />
-                      Copy
-                    </button>
-                  </CopyToClipboard>
+                  <button
+                    onClick={handleCopyCurl}
+                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    {curlCopied ? (
+                      <>
+                        <FiCheck className="w-3 h-3" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <FiCopy className="w-3 h-3" />
+                        Copy
+                      </>
+                    )}
+                  </button>
                 </div>
                 <CodeBlock language="bash" showLineNumbers={false}>
                   {generateCurlCommand()}

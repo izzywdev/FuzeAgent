@@ -20,7 +20,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v7
       with:
-        node-version: '20'
+        node-version: '24.x'
         cache: 'npm'
         cache-dependency-path: ./services/ui-react/package-lock.json
         
@@ -181,7 +181,7 @@ jobs:
     - name: Setup Node.js for frontend dependency check
       uses: actions/setup-node@v7
       with:
-        node-version: '20'
+        node-version: '24.x'
         
     - name: Frontend dependency audit
       # Report-only: verified 23 current advisories at --audit-level=high (16 high, 3
