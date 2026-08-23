@@ -1,6 +1,6 @@
 {
   "manifestVersion": "1",
-  "slug": "fuzeagent",
+  "slug": "agent",
   "name": "Agent",
   "menuLabel": "Agents",
   "description": "AI team orchestration — autonomous agents (Claude Code SDK + CrewAI) organised into teams and coordinated by a digital CEO.",
