@@ -51,10 +51,16 @@ ingress:
   host: fuzeagent.prod.fuzefront.com
   annotations: {}
 
-# federatedMount stays OFF here too (inherits values.yaml's disabled default —
-# deliberately no override). Its host would be FuzeFront's app.fuzefront.com,
-# not this repo's own ingress.host above: a second namespace's Ingress object
-# against a host this repo doesn't own is a cross-repo routing decision
-# (coordinate with FuzeFront's own app.fuzefront.com Ingress rules first),
-# exactly as FuzeX deferred enabling its own federatedMount for the same
-# reason. Flip it once that coordination has happened.
+# federatedMount is ON in prod: FuzeFront's app-registry builtin for
+# "fuzeagent" (backend/applications/src/app-registry/builtins.ts, moved
+# same-origin by FuzeFront migration 009) now resolves remoteEntry against
+# app.fuzefront.com/apps/fuzeagent/, so this namespace's own Ingress on that
+# host must exist for the portal to reach the `ui` Service in-cluster. Host is
+# deliberately FuzeFront's own app.fuzefront.com, not this repo's ingress.host
+# above (that one is the separate public admin console). `path` inherits
+# values.yaml's default (`/apps/fuzeagent`), which MUST keep matching the UI's
+# vite `base` (services/ui-react/vite.config.ts) and the vendored
+# registration/manifest.json's integration.remoteEntry exactly.
+federatedMount:
+  enabled: true
+  host: app.fuzefront.com

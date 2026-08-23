@@ -10,7 +10,7 @@
   "builtin": false,
   "integration": {
     "type": "module-federation",
-    "remoteEntry": "https://fuzeagent.prod.fuzefront.com/remoteEntry.js",
+    "remoteEntry": "/apps/fuzeagent/remoteEntry.js",
     "scope": "fuzeagentApp",
     "module": "./FuzeAgentApp"
   },
