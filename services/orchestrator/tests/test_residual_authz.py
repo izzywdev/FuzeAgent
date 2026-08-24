@@ -5,12 +5,26 @@ https://github.com/izzywdev/FuzeAgent/pull/7#pullrequestreview-4587291559).
 
 Covers the three residuals:
 
-  1. The actually-published app surface requires authN. The root
-     docker-compose.yml used to publish ``simple_main:app`` with zero authN and
-     wildcard CORS. simple_main.py now mounts the SAME global
-     ``Depends(get_current_user)`` and a non-wildcard env CORS allowlist — so an
-     unauthenticated request to a non-public route is 401, and CORS does not
-     reflect ``*`` with credentials.
+  1. (REMOVED) The published-app surface. These tests exercised
+     ``simple_main.py``, a demo module that docker-compose once published as
+     ``simple_main:app`` with zero authN and ``allow_origins=["*"]`` plus
+     credentials. The compose override was withdrawn in PR #7 and the file has
+     now been deleted outright — production is ``main:app``.
+
+     The tests went with it, deliberately, because their subject is gone and a
+     test pinned to a deleted module is worse than no test. What replaces them
+     is not another fixture but a gate: ``gate-platform-auth --routes``
+     (FuzeSDLC) asks of EVERY route whether it has an authentication boundary,
+     and fails on any that does not. That is strictly stronger coverage than
+     this section had — it could only ever speak for the one module someone
+     remembered to import.
+
+     Worth recording why the file lasted this long. Its docstring, and the
+     paragraph these lines replace, both asserted that it mounted a global
+     ``Depends(get_current_user)``. It did not: ``app = FastAPI(title=...,
+     lifespan=...)`` with no ``dependencies`` argument at all. The hardening was
+     reverted by a reformat and the prose describing it survived, so the file
+     read as guarded to anyone who looked. Prose is not a control.
 
   2. Object-level BOLA on the long-tail endpoints: file-operations
      approve/rollback (task -> agent -> org) and the A2A endpoints
@@ -67,51 +81,6 @@ def make_token(**claims) -> str:
 
 def auth_header(**claims):
     return {"Authorization": f"Bearer {make_token(**claims)}"}
-
-
-# ===========================================================================
-# 1. The actually-published app (simple_main) requires authN + non-wildcard CORS
-# ===========================================================================
-
-
-@pytest.fixture(scope="module")
-def published_client():
-    import simple_main  # imported with the global auth dependency mounted
-
-    return TestClient(simple_main.app)
-
-
-def test_published_health_is_public(published_client):
-    assert published_client.get("/health").status_code == 200
-
-
-def test_published_agents_without_token_is_401(published_client):
-    # /agents is NOT on the public allowlist -> must be 401 unauthenticated.
-    r = published_client.get("/agents")
-    assert r.status_code == 401
-
-
-def test_published_create_agent_without_token_is_401(published_client):
-    r = published_client.post("/agents", json={"name": "x", "type": "dev"})
-    assert r.status_code == 401
-
-
-def test_published_agents_with_valid_token_is_not_401(published_client):
-    r = published_client.get("/agents", headers=auth_header())
-    assert r.status_code != 401
-
-
-def test_published_cors_does_not_reflect_wildcard_with_credentials(published_client):
-    # An origin NOT on the allowlist must not be echoed back as allowed.
-    r = published_client.get("/health", headers={"Origin": "https://evil.example.com"})
-    allow_origin = r.headers.get("access-control-allow-origin")
-    assert allow_origin != "*"
-    assert allow_origin != "https://evil.example.com"
-
-
-def test_published_cors_allows_configured_origin(published_client):
-    r = published_client.get("/health", headers={"Origin": "http://localhost:3000"})
-    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
 
 # ===========================================================================
