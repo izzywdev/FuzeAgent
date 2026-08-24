@@ -17,7 +17,7 @@ a2a:
   enabled: false
 
   image:
-    repository: ghcr.io/izzywdev/fuzeagent-a2a
+    repository: ghcr.io/izzywdev/fuze-a2a
     # Immutable tag; prod values bump this (release.yml). Never `latest` in prod.
     tag: latest
     pullPolicy: IfNotPresent

@@ -118,8 +118,8 @@ jobs:
           file: agent-templates/a2a/Dockerfile
           push: true
           tags: |
-            ghcr.io/izzywdev/fuzeagent-a2a:${{ steps.tag.outputs.sha }}
-            ghcr.io/izzywdev/fuzeagent-a2a:latest
+            ghcr.io/izzywdev/fuze-a2a:${{ steps.tag.outputs.sha }}
+            ghcr.io/izzywdev/fuze-a2a:latest
           cache-from: type=gha,scope=a2a
           cache-to: type=gha,mode=max,scope=a2a
 
