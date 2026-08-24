@@ -67,7 +67,7 @@ open question for the whole family, so here is the evidence rather than a claim:
   `valueFiles: [values-prod.yaml]`, `destination.namespace: fuzeagent`, with
   `automated: {prune: true, selfHeal: true}`.
 - `deploy/helm/a2a-shared/values-prod.yaml` **on `main`** has `a2a.enabled: true`
-  and a pinned image `ghcr.io/izzywdev/fuzeagent-a2a:e2d7d1c2b55a`.
+  and a pinned image `ghcr.io/izzywdev/fuze-a2a:e2d7d1c2b55a`.
 - `helm template` against those prod values renders a **Deployment and a Service
   both named `a2a-shared`, port 8080**, whose selector matches exactly one
   workload — i.e. precisely the address the image hardcodes on every Agent Card

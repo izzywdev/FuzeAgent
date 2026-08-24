@@ -83,7 +83,7 @@ exactly. **Exactly these 4 SealedSecrets are required for the FuzeAgent-first ro
 | SealedSecret `name` | key | Purpose | Required? |
 |---|---|---|---|
 | `a2a-provider-anthropic` | `api-key` | Anthropic API key the server's provider uses (also exported as `ANTHROPIC_API_KEY` for session provisioning) | **Yes** |
-| `ghcr-pull` | `.dockerconfigjson` | Pull the private `fuzeagent-a2a` image from GHCR (`kubernetes.io/dockerconfigjson` type) | **Yes** |
+| `ghcr-pull` | `.dockerconfigjson` | Pull the private `fuze-a2a` image from GHCR (`kubernetes.io/dockerconfigjson` type) | **Yes** |
 | `a2a-mtls-ca` | `ca.crt` | In-cluster mTLS CA (defence-in-depth) — `a2a.auth.mtls.enabled: true` | **Yes (Option B)** |
 | `a2a-card-signing` | `jws.key` | JWS key to sign Agent Cards — `a2a.cardSigning` kept | **Yes (Option B)** |
 
@@ -106,13 +106,13 @@ tenant as it is added.
 
 ## 4. The image (auto-built on merge — one caveat)
 
-`release.yml` builds/pushes `ghcr.io/izzywdev/fuzeagent-a2a` and rewrites the `tag:` in this file on
+`release.yml` builds/pushes `ghcr.io/izzywdev/fuze-a2a` and rewrites the `tag:` in this file on
 push to `main` under `deploy/helm/a2a-shared/**`. It has **not** run for the A2A merges because the
 squash-merge commit bodies inherited a `[skip ci]` line from the governance-sync reconcile commits.
 
 ➡️ **Merge this rollout PR with a CLEAN squash message (no `[skip ci]`)** so `release.yml` fires,
 builds the image, and bumps `a2a.image.tag`. Verify afterward: `gh api
-user/packages/container/fuzeagent-a2a/versions`.
+user/packages/container/fuze-a2a/versions`.
 
 ## 5. Merge → verify
 

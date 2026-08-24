@@ -3,7 +3,7 @@
 # values.json (`tenants` length + `a2a.inClusterUrl`), never in the image or the env.
 #
 # Build context = agent-templates/  (mirrors orchestration/handoff_mcp/Dockerfile):
-#   docker build -f a2a/Dockerfile -t ghcr.io/izzywdev/fuzeagent-a2a:dev .   # ctx = agent-templates/
+#   docker build -f a2a/Dockerfile -t ghcr.io/izzywdev/fuze-a2a:dev .   # ctx = agent-templates/
 #
 # Runtime surface is fixed by the FROZEN contract (agent-templates/contracts/a2a/v1):
 #   POST /rpc                             (JSON-RPC 2.0, binding.md §1)

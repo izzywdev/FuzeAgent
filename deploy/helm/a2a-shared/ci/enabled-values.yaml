@@ -4,7 +4,7 @@
 a2a:
   enabled: true
   image:
-    repository: ghcr.io/izzywdev/fuzeagent-a2a
+    repository: ghcr.io/izzywdev/fuze-a2a
     tag: "0.0.0-ci"
     pullPolicy: IfNotPresent
   service:

@@ -115,7 +115,7 @@ a2a:
   enabled: true
 
   image:
-    repository: ghcr.io/izzywdev/fuzeagent-a2a    # the SAME image; there is no per-product image
+    repository: ghcr.io/izzywdev/fuze-a2a    # the SAME image; there is no per-product image
     tag: <immutable-sha>                          # never `latest` in prod
     pullPolicy: IfNotPresent
 

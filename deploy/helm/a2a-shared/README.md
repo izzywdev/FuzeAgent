@@ -27,7 +27,7 @@ byte-conformant to the interface.
 
 `values-prod.yaml` sets `a2a.enabled: false`, so the Argo app renders nothing until:
 
-1. **Server image exists** — `ghcr.io/izzywdev/fuzeagent-a2a` is built by `release.yml`
+1. **Server image exists** — `ghcr.io/izzywdev/fuze-a2a` is built by `release.yml`
    from `agent-templates/a2a/` (backend-engineer). The tag is auto-bumped in
    `values-prod.yaml` on merge.
 2. **`providesTo` backfill** — `authz.md §3` is fail-closed (absent `providesTo` == DENY).
