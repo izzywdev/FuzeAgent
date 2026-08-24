@@ -79,10 +79,13 @@ services:
     user: root
     # SECURITY (PR #7): do NOT override the image entrypoint. The hardened
     # entrypoint.sh runs migrations and launches the AUTHENTICATED app
-    # `main:app` (global Depends(get_current_user) + non-wildcard CORS + BOLA
-    # authz). The previous `simple_main:app` override published a demo app with
-    # ZERO authN and allow_origins=["*"]+credentials on 0.0.0.0:8000.
-    # simple_main.py is an in-memory demo and is NOT the production surface.
+    # `main:app` (require_auth on routes + non-wildcard CORS + BOLA authz).
+    # An earlier `simple_main:app` override here published a demo app with ZERO
+    # authN and allow_origins=["*"]+credentials on 0.0.0.0:8000. That override
+    # was withdrawn in PR #7 and simple_main.py itself has now been deleted, so
+    # the unauthenticated surface no longer exists to be re-published by a
+    # future override. Removing the file was the point: while it existed, its
+    # own docstring claimed a global auth dependency it did not have.
     volumes:
       - orchestrator_workspaces:/app/workspaces
       - orchestrator_backups:/app/.fuzeagent/backups
