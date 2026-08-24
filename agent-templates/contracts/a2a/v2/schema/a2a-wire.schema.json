@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/izzywdev/FuzeAgent/agent-templates/contracts/a2a/v1/schema/a2a-wire.schema.json",
+  "title": "A2A wire types (JSON-RPC binding, v1 subset)",
+  "description": "ProtoJSON (camelCase) serialization of the lf.a2a.v1 wire messages used by the Fuze v1 binding. Derived from the normative a2a.proto of A2A spec 1.0.0. Scope is the v1 method set from binding.md — push-notification config types are intentionally absent because those methods return PushNotificationNotSupportedError in v1.",
+  "$defs": {
+    "TaskState": {
+      "type": "string",
+      "description": "ProtoJSON enum names. TASK_STATE_UNSPECIFIED MUST never be emitted by a Fuze agent.",
+      "enum": [
+        "TASK_STATE_UNSPECIFIED",
+        "TASK_STATE_SUBMITTED",
+        "TASK_STATE_WORKING",
+        "TASK_STATE_COMPLETED",
+        "TASK_STATE_FAILED",
+        "TASK_STATE_CANCELED",
+        "TASK_STATE_INPUT_REQUIRED",
+        "TASK_STATE_REJECTED",
+        "TASK_STATE_AUTH_REQUIRED"
+      ]
+    },
+    "Role": {
+      "type": "string",
+      "enum": ["ROLE_UNSPECIFIED", "ROLE_USER", "ROLE_AGENT"]
+    },
+    "Part": {
+      "type": "object",
+      "description": "Exactly one content variant. Fuze v1 accepts `text` and `data` on input; `url`/`raw` inputs return ContentTypeNotSupportedError (-32005).",
+      "properties": {
+        "text": { "type": "string" },
+        "raw": { "type": "string", "contentEncoding": "base64" },
+        "url": { "type": "string", "format": "uri" },
+        "data": {},
+        "metadata": { "type": "object" },
+        "filename": { "type": "string" },
+        "mediaType": { "type": "string" }
+      },
+      "oneOf": [
+        { "required": ["text"] },
+        { "required": ["raw"] },
+        { "required": ["url"] },
+        { "required": ["data"] }
+      ]
+    },
+    "Message": {
+      "type": "object",
+      "required": ["messageId", "role", "parts"],
+      "properties": {
+        "messageId": { "type": "string", "minLength": 1 },
+        "contextId": { "type": "string" },
+        "taskId": { "type": "string", "description": "Present on a continuation. Its presence is what makes the adapter resume_session instead of create_session (state-mapping.md §2)." },
+        "role": { "$ref": "#/$defs/Role" },
+        "parts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Part" } },
+        "metadata": { "type": "object", "description": "NEVER trusted for authorization (authz.md §1)." },
+        "extensions": { "type": "array", "items": { "type": "string" } },
+        "referenceTaskIds": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "TaskStatus": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "$ref": "#/$defs/TaskState" },
+        "message": { "$ref": "#/$defs/Message", "description": "REQUIRED by the Fuze profile whenever state is INPUT_REQUIRED or AUTH_REQUIRED — it explains what is being asked and of whom." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "ISO 8601, UTC, Z suffix." }
+      }
+    },
+    "Artifact": {
+      "type": "object",
+      "required": ["artifactId", "parts"],
+      "properties": {
+        "artifactId": { "type": "string", "description": "Stable across append chunks." },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "parts": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Part" } },
+        "metadata": { "type": "object" },
+        "extensions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Task": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string", "description": "IS the Managed-Agents session id (state-mapping.md §1)." },
+        "contextId": { "type": "string" },
+        "status": { "$ref": "#/$defs/TaskStatus" },
+        "artifacts": { "type": "array", "items": { "$ref": "#/$defs/Artifact" } },
+        "history": { "type": "array", "items": { "$ref": "#/$defs/Message" } },
+        "metadata": { "type": "object" }
+      }
+    },
+    "TaskStatusUpdateEvent": {
+      "type": "object",
+      "required": ["taskId", "contextId", "status"],
+      "properties": {
+        "taskId": { "type": "string" },
+        "contextId": { "type": "string" },
+        "status": { "$ref": "#/$defs/TaskStatus" },
+        "metadata": { "type": "object" }
+      }
+    },
+    "TaskArtifactUpdateEvent": {
+      "type": "object",
+      "required": ["taskId", "contextId", "artifact"],
+      "properties": {
+        "taskId": { "type": "string" },
+        "contextId": { "type": "string" },
+        "artifact": { "$ref": "#/$defs/Artifact" },
+        "append": { "type": "boolean" },
+        "lastChunk": { "type": "boolean" },
+        "metadata": { "type": "object" }
+      }
+    },
+    "SendMessageConfiguration": {
+      "type": "object",
+      "properties": {
+        "acceptedOutputModes": { "type": "array", "items": { "type": "string" } },
+        "historyLength": { "type": "integer", "minimum": 0 },
+        "returnImmediately": {
+          "type": "boolean",
+          "default": false,
+          "description": "false (default): wait for a terminal or interrupted state. true: return SUBMITTED at once and poll/subscribe."
+        }
+      }
+    },
+    "SendMessageRequest": {
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "tenant": { "type": "string", "description": "MUST match the AgentInterface.tenant of the callee's card." },
+        "message": { "$ref": "#/$defs/Message" },
+        "configuration": { "$ref": "#/$defs/SendMessageConfiguration" },
+        "metadata": { "type": "object" }
+      }
+    },
+    "SendMessageResponse": {
+      "type": "object",
+      "description": "Exactly one of task or message.",
+      "properties": {
+        "task": { "$ref": "#/$defs/Task" },
+        "message": { "$ref": "#/$defs/Message" }
+      },
+      "oneOf": [{ "required": ["task"] }, { "required": ["message"] }]
+    },
+    "GetTaskRequest": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "tenant": { "type": "string" },
+        "id": { "type": "string" },
+        "historyLength": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ListTasksRequest": {
+      "type": "object",
+      "description": "Results are ALWAYS scoped to the authenticated caller's own tasks (state-mapping.md §5).",
+      "properties": {
+        "tenant": { "type": "string" },
+        "filter": { "type": "string" },
+        "pageSize": { "type": "integer", "minimum": 1 },
+        "pageToken": { "type": "string" }
+      }
+    },
+    "ListTasksResponse": {
+      "type": "object",
+      "properties": {
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/Task" } },
+        "nextPageToken": { "type": "string" }
+      }
+    },
+    "CancelTaskRequest": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "tenant": { "type": "string" },
+        "id": { "type": "string" }
+      }
+    },
+    "SubscribeToTaskRequest": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "tenant": { "type": "string" },
+        "id": { "type": "string" }
+      }
+    },
+    "StreamResponse": {
+      "type": "object",
+      "description": "One SSE frame payload. Exactly one variant.",
+      "properties": {
+        "task": { "$ref": "#/$defs/Task" },
+        "message": { "$ref": "#/$defs/Message" },
+        "statusUpdate": { "$ref": "#/$defs/TaskStatusUpdateEvent" },
+        "artifactUpdate": { "$ref": "#/$defs/TaskArtifactUpdateEvent" }
+      },
+      "oneOf": [
+        { "required": ["task"] },
+        { "required": ["message"] },
+        { "required": ["statusUpdate"] },
+        { "required": ["artifactUpdate"] }
+      ]
+    },
+    "JsonRpcError": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "integer" },
+        "message": { "type": "string" },
+        "data": {
+          "type": "array",
+          "description": "Each element carries an @type key (ProtoJSON Any).",
+          "items": { "type": "object", "required": ["@type"], "properties": { "@type": { "type": "string" } } }
+        }
+      }
+    },
+    "JsonRpcRequest": {
+      "type": "object",
+      "required": ["jsonrpc", "id", "method"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "id": { "type": ["string", "integer"] },
+        "method": {
+          "type": "string",
+          "description": "Bare PascalCase — NOT 'message/send' (0.x) and NOT 'a2a.SendMessage'.",
+          "enum": [
+            "SendMessage",
+            "SendStreamingMessage",
+            "GetTask",
+            "ListTasks",
+            "CancelTask",
+            "SubscribeToTask",
+            "GetExtendedAgentCard"
+          ]
+        },
+        "params": { "type": "object" }
+      }
+    },
+    "JsonRpcResponse": {
+      "type": "object",
+      "required": ["jsonrpc", "id"],
+      "properties": {
+        "jsonrpc": { "const": "2.0" },
+        "id": { "type": ["string", "integer", "null"] },
+        "result": {},
+        "error": { "$ref": "#/$defs/JsonRpcError" }
+      }
+    }
+  }
+}

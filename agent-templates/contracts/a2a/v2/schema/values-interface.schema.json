@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/izzywdev/FuzeAgent/agent-templates/contracts/a2a/v1/schema/values-interface.schema.json",
+  "title": "A2A server — Helm values INTERFACE (contract only)",
+  "description": "The values contract a product or exec role sets to be served by an A2A server. This file is the INTERFACE, not the chart: it defines the value names, types, defaults and invariants that devops-engineer's chart MUST honour. No templates, no Deployment, no Service, no Argo Application is defined or implied here — those are devops-engineer's slice, gated on this contract.\n\nTOPOLOGY (amended in contract v1.2.0). v1.0 assumed exactly ONE shared server (decision #2), so per-repo configuration was DATA and onboarding a product meant an entry in `tenants`, never a new deployment. That remains the DEFAULT and is unchanged for the existing shared deployment (renamed `a2a-fuzeagent` in v2). It is no longer the ONLY topology: a product may instead run its OWN A2A pod serving a single tenant, for compartmentalisation and blast-radius containment. The two shapes use the SAME values document and differ only in (a) how many entries `tenants` carries and (b) `inClusterUrl`, which a per-product pod MUST set to its own Service — the card is the callable contract, so a pod that does not advertise its own address is unreachable no matter how healthy it looks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["a2a"],
+  "properties": {
+    "a2a": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "The gate. false = the shared A2A server is not deployed at all. Every FuzeInfra/FuzeAgent service is behind such a gate by convention."
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": { "type": "string", "default": "ghcr.io/izzywdev/fuzeagent-a2a" },
+            "tag": { "type": "string", "description": "Immutable tag. Prod values bump this; never `latest`." },
+            "pullPolicy": { "enum": ["IfNotPresent", "Always"], "default": "IfNotPresent" }
+          }
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "ClusterIP",
+              "default": "ClusterIP",
+              "description": "MUST be ClusterIP. Ingress is Cloudflare-tunnel-only; there is no LoadBalancer/NodePort surface."
+            },
+            "port": { "type": "integer", "default": 8080 }
+          }
+        },
+        "protocolVersion": {
+          "const": "1.0",
+          "default": "1.0",
+          "description": "A2A protocol version served. Frozen for contract v1."
+        },
+        "inClusterUrl": {
+          "type": "string",
+          "format": "uri",
+          "default": "http://a2a-fuzeagent.fuzeagent.svc.cluster.local:8080/rpc",
+          "description": "The absolute in-cluster JSON-RPC endpoint THIS server instance advertises as `AgentInterface.url` on every non-external card it projects (card-projection.md §2). It MUST include scheme, Service DNS name, port and the `/rpc` path, and it MUST actually resolve to this deployment — a card whose `url` points elsewhere is a card no caller can follow.\n\nThis is a CARD-PROJECTION input, not a deployment knob, which is why it lives inside `a2a` (the block serialised verbatim into the `values.json` the server parses) rather than beside the chart-internal `deploy.*` mechanics: the server itself must read it to emit the card. Same shape and rationale as `auth.oidcIssuerUrl` — an address the projection publishes.\n\nWhen UNSET the default is the SHARED server's address, so an existing values file behaves exactly as before. A PER-PRODUCT pod (one A2A deployment per product, for compartmentalisation and blast-radius containment) MUST set this to its own Service, e.g. `http://a2a-fuzeplan.fuzeplan.svc.cluster.local:8080/rpc`; otherwise it boots healthy and advertises the SHARED server, and callers following its card never reach it. Ignored for tenants with `external: true`, whose URL is the tunnel host derived from the repo slug."
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["oidcIssuerUrl"],
+          "description": "Identity configuration for the callee-side enforcement described in authz.md.",
+          "properties": {
+            "oidcIssuerUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Issuer whose discovery document is projected into the card's `fuze-oidc` scheme."
+            },
+            "oidcDiscoveryUrl": {
+              "type": "string",
+              "format": "uri",
+              "description": "Optional override for where the A2A server fetches OIDC discovery + JWKS. When set (typically an in-cluster URL, e.g. `http://authentik-server.<ns>.svc.cluster.local:9000/application/o/<slug>/.well-known/openid-configuration`), the server fetches keys from HERE while STILL validating the token `iss` claim against `oidcIssuerUrl`. When UNSET, discovery is derived from `oidcIssuerUrl` (public issuer). Purely additive: existing configs that omit it behave exactly as before."
+            },
+            "audience": { "type": "string", "description": "Expected `aud` claim." },
+            "callerClaim": {
+              "type": "string",
+              "default": "sub",
+              "description": "Token claim carrying the caller repo identity. Its value is the ONLY trusted caller identity (authz.md §2)."
+            },
+            "mtls": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "default": false },
+                "caSecretRef": { "$ref": "#/$defs/secretRef" }
+              }
+            }
+          }
+        },
+        "cardSigning": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["keySecretRef"],
+          "description": "JWS signing key for the Agent Card. REQUIRED because the Fuze profile requires a non-empty `signatures[]`.",
+          "properties": {
+            "keySecretRef": { "$ref": "#/$defs/secretRef" },
+            "keyId": { "type": "string", "description": "JWS `kid`." }
+          }
+        },
+        "tenants": {
+          "type": "array",
+          "description": "One entry per served agent. On the SHARED server this array IS how a repo onboards — no new chart, no new pod. A PER-PRODUCT pod carries exactly ONE entry (plus, if it also serves them, that repo's `Exec-<role>` tenants); the server code is identical either way, and `/.well-known/agent-card.json` needs no `?tenant=` when exactly one tenant is enabled.",
+          "items": { "$ref": "#/$defs/tenant" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "secretRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "key"],
+      "description": "Reference to an existing Kubernetes Secret (SealedSecret-provisioned). Secret VALUES never appear in values.yaml or in git.",
+      "properties": {
+        "name": { "type": "string" },
+        "key": { "type": "string" }
+      }
+    },
+    "tenant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant", "repo", "enabled"],
+      "properties": {
+        "tenant": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "description": "Routing key echoed by clients; MUST equal the card's AgentInterface.tenant (card-projection.md §2)."
+        },
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "description": "owner/name of the repo whose .fuze/manifest.json and agent-templates/roles/ are the projection source."
+        },
+        "ref": { "type": "string", "default": "main", "description": "Git ref the manifest/roles are read from. GitOps: this is the source of truth, never live-mutated state." },
+        "enabled": { "type": "boolean", "default": false, "description": "Per-tenant gate, independent of the server gate." },
+        "entryRole": { "type": "string", "pattern": "^[a-z0-9_-]+$", "description": "Overrides manifest.a2a.entryRole. The role that serves a SendMessage naming no skill." },
+        "servingRoles": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+          "description": "Overrides manifest.a2a.servingRoles — the roles projected into card `skills`."
+        },
+        "external": {
+          "type": "boolean",
+          "default": false,
+          "description": "Publish through the Cloudflare tunnel with an https:// interface URL. MUST be false for exec-tier tenants (card-projection.md §5)."
+        },
+        "provider": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Managed-Agents runtime binding for this tenant's sessions — the values that reach agent-templates/providers/*.",
+          "properties": {
+            "name": { "type": "string", "default": "anthropic", "description": "AgentProvider implementation id (base.py `name`)." },
+            "environmentId": { "type": "string", "description": "Environment the sessions bind to. Resolved from the role's `environment` when unset." },
+            "apiKeySecretRef": { "$ref": "#/$defs/secretRef" },
+            "vaultIds": { "type": "array", "items": { "type": "string" }, "description": "Vault ids passed to create_session. NEVER projected onto the card." },
+            "memoryResources": { "type": "array", "items": { "type": "string" }, "description": "Memory stores mounted into sessions (e.g. the shared handoff store)." }
+          }
+        },
+        "env": {
+          "type": "array",
+          "description": "Extra environment for this tenant's sessions. Values MUST come from secretRef, never inline literals.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "valueFrom": { "$ref": "#/$defs/secretRef" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

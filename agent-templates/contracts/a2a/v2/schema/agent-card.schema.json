@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/izzywdev/FuzeAgent/agent-templates/contracts/a2a/v1/schema/agent-card.schema.json",
+  "title": "Fuze A2A Agent Card",
+  "description": "JSON Schema for the A2A AgentCard as served at /.well-known/agent-card.json. Faithful to the ProtoJSON (camelCase) serialization of message AgentCard in lf.a2a.v1 (a2a.proto, A2A spec 1.0.0). The `fuze` profile below adds REQUIRED family constraints on top of the open standard; a card that satisfies this schema is by construction a valid A2A 1.0 AgentCard.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "description",
+    "supportedInterfaces",
+    "version",
+    "capabilities",
+    "defaultInputModes",
+    "defaultOutputModes",
+    "skills",
+    "provider"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human readable agent name. Fuze projection: `<Repo> <role> agent`, e.g. 'FuzePlan planning agent'."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What this agent is for, in caller-facing terms. Callers route on this text, so it MUST describe outcomes the agent delivers, not the tools it holds."
+    },
+    "supportedInterfaces": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered list of interfaces; the FIRST entry is the preferred one. A2A 1.0 replaced 0.x `url` + `preferredTransport` with this list — there is no top-level url field.",
+      "items": { "$ref": "#/$defs/AgentInterface" }
+    },
+    "provider": { "$ref": "#/$defs/AgentProvider" },
+    "version": {
+      "type": "string",
+      "description": "Version OF THE AGENT (not of the A2A protocol). SemVer. Projected from the contract version of the serving repo's role set.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$"
+    },
+    "documentationUrl": { "type": "string", "format": "uri" },
+    "iconUrl": { "type": "string", "format": "uri" },
+    "capabilities": { "$ref": "#/$defs/AgentCapabilities" },
+    "securitySchemes": {
+      "type": "object",
+      "description": "Map of scheme name -> SecurityScheme. NOTE the ProtoJSON oneof wrapper: the value is an object with exactly one key naming the scheme variant (e.g. {\"openIdConnectSecurityScheme\": {...}}). This is NOT the OpenAPI securityScheme shape.",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/SecurityScheme" }
+    },
+    "securityRequirements": {
+      "type": "array",
+      "description": "Requirements for contacting the agent. Entries are OR'ed; schemes within an entry are AND'ed.",
+      "items": { "$ref": "#/$defs/SecurityRequirement" }
+    },
+    "defaultInputModes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Media types accepted across all skills. Fuze v1 baseline: [\"text/plain\", \"application/json\"]."
+    },
+    "defaultOutputModes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Media types produced. Fuze v1 baseline: [\"text/plain\", \"application/json\"]."
+    },
+    "skills": {
+      "type": "array",
+      "minItems": 1,
+      "description": "DERIVED from agent-templates/roles/*/role.json. See card-projection.md. Hand-authoring skills is a contract violation.",
+      "items": { "$ref": "#/$defs/AgentSkill" }
+    },
+    "signatures": {
+      "type": "array",
+      "description": "JWS signatures over the canonicalized card (RFC 7515 JSON serialization). OPTIONAL in A2A; see the Fuze profile for when it is REQUIRED.",
+      "items": { "$ref": "#/$defs/AgentCardSignature" }
+    }
+  },
+  "$defs": {
+    "AgentInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "protocolBinding", "protocolVersion"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Absolute URL of this interface. In-cluster Fuze interfaces use service DNS (http://a2a-<repo>.fuzeagent.svc.cluster.local:8080/rpc); externally-published ones MUST be https:// through the Cloudflare tunnel."
+        },
+        "protocolBinding": {
+          "type": "string",
+          "description": "Open string. Core values: JSONRPC, GRPC, HTTP+JSON. Fuze v1 permits only JSONRPC.",
+          "enum": ["JSONRPC", "GRPC", "HTTP+JSON"]
+        },
+        "tenant": {
+          "type": "string",
+          "description": "Opaque routing id when several agents sit behind one endpoint. The Fuze shared server sets this to the serving repo slug so one ingress can front many product agents. When set, clients MUST echo it in the request `tenant` field."
+        },
+        "protocolVersion": {
+          "type": "string",
+          "description": "A2A protocol Major.Minor exposed at this URL (NOT the agent version). Fuze v1 freezes on \"1.0\".",
+          "pattern": "^\\d+\\.\\d+$"
+        }
+      }
+    },
+    "AgentProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "organization"],
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "organization": { "type": "string", "minLength": 1 }
+      }
+    },
+    "AgentCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "streaming": { "type": "boolean" },
+        "pushNotifications": { "type": "boolean" },
+        "extendedAgentCard": { "type": "boolean" },
+        "extensions": { "type": "array", "items": { "$ref": "#/$defs/AgentExtension" } }
+      }
+    },
+    "AgentExtension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri"],
+      "properties": {
+        "uri": { "type": "string", "format": "uri" },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" },
+        "params": { "type": "object" }
+      }
+    },
+    "AgentSkill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "description", "tags"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+$",
+          "description": "MUST equal the `role` key of the source role.json. This is the join key that lets the adapter resolve a skill back to a role manifest."
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "tags": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "examples": { "type": "array", "items": { "type": "string" } },
+        "inputModes": { "type": "array", "items": { "type": "string" } },
+        "outputModes": { "type": "array", "items": { "type": "string" } },
+        "securityRequirements": { "type": "array", "items": { "$ref": "#/$defs/SecurityRequirement" } }
+      }
+    },
+    "SecurityRequirement": {
+      "type": "object",
+      "description": "Map of security scheme name -> list of required scopes.",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    },
+    "SecurityScheme": {
+      "type": "object",
+      "description": "ProtoJSON oneof wrapper — exactly one variant key.",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "apiKeySecurityScheme": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["location", "name"],
+          "properties": {
+            "description": { "type": "string" },
+            "location": { "enum": ["query", "header", "cookie"] },
+            "name": { "type": "string" }
+          }
+        },
+        "httpAuthSecurityScheme": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scheme"],
+          "properties": {
+            "description": { "type": "string" },
+            "scheme": { "type": "string" },
+            "bearerFormat": { "type": "string" }
+          }
+        },
+        "oauth2SecurityScheme": {
+          "type": "object",
+          "required": ["flows"],
+          "properties": {
+            "description": { "type": "string" },
+            "flows": { "type": "object" },
+            "oauth2MetadataUrl": { "type": "string", "format": "uri" }
+          }
+        },
+        "openIdConnectSecurityScheme": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["openIdConnectUrl"],
+          "properties": {
+            "description": { "type": "string" },
+            "openIdConnectUrl": { "type": "string", "format": "uri" }
+          }
+        },
+        "mtlsSecurityScheme": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "description": { "type": "string" } }
+        }
+      }
+    },
+    "AgentCardSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protected", "signature"],
+      "properties": {
+        "protected": { "type": "string", "description": "base64url-encoded protected JWS header." },
+        "signature": { "type": "string", "description": "base64url-encoded signature." },
+        "header": { "type": "object" }
+      }
+    }
+  }
+}

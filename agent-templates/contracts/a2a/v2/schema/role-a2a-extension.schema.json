@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/izzywdev/FuzeAgent/agent-templates/contracts/a2a/v1/schema/role-a2a-extension.schema.json",
+  "title": "A2A additions to agent-templates/roles/*/role.json",
+  "description": "OPTIONAL additive block on the existing role manifest (agent-templates/schema/role-manifest.schema.json). Every field here has a derived default, so NO existing role.json needs editing for A2A to work — the projection reads `role`, `name`, `description`, `services`, `metadata` and `coordinator`, all of which already exist.\n\nThis block exists only to let a role improve its own discoverability (examples/tags) and to let a role opt OUT of being published. Adding this block to role-manifest.schema.json is a devops/backend task gated on this contract; it is not performed in the contract PR.",
+  "type": "object",
+  "properties": {
+    "a2a": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "publish": {
+          "type": "boolean",
+          "default": true,
+          "description": "false hides this role from the public card. It is still reachable on the EXTENDED card if the caller is allowlisted (see authz.md §5)."
+        },
+        "extendedOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "true publishes this skill ONLY on the authenticated extended card (GetExtendedAgentCard), never on the anonymous /.well-known/agent-card.json. Use for skills whose mere existence is sensitive."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Extra tags merged with the derived tags. Derived tags are never removed."
+        },
+        "examples": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Example prompts a caller can send to this skill. STRONGLY RECOMMENDED: this is the primary signal a calling agent uses to decide whether this skill fits its goal. Absent examples make a skill effectively undiscoverable."
+        },
+        "inputModes": { "type": "array", "items": { "type": "string" } },
+        "outputModes": { "type": "array", "items": { "type": "string" } },
+        "scopes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "OAuth scopes required for THIS skill, projected into the skill's securityRequirements. Lets one agent expose a read-only skill broadly and a mutating skill narrowly."
+        }
+      }
+    }
+  }
+}
