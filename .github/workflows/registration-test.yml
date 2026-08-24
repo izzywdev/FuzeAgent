@@ -8,15 +8,32 @@ name: Registration init-container tests
 #
 # These tests run the real script against a mock registry on a PATH restricted to
 # the image's toolset, so a reintroduced dependency fails here rather than at deploy.
+#
+# THEY TESTED THE WRONG COPY. Helm can only read files inside the chart directory,
+# so what the init container actually mounts is
+# deploy/helm/fuzeagent/files/registration/ — a vendored copy of registration/.
+# This workflow watched and ran only the SOURCE. The curl-only rewrite that removed
+# the jq dependency landed in the source and never reached the vendored copy, so
+# the exact bug this job was written to prevent stayed live in the file that runs
+# while this job went green on the file that does not. The vendored manifest had
+# drifted too, declaring slug "agent" against the source's "fuzeagent".
+#
+# Fixed on both axes: the paths filter now watches the vendored tree, and the sync
+# check runs FIRST — a divergence is caught before the tests, because tests passing
+# on the source say nothing about what deploys.
 
 on:
   push:
     paths:
       - 'registration/**'
+      - 'deploy/helm/fuzeagent/files/registration/**'
+      - 'scripts/sync-chart-files.sh'
       - '.github/workflows/registration-test.yml'
   pull_request:
     paths:
       - 'registration/**'
+      - 'deploy/helm/fuzeagent/files/registration/**'
+      - 'scripts/sync-chart-files.sh'
       - '.github/workflows/registration-test.yml'
 
 permissions:
@@ -31,6 +48,13 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
+
+      # Runs BEFORE the tests. A passing test suite on registration/ is worthless
+      # if deploy/helm/fuzeagent/files/registration/ — the copy the cluster mounts
+      # — is a different file. That is not hypothetical: it is how the jq
+      # dependency this job exists to catch stayed in production after being fixed.
+      - name: Vendored registration copies match the source
+        run: ./scripts/sync-chart-files.sh --check
 
       # NOT `|| true`. The point of this job is to fail when register.sh cannot run
       # on the image it is actually deployed on.
