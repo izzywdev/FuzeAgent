@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # The provider strings are kept in ONE place so the literal cannot be re-typed.
 # agent-templates/a2a/rag/config.py carries the same two constants for the shared
 # A2A image, and tests/test_rag_provider_parity.py fails if the two disagree.
-TOKEN_AUTH_PROVIDER = "chromadb.auth.token_authn.TokenAuthClientProvider"
+TOKEN_AUTH_PROVIDER = "chromadb.auth.token_authn.TokenAuthClientProvider"  # nosec B105 -- an import path Chroma resolves to a class, not a credential; B105 fires on the "TOKEN" in the variable NAME. The real credential is read from CHROMA_AUTH_TOKEN at runtime and never appears in this file.
 BASIC_AUTH_PROVIDER = "chromadb.auth.basic_authn.BasicAuthClientProvider"
 
 CHROMA_HOST = os.environ.get("CHROMA_HOST", "").strip()
