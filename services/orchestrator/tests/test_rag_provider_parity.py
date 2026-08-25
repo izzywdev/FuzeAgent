@@ -37,10 +37,12 @@ class ProviderParityTests(unittest.TestCase):
 
     def test_token_provider_matches(self):
         from rag_integration import TOKEN_AUTH_PROVIDER
+
         self.assertEqual(TOKEN_AUTH_PROVIDER, self.shared.TOKEN_AUTH_PROVIDER)
 
     def test_basic_provider_matches(self):
         from rag_integration import BASIC_AUTH_PROVIDER
+
         self.assertEqual(BASIC_AUTH_PROVIDER, self.shared.BASIC_AUTH_PROVIDER)
 
     def test_neither_is_a_bare_keyword(self):

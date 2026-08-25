@@ -70,7 +70,8 @@ def _chroma_settings():
             chroma_client_auth_provider=TOKEN_AUTH_PROVIDER,
             chroma_client_auth_credentials=token,
             chroma_auth_token_transport_header=os.environ.get(
-                "CHROMA_AUTH_HEADER", "Authorization"),
+                "CHROMA_AUTH_HEADER", "Authorization"
+            ),
         )
     if basic:
         if ":" not in basic:
@@ -80,7 +81,11 @@ def _chroma_settings():
             chroma_client_auth_credentials=basic,
         )
     if os.environ.get("CHROMA_ALLOW_UNAUTHENTICATED", "0").strip().lower() in {
-            "1", "true", "yes", "on"}:
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
         return Settings()
     raise RAGUnavailable(
         "No Chroma credential configured. Set CHROMA_AUTH_TOKEN (preferred) or "
@@ -88,6 +93,7 @@ def _chroma_settings():
         "this instance has no auth. An empty credential is never assumed to mean "
         "'no auth wanted'."
     )
+
 
 # Embedding model configuration
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # Lightweight, fast model
@@ -154,8 +160,8 @@ class RAGIntegration:
             self.chroma_client = chromadb.HttpClient(
                 host=CHROMA_HOST,
                 port=CHROMA_PORT,
-                ssl=os.environ.get("CHROMA_SSL", "0").strip().lower() in {
-                    "1", "true", "yes", "on"},
+                ssl=os.environ.get("CHROMA_SSL", "0").strip().lower()
+                in {"1", "true", "yes", "on"},
                 settings=_chroma_settings(),
             )
 
@@ -317,9 +323,7 @@ class RAGIntegration:
             # RAISES. Returning an empty RAGContext here is the original defect:
             # it is a well-formed "we found nothing" answer, and a caller — human
             # or agent — has no way to know the store was never reached.
-            raise RAGUnavailable(
-                self.init_error or "RAG system was not initialized"
-            )
+            raise RAGUnavailable(self.init_error or "RAG system was not initialized")
 
         try:
             # Generate query embedding
