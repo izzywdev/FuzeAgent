@@ -37,6 +37,35 @@ Per-tenant **collections**, not one collection with a `where` filter. A filter i
 one forgotten argument away from returning another tenant's chunks; a separate
 collection cannot be read by omission.
 
+### That isolation is enforced by FuzeInfra's provider, NOT by stock Chroma
+
+This matters enough to state plainly, because the obvious reading — "Chroma has
+tenants and databases, so tenants and databases are isolated" — **is false for
+every published version of Chroma**:
+
+| CVE | What stock Chroma does |
+|---|---|
+| CVE-2026-45830 | *"lack of authorization validation … allows any authenticated user to arbitrarily read, write, update, or delete data in any tenant's collection regardless of which tenant they belong to"* (0.4.17+) |
+| CVE-2026-45831 | `SimpleRBACAuthorizationProvider` *"evaluates whether a user holds a given permission but never checks which tenant, database, or collection that permission applies to"* (0.5.0+) |
+
+Neither has an upstream fix in any release — verified with `pip-audit` across
+0.4.24 → 1.3.0; **no version is clean**.
+
+What closes it here is that FuzeInfra does not use the built-in provider. It
+ships `TenantDatabaseAuthorizationProvider`
+(`helm/fuzeinfra/templates/chroma-authz.yaml`), which resolves the immutable
+collection UUID in SysDB rather than trusting the request's tenant/database —
+its own comment says it *"prevents a token from using a known collection UUID to
+cross an allocation boundary"* — and the provisioning job then **verifies** the
+denial by attempting a foreign-tenant write with each token and requiring it to
+be rejected.
+
+So the isolation claim above rests on a replacement provider plus a test that
+exercises it, not on a vendor feature. If that provider is ever swapped back to
+the stock one, per-tenant collections stop being a boundary and become a naming
+convention. Do not treat them as isolation on any Chroma deployment that has not
+replaced the provider.
+
 ## Configuration
 
 Set on the chart under `deploy.rag`; the deployment template projects them into
