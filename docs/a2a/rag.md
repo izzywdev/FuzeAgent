@@ -49,6 +49,7 @@ the container env. When `enabled: true`, `host`, `database` and
 | `CHROMA_HOST` | `deploy.rag.host` | **no default** — see below |
 | `CHROMA_PORT` | `deploy.rag.port` | 8000 |
 | `CHROMA_SSL` | `deploy.rag.ssl` | |
+| `CHROMA_TENANT` | `deploy.rag.tenant` | `fuzeagent` |
 | `CHROMA_DATABASE` | `deploy.rag.database` | `a2a` |
 | `CHROMA_COLLECTION_PREFIX` | `deploy.rag.collectionPrefix` | `a2a-` |
 | `RAG_EMBEDDING_MODEL` | `deploy.rag.embeddingModel` | `all-MiniLM-L6-v2` |
@@ -90,10 +91,32 @@ And the fourth, which is what actually hid the other three:
 
 `deploy.rag.enabled` stays `false` until FuzeInfra provides:
 
-- a reachable Chroma service DNS name in-cluster,
-- a Chroma **database** named `a2a` on it,
-- a scoped auth **token**, delivered as a SealedSecret in the `fuzeagent`
-  namespace, whose `{name, key}` goes into `deploy.rag.authTokenSecretRef`.
+FuzeInfra already has exactly the right mechanism — `serviceChromaCollections[]`
+in `helm/fuzeinfra/values-contabo.yaml`, which provisions an isolated
+tenant/database per consumer, seals a bearer token for it, and **verifies
+cross-tenant denial** as part of the provisioning job. `fuzeplan-repo-digester`
+and `fuzequality` are existing entries. So the request is one more entry, not a
+new capability:
+
+```yaml
+- name: fuzeagent-a2a
+  enabled: true
+  tenant: fuzeagent
+  database: a2a
+  credentialSecret:
+    name: fuzeagent-a2a-chroma-credentials
+    key: token
+  networkPolicy:
+    namespace: fuzeagent
+    podLabels:
+      app.kubernetes.io/name: a2a-shared
+  collections: []        # created on demand, one per A2A tenant
+```
+
+**Both `tenant` and `database` matter.** FuzeInfra's authorization provider binds
+each token to exactly one `(tenant, database)` pair server-side, and the Chroma
+client resolves both eagerly at construction — so a mismatch is not a subtle
+permission error later, it is a failure to connect at all.
 
 FuzeInfra is never edited from this repo — that request goes via `@claude` with
 the allocation named. Turning the flag on before those exist does not produce a

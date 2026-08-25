@@ -136,6 +136,11 @@ deploy:
     host: ""            # e.g. chromadb.fuzeinfra.svc.cluster.local
     port: 8000
     ssl: false
+    # FuzeInfra binds each token to exactly ONE tenant/database pair server-side
+    # (helm/fuzeinfra/templates/chroma-authz.yaml), so both must match the
+    # allocation it provisions or every call is denied — including the client
+    # construction, which resolves tenant/database eagerly.
+    tenant: fuzeagent
     database: a2a
     collectionPrefix: "a2a-"
     embeddingModel: all-MiniLM-L6-v2
