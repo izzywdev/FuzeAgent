@@ -115,6 +115,33 @@ deploy:
   # Optional ConfigMap name holding the Managed-Agents id-state (agent/vault/memory/
   # environment ids) mounted at FUZE_STATE_DIR=/state, same pattern as handoff-mcp.
   stateConfigMap: null
+
+  # RAG retrieval against the SHARED FuzeInfra Chroma instance (a2a/rag/).
+  #
+  # OFF by default, and deliberately all-or-nothing: with `enabled: true` the server
+  # refuses to start unless host, database and a credential are all present. A pod
+  # that comes up "successfully" pointing at nothing is the failure mode this whole
+  # block exists to prevent — that is precisely what the orchestrator did for months
+  # (CHROMA_HOST unset, defaulted to localhost, connection error swallowed).
+  #
+  # `database` is A2A's OWN database on the shared instance, not the default one.
+  # Collections inside it are named per tenant (`<collectionPrefix><tenant>`), so
+  # isolation is structural rather than a `where` filter one omission away from
+  # returning another tenant's chunks.
+  #
+  # NOTE: the Chroma instance, the `a2a` database and the auth token are FuzeInfra
+  # allocations. Until they exist this stays disabled; see docs/a2a/rag.md.
+  rag:
+    enabled: false
+    host: ""            # e.g. chromadb.fuzeinfra.svc.cluster.local
+    port: 8000
+    ssl: false
+    database: a2a
+    collectionPrefix: "a2a-"
+    embeddingModel: all-MiniLM-L6-v2
+    # SealedSecret ref {name,key} for the Chroma token. A literal token is never
+    # accepted here — there is no `token:` key on purpose.
+    authTokenSecretRef: null
   # MCP endpoints exported into the container env so every provisioned agent's _base
   # github/handoff servers (url: ${GITHUB_MCP_URL} / ${HANDOFF_MCP_URL}) RESOLVE instead
   # of being dropped. Each endpoint takes EITHER a plain in-cluster `url` OR a

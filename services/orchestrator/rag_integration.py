@@ -22,10 +22,72 @@ from knowledge_manager import DocumentMetadata, knowledge_manager
 
 logger = logging.getLogger(__name__)
 
-# ChromaDB configuration
-CHROMA_HOST = os.environ.get("CHROMA_HOST", "localhost")
+# ChromaDB configuration.
+#
+# THREE DEFECTS LIVED IN THIS BLOCK AND THE CONNECT BELOW, and together they made
+# RAG inert in production while every log line, probe and endpoint looked healthy:
+#
+#   1. CHROMA_HOST defaulted to "localhost" and NOTHING set it in any deployment
+#      manifest, so the pod dialled itself.
+#   2. chroma_client_auth_provider was the literal "basic". Chroma resolves that
+#      string as an import path to a provider class, so "basic" resolves to
+#      nothing — the client was built with no auth while appearing to configure it.
+#   3. chroma_client_auth_credentials was a hardcoded "". Even with (2) fixed,
+#      it would have authenticated with an empty secret.
+#
+# Any of the three raises inside _initialize_components, whose broad `except`
+# then set collection = None — after which every search returned an empty result
+# that no caller could distinguish from an empty corpus.
+#
+# The provider strings are kept in ONE place so the literal cannot be re-typed.
+# agent-templates/a2a/rag/config.py carries the same two constants for the shared
+# A2A image, and tests/test_rag_provider_parity.py fails if the two disagree.
+TOKEN_AUTH_PROVIDER = "chromadb.auth.token_authn.TokenAuthClientProvider"
+BASIC_AUTH_PROVIDER = "chromadb.auth.basic_authn.BasicAuthClientProvider"
+
+CHROMA_HOST = os.environ.get("CHROMA_HOST", "").strip()
 CHROMA_PORT = int(os.environ.get("CHROMA_PORT", "8000"))
 CHROMA_COLLECTION_NAME = "fuzeagent_knowledge"
+
+
+class RAGUnavailable(RuntimeError):
+    """The vector store is not reachable or not configured.
+
+    Raised rather than degraded. "RAG is down" and "the corpus has nothing on
+    that" are different answers and a caller must be able to tell them apart —
+    conflating them is what hid this outage.
+    """
+
+
+def _chroma_settings():
+    """Auth settings for the client, or None when explicitly unauthenticated."""
+    token = os.environ.get("CHROMA_AUTH_TOKEN", "").strip()
+    basic = os.environ.get("CHROMA_AUTH_BASIC", "").strip()
+    if token and basic:
+        raise RAGUnavailable("Both CHROMA_AUTH_TOKEN and CHROMA_AUTH_BASIC are set.")
+    if token:
+        return Settings(
+            chroma_client_auth_provider=TOKEN_AUTH_PROVIDER,
+            chroma_client_auth_credentials=token,
+            chroma_auth_token_transport_header=os.environ.get(
+                "CHROMA_AUTH_HEADER", "Authorization"),
+        )
+    if basic:
+        if ":" not in basic:
+            raise RAGUnavailable("CHROMA_AUTH_BASIC must be 'user:password'.")
+        return Settings(
+            chroma_client_auth_provider=BASIC_AUTH_PROVIDER,
+            chroma_client_auth_credentials=basic,
+        )
+    if os.environ.get("CHROMA_ALLOW_UNAUTHENTICATED", "0").strip().lower() in {
+            "1", "true", "yes", "on"}:
+        return Settings()
+    raise RAGUnavailable(
+        "No Chroma credential configured. Set CHROMA_AUTH_TOKEN (preferred) or "
+        "CHROMA_AUTH_BASIC, or set CHROMA_ALLOW_UNAUTHENTICATED=1 to state that "
+        "this instance has no auth. An empty credential is never assumed to mean "
+        "'no auth wanted'."
+    )
 
 # Embedding model configuration
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # Lightweight, fast model
@@ -62,7 +124,16 @@ class RAGIntegration:
         self.embedding_model = None
         self.chroma_client = None
         self.collection = None
+        # Retained, not discarded. This module is imported at process start and a
+        # raise here would take down the whole orchestrator, so construction stays
+        # tolerant — but the reason is kept and every query re-raises it, so the
+        # failure surfaces at the first use instead of never.
+        self.init_error: Optional[str] = None
         self._initialize_components()
+
+    @property
+    def is_available(self) -> bool:
+        return bool(self.embedding_model and self.collection)
 
     def _initialize_components(self):
         """Initialize embedding model and vector database"""
@@ -73,14 +144,19 @@ class RAGIntegration:
             logger.info("Embedding model loaded successfully")
 
             # Initialize ChromaDB client
+            if not CHROMA_HOST:
+                raise RAGUnavailable(
+                    "CHROMA_HOST is unset. Refusing to fall back to localhost: a pod "
+                    "that dials itself connects to nothing and then reports an empty "
+                    "corpus forever, which is exactly how this went unnoticed."
+                )
             logger.info(f"Connecting to ChromaDB at {CHROMA_HOST}:{CHROMA_PORT}")
             self.chroma_client = chromadb.HttpClient(
                 host=CHROMA_HOST,
                 port=CHROMA_PORT,
-                settings=Settings(
-                    chroma_client_auth_provider="basic",
-                    chroma_client_auth_credentials="",
-                ),
+                ssl=os.environ.get("CHROMA_SSL", "0").strip().lower() in {
+                    "1", "true", "yes", "on"},
+                settings=_chroma_settings(),
             )
 
             # Get or create collection
@@ -99,7 +175,10 @@ class RAGIntegration:
                 logger.info(f"Created new collection: {CHROMA_COLLECTION_NAME}")
 
         except Exception as e:
-            logger.error(f"Failed to initialize RAG components: {e}")
+            # The error is RECORDED, not just logged and dropped. `init_error` is
+            # what search_relevant_context re-raises, and what /rag/status reports.
+            self.init_error = f"{type(e).__name__}: {e}"
+            logger.error("RAG unavailable: %s", self.init_error)
             self.embedding_model = None
             self.chroma_client = None
             self.collection = None
@@ -234,14 +313,12 @@ class RAGIntegration:
         similarity_threshold: float = 0.7,
     ) -> RAGContext:
         """Search for relevant context based on query"""
-        if not self.embedding_model or not self.collection:
-            logger.error("RAG system not properly initialized")
-            return RAGContext(
-                query=query,
-                relevant_chunks=[],
-                similarity_scores=[],
-                total_documents=0,
-                context_length=0,
+        if not self.is_available:
+            # RAISES. Returning an empty RAGContext here is the original defect:
+            # it is a well-formed "we found nothing" answer, and a caller — human
+            # or agent — has no way to know the store was never reached.
+            raise RAGUnavailable(
+                self.init_error or "RAG system was not initialized"
             )
 
         try:

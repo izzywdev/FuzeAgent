@@ -35,7 +35,7 @@ from .container_manager import ContainerConfig, ContainerStatus, container_manag
 from .context_service import ContextService
 from .database import get_db_connection
 from .knowledge_manager import DocumentMetadata, knowledge_manager
-from .rag_integration import RAGContext, rag_system
+from .rag_integration import RAGContext, RAGUnavailable, rag_system
 from .sandbox_manager import AgentSandboxManager
 from .task_execution_engine import TaskExecutionEngine
 from .task_queue import TaskQueue
@@ -5465,6 +5465,12 @@ async def search_knowledge_context(
             "context_length": context.context_length,
         }
 
+    # 503, not 500 and emphatically not 200-with-no-results. "The vector store is
+    # unreachable" is a different answer from "nothing in the corpus matched", and
+    # collapsing the two is what let RAG sit dead in production unnoticed.
+    except RAGUnavailable as e:
+        logger.error("RAG unavailable: %s", e)
+        raise HTTPException(status_code=503, detail=f"RAG unavailable: {e}")
     except Exception as e:
         logger.error(f"Error searching knowledge context: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -5494,6 +5500,12 @@ async def enhance_prompt_with_context(
             "context_added": len(enhanced_prompt) > len(message),
         }
 
+    # 503, not 500 and emphatically not 200-with-no-results. "The vector store is
+    # unreachable" is a different answer from "nothing in the corpus matched", and
+    # collapsing the two is what let RAG sit dead in production unnoticed.
+    except RAGUnavailable as e:
+        logger.error("RAG unavailable: %s", e)
+        raise HTTPException(status_code=503, detail=f"RAG unavailable: {e}")
     except Exception as e:
         logger.error(f"Error enhancing prompt with context: {e}")
         raise HTTPException(status_code=500, detail=str(e))
