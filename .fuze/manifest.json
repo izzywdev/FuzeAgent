@@ -1,7 +1,7 @@
 {
   "identity": {
     "namespace": "agent",
-    "note": "Prefix namespace for this product's entity types (governance/identifier-standard.md \u00a72). DECLARED here rather than derived from the repo directory name: a rename would otherwise silently orphan every id already issued, and that surfaces much later as unresolvable references with no obvious cause. Reserved spine prefixes (usr/org/prt/app, billing, messaging) belong to FuzeFront; this product's own types namespace as agent_<type>. Enforced by `gate_identifier.py --namespace`.",
+    "note": "Prefix namespace for this product's entity types (governance/identifier-standard.md §2). DECLARED here rather than derived from the repo directory name: a rename would otherwise silently orphan every id already issued, and that surfaces much later as unresolvable references with no obvious cause. Reserved spine prefixes (usr/org/prt/app, billing, messaging) belong to FuzeFront; this product's own types namespace as agent_<type>. Enforced by `gate_identifier.py --namespace`.",
     "packages": {
       "node": "@izzywdev/fuzefront-identity",
       "python": "fuzefront-identity"
@@ -35,7 +35,7 @@
   "hardening": {
     "ruleset": true,
     "requireSignatures": true,
-    "deployOnPush": false
+    "deployOnPush": true
   },
   "a2a": {
     "enabled": true,
@@ -114,7 +114,7 @@
         "min_score": 80,
         "at_width": 375
       },
-      "The standalone URL loads with no portal chrome \u2014 it is what the APK wraps."
+      "The standalone URL loads with no portal chrome — it is what the APK wraps."
     ]
   },
   "toolchain": {
