@@ -153,7 +153,8 @@ def _authorize_delegated(
     if not skill_key:
         return AuthzResult(
             Decision.DENY,
-            "delegation policy present but no skill key to classify -> fail closed")
+            "delegation policy present but no skill key to classify -> fail closed",
+        )
 
     klass = policy.classify(skill_key)
     if klass is None:
@@ -162,12 +163,14 @@ def _authorize_delegated(
         # weakest rule in the system by being written rather than decided.
         return AuthzResult(
             Decision.DENY,
-            f"skill {skill_key!r} is unclassified in delegation.skills -> fail closed")
+            f"skill {skill_key!r} is unclassified in delegation.skills -> fail closed",
+        )
 
     if klass is SkillClass.NEVER_DELEGABLE:
         return AuthzResult(
             Decision.DENY,
-            f"skill {skill_key!r} is never-delegable; no principal reaches it via A2A")
+            f"skill {skill_key!r} is never-delegable; no principal reaches it via A2A",
+        )
 
     if klass is SkillClass.DELEGABLE:
         return AuthzResult(Decision.ALLOW, "authorized (delegable)")
@@ -178,14 +181,16 @@ def _authorize_delegated(
         return AuthzResult(
             Decision.DENY,
             f"skill {skill_key!r} is principal-required but the call carries no "
-            f"verified subject")
+            f"verified subject",
+        )
 
     # Term 2 first, because it needs no network call: the subject cannot reach past
     # what the agent may broker, however privileged the subject is.
     if not policy.brokerable_by(delegation.actor_chain, skill_key):
         return AuthzResult(
             Decision.DENY,
-            f"no actor in {delegation.actor_chain} may broker {skill_key!r}")
+            f"no actor in {delegation.actor_chain} may broker {skill_key!r}",
+        )
 
     # Term 1: what the SUBJECT may do, decided by Permit via FuzeFront's Security
     # API. A product never calls Permit directly.
@@ -193,7 +198,8 @@ def _authorize_delegated(
         return AuthzResult(
             Decision.DENY,
             "principal-required skill but no authz client is wired -> cannot "
-            "evaluate the subject's permission -> fail closed")
+            "evaluate the subject's permission -> fail closed",
+        )
     try:
         permitted = permit_check(delegation.subject, skill_key)
     except Exception as exc:
@@ -203,7 +209,8 @@ def _authorize_delegated(
     if not permitted:
         return AuthzResult(
             Decision.DENY,
-            f"subject {delegation.subject!r} is not permitted {skill_key!r}")
+            f"subject {delegation.subject!r} is not permitted {skill_key!r}",
+        )
 
     # The agent cannot grant more than the subject has, AND the subject cannot
     # reach past what the agent may broker. Both were required; neither alone.

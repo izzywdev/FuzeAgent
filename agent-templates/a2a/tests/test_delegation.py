@@ -14,7 +14,11 @@ import unittest
 
 from a2a.authz import AuthContext, Decision, authorize
 from a2a.delegation import (
-    EXTENSION_URI, Delegation, DelegationError, DelegationPolicy, SkillClass,
+    EXTENSION_URI,
+    Delegation,
+    DelegationError,
+    DelegationPolicy,
+    SkillClass,
     parse_claims,
 )
 
@@ -34,10 +38,14 @@ POLICY_BLOCK = {
     },
 }
 
-CEO_CLAIMS = {"sub": "user:ceo@fuzefront.com",
-              "act": {"sub": "repo:FuzeExecutive", "act": {"sub": "agent:a2a-shared"}}}
-WORKER_CLAIMS = {"sub": "user:worker@fuzefront.com",
-                 "act": {"sub": "repo:FuzeExecutive", "act": {"sub": "agent:a2a-shared"}}}
+CEO_CLAIMS = {
+    "sub": "user:ceo@fuzefront.com",
+    "act": {"sub": "repo:FuzeExecutive", "act": {"sub": "agent:a2a-shared"}},
+}
+WORKER_CLAIMS = {
+    "sub": "user:worker@fuzefront.com",
+    "act": {"sub": "repo:FuzeExecutive", "act": {"sub": "agent:a2a-shared"}},
+}
 
 
 def policy():
@@ -49,8 +57,13 @@ def ctx(claims=None, caller="FuzeExecutive"):
 
 
 def decide(claims=None, skill="plan-editor", permit=None, caller="FuzeExecutive"):
-    return authorize(ctx(claims, caller), MANIFEST, skill_key=skill,
-                     delegation_policy=policy(), permit_check=permit)
+    return authorize(
+        ctx(claims, caller),
+        MANIFEST,
+        skill_key=skill,
+        delegation_policy=policy(),
+        permit_check=permit,
+    )
 
 
 class BackwardCompatibilityTests(unittest.TestCase):
@@ -123,11 +136,17 @@ class IntersectionTests(unittest.TestCase):
         self.assertIs(decide(CEO_CLAIMS, permit=allow_all).decision, Decision.ALLOW)
 
         # Subject permitted, actor may NOT broker -> DENY. A union would allow.
-        sales_claims = {"sub": "user:ceo@fuzefront.com",
-                        "act": {"sub": "repo:FuzeSales"}}
-        r = authorize(ctx(sales_claims, caller="FuzeSales"), MANIFEST,
-                      skill_key="plan-editor", delegation_policy=policy(),
-                      permit_check=allow_all)
+        sales_claims = {
+            "sub": "user:ceo@fuzefront.com",
+            "act": {"sub": "repo:FuzeSales"},
+        }
+        r = authorize(
+            ctx(sales_claims, caller="FuzeSales"),
+            MANIFEST,
+            skill_key="plan-editor",
+            delegation_policy=policy(),
+            permit_check=allow_all,
+        )
         self.assertIs(r.decision, Decision.DENY)
         self.assertIn("broker", r.reason)
 
@@ -139,16 +158,23 @@ class IntersectionTests(unittest.TestCase):
     def test_an_actor_absent_from_brokerable_brokers_nothing(self):
         """Absence is not a wildcard."""
         claims = {"sub": "user:ceo@fuzefront.com", "act": {"sub": "repo:FuzeUnknown"}}
-        r = authorize(ctx(claims), MANIFEST, skill_key="plan-editor",
-                      delegation_policy=policy(), permit_check=lambda *_: True)
+        r = authorize(
+            ctx(claims),
+            MANIFEST,
+            skill_key="plan-editor",
+            delegation_policy=policy(),
+            permit_check=lambda *_: True,
+        )
         self.assertIs(r.decision, Decision.DENY)
 
 
 class FailClosedTests(unittest.TestCase):
     def test_permit_unreachable_is_deny_never_allow(self):
         """DECISION_UNAVAILABLE is a DENY. This is the fail-open branch, spelled out."""
+
         def boom(*_):
             raise ConnectionError("authz service unreachable")
+
         r = decide(CEO_CLAIMS, permit=boom)
         self.assertIs(r.decision, Decision.DENY)
         self.assertIn("unavailable", r.reason)
@@ -159,8 +185,12 @@ class FailClosedTests(unittest.TestCase):
         self.assertIn("cannot", r.reason)
 
     def test_missing_skill_key_is_deny(self):
-        r = authorize(ctx(CEO_CLAIMS), MANIFEST, delegation_policy=policy(),
-                      permit_check=lambda *_: True)
+        r = authorize(
+            ctx(CEO_CLAIMS),
+            MANIFEST,
+            delegation_policy=policy(),
+            permit_check=lambda *_: True,
+        )
         self.assertIs(r.decision, Decision.DENY)
 
 

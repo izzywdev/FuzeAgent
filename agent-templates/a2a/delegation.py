@@ -121,8 +121,11 @@ class DelegationPolicy:
             if not isinstance(roles, list):
                 raise DelegationError(f"brokerable[{actor!r}] must be an array")
             brokerable[actor] = frozenset(roles)
-        return cls(skills=skills, brokerable=brokerable,
-                   authz_base_url=block.get("authzBaseUrl"))
+        return cls(
+            skills=skills,
+            brokerable=brokerable,
+            authz_base_url=block.get("authzBaseUrl"),
+        )
 
     def classify(self, skill: str) -> SkillClass | None:
         """The skill's class, or None when unclassified. None is DENY, not a default."""
@@ -135,8 +138,9 @@ class DelegationPolicy:
         wildcard. An explicit empty list says the same thing on purpose, which is
         a meaningful statement in a way absence is not.
         """
-        return any(skill in self.brokerable.get(actor, frozenset())
-                   for actor in actor_chain)
+        return any(
+            skill in self.brokerable.get(actor, frozenset()) for actor in actor_chain
+        )
 
 
 def parse_claims(claims: dict | None) -> Delegation | None:
