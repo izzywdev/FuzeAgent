@@ -1,0 +1,9 @@
+{
+  "iss": "https://auth.fuzefront.com/",
+  "aud": "a2a-shared",
+  "sub": "user:izzy@fuzefront.com",
+  "act": {
+    "sub": "repo:FuzeExecutive",
+    "act": { "sub": "agent:a2a-shared" }
+  }
+}
