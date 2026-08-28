@@ -33,7 +33,8 @@ COPY contracts/a2a/v1/client/ /app/contract-client/
 RUN pip install --no-cache-dir /app/contract-client
 
 # The shared A2A server + its runtime deps within the templates tree:
-#   a2a/        the server itself (python -m a2a.runtime)
+#   a2a/        the server itself (python -m a2a.runtime), INCLUDING a2a/rag/
+#               (retrieval against the shared Chroma instance — no separate COPY)
 #   providers/  `from providers import get_provider` (Managed-Agents binding)
 #   sync/       common/driver/role_loader the anthropic provider delegates to
 COPY a2a/ /app/a2a/
@@ -56,7 +57,11 @@ USER 10001
 # (service.port), so image and chart stay consistent via one source. Same rule for the
 # ADVERTISED endpoint: a per-product pod declares `a2a.inClusterUrl` in that values file
 # (contract v1.2.0), never an env var.
-ENV HOST=0.0.0.0 \
+# RAG is OFF unless the chart says otherwise. a2a.rag.build_from_env() returns None
+# when A2A_RAG_ENABLED is unset, and RAISES when it is set but misconfigured — so a
+# RAG-enabled pod can never start believing it is connected to a store it is not.
+ENV A2A_RAG_ENABLED=0 \
+    HOST=0.0.0.0 \
     A2A_VALUES_FILE=/config/values.json \
     A2A_REPOS_DIR=/repos \
     AGENT_PROVIDER=anthropic \

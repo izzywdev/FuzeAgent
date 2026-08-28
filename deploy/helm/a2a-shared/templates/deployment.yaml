@@ -98,6 +98,40 @@ spec:
               value: /state
             - name: PYTHONUNBUFFERED
               value: "1"
+            {{- with .Values.deploy.rag }}
+            {{- if .enabled }}
+            # RAG retrieval (a2a/rag). a2a.rag.config.from_env RAISES on a missing
+            # host, database or credential rather than defaulting, so a misconfigured
+            # pod fails fast instead of serving empty answers that look like an empty
+            # corpus. The `required` guards below are the earlier, cheaper half of the
+            # same rule — but note they only fire where the value is nil or blank:
+            # `tenant` and `database` carry non-empty defaults in values.yaml, so
+            # OMITTING them yields the default (which is correct for the known
+            # allocation) and only explicitly blanking them fails here.
+            - name: A2A_RAG_ENABLED
+              value: "1"
+            - name: CHROMA_HOST
+              value: {{ required "deploy.rag.host is required when deploy.rag.enabled" .host | quote }}
+            - name: CHROMA_PORT
+              value: {{ .port | default 8000 | quote }}
+            - name: CHROMA_SSL
+              value: {{ ternary "1" "0" (.ssl | default false) | quote }}
+            - name: CHROMA_TENANT
+              value: {{ required "deploy.rag.tenant is required when deploy.rag.enabled" .tenant | quote }}
+            - name: CHROMA_DATABASE
+              value: {{ required "deploy.rag.database is required when deploy.rag.enabled" .database | quote }}
+            - name: CHROMA_COLLECTION_PREFIX
+              value: {{ .collectionPrefix | default "a2a-" | quote }}
+            - name: RAG_EMBEDDING_MODEL
+              value: {{ .embeddingModel | default "all-MiniLM-L6-v2" | quote }}
+            {{- $ref := required "deploy.rag.authTokenSecretRef {name,key} is required when deploy.rag.enabled — there is deliberately no literal token key" .authTokenSecretRef }}
+            - name: CHROMA_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "deploy.rag.authTokenSecretRef.name is required" $ref.name }}
+                  key: {{ required "deploy.rag.authTokenSecretRef.key is required" $ref.key }}
+            {{- end }}
+            {{- end }}
             {{- with .Values.deploy.providerApiKeySecretRef }}
             # Managed-Agents API key for session provisioning (sync/common.py _api_key()).
             - name: ANTHROPIC_API_KEY

@@ -13,3 +13,10 @@ jsonschema>=4.0
 # devops for the deployed image (unit tests never construct the verifier, so main's
 # server-owned deps omit it). See PR #85.
 cryptography>=42
+# RAG retrieval against the shared Chroma instance (a2a/rag/). Retrieval only —
+# the A2A pod never indexes, so no document-store driver is needed here: the
+# indexer stores chunk TEXT alongside each vector and the query reads it back.
+# Both are optional at import time (a2a.rag builds only when A2A_RAG_ENABLED is
+# set), so the unit tests never need them installed.
+chromadb>=0.5.0,<2.0.0
+sentence-transformers>=3.0.0,<6.0.0
