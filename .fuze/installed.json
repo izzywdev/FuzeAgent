@@ -179,6 +179,13 @@
       "sourceSha256": "a22e09f472571a5ba94ae81b247dbfe945a0781f1509b0c494feb1d39ff22e67",
       "renderedSha256": "a22e09f472571a5ba94ae81b247dbfe945a0781f1509b0c494feb1d39ff22e67"
     },
+    "governance/required-checks.json": {
+      "capability": "harden-gate-scripts",
+      "mode": "managed",
+      "sourcePath": "governance/required-checks.json",
+      "sourceSha256": "e2ed9b235e05fbfeed653c5dcce3b6532d184e3e87a9c1673756976ca3d5d6d5",
+      "renderedSha256": "e2ed9b235e05fbfeed653c5dcce3b6532d184e3e87a9c1673756976ca3d5d6d5"
+    },
     "governance/workflow-drift-policy.json": {
       "capability": "workflows",
       "mode": "managed",
@@ -206,6 +213,13 @@
       "sourcePath": "scripts/__tests__/test_gate_federation_contract.py",
       "sourceSha256": "93dd164cdfe1d9c7ed3b3ba8bc0da3e2f49b9b1628669a69d177b957693b5ba5",
       "renderedSha256": "93dd164cdfe1d9c7ed3b3ba8bc0da3e2f49b9b1628669a69d177b957693b5ba5"
+    },
+    "scripts/__tests__/test_gate_required_checks.py": {
+      "capability": "harden-gate-scripts",
+      "mode": "managed",
+      "sourcePath": "scripts/__tests__/test_gate_required_checks.py",
+      "sourceSha256": "f0cf7e2415607d1be0ef41efb280374a0f3a0ae4e542774b77dca4d8ae6e9949",
+      "renderedSha256": "f0cf7e2415607d1be0ef41efb280374a0f3a0ae4e542774b77dca4d8ae6e9949"
     },
     "scripts/__tests__/test_gate_vacuous_check.py": {
       "capability": "workflows",
@@ -255,6 +269,13 @@
       "sourcePath": "scripts/gate_pagination.py",
       "sourceSha256": "7f1e0d79e2a80a79250db72ff8e437c9cb4a7b596728c4c9b377d66c080f6c35",
       "renderedSha256": "7f1e0d79e2a80a79250db72ff8e437c9cb4a7b596728c4c9b377d66c080f6c35"
+    },
+    "scripts/gate_required_checks.py": {
+      "capability": "harden-gate-scripts",
+      "mode": "managed",
+      "sourcePath": "scripts/gate_required_checks.py",
+      "sourceSha256": "0bf1dd75d601cfad14e935fd702e2667fc243e020f5e20758a493926c4fe9a6f",
+      "renderedSha256": "0bf1dd75d601cfad14e935fd702e2667fc243e020f5e20758a493926c4fe9a6f"
     },
     "scripts/gate_vacuous_check.py": {
       "capability": "workflows",
