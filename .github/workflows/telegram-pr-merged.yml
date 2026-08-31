@@ -1,3 +1,4 @@
+# fuze:managed template=telegram-pr-merged.yml baseline=03fe67a36648431acf85f25c1a2a29f814b0699d digest=sha256:06312649f4369d186e7b6cec548436d02788a6f559ec3aee44c312b3672cc5ad
 name: Notify Telegram on PR merge
 
 on:
@@ -7,7 +8,7 @@ on:
 jobs:
   notify:
     if: github.event.pull_request.merged == true
-    uses: izzywdev/FuzeSDLC/.github/workflows/reusable-telegram-pr-merged.yml@main
+    uses: izzywdev/FuzeSDLC/.github/workflows/reusable-telegram-pr-merged.yml@03fe67a36648431acf85f25c1a2a29f814b0699d
     with:
       pr_title: ${{ github.event.pull_request.title }}
       pr_url: ${{ github.event.pull_request.html_url }}
@@ -15,4 +16,9 @@ jobs:
       repository: ${{ github.repository }}
       merged_by: ${{ github.event.pull_request.merged_by.login }}
       base_branch: ${{ github.event.pull_request.base.ref }}
+      # Rewritten by the installer to this repo's ci.runner (render.py). The called
+      # job runs in THIS repo's context and bills to it, so leaving it on
+      # ubuntu-latest puts one job back on a GitHub-hosted machine -- and on a
+      # private repo, never runs it at all.
+      runner: ubuntu-latest
     secrets: inherit

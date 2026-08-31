@@ -1,0 +1,416 @@
+{
+  "schemaVersion": 1,
+  "files": {
+    ".github/actions/fuze-code-action/__tests__/test_classify.sh": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/fuze-code-action/__tests__/test_classify.sh",
+      "sourceSha256": "b9dda1ea613488303a0ab92c21a4a04f03436bc71bc158ff6c648c74e5432d0f",
+      "renderedSha256": "b9dda1ea613488303a0ab92c21a4a04f03436bc71bc158ff6c648c74e5432d0f"
+    },
+    ".github/actions/fuze-code-action/__tests__/test_extra_env.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/fuze-code-action/__tests__/test_extra_env.py",
+      "sourceSha256": "221e33fd19bff90a77b2a5311d92c526332fd78ba1690502e79c0e9c02a94179",
+      "renderedSha256": "221e33fd19bff90a77b2a5311d92c526332fd78ba1690502e79c0e9c02a94179"
+    },
+    ".github/actions/fuze-code-action/__tests__/test_passthrough_defaults.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/fuze-code-action/__tests__/test_passthrough_defaults.py",
+      "sourceSha256": "580b152d228f7b7120d843129397400b83408ec1afe9069bccf4bc2488b696c0",
+      "renderedSha256": "580b152d228f7b7120d843129397400b83408ec1afe9069bccf4bc2488b696c0"
+    },
+    ".github/actions/fuze-code-action/__tests__/test_run_blocks_parse.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/fuze-code-action/__tests__/test_run_blocks_parse.py",
+      "sourceSha256": "68c504dc7077f393b86ca12f70e9e303a97eee1b6cb113234e2db8cb3f640e67",
+      "renderedSha256": "68c504dc7077f393b86ca12f70e9e303a97eee1b6cb113234e2db8cb3f640e67"
+    },
+    ".github/actions/fuze-code-action/__tests__/test_rung_gating.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/fuze-code-action/__tests__/test_rung_gating.py",
+      "sourceSha256": "9e26b65902c0309b7231715c96543dd62393ddca42d6ce784206f3a7b296879a",
+      "renderedSha256": "9e26b65902c0309b7231715c96543dd62393ddca42d6ce784206f3a7b296879a"
+    },
+    ".github/actions/fuze-code-action/action.yml": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/fuze-code-action/action.yml",
+      "sourceSha256": "a260b5ab31ad6645183612fc90953b3d0b6f21d083b23260b7765404d325a75e",
+      "renderedSha256": "a260b5ab31ad6645183612fc90953b3d0b6f21d083b23260b7765404d325a75e"
+    },
+    ".github/actions/fuze-code-action/classify.sh": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/fuze-code-action/classify.sh",
+      "sourceSha256": "071c727ea2f347ed43f9fb44ae224630ec99b55a117777c2a3bc8e3c97bccbd1",
+      "renderedSha256": "071c727ea2f347ed43f9fb44ae224630ec99b55a117777c2a3bc8e3c97bccbd1"
+    },
+    ".github/actions/fuze-push-identity/action.yml": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/fuze-push-identity/action.yml",
+      "sourceSha256": "57b7c90c55a8b15649b22a73703cb6faa54ba7749d695592ff911e8a7f040963",
+      "renderedSha256": "57b7c90c55a8b15649b22a73703cb6faa54ba7749d695592ff911e8a7f040963"
+    },
+    ".github/actions/llm-endpoint/action.yml": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": ".github/actions/llm-endpoint/action.yml",
+      "sourceSha256": "939fe5e84568530a6fc2a8328deefa52a31137d639b2fbe6f5c1bd4ca8dae3c9",
+      "renderedSha256": "939fe5e84568530a6fc2a8328deefa52a31137d639b2fbe6f5c1bd4ca8dae3c9"
+    },
+    ".github/workflows/a2a-maintain.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/a2a-maintain.yml",
+      "sourceSha256": "9b7fab56ffe1eaf1720f10b91b3300deff1a21366bbcae8367c2040821ae9737",
+      "renderedSha256": "9b7fab56ffe1eaf1720f10b91b3300deff1a21366bbcae8367c2040821ae9737",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/auto-merge.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/auto-merge.yml",
+      "sourceSha256": "89b2ac3bc3a20e6a26b27c242e31c129416701848039988edd3a97900d3713ed",
+      "renderedSha256": "89b2ac3bc3a20e6a26b27c242e31c129416701848039988edd3a97900d3713ed",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/claude-auto-pr.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/claude-auto-pr.yml",
+      "sourceSha256": "b37ea61a6db332e5f718c1a9659c971a08042b5f78a146cf09b5e71b5c203e51",
+      "renderedSha256": "b37ea61a6db332e5f718c1a9659c971a08042b5f78a146cf09b5e71b5c203e51",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/claude.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/claude.yml",
+      "sourceSha256": "5514c5859d6389e012592f427adb525d9401eea01f646f7c908d4cab44b7dd6a",
+      "renderedSha256": "5514c5859d6389e012592f427adb525d9401eea01f646f7c908d4cab44b7dd6a",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/design-approval.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/design-approval.yml",
+      "sourceSha256": "e01699a1fabf2cc837a4ddbf5b0ea503eadf61305a1f75d7efd409fe7d909849",
+      "renderedSha256": "e01699a1fabf2cc837a4ddbf5b0ea503eadf61305a1f75d7efd409fe7d909849",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/design-review-notify.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/design-review-notify.yml",
+      "sourceSha256": "853dd38ffa5223d11ec7034dc2b0af470a1ab79789a59fec93d8ec20eed869ee",
+      "renderedSha256": "853dd38ffa5223d11ec7034dc2b0af470a1ab79789a59fec93d8ec20eed869ee",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/fuze-ci-autofix.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/fuze-ci-autofix.yml",
+      "sourceSha256": "109f80d20315f5fdb2a336dedd74640962ee5df1d678c38c02e4af0c326a2f79",
+      "renderedSha256": "109f80d20315f5fdb2a336dedd74640962ee5df1d678c38c02e4af0c326a2f79",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/fuze-code-review.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/fuze-code-review.yml",
+      "sourceSha256": "71eef5ec5121fdb79ec374315e695ab40e1d8fec67e9828b6dfed278016ddd1c",
+      "renderedSha256": "71eef5ec5121fdb79ec374315e695ab40e1d8fec67e9828b6dfed278016ddd1c",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/gate-frames-stamped.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/gate-frames-stamped.yml",
+      "sourceSha256": "cbdc3f534c3caf07d208b754a0031aa52b7c10b7d50b609a0567c52fc3468c73",
+      "renderedSha256": "cbdc3f534c3caf07d208b754a0031aa52b7c10b7d50b609a0567c52fc3468c73",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/gate-fuze-code-action.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/gate-fuze-code-action.yml",
+      "sourceSha256": "f7e7cc06f0b83412dedd2e0a43ed9f918adb4c58208e78648e204281f13e206d",
+      "renderedSha256": "f7e7cc06f0b83412dedd2e0a43ed9f918adb4c58208e78648e204281f13e206d",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/gate-line-endings.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/gate-line-endings.yml",
+      "sourceSha256": "1dff944b748769c6204c7b1ff9a48bda2fddc6d5d2994f322874e8c4e77ba0ff",
+      "renderedSha256": "1dff944b748769c6204c7b1ff9a48bda2fddc6d5d2994f322874e8c4e77ba0ff",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/gate-required-checks.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/gate-required-checks.yml",
+      "sourceSha256": "ce81eb0e184e824a22ca5b6e20632f08a08ae1cb07afc0513713d6e2dfd96369",
+      "renderedSha256": "ce81eb0e184e824a22ca5b6e20632f08a08ae1cb07afc0513713d6e2dfd96369",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/governance-nightly.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/governance-nightly.yml",
+      "sourceSha256": "9956cac74cd3cf71a7b3fcd7e9ae55aa11552f1c58cb8fadea737186bebcc9a9",
+      "renderedSha256": "9956cac74cd3cf71a7b3fcd7e9ae55aa11552f1c58cb8fadea737186bebcc9a9",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/governance-sync.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/governance-sync.yml",
+      "sourceSha256": "57bd89d3c1d8971e592b7cc92f93904cd99e784a1dcf0b8e19314711c83eb9b7",
+      "renderedSha256": "57bd89d3c1d8971e592b7cc92f93904cd99e784a1dcf0b8e19314711c83eb9b7",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/harden-gate.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/harden-gate.yml",
+      "sourceSha256": "1fe4425695f498c8e1f8589ef4bc95d628791f318f42c482f5e3ea588292a8d7",
+      "renderedSha256": "1fe4425695f498c8e1f8589ef4bc95d628791f318f42c482f5e3ea588292a8d7",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/helm-validate.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/helm-validate.yml",
+      "sourceSha256": "ba2f6514f9bc27dedcfcec02fb402971deb9b5fb5d1c2a6c5e9c23370b2cb46c",
+      "renderedSha256": "ba2f6514f9bc27dedcfcec02fb402971deb9b5fb5d1c2a6c5e9c23370b2cb46c",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/label-sync.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/label-sync.yml",
+      "sourceSha256": "28d3c319c4ec648c43055b90753a1ac29c5dfadecb3969161c91abd00975e215",
+      "renderedSha256": "28d3c319c4ec648c43055b90753a1ac29c5dfadecb3969161c91abd00975e215",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/mcp-maintain.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/mcp-maintain.yml",
+      "sourceSha256": "9286b02aeffee29ce98a90cbf5c108efdba5cbeb671fd46edae87252d9cc610c",
+      "renderedSha256": "9286b02aeffee29ce98a90cbf5c108efdba5cbeb671fd46edae87252d9cc610c",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/nightly-integration.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/nightly-integration.yml",
+      "sourceSha256": "231f10ea07552f2dbc53923cd313aa01c3514819a42db4df4e9165db7dc561b2",
+      "renderedSha256": "231f10ea07552f2dbc53923cd313aa01c3514819a42db4df4e9165db7dc561b2",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/pages-frames.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/pages-frames.yml",
+      "sourceSha256": "143a6e34600d2d691a0be68d6f339b292ce9d864096ba69c4c83ce5d74159d45",
+      "renderedSha256": "143a6e34600d2d691a0be68d6f339b292ce9d864096ba69c4c83ce5d74159d45",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/publish-expert.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/publish-expert.yml",
+      "sourceSha256": "96899ed116bfb5c8915dfc693df0793a967bdbd7fdb35f78d85263d1e31ebb92",
+      "renderedSha256": "96899ed116bfb5c8915dfc693df0793a967bdbd7fdb35f78d85263d1e31ebb92",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/telegram-pr-merged.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/telegram-pr-merged.yml",
+      "sourceSha256": "5661ff69a173467c233108ed9b13af61feafea1cf0847156a39c535e4ce7c2c0",
+      "renderedSha256": "5661ff69a173467c233108ed9b13af61feafea1cf0847156a39c535e4ce7c2c0",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    "governance/federation-contract-policy.json": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "governance/federation-contract-policy.json",
+      "sourceSha256": "a22e09f472571a5ba94ae81b247dbfe945a0781f1509b0c494feb1d39ff22e67",
+      "renderedSha256": "a22e09f472571a5ba94ae81b247dbfe945a0781f1509b0c494feb1d39ff22e67"
+    },
+    "scripts/__tests__/test_fuze_code_review_verdict.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/__tests__/test_fuze_code_review_verdict.py",
+      "sourceSha256": "b8b8c86efbc5dbe83d7916d2bedfba2530989a6c4ececd9c02fb7df6d8328e90",
+      "renderedSha256": "b8b8c86efbc5dbe83d7916d2bedfba2530989a6c4ececd9c02fb7df6d8328e90"
+    },
+    "scripts/__tests__/test_gate_api_version.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/__tests__/test_gate_api_version.py",
+      "sourceSha256": "1fafd2bc7aa2ec7411a6486b5ea9750219dcc30d5d6074972cdc8c95c1bde67a",
+      "renderedSha256": "1fafd2bc7aa2ec7411a6486b5ea9750219dcc30d5d6074972cdc8c95c1bde67a"
+    },
+    "scripts/__tests__/test_gate_federation_contract.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/__tests__/test_gate_federation_contract.py",
+      "sourceSha256": "93dd164cdfe1d9c7ed3b3ba8bc0da3e2f49b9b1628669a69d177b957693b5ba5",
+      "renderedSha256": "93dd164cdfe1d9c7ed3b3ba8bc0da3e2f49b9b1628669a69d177b957693b5ba5"
+    },
+    "scripts/__tests__/test_gate_vacuous_check.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/__tests__/test_gate_vacuous_check.py",
+      "sourceSha256": "febd1091605fc00fc31f466dcf9529317826d0d648fc5d3250e2cebdda698187",
+      "renderedSha256": "febd1091605fc00fc31f466dcf9529317826d0d648fc5d3250e2cebdda698187"
+    },
+    "scripts/build-frames-site.mjs": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/build-frames-site.mjs",
+      "sourceSha256": "4fcb6bc3cb2d9c658622e55ada484ed9958a9591af36959301c6310a24d75aae",
+      "renderedSha256": "4fcb6bc3cb2d9c658622e55ada484ed9958a9591af36959301c6310a24d75aae"
+    },
+    "scripts/fuze_code_review_verdict.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/fuze_code_review_verdict.py",
+      "sourceSha256": "d408d9d29e01accc1a736b296a3c4367a9e23bab12a05a6eaa01ecbdc0c5e58d",
+      "renderedSha256": "d408d9d29e01accc1a736b296a3c4367a9e23bab12a05a6eaa01ecbdc0c5e58d"
+    },
+    "scripts/gate_api_version.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/gate_api_version.py",
+      "sourceSha256": "dbdcc301f2a9607ac4b23b71919ff990931cea0ef6404ec8646c03b3c428fafe",
+      "renderedSha256": "dbdcc301f2a9607ac4b23b71919ff990931cea0ef6404ec8646c03b3c428fafe"
+    },
+    "scripts/gate_federation_contract.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/gate_federation_contract.py",
+      "sourceSha256": "306612164d7a33855bb4e1e36f70bbf289b1e00b29c1eebc3c8887f53351e10f",
+      "renderedSha256": "306612164d7a33855bb4e1e36f70bbf289b1e00b29c1eebc3c8887f53351e10f"
+    },
+    "scripts/gate_pagination.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/gate_pagination.py",
+      "sourceSha256": "7f1e0d79e2a80a79250db72ff8e437c9cb4a7b596728c4c9b377d66c080f6c35",
+      "renderedSha256": "7f1e0d79e2a80a79250db72ff8e437c9cb4a7b596728c4c9b377d66c080f6c35"
+    },
+    "scripts/gate_vacuous_check.py": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/gate_vacuous_check.py",
+      "sourceSha256": "3415c860699eda3f3a81c2d935251558f25f8a147024842e4dc8927d19bb7fb0",
+      "renderedSha256": "3415c860699eda3f3a81c2d935251558f25f8a147024842e4dc8927d19bb7fb0"
+    },
+    "scripts/stamp-frames.mjs": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/stamp-frames.mjs",
+      "sourceSha256": "71ede05b3cf69848c595302b4d80a041d2e7cb177e7afa8b2fe68ace2d04d6b9",
+      "renderedSha256": "71ede05b3cf69848c595302b4d80a041d2e7cb177e7afa8b2fe68ace2d04d6b9"
+    }
+  }
+}
