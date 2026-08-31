@@ -21,7 +21,7 @@
     "agent-templates/roles/",
     ".fuze/manifest.json"
   ],
-  "baselineRef": "v1",
+  "baselineRef": "03fe67a36648431acf85f25c1a2a29f814b0699d",
   "agents": [
     "fuzeagent-expert",
     "contract-designer",
