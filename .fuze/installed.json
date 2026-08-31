@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "files": {
+    ".github/workflows/design-approval.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/design-approval.yml",
+      "sourceSha256": "29bec1de9e422c32c82303e7025813b410dfb58390adf9f92e225a2f132f7703",
+      "renderedSha256": "29bec1de9e422c32c82303e7025813b410dfb58390adf9f92e225a2f132f7703",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/design-review-notify.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/design-review-notify.yml",
+      "sourceSha256": "2d86c2c70163765b7149fc091f211b918d29d68fb856ed45b3b551b3bb7ff59a",
+      "renderedSha256": "2d86c2c70163765b7149fc091f211b918d29d68fb856ed45b3b551b3bb7ff59a",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/gate-frames-stamped.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/gate-frames-stamped.yml",
+      "sourceSha256": "5dc3dff5aeb952c841646c4de42082db74d017b67dac5397094ab61b387dbc23",
+      "renderedSha256": "5dc3dff5aeb952c841646c4de42082db74d017b67dac5397094ab61b387dbc23",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/pages-frames.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/pages-frames.yml",
+      "sourceSha256": "192b57b19b36a0a0ade8f97fd716d012ffd108885b515789808083924299daf0",
+      "renderedSha256": "192b57b19b36a0a0ade8f97fd716d012ffd108885b515789808083924299daf0",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    "scripts/build-frames-site.mjs": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/build-frames-site.mjs",
+      "sourceSha256": "4fcb6bc3cb2d9c658622e55ada484ed9958a9591af36959301c6310a24d75aae",
+      "renderedSha256": "4fcb6bc3cb2d9c658622e55ada484ed9958a9591af36959301c6310a24d75aae"
+    },
+    "scripts/stamp-frames.mjs": {
+      "capability": "workflows",
+      "mode": "managed",
+      "sourcePath": "scripts/stamp-frames.mjs",
+      "sourceSha256": "71ede05b3cf69848c595302b4d80a041d2e7cb177e7afa8b2fe68ace2d04d6b9",
+      "renderedSha256": "71ede05b3cf69848c595302b4d80a041d2e7cb177e7afa8b2fe68ace2d04d6b9"
+    }
+  }
+}
