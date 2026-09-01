@@ -1,16 +1,25 @@
+# syntax=docker/dockerfile:1
 # Build stage
-FROM node:20-alpine as dependencies
+FROM node:24-alpine AS dependencies
 
 WORKDIR /app
 
-# Copy package files first (better caching)
-COPY package*.json ./
+# Copy package files + npm registry config first (better caching).
+# .npmrc maps the @izzywdev/* scope to GitHub Packages -- services/ui-react
+# depends on @izzywdev/fuzefront-identity -- and reads its auth token from
+# $GITHUB_TOKEN. See .npmrc for the full rationale.
+COPY package*.json .npmrc ./
 
-# Install dependencies with caching optimizations
-RUN npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+# Install dependencies with caching optimizations.
+# Token mounted as a BuildKit secret -- NEVER stored in any image layer or
+# metadata (matches containers/claude-runner-base/Dockerfile's npm_token
+# pattern). A build-arg would bake it into the image history instead.
+RUN --mount=type=secret,id=github_token \
+    export GITHUB_TOKEN="$(cat /run/secrets/github_token)" && \
+    npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
 # Build stage
-FROM dependencies as build
+FROM dependencies AS build
 
 # Copy source code
 COPY . .

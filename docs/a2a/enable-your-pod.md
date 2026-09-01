@@ -65,7 +65,7 @@ served agent. All fields below are defined in
 | `a2a.enabled` | yes | `false` | **The gate.** `false` = the shared A2A server is not deployed at all. |
 | `a2a.protocolVersion` | — | `"1.0"` | Frozen for contract v1 (const). |
 | `a2a.inClusterUrl` | — | `http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc` | The endpoint this server advertises as `AgentInterface.url` on every non-external card (card-projection.md §2). Leave unset on the shared server. A **per-product pod MUST** set it to its own Service, or its card names the shared server and callers never reach it — see [per-product-pod.md](per-product-pod.md). Added in contract v1.2.0. |
-| `a2a.image.repository` | — | `ghcr.io/izzywdev/fuzeagent-a2a` | |
+| `a2a.image.repository` | — | `ghcr.io/izzywdev/fuze-a2a` | |
 | `a2a.image.tag` | — | — | Immutable tag; prod values bump this, **never `latest`**. |
 | `a2a.image.pullPolicy` | — | `IfNotPresent` | |
 | `a2a.service.type` | — | `ClusterIP` (const) | **MUST be ClusterIP.** Ingress is Cloudflare-tunnel-only; there is no LoadBalancer/NodePort surface. |

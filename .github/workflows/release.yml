@@ -82,6 +82,13 @@ jobs:
           # No VITE_API_URL build-arg: config/api.ts derives the API base from
           # window.location.origin in production, and the UI's own nginx proxies
           # same-origin /api/orchestrator + /api/hierarchy to the backends.
+          # services/ui-react depends on the private @izzywdev/fuzefront-identity
+          # package (GitHub Packages); the Dockerfile's npm-ci layer reads it via
+          # a BuildKit secret (never a build-arg, which would bake it into image
+          # history) -- see services/ui-react/Dockerfile + .npmrc, and matches
+          # build-agent-images-base's npm_token secret below.
+          secrets: |
+            github_token=${{ secrets.GITHUB_TOKEN }}
           tags: |
             ghcr.io/izzywdev/fuzeagent-ui:${{ steps.tag.outputs.sha }}
             ghcr.io/izzywdev/fuzeagent-ui:latest
@@ -111,8 +118,8 @@ jobs:
           file: agent-templates/a2a/Dockerfile
           push: true
           tags: |
-            ghcr.io/izzywdev/fuzeagent-a2a:${{ steps.tag.outputs.sha }}
-            ghcr.io/izzywdev/fuzeagent-a2a:latest
+            ghcr.io/izzywdev/fuze-a2a:${{ steps.tag.outputs.sha }}
+            ghcr.io/izzywdev/fuze-a2a:latest
           cache-from: type=gha,scope=a2a
           cache-to: type=gha,mode=max,scope=a2a
 
@@ -142,6 +149,37 @@ jobs:
             --base main --head "${BRANCH}")
           GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr review "${PR_URL}" --approve -b "Automated GitOps release"
           GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr merge "${PR_URL}" --admin --squash --delete-branch
+
+      - name: Create GitHub Release
+        # Every prior run of this job built and shipped images but never recorded
+        # a tag or a Release object anywhere -- `gh api repos/.../releases/latest`
+        # 404s and `tags` is empty even though dozens of these runs have succeeded.
+        # This closes that gap: one Release per successful build, named after the
+        # same short SHA already used for the image tags above, so the Release is
+        # directly traceable to what actually got built and rolled out. Uses the
+        # job's default GITHUB_TOKEN (contents: write, already granted) -- this
+        # only creates a tag + Release via the API, it never pushes to the
+        # protected `main` branch, so it needs no elevated/admin token.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA="${{ steps.tag.outputs.sha }}"
+          TAG="release-${SHA}"
+          cat > /tmp/release-notes.md <<EOF
+          Images built and published from commit \`${GITHUB_SHA}\`, then rolled
+          out to prod via the GitOps bump PR merged to \`main\` earlier in this
+          same workflow run.
+
+          - \`ghcr.io/izzywdev/fuzeagent-orchestrator:${SHA}\`
+          - \`ghcr.io/izzywdev/fuzeagent-hierarchy-api:${SHA}\`
+          - \`ghcr.io/izzywdev/fuzeagent-ui:${SHA}\`
+          - \`ghcr.io/izzywdev/fuzeagent-mcp-server:${SHA}\`
+          - \`ghcr.io/izzywdev/fuze-a2a:${SHA}\`
+          EOF
+          gh release create "${TAG}" \
+            --target "${GITHUB_SHA}" \
+            --title "FuzeAgent ${TAG}" \
+            --notes-file /tmp/release-notes.md
 
   # ---------------------------------------------------------------------------
   # claude-runner image library (Track 4)

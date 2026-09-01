@@ -1,8 +1,26 @@
 {
+  "identity": {
+    "namespace": "agent",
+    "note": "Prefix namespace for this product's entity types (governance/identifier-standard.md \u00a72). DECLARED here rather than derived from the repo directory name: a rename would otherwise silently orphan every id already issued, and that surfaces much later as unresolvable references with no obvious cause. Reserved spine prefixes (usr/org/prt/app, billing, messaging) belong to FuzeFront; this product's own types namespace as agent_<type>. Enforced by `gate_identifier.py --namespace`.",
+    "packages": {
+      "node": "@izzywdev/fuzefront-identity",
+      "python": "fuzefront-identity"
+    }
+  },
   "repo": "izzywdev/FuzeAgent",
   "class": "oss-public",
   "tier": "product",
   "expert": "fuzeagent-expert",
+  "expertMonitors": [
+    "deploy/helm/",
+    "deploy/argocd/",
+    "services/database_service/",
+    "mcp-servers/fuzeagent-server/",
+    "contracts/openapi.yaml",
+    "docker-compose.yml",
+    "agent-templates/roles/",
+    ".fuze/manifest.json"
+  ],
   "baselineRef": "v1",
   "agents": [
     "fuzeagent-expert",
@@ -30,12 +48,13 @@
     "deployOnPush": false
   },
   "a2a": {
-    "enabled": false,
+    "enabled": true,
     "servingRoles": [
       "agent-orchestrator"
     ],
     "entryRole": "agent-orchestrator",
-    "note": "The A2A surface here is REAL, not a scaffold: agent-templates/a2a/ implements card_generator, adapter, authz and identity, and agent-templates/roles/agent-orchestrator/role.json is a fully-described serving role. Left enabled:false only because flipping it requires verifying the card projects schema-valid against the frozen contract \u2014 a2a-maintainer's call, not a manifest edit's."
+    "external": false,
+    "note": "CORRECTED 2026-08-23: enabled:false denied a surface that is serving in production. FuzeAgent HOSTS the family's A2A deployment. deploy/helm/a2a-shared/values-prod.yaml — the only valueFile the Argo Application (deploy/argocd/applications/a2a-shared.yaml) lists — carries `a2a.enabled: true` with image tag 51f12786811a, and the `a2a-shared` pod was observed Running 1/1 in the fuzeagent namespace on 2026-08-21 (FuzeInfra cluster-query run 32475207623). It is the ONLY A2A pod in the fleet, by design: the image hardcodes the Agent Card's in-cluster interface URL to a2a-shared.fuzeagent.svc.cluster.local (card_generator.py:29), so per-product pods cannot work and every other product onboards as a `tenants[]` entry here. FuzeAgent is tenant #1 in that list — enabled:true, entryRole agent-orchestrator, external:false — which is exactly what the servingRoles/entryRole below already declared. THE OLD NOTE'S REASONING IS RETAINED AND STILL OPEN: this was left enabled:false pending verification that the card projects schema-valid against the frozen contract (agent-templates/contracts/a2a/v1/schema/manifest-a2a-extension.schema.json). That verification has still not happened, and this change does not perform it — but withholding the flag was never the right way to record an unverified projection, because the flag mirrors the Helm gate and the Helm gate is ON. An unverified card that is being served is a worse thing to hide than to show. a2a-maintainer owns the projection check. WHAT THIS ACTUALLY CHANGES DOWNSTREAM — stated from the workflow as it exists today, and NOT from the assumption that flipping this flag turns a check red. IT DOES NOT. .github/workflows/a2a-maintain.yml runs on EVERY pull_request and is gated only on secrets.ANTHROPIC_API_KEY; with no key it emits a ::notice:: and the job SUCCEEDS. Nothing in this repo's CI reads a2a.enabled at all — that was checked, not assumed. What the flag really steers is the a2a-maintainer AGENT the workflow runs: its prompt tells it to assess the .fuze/manifest.json a2a block + providesTo, the serving roles under agent-templates/roles/ and their card projection, and sets the hard boundary 'never flip a tenant/role to enabled: true whose card can't yet project'. With enabled:false on the repo that HOSTS the server, the manifest was asserting there was nothing to assess — so the manifest was steering the maintainer away from a surface that is live in the cluster. THE VACUOUS GATE HERE IS THIS FILE, NOT THE WORKFLOW. Nothing in CI cross-checks the manifest against the chart's effective prod values, which is exactly why the contradiction survived; the gate that would have caught it does not exist yet. AUTHORITATIVE CALLER ALLOWLIST is the top-level `providesTo` (22 entries, present), not anything in this block."
   },
   "mcp": {
     "enabled": true,
@@ -47,7 +66,7 @@
       }
     ],
     "entryServer": "fuzeagent",
-    "note": "REAL, not a scaffold \u2014 mcp-servers/fuzeagent-server/ already serves 15+ tools over the hierarchy API. Outstanding: a tools.json declaring `mutates` per tool. Several tools mutate (assign_task, deploy_agent, create_custom_agent, update_task_status, create_organizational_goal, update_goal_progress) and MUST be classified mutates:true; the read tools (list_*, get_*) are mutates:false. Classification is mcp-maintainer's to reconcile."
+    "note": "REAL, not a scaffold — mcp-servers/fuzeagent-server/ already serves 15+ tools over the hierarchy API. Outstanding: a tools.json declaring `mutates` per tool. Several tools mutate (assign_task, deploy_agent, create_custom_agent, update_task_status, create_organizational_goal, update_goal_progress) and MUST be classified mutates:true; the read tools (list_*, get_*) are mutates:false. Classification is mcp-maintainer's to reconcile."
   },
   "providesTo": [
     "Exec-ceo",

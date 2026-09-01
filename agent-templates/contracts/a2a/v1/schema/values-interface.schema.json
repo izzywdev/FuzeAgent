@@ -21,7 +21,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "repository": { "type": "string", "default": "ghcr.io/izzywdev/fuzeagent-a2a" },
+            "repository": { "type": "string", "default": "ghcr.io/izzywdev/fuze-a2a" },
             "tag": { "type": "string", "description": "Immutable tag. Prod values bump this; never `latest`." },
             "pullPolicy": { "enum": ["IfNotPresent", "Always"], "default": "IfNotPresent" }
           }

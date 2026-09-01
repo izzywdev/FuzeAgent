@@ -152,4 +152,366 @@ class AutonomousAgent:
                         'workspace_path': self.workspace_path
                     }
                 }
-            ) as response:\n                if response.status == 200:\n                    logger.info(\"Successfully registered with orchestrator\")\n                else:\n                    logger.warning(f\"Registration response: {response.status}\")\n                    \n        except Exception as e:\n            logger.error(f\"Error connecting to orchestrator: {e}\")\n            # Continue anyway - we can work offline\n            \n    async def _setup_workspace(self):\n        \"\"\"Set up the development workspace\"\"\"\n        logger.info(f\"Setting up workspace: {self.workspace_path}\")\n        \n        try:\n            # Create workspace directory\n            workspace = Path(self.workspace_path)\n            workspace.mkdir(parents=True, exist_ok=True)\n            \n            # Change to workspace directory\n            os.chdir(self.workspace_path)\n            \n            # Clone repository if specified\n            if self.repository_url:\n                await self._clone_repository()\n                \n            logger.info(\"Workspace setup complete\")\n            \n        except Exception as e:\n            logger.error(f\"Error setting up workspace: {e}\")\n            raise\n            \n    async def _clone_repository(self):\n        \"\"\"Clone the repository into workspace\"\"\"\n        logger.info(f\"Cloning repository: {self.repository_url}\")\n        \n        try:\n            # Configure git if token provided\n            if self.github_token:\n                await self._run_command([\n                    'git', 'config', '--global', 'credential.helper', \n                    f'!echo username={self.github_token}; echo password='\n                ])\n                \n            # Clone repository\n            result = await self._run_command(['git', 'clone', self.repository_url, '.'])\n            \n            if result['exit_code'] == 0:\n                logger.info(\"Repository cloned successfully\")\n            else:\n                logger.error(f\"Failed to clone repository: {result['output']}\")\n                \n        except Exception as e:\n            logger.error(f\"Error cloning repository: {e}\")\n            \n    async def _main_loop(self):\n        \"\"\"Main execution loop\"\"\"\n        logger.info(\"Starting main execution loop\")\n        \n        while self.running:\n            try:\n                # Check for new tasks from orchestrator\n                task = await self._get_next_task()\n                \n                if task:\n                    logger.info(f\"Received task: {task.get('title', 'Untitled')}\")\n                    await self._execute_task(task)\n                else:\n                    # No task - wait a bit\n                    await asyncio.sleep(5)\n                    \n            except Exception as e:\n                logger.error(f\"Error in main loop: {e}\")\n                await asyncio.sleep(10)\n                \n        logger.info(\"Main execution loop stopped\")\n        \n    async def _get_next_task(self) -> Optional[Dict[str, Any]]:\n        \"\"\"Get next task from orchestrator\"\"\"\n        try:\n            if not self.session:\n                return None\n                \n            async with self.session.get(\n                f\"{self.orchestrator_url}/agents/{self.agent_id}/next-task\"\n            ) as response:\n                if response.status == 200:\n                    return await response.json()\n                elif response.status == 204:\n                    # No tasks available\n                    return None\n                else:\n                    logger.warning(f\"Error getting next task: {response.status}\")\n                    return None\n                    \n        except Exception as e:\n            logger.error(f\"Error getting next task: {e}\")\n            return None\n            \n    async def _execute_task(self, task: Dict[str, Any]):\n        \"\"\"Execute a development task using Claude Code CLI\"\"\"\n        task_id = task.get('id', 'unknown')\n        task_title = task.get('title', 'Untitled Task')\n        task_description = task.get('description', '')\n        \n        logger.info(f\"Executing task {task_id}: {task_title}\")\n        \n        try:\n            # Update task status\n            await self._update_task_status(task_id, 'executing')\n            \n            # Create feature branch\n            branch_name = f\"feature/agent-{self.agent_id[:8]}-task-{task_id[:8]}\"\n            await self._create_git_branch(branch_name)\n            \n            # Execute task using Claude Code CLI\n            result = await self._execute_with_claude(task_description)\n            \n            if result['success']:\n                # Commit changes\n                commit_message = f\"🤖 {task_title}\\n\\n{task_description[:200]}...\\n\\nGenerated by FuzeAgent autonomous development.\"\n                await self._commit_changes(commit_message)\n                \n                # Update task status\n                await self._update_task_status(task_id, 'completed', {\n                    'branch': branch_name,\n                    'files_modified': result.get('files_modified', []),\n                    'execution_time': result.get('execution_time', 0)\n                })\n                \n                logger.info(f\"✅ Task {task_id} completed successfully\")\n                \n            else:\n                # Task failed\n                await self._update_task_status(task_id, 'failed', {\n                    'error': result.get('error', 'Unknown error'),\n                    'branch': branch_name\n                })\n                \n                logger.error(f\"❌ Task {task_id} failed: {result.get('error')}\")\n                \n        except Exception as e:\n            logger.error(f\"Error executing task {task_id}: {e}\")\n            await self._update_task_status(task_id, 'failed', {'error': str(e)})\n            \n    async def _execute_with_claude(self, task_description: str) -> Dict[str, Any]:\n        \"\"\"Execute task using Claude Code CLI\"\"\"\n        logger.info(\"Executing task with Claude Code CLI\")\n        \n        if not self.claude_cli_initialized:\n            return {\n                'success': False,\n                'error': 'Claude CLI not initialized'\n            }\n            \n        try:\n            start_time = time.time()\n            \n            # Use Claude Code CLI to execute the task\n            # This is a simplified approach - in practice you'd want more sophisticated prompting\n            claude_prompt = f\"\"\"\nI need you to help me complete this development task:\n\n{task_description}\n\nPlease:\n1. Analyze the current codebase and understand the requirements\n2. Implement the necessary changes\n3. Write appropriate tests\n4. Ensure code quality and best practices\n\nWork in the current directory: {os.getcwd()}\n\"\"\"\n            \n            # Execute Claude Code CLI\n            result = await self._run_command([\n                'claude', 'code', '--prompt', claude_prompt, \n                '--workspace', self.workspace_path\n            ])\n            \n            execution_time = time.time() - start_time\n            \n            if result['exit_code'] == 0:\n                # Parse output to determine what files were modified\n                files_modified = await self._get_modified_files()\n                \n                return {\n                    'success': True,\n                    'output': result['output'],\n                    'files_modified': files_modified,\n                    'execution_time': execution_time\n                }\n            else:\n                return {\n                    'success': False,\n                    'error': result['output'],\n                    'execution_time': execution_time\n                }\n                \n        except Exception as e:\n            return {\n                'success': False,\n                'error': str(e)\n            }\n            \n    async def _create_git_branch(self, branch_name: str):\n        \"\"\"Create and checkout a new git branch\"\"\"\n        try:\n            # Check if we're in a git repository\n            result = await self._run_command(['git', 'status'])\n            if result['exit_code'] != 0:\n                logger.warning(\"Not in a git repository - skipping branch creation\")\n                return\n                \n            # Create and checkout branch\n            result = await self._run_command(['git', 'checkout', '-b', branch_name])\n            if result['exit_code'] == 0:\n                logger.info(f\"Created and checked out branch: {branch_name}\")\n            else:\n                logger.warning(f\"Failed to create branch: {result['output']}\")\n                \n        except Exception as e:\n            logger.error(f\"Error creating git branch: {e}\")\n            \n    async def _commit_changes(self, commit_message: str):\n        \"\"\"Commit changes to git\"\"\"\n        try:\n            # Add all changes\n            await self._run_command(['git', 'add', '.'])\n            \n            # Check if there are changes to commit\n            result = await self._run_command(['git', 'diff', '--staged', '--name-only'])\n            if not result['output'].strip():\n                logger.info(\"No changes to commit\")\n                return\n                \n            # Configure git user\n            await self._run_command(['git', 'config', 'user.name', f'FuzeAgent-{self.agent_id[:8]}'])\n            await self._run_command(['git', 'config', 'user.email', f'agent-{self.agent_id}@fuzeagent.ai'])\n            \n            # Commit changes\n            result = await self._run_command(['git', 'commit', '-m', commit_message])\n            \n            if result['exit_code'] == 0:\n                logger.info(\"Changes committed successfully\")\n            else:\n                logger.error(f\"Failed to commit changes: {result['output']}\")\n                \n        except Exception as e:\n            logger.error(f\"Error committing changes: {e}\")\n            \n    async def _get_modified_files(self) -> List[str]:\n        \"\"\"Get list of modified files\"\"\"\n        try:\n            result = await self._run_command(['git', 'diff', '--name-only', 'HEAD~1'])\n            if result['exit_code'] == 0:\n                return [f.strip() for f in result['output'].split('\\n') if f.strip()]\n            else:\n                return []\n        except Exception:\n            return []\n            \n    async def _update_task_status(self, task_id: str, status: str, result: Optional[Dict[str, Any]] = None):\n        \"\"\"Update task status in orchestrator\"\"\"\n        try:\n            if not self.session:\n                return\n                \n            async with self.session.put(\n                f\"{self.orchestrator_url}/tasks/{task_id}\",\n                json={\n                    'status': status,\n                    'result': result or {},\n                    'updated_by': self.agent_id,\n                    'updated_at': datetime.now().isoformat()\n                }\n            ) as response:\n                if response.status == 200:\n                    logger.info(f\"Task {task_id} status updated to {status}\")\n                else:\n                    logger.warning(f\"Failed to update task status: {response.status}\")\n                    \n        except Exception as e:\n            logger.error(f\"Error updating task status: {e}\")\n            \n    async def _report_error(self, error_message: str):\n        \"\"\"Report error to orchestrator\"\"\"\n        try:\n            if not self.session:\n                return\n                \n            async with self.session.post(\n                f\"{self.orchestrator_url}/agents/{self.agent_id}/error\",\n                json={\n                    'error': error_message,\n                    'timestamp': datetime.now().isoformat(),\n                    'sandbox_id': self.sandbox_id\n                }\n            ) as response:\n                if response.status == 200:\n                    logger.info(\"Error reported to orchestrator\")\n                    \n        except Exception as e:\n            logger.error(f\"Failed to report error: {e}\")\n            \n    async def _run_command(self, args: List[str], env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:\n        \"\"\"Run a shell command asynchronously\"\"\"\n        try:\n            command_env = os.environ.copy()\n            if env:\n                command_env.update(env)\n                \n            process = await asyncio.create_subprocess_exec(\n                *args,\n                stdout=asyncio.subprocess.PIPE,\n                stderr=asyncio.subprocess.STDOUT,\n                env=command_env\n            )\n            \n            stdout, _ = await process.communicate()\n            \n            return {\n                'exit_code': process.returncode,\n                'output': stdout.decode('utf-8', errors='replace'),\n                'success': process.returncode == 0\n            }\n            \n        except Exception as e:\n            return {\n                'exit_code': -1,\n                'output': str(e),\n                'success': False\n            }\n            \n    async def _cleanup(self):\n        \"\"\"Clean up resources\"\"\"\n        logger.info(\"Cleaning up agent resources\")\n        \n        if self.websocket:\n            await self.websocket.close()\n            \n        if self.session:\n            await self.session.close()\n            \n        logger.info(\"Agent cleanup complete\")\n\n\nasync def main():\n    \"\"\"Main entry point\"\"\"\n    agent = AutonomousAgent()\n    \n    try:\n        await agent.start()\n    except KeyboardInterrupt:\n        logger.info(\"Received interrupt signal\")\n    except Exception as e:\n        logger.error(f\"Unhandled error: {e}\")\n    finally:\n        await agent.stop()\n\n\nif __name__ == '__main__':\n    asyncio.run(main())"
+            ) as response:
+                if response.status == 200:
+                    logger.info("Successfully registered with orchestrator")
+                else:
+                    logger.warning(f"Registration response: {response.status}")
+                    
+        except Exception as e:
+            logger.error(f"Error connecting to orchestrator: {e}")
+            # Continue anyway - we can work offline
+            
+    async def _setup_workspace(self):
+        """Set up the development workspace"""
+        logger.info(f"Setting up workspace: {self.workspace_path}")
+        
+        try:
+            # Create workspace directory
+            workspace = Path(self.workspace_path)
+            workspace.mkdir(parents=True, exist_ok=True)
+            
+            # Change to workspace directory
+            os.chdir(self.workspace_path)
+            
+            # Clone repository if specified
+            if self.repository_url:
+                await self._clone_repository()
+                
+            logger.info("Workspace setup complete")
+            
+        except Exception as e:
+            logger.error(f"Error setting up workspace: {e}")
+            raise
+            
+    async def _clone_repository(self):
+        """Clone the repository into workspace"""
+        logger.info(f"Cloning repository: {self.repository_url}")
+        
+        try:
+            # Configure git if token provided
+            if self.github_token:
+                await self._run_command([
+                    'git', 'config', '--global', 'credential.helper', 
+                    f'!echo username={self.github_token}; echo password='
+                ])
+                
+            # Clone repository
+            result = await self._run_command(['git', 'clone', self.repository_url, '.'])
+            
+            if result['exit_code'] == 0:
+                logger.info("Repository cloned successfully")
+            else:
+                logger.error(f"Failed to clone repository: {result['output']}")
+                
+        except Exception as e:
+            logger.error(f"Error cloning repository: {e}")
+            
+    async def _main_loop(self):
+        """Main execution loop"""
+        logger.info("Starting main execution loop")
+        
+        while self.running:
+            try:
+                # Check for new tasks from orchestrator
+                task = await self._get_next_task()
+                
+                if task:
+                    logger.info(f"Received task: {task.get('title', 'Untitled')}")
+                    await self._execute_task(task)
+                else:
+                    # No task - wait a bit
+                    await asyncio.sleep(5)
+                    
+            except Exception as e:
+                logger.error(f"Error in main loop: {e}")
+                await asyncio.sleep(10)
+                
+        logger.info("Main execution loop stopped")
+        
+    async def _get_next_task(self) -> Optional[Dict[str, Any]]:
+        """Get next task from orchestrator"""
+        try:
+            if not self.session:
+                return None
+                
+            async with self.session.get(
+                f"{self.orchestrator_url}/agents/{self.agent_id}/next-task"
+            ) as response:
+                if response.status == 200:
+                    return await response.json()
+                elif response.status == 204:
+                    # No tasks available
+                    return None
+                else:
+                    logger.warning(f"Error getting next task: {response.status}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error getting next task: {e}")
+            return None
+            
+    async def _execute_task(self, task: Dict[str, Any]):
+        """Execute a development task using Claude Code CLI"""
+        task_id = task.get('id', 'unknown')
+        task_title = task.get('title', 'Untitled Task')
+        task_description = task.get('description', '')
+        
+        logger.info(f"Executing task {task_id}: {task_title}")
+        
+        try:
+            # Update task status
+            await self._update_task_status(task_id, 'executing')
+            
+            # Create feature branch
+            branch_name = f"feature/agent-{self.agent_id[:8]}-task-{task_id[:8]}"
+            await self._create_git_branch(branch_name)
+            
+            # Execute task using Claude Code CLI
+            result = await self._execute_with_claude(task_description)
+            
+            if result['success']:
+                # Commit changes
+                commit_message = f"🤖 {task_title}\n\n{task_description[:200]}...\n\nGenerated by FuzeAgent autonomous development."
+                await self._commit_changes(commit_message)
+                
+                # Update task status
+                await self._update_task_status(task_id, 'completed', {
+                    'branch': branch_name,
+                    'files_modified': result.get('files_modified', []),
+                    'execution_time': result.get('execution_time', 0)
+                })
+                
+                logger.info(f"✅ Task {task_id} completed successfully")
+                
+            else:
+                # Task failed
+                await self._update_task_status(task_id, 'failed', {
+                    'error': result.get('error', 'Unknown error'),
+                    'branch': branch_name
+                })
+                
+                logger.error(f"❌ Task {task_id} failed: {result.get('error')}")
+                
+        except Exception as e:
+            logger.error(f"Error executing task {task_id}: {e}")
+            await self._update_task_status(task_id, 'failed', {'error': str(e)})
+            
+    async def _execute_with_claude(self, task_description: str) -> Dict[str, Any]:
+        """Execute task using Claude Code CLI"""
+        logger.info("Executing task with Claude Code CLI")
+        
+        if not self.claude_cli_initialized:
+            return {
+                'success': False,
+                'error': 'Claude CLI not initialized'
+            }
+            
+        try:
+            start_time = time.time()
+            
+            # Use Claude Code CLI to execute the task
+            # This is a simplified approach - in practice you'd want more sophisticated prompting
+            claude_prompt = f"""
+I need you to help me complete this development task:
+
+{task_description}
+
+Please:
+1. Analyze the current codebase and understand the requirements
+2. Implement the necessary changes
+3. Write appropriate tests
+4. Ensure code quality and best practices
+
+Work in the current directory: {os.getcwd()}
+"""
+            
+            # Execute Claude Code CLI
+            result = await self._run_command([
+                'claude', 'code', '--prompt', claude_prompt, 
+                '--workspace', self.workspace_path
+            ])
+            
+            execution_time = time.time() - start_time
+            
+            if result['exit_code'] == 0:
+                # Parse output to determine what files were modified
+                files_modified = await self._get_modified_files()
+                
+                return {
+                    'success': True,
+                    'output': result['output'],
+                    'files_modified': files_modified,
+                    'execution_time': execution_time
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': result['output'],
+                    'execution_time': execution_time
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+            
+    async def _create_git_branch(self, branch_name: str):
+        """Create and checkout a new git branch"""
+        try:
+            # Check if we're in a git repository
+            result = await self._run_command(['git', 'status'])
+            if result['exit_code'] != 0:
+                logger.warning("Not in a git repository - skipping branch creation")
+                return
+                
+            # Create and checkout branch
+            result = await self._run_command(['git', 'checkout', '-b', branch_name])
+            if result['exit_code'] == 0:
+                logger.info(f"Created and checked out branch: {branch_name}")
+            else:
+                logger.warning(f"Failed to create branch: {result['output']}")
+                
+        except Exception as e:
+            logger.error(f"Error creating git branch: {e}")
+            
+    async def _commit_changes(self, commit_message: str):
+        """Commit changes to git"""
+        try:
+            # Add all changes
+            await self._run_command(['git', 'add', '.'])
+            
+            # Check if there are changes to commit
+            result = await self._run_command(['git', 'diff', '--staged', '--name-only'])
+            if not result['output'].strip():
+                logger.info("No changes to commit")
+                return
+                
+            # Configure git user
+            await self._run_command(['git', 'config', 'user.name', f'FuzeAgent-{self.agent_id[:8]}'])
+            await self._run_command(['git', 'config', 'user.email', f'agent-{self.agent_id}@fuzeagent.ai'])
+            
+            # Commit changes
+            result = await self._run_command(['git', 'commit', '-m', commit_message])
+            
+            if result['exit_code'] == 0:
+                logger.info("Changes committed successfully")
+            else:
+                logger.error(f"Failed to commit changes: {result['output']}")
+                
+        except Exception as e:
+            logger.error(f"Error committing changes: {e}")
+            
+    async def _get_modified_files(self) -> List[str]:
+        """Get list of modified files"""
+        try:
+            result = await self._run_command(['git', 'diff', '--name-only', 'HEAD~1'])
+            if result['exit_code'] == 0:
+                return [f.strip() for f in result['output'].split('\n') if f.strip()]
+            else:
+                return []
+        except Exception:
+            return []
+            
+    async def _update_task_status(self, task_id: str, status: str, result: Optional[Dict[str, Any]] = None):
+        """Update task status in orchestrator"""
+        try:
+            if not self.session:
+                return
+                
+            async with self.session.put(
+                f"{self.orchestrator_url}/tasks/{task_id}",
+                json={
+                    'status': status,
+                    'result': result or {},
+                    'updated_by': self.agent_id,
+                    'updated_at': datetime.now().isoformat()
+                }
+            ) as response:
+                if response.status == 200:
+                    logger.info(f"Task {task_id} status updated to {status}")
+                else:
+                    logger.warning(f"Failed to update task status: {response.status}")
+                    
+        except Exception as e:
+            logger.error(f"Error updating task status: {e}")
+            
+    async def _report_error(self, error_message: str):
+        """Report error to orchestrator"""
+        try:
+            if not self.session:
+                return
+                
+            async with self.session.post(
+                f"{self.orchestrator_url}/agents/{self.agent_id}/error",
+                json={
+                    'error': error_message,
+                    'timestamp': datetime.now().isoformat(),
+                    'sandbox_id': self.sandbox_id
+                }
+            ) as response:
+                if response.status == 200:
+                    logger.info("Error reported to orchestrator")
+                    
+        except Exception as e:
+            logger.error(f"Failed to report error: {e}")
+            
+    async def _run_command(self, args: List[str], env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """Run a shell command asynchronously"""
+        try:
+            command_env = os.environ.copy()
+            if env:
+                command_env.update(env)
+                
+            process = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=command_env
+            )
+            
+            stdout, _ = await process.communicate()
+            
+            return {
+                'exit_code': process.returncode,
+                'output': stdout.decode('utf-8', errors='replace'),
+                'success': process.returncode == 0
+            }
+            
+        except Exception as e:
+            return {
+                'exit_code': -1,
+                'output': str(e),
+                'success': False
+            }
+            
+    async def _cleanup(self):
+        """Clean up resources"""
+        logger.info("Cleaning up agent resources")
+        
+        if self.websocket:
+            await self.websocket.close()
+            
+        if self.session:
+            await self.session.close()
+            
+        logger.info("Agent cleanup complete")
+
+
+async def main():
+    """Main entry point"""
+    agent = AutonomousAgent()
+    
+    try:
+        await agent.start()
+    except KeyboardInterrupt:
+        logger.info("Received interrupt signal")
+    except Exception as e:
+        logger.error(f"Unhandled error: {e}")
+    finally:
+        await agent.stop()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

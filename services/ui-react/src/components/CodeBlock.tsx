@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Highlight, themes } from 'prism-react-renderer'
-import { CopyToClipboard } from 'react-copy-to-clipboard'
 import { FiCopy, FiCheck } from 'react-icons/fi'
 
 interface CodeBlockProps {
@@ -21,8 +20,21 @@ export default function CodeBlock({
   const [copied, setCopied] = useState(false)
 
   const handleCopy = () => {
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (!navigator.clipboard) {
+      // Insecure origin (plain http) or unsupported browser: surface the
+      // failure by leaving the "Copied!" state unset rather than lying.
+      return
+    }
+    navigator.clipboard.writeText(code).then(
+      () => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      },
+      () => {
+        // Copy failed (permissions, browser quirk, etc.) — leave copied
+        // unset so the UI honestly reflects that nothing was copied.
+      }
+    )
   }
 
   // Clean up the code string
@@ -65,15 +77,16 @@ export default function CodeBlock({
         </Highlight>
 
         {/* Copy button */}
-        <CopyToClipboard text={code} onCopy={handleCopy}>
-          <button className="absolute top-2 right-2 p-2 rounded-md bg-gray-700 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-600">
-            {copied ? (
-              <FiCheck className="w-4 h-4 text-green-400" />
-            ) : (
-              <FiCopy className="w-4 h-4" />
-            )}
-          </button>
-        </CopyToClipboard>
+        <button
+          onClick={handleCopy}
+          className="absolute top-2 right-2 p-2 rounded-md bg-gray-700 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-600"
+        >
+          {copied ? (
+            <FiCheck className="w-4 h-4 text-green-400" />
+          ) : (
+            <FiCopy className="w-4 h-4" />
+          )}
+        </button>
       </div>
     </div>
   )

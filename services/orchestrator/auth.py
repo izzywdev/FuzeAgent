@@ -48,11 +48,12 @@ from typing import Any, Dict, List, Optional, Set
 from fastapi import Depends, HTTPException, Request, WebSocket, status
 from fastapi.security import HTTPBearer
 
-try:  # python-jose is already a declared dependency (requirements.txt)
-    from jose import JWTError, jwt
+try:  # PyJWT is already a declared dependency (requirements.txt)
+    import jwt
+    from jwt import PyJWTError
 except Exception:  # pragma: no cover - import guard for partial envs
     jwt = None  # type: ignore
-    JWTError = Exception  # type: ignore
+    PyJWTError = Exception  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ PUBLIC_PATHS: Set[str] = {
     "/favicon.ico",
 }
 
-# python-jose verifies signatures; we additionally require the standard
+# PyJWT verifies signatures; we additionally require the standard
 # registered claims to be present/valid.
 _VERIFY_OPTIONS = {
     "verify_signature": True,
@@ -222,13 +223,19 @@ def _as_str_list(value: Any) -> List[str]:
 
 def _decode_token(token: str) -> Dict[str, Any]:
     if jwt is None:  # pragma: no cover
-        logger.error("python-jose not installed; cannot verify JWT")
+        logger.error("PyJWT not installed; cannot verify JWT")
         raise _UNAUTHENTICATED
     key = JWT_SECRET or JWT_PUBLIC_KEY
     if not key:
         # No verification material configured.
         raise _UNAUTHENTICATED
     try:
+        # `algorithms` is passed explicitly and is never derived from the
+        # token itself -- this is what stops an alg-confusion attack (e.g. a
+        # token claiming "alg": "none", or an RS256-signed token replayed as
+        # HS256 using the public key as the HMAC secret). PyJWT enforces the
+        # header alg against this allow-list and raises InvalidAlgorithmError
+        # (a PyJWTError subclass) on any mismatch.
         return jwt.decode(
             token,
             key,
@@ -237,7 +244,7 @@ def _decode_token(token: str) -> Dict[str, Any]:
             issuer=JWT_ISSUER,
             options=_VERIFY_OPTIONS,
         )
-    except JWTError as exc:  # invalid signature / expired / bad claims
+    except PyJWTError as exc:  # invalid signature / algorithm / expired / bad claims
         logger.info("Rejected token: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

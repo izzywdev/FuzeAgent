@@ -74,6 +74,9 @@ jobs:
       run: npm install -g license-checker
       
     - name: Check frontend licenses
+      # @izzywdev/fuzefront-identity is on GitHub Packages; see services/ui-react/.npmrc.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd services/ui-react
         npm ci
