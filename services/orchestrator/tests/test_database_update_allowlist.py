@@ -24,6 +24,7 @@ def _fake_db_connection(mock_conn):
     return _cm
 
 
+@pytest.mark.asyncio
 @pytest.mark.database
 @pytest.mark.asyncio
 class TestUpdateColumnAllowlist:
