@@ -1,4 +1,12 @@
 // API Configuration for FuzeAgent Frontend
+//
+// Every call carries the FuzeFront session token. Before this, the UI sent NO
+// credentials at all, so it could only ever talk to an unauthenticated backend —
+// the orchestrator fails closed (401) on every non-public route. `authHeader()`
+// reads the token the FuzeFront shell provides when embedded, or the one
+// `/v1/security/session/exchange` stored when standalone.
+
+import { authHeader, getToken } from '../lib/security/client'
 
 // Environment-based API endpoints
 const getAPIEndpoints = () => {
@@ -41,7 +49,9 @@ export const api = {
   // Hierarchy API calls (organizations, teams, agents structure)
   hierarchy: {
     get: async (endpoint: string) => {
-      const response = await fetch(`${API_ENDPOINTS.HIERARCHY_API_BASE}${endpoint}`)
+      const response = await fetch(`${API_ENDPOINTS.HIERARCHY_API_BASE}${endpoint}`, {
+        headers: { ...authHeader() },
+      })
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -53,6 +63,7 @@ export const api = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeader(),
         },
         body: JSON.stringify(data),
       })
@@ -67,6 +78,7 @@ export const api = {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeader(),
         },
         body: JSON.stringify(data),
       })
@@ -79,6 +91,7 @@ export const api = {
     delete: async (endpoint: string) => {
       const response = await fetch(`${API_ENDPOINTS.HIERARCHY_API_BASE}${endpoint}`, {
         method: 'DELETE',
+        headers: { ...authHeader() },
       })
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -90,7 +103,9 @@ export const api = {
   // Orchestrator API calls (agent management, tasks, containers, etc.)
   orchestrator: {
     get: async (endpoint: string) => {
-      const response = await fetch(`${API_ENDPOINTS.ORCHESTRATOR_API_BASE}${endpoint}`)
+      const response = await fetch(`${API_ENDPOINTS.ORCHESTRATOR_API_BASE}${endpoint}`, {
+        headers: { ...authHeader() },
+      })
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -102,6 +117,7 @@ export const api = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeader(),
         },
         body: JSON.stringify(data),
       })
@@ -116,6 +132,7 @@ export const api = {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeader(),
         },
         body: JSON.stringify(data),
       })
@@ -128,6 +145,7 @@ export const api = {
     delete: async (endpoint: string) => {
       const response = await fetch(`${API_ENDPOINTS.ORCHESTRATOR_API_BASE}${endpoint}`, {
         method: 'DELETE',
+        headers: { ...authHeader() },
       })
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -140,6 +158,7 @@ export const api = {
   upload: async (endpoint: string, formData: FormData) => {
     const response = await fetch(`${API_ENDPOINTS.ORCHESTRATOR_API_BASE}${endpoint}`, {
       method: 'POST',
+      headers: { ...authHeader() },
       body: formData,
     })
     if (!response.ok) {
@@ -149,9 +168,18 @@ export const api = {
   }
 }
 
-// WebSocket utility
+// WebSocket utility.
+//
+// A browser cannot set an `Authorization` header on a WS handshake, so the session
+// token rides the `Sec-WebSocket-Protocol` subprotocol as `bearer, <token>` — the
+// browser-friendly form the orchestrator's `authenticate_websocket` accepts (it also
+// takes a `?token=` query param, but that leaks the token into access logs and
+// referrers, so we do not use it). Without a token we connect unauthenticated and the
+// server closes with 1008, which is the correct fail-closed outcome.
 export const createWebSocket = (endpoint: string) => {
-  return new WebSocket(`${API_ENDPOINTS.WEBSOCKET_BASE}${endpoint}`)
+  const url = `${API_ENDPOINTS.WEBSOCKET_BASE}${endpoint}`
+  const token = getToken()
+  return token ? new WebSocket(url, ['bearer', token]) : new WebSocket(url)
 }
 
 export default API_ENDPOINTS

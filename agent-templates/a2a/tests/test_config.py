@@ -97,7 +97,7 @@ def test_oidc_discovery_url_parsed_when_set():
                 "auth": {
                     "oidcIssuerUrl": "https://auth.prod.fuzefront.com",
                     "oidcDiscoveryUrl": (
-                        "http://authentik-server.identity.svc.cluster.local:9000"
+                        "http://idp-server.identity.svc.cluster.local:9000"
                         "/application/o/fuzeagent-a2a/.well-known/openid-configuration"
                     ),
                 },
@@ -106,7 +106,7 @@ def test_oidc_discovery_url_parsed_when_set():
     )
     assert cfg.auth.oidc_issuer_url == "https://auth.prod.fuzefront.com"
     assert cfg.auth.oidc_discovery_url == (
-        "http://authentik-server.identity.svc.cluster.local:9000"
+        "http://idp-server.identity.svc.cluster.local:9000"
         "/application/o/fuzeagent-a2a/.well-known/openid-configuration"
     )
 

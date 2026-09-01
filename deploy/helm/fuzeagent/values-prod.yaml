@@ -25,6 +25,18 @@ orchestrator:
   # the orchestrator, so the browser Origin is the ingress host).
   runMigrations: true
   auth:
+    # Identity + authorization are the FuzeFront platform's. The orchestrator calls
+    # the FuzeFront Security API in-cluster (GET /v1/security/session,
+    # POST /v1/security/authz/check) — it holds no signing key and names no
+    # identity/policy vendor. The public app.fuzefront.com host is deliberately NOT
+    # used: server-to-server traffic stays inside the cluster.
+    #
+    # PREREQ (FuzeFront/FuzeInfra, delegate via @claude): a NetworkPolicy admitting
+    # fuzeagent -> fuzefront-backend:3001, alongside the existing allowances, exactly
+    # as the A2A JWKS path was admitted. Without it every decision fails CLOSED
+    # (403) rather than degrading open.
+    securityBaseUrl: "http://fuzefront-backend.fuzefront.svc.cluster.local:3001/api"
+    securityTimeoutSeconds: 5
     corsAllowOrigins: "https://fuzeagent.prod.fuzefront.com"
 
 hierarchyApi:

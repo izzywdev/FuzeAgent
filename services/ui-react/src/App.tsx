@@ -8,7 +8,7 @@ import StatsCards from './components/StatsCards'
 import OrganizationSelector from './components/OrganizationSelector'
 import TeamSelector from './components/TeamSelector'
 import HierarchyView from './components/HierarchyView'
-import { api, API_ENDPOINTS } from './config/api'
+import { api, createWebSocket } from './config/api'
 import type { 
   Agent, Task, AgentTemplate, 
   Organization, Team, 
@@ -104,7 +104,7 @@ function App() {
   useEffect(() => {
     let ws: WebSocket | null = null
     try {
-      ws = new WebSocket(`${API_ENDPOINTS.WEBSOCKET_BASE}/ws`)
+      ws = createWebSocket('/ws')
     } catch (e) {
       console.warn('WebSocket unavailable, continuing without realtime updates')
       return
