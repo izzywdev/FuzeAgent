@@ -23,10 +23,15 @@ from . import task_mapper as tm
 from . import wire_errors as we
 from .authz import AuthContext, Decision, authorize
 from .config import ServerConfig, TenantConfig
+from .environments import EnvironmentResolver
 from .session_store import SessionStore
 
 #: Resolve a tenant's projection inputs (manifest, roles) from its git ref.
 RepoResolver = Callable[[TenantConfig], "tuple[dict, dict]"]
+
+#: Resolve a role's ``environment`` BASENAME (never called with an empty/absent one) to
+#: a provider environment id, or raise ``environments.EnvironmentResolutionError``.
+EnvironmentIdResolver = Callable[[str], str]
 
 
 class AgentProviderLike(Protocol):
@@ -69,12 +74,25 @@ def _join_parts(parts: list[dict]) -> str:
     return "\n".join(chunks)
 
 
+# A caller may allow a paused always_ask tool call ONLY with an explicit
+# affirmative. Everything else — silence, "sounds good", "let me check with the
+# team" — denies. The previous default was allow, which let an ambiguous reply
+# authorise a production/third-party mutation inside the callee (state-mapping.md
+# §4 is updated to match). The deeper point: over A2A the principal answering is
+# the *calling agent*, not a human, so a prod-affecting approval should route to
+# reach_human on the callee's side rather than be resolvable here at all.
+_AFFIRMATIVE = ("allow", "approve", "yes", "confirm")
+
+
 def _parse_decision(text: str) -> tuple[bool, str | None]:
-    """A caller's reply to an always_ask pause -> (allow, deny_message)."""
+    """A caller's reply to an always_ask pause -> (allow, deny_message).
+
+    Deny-by-default: allow only on an explicit affirmative prefix.
+    """
     head = (text or "").strip().lower()
-    if head.startswith(("deny", "no", "reject", "decline", "disallow")):
-        return False, (text.strip() or "denied by caller")
-    return True, None
+    if head.startswith(_AFFIRMATIVE):
+        return True, None
+    return False, (text.strip() or "denied by caller (no explicit approval)")
 
 
 class A2AAdapter:
@@ -85,12 +103,20 @@ class A2AAdapter:
         repo_resolver: RepoResolver,
         *,
         signer: cg.Signer | None = None,
+        environment_resolver: EnvironmentIdResolver | None = None,
     ):
         self.config = config
         self.provider = provider
         self.resolve_repo = repo_resolver
         self.signer = signer
         self.store = SessionStore()
+        # Constructed once per adapter/process (caches both the environments/*.json
+        # basename->name reads and the environment-ids.json id-state read) — never
+        # built or re-read per call (FA-14 AC3). Callers that already loaded/mocked an
+        # id source may pass their own resolver callable instead.
+        self.resolve_environment_id: EnvironmentIdResolver = (
+            environment_resolver if environment_resolver is not None else EnvironmentResolver()
+        )
 
     # ------------------------------------------------------------------ #
     # cards
@@ -103,6 +129,12 @@ class A2AAdapter:
 
     def _card_for(self, tenant: TenantConfig, *, visibility: str) -> dict:
         manifest, roles = self.resolve_repo(tenant)
+        # Every card THIS pod serves must advertise THIS pod's endpoint. On the shared
+        # server `in_cluster_url` is unset and the generator falls back to the shared
+        # address (unchanged behaviour); a per-product pod declares `a2a.inClusterUrl` and
+        # its cards point at its own Service. Without threading it through here, the card
+        # names the shared server whichever pod produced it — card-projection.md §2.
+        in_cluster_url = self.config.in_cluster_url
         # exec tenants (Exec-<role>) project a single exec role card
         if tenant.tenant.startswith("Exec-"):
             role_key = tenant.tenant[len("Exec-") :]
@@ -110,10 +142,21 @@ class A2AAdapter:
             if role is None:
                 raise we.task_not_found()
             return cg.project_exec_card(
-                role_key, role, manifest, issuer_url=self._issuer(), signer=self.signer
+                role_key,
+                role,
+                manifest,
+                issuer_url=self._issuer(),
+                in_cluster_url=in_cluster_url,
+                signer=self.signer,
             )
         return cg.project_product_card(
-            manifest, roles, issuer_url=self._issuer(), visibility=visibility, signer=self.signer
+            manifest,
+            roles,
+            tenant=tenant.tenant,
+            issuer_url=self._issuer(),
+            visibility=visibility,
+            in_cluster_url=in_cluster_url,
+            signer=self.signer,
         )
 
     def well_known_card(self, tenant_name: str) -> dict:
@@ -138,20 +181,75 @@ class A2AAdapter:
     # ------------------------------------------------------------------ #
     # SendMessage / SendStreamingMessage
     # ------------------------------------------------------------------ #
+    def _serving_set(self, manifest: dict, roles: dict, tenant: TenantConfig) -> set[str]:
+        """The role keys a caller may actually dispatch to for this tenant.
+
+        This is the card's published serving set, NOT every role.json in the checkout.
+        Without it, `metadata.skillId` resolves against the whole tree, so any
+        allowlisted caller could invoke `_base`, a coordinator, an `a2a.publish:false`
+        role, or any role a tenant does not serve — `servingRoles`/`publish`/
+        `extendedOnly` would gate only card *visibility*, never dispatch.
+
+        Exec tenants (`Exec-<role>`) serve exactly their one exec role — which
+        `select_serving_roles` deliberately excludes from product cards, so they are
+        special-cased here. `tenant.servingRoles`, when set, overrides
+        `manifest.a2a.servingRoles`. A malformed serving list denies (empty set)
+        rather than raising.
+        """
+        if tenant.tenant.startswith("Exec-"):
+            return {tenant.tenant[len("Exec-") :]}
+        m = manifest
+        if tenant.serving_roles:
+            m = {
+                **manifest,
+                "a2a": {**(manifest.get("a2a") or {}), "servingRoles": list(tenant.serving_roles)},
+            }
+        try:
+            # visibility="extended" is the widest published set; per-caller card
+            # visibility is enforced separately in projection (authz.md §5).
+            return set(cg.select_serving_roles(m, roles, visibility="extended"))
+        except cg.CardProjectionError:
+            return set()
+
     def _resolve_role(self, roles: dict, manifest: dict, tenant: TenantConfig, message: dict):
-        """(skill_id, role_dict, known) from message.metadata.skillId or the entry role."""
+        """(skill_id, role_dict, known) from message.metadata.skillId or the entry role.
+
+        `known` is True ONLY when the resolved skill is in this tenant's published
+        serving set. A skill that exists in the checkout but is not served returns
+        `known=False` -> DENY -> the same generic REJECTED as an unknown tenant
+        (non-disclosure, authz.md §6)."""
         skill_id = (message.get("metadata") or {}).get("skillId")
         if not skill_id:
             skill_id = tenant.entry_role or (manifest.get("a2a") or {}).get("entryRole")
         if tenant.tenant.startswith("Exec-") and not skill_id:
             skill_id = tenant.tenant[len("Exec-") :]
-        role = roles.get(skill_id) if skill_id else None
-        return skill_id, role, role is not None
+        if skill_id and skill_id in self._serving_set(manifest, roles, tenant):
+            role = roles.get(skill_id)
+            return skill_id, role, role is not None
+        return skill_id, None, False
 
     def _provision(self, tenant: TenantConfig, role: dict):
         agent = self.provider.ensure_agent(role)
-        environment_id = tenant.provider.environment_id or agent.get("environment_id")
+        environment_id = self._resolve_environment_id(tenant, role, agent)
         return agent["id"], agent.get("version"), environment_id
+
+    def _resolve_environment_id(self, tenant: TenantConfig, role: dict, agent: dict):
+        """FA-14 precedence — never silently fall back to null for a NAMED environment:
+
+        1. ``tenant.provider.environment_id`` (values ``provider.environmentId``) wins
+           outright — an explicit per-tenant override.
+        2. Else, if the role names an ``environment``, resolve it
+           (``environments.EnvironmentResolver``) — this RAISES rather than returning
+           ``None`` when the name can't be resolved (AC2).
+        3. Else (the role names no environment at all — legitimately no error) fall
+           back to whatever the provider's ``ensure_agent`` response carried, if any.
+        """
+        if tenant.provider.environment_id:
+            return tenant.provider.environment_id
+        env_name = (role or {}).get("environment")
+        if env_name:
+            return self.resolve_environment_id(env_name)
+        return agent.get("environment_id")
 
     def send_message(self, params: dict, ctx: AuthContext) -> dict:
         task = self._send(params, ctx, streaming=False)

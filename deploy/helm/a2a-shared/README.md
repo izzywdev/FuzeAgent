@@ -1,8 +1,11 @@
 # a2a-shared — the ONE shared A2A server (deploy runbook)
 
-A single Deployment/Service (`a2a-shared` in namespace `fuzeagent`) fronts **every**
-tenant. Onboarding a repo is an `a2a.tenants[]` entry — **DATA, never a new chart or
-pod**. The operator surface is frozen by the contract:
+A single Deployment/Service (`a2a-shared` in namespace `fuzeagent`) fronts **every** tenant
+served *here*. Onboarding a repo onto THIS server is an `a2a.tenants[]` entry — **DATA,
+never a new chart or pod**. (Since contract v1.2.0 a product may alternatively run its own
+A2A pod; that is a separate chart in the product's repo — see
+[`docs/a2a/per-product-pod.md`](../../../docs/a2a/per-product-pod.md). This chart is
+unaffected either way.) The operator surface is frozen by the contract:
 `agent-templates/contracts/a2a/v1/schema/values-interface.schema.json`
 (`binding.md`, `card-projection.md`, `authz.md`). This chart implements exactly that
 surface; deploy mechanics (`deploy.*`) are kept out of the `a2a` block so it stays
@@ -10,7 +13,9 @@ byte-conformant to the interface.
 
 - **In-cluster (default):** `http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc`
   and `…/​.well-known/agent-card.json`. HTTP; identity is the OIDC bearer, never network
-  position (`authz.md §2`).
+  position (`authz.md §2`). The URL cards advertise is `a2a.inClusterUrl` (contract
+  v1.2.0), left **unset** here so the default applies; it must always equal what this
+  chart's Service resolves to, or callers following the card reach the wrong pod.
 - **External (opt-in per tenant `external: true`):** `https://a2a.<repo-slug>.prod.fuzefront.com/rpc`
   through the Cloudflare tunnel → Traefik (ClusterIP). Exec-tier tenants MUST be
   `external: false` (`card-projection.md §5`). No LoadBalancer/NodePort surface.
@@ -22,7 +27,7 @@ byte-conformant to the interface.
 
 `values-prod.yaml` sets `a2a.enabled: false`, so the Argo app renders nothing until:
 
-1. **Server image exists** — `ghcr.io/izzywdev/fuzeagent-a2a` is built by `release.yml`
+1. **Server image exists** — `ghcr.io/izzywdev/fuze-a2a` is built by `release.yml`
    from `agent-templates/a2a/` (backend-engineer). The tag is auto-bumped in
    `values-prod.yaml` on merge.
 2. **`providesTo` backfill** — `authz.md §3` is fail-closed (absent `providesTo` == DENY).

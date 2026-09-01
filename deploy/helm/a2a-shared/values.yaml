@@ -17,7 +17,7 @@ a2a:
   enabled: false
 
   image:
-    repository: ghcr.io/izzywdev/fuzeagent-a2a
+    repository: ghcr.io/izzywdev/fuze-a2a
     # Immutable tag; prod values bump this (release.yml). Never `latest` in prod.
     tag: latest
     pullPolicy: IfNotPresent
@@ -29,6 +29,22 @@ a2a:
 
   # A2A protocol version served. Frozen for contract v1.
   protocolVersion: "1.0"
+
+  # The in-cluster JSON-RPC endpoint this server ADVERTISES in every non-external card
+  # it projects (`AgentInterface.url`, card-projection.md §2). Added to the frozen
+  # interface in contract v1.2.0 — optional + additive.
+  #
+  # LEFT UNSET HERE ON PURPOSE. Unset == the default
+  # `http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc`, which is exactly what
+  # this Service resolves to, so the shared deployment's cards are unchanged. Setting
+  # it to anything else here would publish an address this pod does not own.
+  #
+  # A PER-PRODUCT pod (one A2A deployment per product, in the product's own repo and
+  # namespace) MUST set it to its own Service — e.g.
+  #   inClusterUrl: http://a2a-fuzeplan.fuzeplan.svc.cluster.local:8080/rpc
+  # Otherwise it starts, passes its probes, and advertises THIS server; every caller
+  # that follows its card reaches the wrong pod. See docs/a2a/per-product-pod.md.
+  # inClusterUrl: http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc
 
   # Identity config for callee-side enforcement (authz.md). `auth` is optional in
   # the interface, but oidcIssuerUrl is REQUIRED whenever `auth` is set, so real
@@ -99,3 +115,19 @@ deploy:
   # Optional ConfigMap name holding the Managed-Agents id-state (agent/vault/memory/
   # environment ids) mounted at FUZE_STATE_DIR=/state, same pattern as handoff-mcp.
   stateConfigMap: null
+  # MCP endpoints exported into the container env so every provisioned agent's _base
+  # github/handoff servers (url: ${GITHUB_MCP_URL} / ${HANDOFF_MCP_URL}) RESOLVE instead
+  # of being dropped. Each endpoint takes EITHER a plain in-cluster `url` OR a
+  # `urlSecretRef` {name,key} (use the secretRef when the URL embeds a credential), plus
+  # an optional `tokenSecretRef` {name,key} exported as <NAME>_MCP_TOKEN. All unset by
+  # default -> role_loader logs each drop at WARNING; the agent still starts, just without
+  # those tools. Secret VALUES never appear in git.
+  mcp:
+    github:
+      url: ""
+      urlSecretRef: null
+      tokenSecretRef: null
+    handoff:
+      url: ""
+      urlSecretRef: null
+      tokenSecretRef: null

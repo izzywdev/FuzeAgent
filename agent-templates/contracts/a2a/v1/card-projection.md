@@ -38,7 +38,7 @@ Exactly one interface in v1 (profile-enforced):
 
 | Field | Value |
 |---|---|
-| `url` | in-cluster: `http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc`<br>external (`manifest.a2a.external: true`): `https://a2a.<repo-slug>.prod.fuzefront.com/rpc` |
+| `url` | in-cluster: `a2a.inClusterUrl` from the values interface — default `http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc`<br>external (`manifest.a2a.external: true`): `https://a2a.<repo-slug>.prod.fuzefront.com/rpc` |
 | `protocolBinding` | `"JSONRPC"` |
 | `protocolVersion` | `"1.0"` |
 | `tenant` | `<RepoName>` — the repo name segment. |
@@ -47,6 +47,16 @@ Exactly one interface in v1 (profile-enforced):
 same URL and is disambiguated by `tenant`, which the client MUST echo per A2A §4.4.6. This is the
 mechanism that makes decision #2 ("one shared A2A server, not 20 implementations") expressible in
 the standard rather than as a Fuze deviation.
+
+**The in-cluster `url` is CONFIGURATION, not a constant** (contract v1.2.0). It is whatever
+`a2a.inClusterUrl` declares, defaulting to the shared server's address so an unchanged values file
+projects a byte-identical card. A **per-product** pod — one A2A deployment per product, serving a
+single tenant — MUST set it to its own Service (scheme + DNS name + port + `/rpc`). Through v1.1.0 it
+was a constant in the generator, which is exactly why a second deployment could come up healthy and
+advertise the *shared* server: the card is the callable contract, so a pod that publishes an address
+it does not own is unreachable however green its probes are. The projection MUST NOT derive the URL
+from the Service name, the namespace or any cluster lookup — it is DECLARED, so the card stays a pure
+function of its declared inputs and remains byte-reproducible off-cluster.
 
 ## 3. Skills — the core of the projection
 

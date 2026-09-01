@@ -132,6 +132,23 @@ ingress:
   host: fuzeagent.local
   annotations: {}
 
+# --- federatedMount: same-origin FuzeFront-portal route for the UI's
+# Module-Federation remote (templates/federated-mount-ingress.yaml). A SEPARATE
+# surface from `ingress` above: this one lives on FuzeFront's OWN host
+# (app.fuzefront.com), not fuzeagent's admin-console host, so the portal shell
+# can import remoteEntry.js same-origin. `path` MUST match the UI's vite build
+# `base` exactly (services/ui-react/vite.config.ts) or remoteEntry.js 200s and
+# every chunk it references 404s. Disabled + hostless by default (mirrors
+# FuzeX's deploy/helm/fuzex federatedMount): flipping `enabled` is a cross-repo
+# routing decision — coordinate with FuzeFront's app.fuzefront.com Ingress
+# rules first, same as FuzeX deferred it in its own values-prod.yaml.
+federatedMount:
+  enabled: false
+  className: traefik
+  host: ""
+  annotations: {}
+  path: /apps/fuzeagent
+
 # --- Namespace guardrails on the shared node ----------------------------------
 resourceGovernance:
   enabled: true
@@ -146,3 +163,64 @@ resourceGovernance:
     defaultMemory: 512Mi
     defaultRequestCpu: 100m
     defaultRequestMemory: 128Mi
+
+# ---------------------------------------------------------------------------
+# MCP SSE gateway — the config-driven @fuzefront/mcp-gateway pod.
+#
+# NOTE the distinction from `mcpServer` above. They are NOT the same thing and
+# both are real:
+#
+#   mcpServer  mcp-servers/fuzeagent-server — a HAND-WRITTEN MCP SSE server with
+#              ~15 curated tools over the hierarchy API. It ships today, and it
+#              carries NO mutates/reversibility classification at all
+#              (.fuze/manifest.json says so explicitly: "Outstanding: a
+#              tools.json declaring `mutates` per tool").
+#   mcp        THIS one — the shared gateway image, configured with
+#              contracts/openapi.yaml + mcp/tools.overrides.yaml, which derives
+#              the classification mechanically and REFUSES TO BOOT on a
+#              self-contradictory one.
+#
+# That difference matters more on FuzeAgent than anywhere else in the family:
+# this API dispatches agents that take real actions. A tool surface that
+# presents `startTaskExecution` without saying it cannot be recalled is the
+# specific failure the classification exists to prevent.
+#
+# Whether the hand-written server should be retired in favour of this pod is an
+# owner decision, not a deployment one — both are left as they are, and the
+# overlap is flagged in the PR body rather than resolved silently.
+#
+# Disabled by default: flipping it needs ghcr.io/izzywdev/fuze-mcp-gateway in
+# GHCR, which NO workflow in this repo builds (it is FuzeFront's image).
+# ---------------------------------------------------------------------------
+mcp:
+  enabled: false
+  replicaCount: 1
+  port: 8081
+  image:
+    repository: ghcr.io/izzywdev/fuze-mcp-gateway
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  # In-cluster base URL of the ORCHESTRATOR. No path segment: the app serves
+  # absolute paths with no common prefix, which is what
+  # `servers: [{url: /}]` in contracts/openapi.yaml declares. `orchestrator` is
+  # the Service created by templates/orchestrator.yaml.
+  #
+  # NOT the hierarchy API. services/hierarchy_API is a SECOND backend on a
+  # second Service (port 8006) with its own ~40 routes, and one gateway pod
+  # maps to exactly one spec and one upstream. Covering it needs its own
+  # contract and its own pod — see contracts/README.md.
+  upstreamBaseUrl: "http://orchestrator:8000"
+  resources:
+    requests: { cpu: 50m,  memory: 64Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+
+# ---------------------------------------------------------------------------
+# FuzeFront self-registration (docs/mfe-self-registration.md).
+#
+# Cluster-internal service DNS on purpose, per @fuzefront/onboarding-kit: the
+# init container has no reason to leave the cluster, and the public ingress host
+# may not resolve before ingress is ready. Override per-environment if the
+# applications service moves.
+# ---------------------------------------------------------------------------
+fuzefront:
+  apiUrl: "http://fuzefront-applications.fuzefront.svc.cluster.local:3003"

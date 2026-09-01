@@ -145,4 +145,74 @@ async def test_autonomous_execution():
                                         print(f"❓ Question: {question}")
                                         
                                         # Provide a test response
-                                        response_data = {"response": "Focus on readability while maintaining good performance. Prioritize clean, maintainable code."}\n                                        \n                                        async with session.post(f\"{API_BASE}/tasks/{task_id}/human-response\", json=response_data) as resp:\n                                            if resp.status == 200:\n                                                print(\"✅ Human response submitted\")\n                                            else:\n                                                print(f\"❌ Failed to submit response: {resp.status}\")\n                                        break\n                else:\n                    print(f\"❌ Failed to get status: {response.status}\")\n                    \n            await asyncio.sleep(10)  # Wait 10 seconds before checking again\n        \n        # Step 5: Get final results and conversation\n        print(\"\\n📋 Step 5: Getting final results...\")\n        \n        # Get conversation summary\n        async with session.get(f\"{API_BASE}/tasks/{task_id}/conversation/summary\") as response:\n            if response.status == 200:\n                summary = await response.json()\n                print(f\"💬 Conversation Summary:\")\n                print(f\"   - Total messages: {summary.get('total_messages', 0)}\")\n                print(f\"   - Total tokens: {summary.get('total_tokens', 0)}\")\n                print(f\"   - Max iteration: {summary.get('max_iteration', 0)}\")\n                print(f\"   - Human interactions: {summary.get('human_interactions', {}).get('total', 0)}\")\n            else:\n                print(f\"❌ Failed to get conversation summary: {response.status}\")\n        \n        # Get code generations\n        async with session.get(f\"{API_BASE}/tasks/{task_id}/code-generations\") as response:\n            if response.status == 200:\n                code_gens = await response.json()\n                generations = code_gens.get('code_generations', [])\n                print(f\"💻 Code Generations: {len(generations)} files created\")\n                for gen in generations[:3]:  # Show first 3\n                    print(f\"   - {gen.get('file_path')} ({gen.get('language')})\")\n            else:\n                print(f\"❌ Failed to get code generations: {response.status}\")\n        \n        # Get agent performance\n        async with session.get(f\"{API_BASE}/agents/{agent_id}/performance\") as response:\n            if response.status == 200:\n                performance = await response.json()\n                metrics = performance.get('metrics', [])\n                print(f\"📊 Performance Metrics: {len(metrics)} recorded\")\n                for metric in metrics[:3]:  # Show first 3\n                    print(f\"   - {metric.get('metric_type')}: {metric.get('metric_value')} {metric.get('metric_unit', '')}\")\n            else:\n                print(f\"❌ Failed to get performance metrics: {response.status}\")\n    \n    print(\"\\n\" + \"=\"*60)\n    print(\"🎉 Autonomous execution test completed!\")\n    print(\"\\nThis test verified:\")\n    print(\"✅ Agent creation with repository and sandbox settings\")\n    print(\"✅ Task assignment and autonomous execution startup\")\n    print(\"✅ Progress monitoring and status tracking\")\n    print(\"✅ Human-in-the-loop interaction handling\")\n    print(\"✅ Conversation tracking and storage\")\n    print(\"✅ Code generation and performance metrics\")\n\nasync def main():\n    \"\"\"Main test runner\"\"\"\n    try:\n        await test_autonomous_execution()\n    except Exception as e:\n        print(f\"\\n❌ Test failed with error: {e}\")\n        import traceback\n        traceback.print_exc()\n\nif __name__ == \"__main__\":\n    asyncio.run(main())"
+                                        response_data = {"response": "Focus on readability while maintaining good performance. Prioritize clean, maintainable code."}
+                                        
+                                        async with session.post(f"{API_BASE}/tasks/{task_id}/human-response", json=response_data) as resp:
+                                            if resp.status == 200:
+                                                print("✅ Human response submitted")
+                                            else:
+                                                print(f"❌ Failed to submit response: {resp.status}")
+                                        break
+                else:
+                    print(f"❌ Failed to get status: {response.status}")
+                    
+            await asyncio.sleep(10)  # Wait 10 seconds before checking again
+        
+        # Step 5: Get final results and conversation
+        print("\n📋 Step 5: Getting final results...")
+        
+        # Get conversation summary
+        async with session.get(f"{API_BASE}/tasks/{task_id}/conversation/summary") as response:
+            if response.status == 200:
+                summary = await response.json()
+                print(f"💬 Conversation Summary:")
+                print(f"   - Total messages: {summary.get('total_messages', 0)}")
+                print(f"   - Total tokens: {summary.get('total_tokens', 0)}")
+                print(f"   - Max iteration: {summary.get('max_iteration', 0)}")
+                print(f"   - Human interactions: {summary.get('human_interactions', {}).get('total', 0)}")
+            else:
+                print(f"❌ Failed to get conversation summary: {response.status}")
+        
+        # Get code generations
+        async with session.get(f"{API_BASE}/tasks/{task_id}/code-generations") as response:
+            if response.status == 200:
+                code_gens = await response.json()
+                generations = code_gens.get('code_generations', [])
+                print(f"💻 Code Generations: {len(generations)} files created")
+                for gen in generations[:3]:  # Show first 3
+                    print(f"   - {gen.get('file_path')} ({gen.get('language')})")
+            else:
+                print(f"❌ Failed to get code generations: {response.status}")
+        
+        # Get agent performance
+        async with session.get(f"{API_BASE}/agents/{agent_id}/performance") as response:
+            if response.status == 200:
+                performance = await response.json()
+                metrics = performance.get('metrics', [])
+                print(f"📊 Performance Metrics: {len(metrics)} recorded")
+                for metric in metrics[:3]:  # Show first 3
+                    print(f"   - {metric.get('metric_type')}: {metric.get('metric_value')} {metric.get('metric_unit', '')}")
+            else:
+                print(f"❌ Failed to get performance metrics: {response.status}")
+    
+    print("\n" + "="*60)
+    print("🎉 Autonomous execution test completed!")
+    print("\nThis test verified:")
+    print("✅ Agent creation with repository and sandbox settings")
+    print("✅ Task assignment and autonomous execution startup")
+    print("✅ Progress monitoring and status tracking")
+    print("✅ Human-in-the-loop interaction handling")
+    print("✅ Conversation tracking and storage")
+    print("✅ Code generation and performance metrics")
+
+async def main():
+    """Main test runner"""
+    try:
+        await test_autonomous_execution()
+    except Exception as e:
+        print(f"\n❌ Test failed with error: {e}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    asyncio.run(main())

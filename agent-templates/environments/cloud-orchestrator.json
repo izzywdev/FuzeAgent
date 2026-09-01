@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema/environment.schema.json",
+  "name": "fuzeagent-cloud-orchestrator",
+  "config": {
+    "type": "cloud",
+    "packages": {
+      "apt": ["jq", "gh"],
+      "pip": ["requests", "httpx", "pyyaml"]
+    },
+    "networking": {
+      "type": "limited",
+      "allowed_hosts": [],
+      "allow_mcp_servers": true,
+      "allow_package_managers": true
+    }
+  }
+}

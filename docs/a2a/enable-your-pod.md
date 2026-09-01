@@ -2,11 +2,18 @@
 
 Make your product's agent — or an exec role — reachable to other agents over A2A.
 
-There is **one shared A2A server** for the whole family, not one deployment per
-product. Onboarding your product is therefore **data, not a new chart**: you add a
-`tenants` entry and flip a gate. This is fixed by the values interface
+The **default** path is the one shared A2A server: onboarding your product is **data, not
+a new chart** — you add a `tenants` entry and flip a gate. This is fixed by the values
+interface
 ([`values-interface.schema.json`](../../agent-templates/contracts/a2a/v1/schema/values-interface.schema.json),
-see its `description`) and by card-projection.md §2.
+see its `description`) and by card-projection.md §2. This page documents that path.
+
+> **Want your own pod instead?** Since contract **v1.2.0** a product may run its own A2A
+> deployment for compartmentalisation — same image, same values document, one tenant, plus
+> `a2a.inClusterUrl` pointed at its own Service. Everything on this page still applies; the
+> extra steps are in **[per-product-pod.md](per-product-pod.md)**. Before v1.2.0 that was
+> not possible: the advertised endpoint was a generator constant, so a second pod came up
+> healthy and published the *shared* server's address.
 
 > The Helm chart, Argo Application, and image that consume these values are
 > **devops-engineer's** slice. This page documents the **interface** you fill in, not
@@ -57,7 +64,8 @@ served agent. All fields below are defined in
 |---|---|---|---|
 | `a2a.enabled` | yes | `false` | **The gate.** `false` = the shared A2A server is not deployed at all. |
 | `a2a.protocolVersion` | — | `"1.0"` | Frozen for contract v1 (const). |
-| `a2a.image.repository` | — | `ghcr.io/izzywdev/fuzeagent-a2a` | |
+| `a2a.inClusterUrl` | — | `http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc` | The endpoint this server advertises as `AgentInterface.url` on every non-external card (card-projection.md §2). Leave unset on the shared server. A **per-product pod MUST** set it to its own Service, or its card names the shared server and callers never reach it — see [per-product-pod.md](per-product-pod.md). Added in contract v1.2.0. |
+| `a2a.image.repository` | — | `ghcr.io/izzywdev/fuze-a2a` | |
 | `a2a.image.tag` | — | — | Immutable tag; prod values bump this, **never `latest`**. |
 | `a2a.image.pullPolicy` | — | `IfNotPresent` | |
 | `a2a.service.type` | — | `ClusterIP` (const) | **MUST be ClusterIP.** Ingress is Cloudflare-tunnel-only; there is no LoadBalancer/NodePort surface. |

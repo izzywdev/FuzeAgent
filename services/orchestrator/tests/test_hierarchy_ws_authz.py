@@ -78,8 +78,8 @@ asyncpg.create_pool = AsyncMock(return_value=_mock_pool)  # type: ignore[attr-de
 import hierarchy_endpoints  # noqa: E402
 
 importlib.reload(hierarchy_endpoints)
+import jwt  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from jose import jwt  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
 from hierarchy_endpoints import app  # noqa: E402

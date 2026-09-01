@@ -67,6 +67,89 @@ def test_well_known_single_tenant_default(client):
     assert r.status_code == 200
 
 
+# --- per-product pod (single tenant + its own endpoint) ----------------------
+PER_PRODUCT_URL = "http://a2a-fuzeplan.fuzeplan.svc.cluster.local:8080/rpc"
+
+
+@pytest.fixture
+def per_product_client(fuzeplan_repo):
+    """A pod deployed FOR ONE PRODUCT: one enabled tenant, its own Service URL.
+
+    Same server code and same values document as the shared deployment — the only
+    differences are the length of `tenants` and `inClusterUrl`.
+    """
+    cfg = ServerConfig(
+        enabled=True,
+        in_cluster_url=PER_PRODUCT_URL,
+        tenants=(
+            TenantConfig(
+                tenant="FuzePlan",
+                repo="izzywdev/FuzePlan",
+                enabled=True,
+                entry_role="product-manager",
+                provider=ProviderBinding(name="fake"),
+            ),
+        ),
+    )
+    adapter = A2AAdapter(cfg, FakeProvider(), lambda t: load_repo(fuzeplan_repo))
+    auth = StaticAuthenticator({"tok-sales": "FuzeSales"})
+    return TestClient(build_app(adapter, auth))
+
+
+def test_per_product_pod_serves_its_own_endpoint(per_product_client):
+    """Discovery on a per-product pod: no `?tenant=` needed, and the advertised URL is
+    the pod's OWN Service — not `a2a-shared`. Serving the shared address from a
+    per-product pod is the exact failure that kept these pods disabled."""
+    r = per_product_client.get("/.well-known/agent-card.json")
+    assert r.status_code == 200
+    card = r.json()
+    iface = card["supportedInterfaces"][0]
+    assert iface["url"] == PER_PRODUCT_URL
+    assert iface["tenant"] == "FuzePlan"
+    assert "a2a-shared" not in json.dumps(card)
+
+
+def test_per_product_pod_still_serves_and_dispatches(per_product_client):
+    """The endpoint move is cosmetic to the wire: RPC on the same pod still works."""
+    r = per_product_client.post(
+        "/rpc", json=_rpc("SendMessage", {"tenant": "FuzePlan", "message": _msg()}), headers=_hdr()
+    )
+    assert r.status_code == 200
+    assert r.json()["result"]["task"]["status"]["state"] == "TASK_STATE_COMPLETED"
+
+
+def test_extended_card_on_per_product_pod_carries_the_same_endpoint(per_product_client):
+    r = per_product_client.get("/extendedAgentCard?tenant=FuzePlan", headers=_hdr())
+    assert r.status_code == 200
+    assert r.json()["supportedInterfaces"][0]["url"] == PER_PRODUCT_URL
+
+
+def test_single_tenant_does_not_make_the_tenant_param_optional_on_rpc(per_product_client):
+    """Documents a real single-tenant edge: card DISCOVERY infers the sole tenant, RPC
+    does NOT. `SendMessage` with no `params.tenant` fails closed to a generic REJECTED
+    even here.
+
+    That is correct and deliberate, not a gap to paper over: the card always carries
+    `AgentInterface.tenant` and A2A §4.4.6 requires the caller to echo it (the shipped
+    `A2AClient` does so from the card automatically), so a compliant caller never hits
+    this. It is called out because the rejection is intentionally indistinguishable from
+    an authz denial (non-disclosure, authz.md §6), so a hand-rolled caller that forgets
+    `tenant` will misread it as a permissions problem.
+    """
+    card = per_product_client.get("/.well-known/agent-card.json").json()
+    tenant = card["supportedInterfaces"][0]["tenant"]
+
+    without = per_product_client.post(
+        "/rpc", json=_rpc("SendMessage", {"message": _msg()}), headers=_hdr()
+    ).json()
+    assert without["result"]["task"]["status"]["state"] == "TASK_STATE_REJECTED"
+
+    with_tenant = per_product_client.post(
+        "/rpc", json=_rpc("SendMessage", {"tenant": tenant, "message": _msg()}), headers=_hdr()
+    ).json()
+    assert with_tenant["result"]["task"]["status"]["state"] == "TASK_STATE_COMPLETED"
+
+
 def test_healthz(client):
     assert client.get("/healthz").text == "ok"
 

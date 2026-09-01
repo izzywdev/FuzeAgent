@@ -23,19 +23,24 @@ from .loader import load_repo
 
 
 class LocalRepoResolver:
-    """Resolve a tenant's (manifest, roles) from ``<base_dir>/<repo-name>``.
+    """Resolve a tenant's (manifest, roles) from ``<base_dir>/<tenant-name>``.
 
     The checkout/refresh of each repo at ``tenant.ref`` is performed out of band (an
     init/sidecar container the chart provides); this resolver only reads the tree.
     GitOps: the git ref is the source of truth, never live-mutated state.
+
+    The directory is keyed on the TENANT name, matching what the repo-sync init
+    container clones to (``/repos/<tenant>``). Keying on the repo slug instead only
+    coincides while every tenant name equals its repo name — a second tenant over an
+    existing repo (e.g. ``FuzeInfraOps`` over ``izzywdev/FuzeAgent``) would be read
+    from the wrong directory.
     """
 
     def __init__(self, base_dir: str | Path):
         self.base_dir = Path(base_dir)
 
     def __call__(self, tenant: TenantConfig) -> tuple[dict, dict]:
-        name = tenant.repo.rsplit("/", 1)[-1]
-        return load_repo(self.base_dir / name)
+        return load_repo(self.base_dir / tenant.tenant)
 
 
 def _read_values(path: str | None) -> dict:

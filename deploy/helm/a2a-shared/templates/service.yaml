@@ -2,8 +2,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  # MUST be `a2a-shared`: binding.md/card-projection.md §2 hardcode the in-cluster
-  # interface URL http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc.
+  # MUST be `a2a-shared`: this chart leaves `a2a.inClusterUrl` unset, so cards advertise
+  # the card-projection.md §2 default http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc
+  # and THIS Service is what that name must resolve to. Rename one and you must rename both.
   name: {{ include "a2a.name" . }}
   labels:
     {{- include "a2a.labels" . | nindent 4 }}

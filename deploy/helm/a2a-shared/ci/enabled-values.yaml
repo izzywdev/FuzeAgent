@@ -4,13 +4,18 @@
 a2a:
   enabled: true
   image:
-    repository: ghcr.io/izzywdev/fuzeagent-a2a
+    repository: ghcr.io/izzywdev/fuze-a2a
     tag: "0.0.0-ci"
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 8080
   protocolVersion: "1.0"
+  # Exercise the contract-v1.2.0 key end-to-end: it must survive
+  # `dict "a2a" .Values.a2a | toJson` into the values.json ConfigMap the server parses.
+  # Set to the SHARED default so this render stays self-consistent with the `a2a-shared`
+  # Service it also renders.
+  inClusterUrl: http://a2a-shared.fuzeagent.svc.cluster.local:8080/rpc
   auth:
     oidcIssuerUrl: https://issuer.example.com/application/o/a2a/
     audience: a2a

@@ -24,7 +24,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -673,7 +673,78 @@ async def health_check():
             "mcp_integration": True,
             "real_time_streaming": True,
         },
+        # Whether GET /openapi.yaml can answer. An image built without its
+        # contract is DEGRADED, not dead — the probe still passes (no restart
+        # can conjure a file the image lacks) but the condition is visible to
+        # anything that looks, instead of surfacing only as a 503 later.
+        "openapi": "loaded" if _openapi_document() is not None else "unavailable",
     }
+
+
+# ---------------------------------------------------------------------------
+# The contract, SERVED.
+#
+# contracts/openapi.yaml describes this orchestrator's real HTTP surface, with
+# the curated descriptions and the irreversibility guidance that
+# mcp/tools.overrides.yaml narrows. Committing it is not the same as publishing
+# it: consumers — the MCP gateway among them — discover the surface over HTTP.
+#
+# This is NOT /openapi.json. FastAPI generates that from the code at import
+# time; it is accurate about shapes and says nothing about which operations
+# dispatch an agent that cannot be recalled. Both are served. This one is the
+# contract.
+#
+# The document is read from the IMAGE, never from a mount, so what this endpoint
+# publishes is always the contract this build was compiled against.
+# ---------------------------------------------------------------------------
+_ORCH_DIR = os.path.dirname(os.path.abspath(__file__))
+_OPENAPI_CANDIDATES = [
+    p
+    for p in [
+        os.getenv("OPENAPI_SPEC_PATH"),
+        os.path.join(_ORCH_DIR, "contracts", "openapi.yaml"),
+        os.path.join(_ORCH_DIR, "..", "..", "contracts", "openapi.yaml"),
+    ]
+    if p
+]
+
+
+def _openapi_document():
+    """Return the OpenAPI document text, or None when the image lacks it."""
+    for path in _OPENAPI_CANDIDATES:
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                return fh.read()
+        except OSError:
+            continue
+    return None
+
+
+@app.get(
+    "/openapi.yaml",
+    tags=["health"],
+    summary="This OpenAPI Document",
+    description=(
+        "Serve contracts/openapi.yaml — the curated contract, as distinct from "
+        "FastAPI's auto-generated /openapi.json."
+    ),
+    include_in_schema=False,
+)
+async def get_openapi_document():
+    doc = _openapi_document()
+    if doc is None:
+        logger.error("OpenAPI document not found; tried %s", _OPENAPI_CANDIDATES)
+        # 503, not 500 and not a crash: the service is otherwise functional and
+        # no restart can produce a spec the image does not contain.
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "openapi_document_unavailable: this image was built without "
+                "contracts/openapi.yaml. Rebuild with the repo root as the Docker "
+                "context so the contract is copied in."
+            ),
+        )
+    return Response(content=doc, media_type="application/yaml")
 
 
 # WebSocket for real-time updates

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import json
+
+import pytest
+from a2a._contract import SCHEMA_DIR
 from a2a.config import load_config
+from jsonschema import Draft202012Validator
 
 VALUES = {
     "a2a": {
@@ -104,3 +109,60 @@ def test_oidc_discovery_url_parsed_when_set():
         "http://idp-server.identity.svc.cluster.local:9000"
         "/application/o/fuzeagent-a2a/.well-known/openid-configuration"
     )
+
+
+# --------------------------------------------------------------------------- #
+# a2a.inClusterUrl — the per-product-pod endpoint (contract v1.2.0)
+# --------------------------------------------------------------------------- #
+PER_PRODUCT_VALUES = {
+    "a2a": {
+        "enabled": True,
+        "inClusterUrl": "http://a2a-fuzeplan.fuzeplan.svc.cluster.local:8080/rpc",
+        "service": {"type": "ClusterIP", "port": 8080},
+        "auth": {"oidcIssuerUrl": "https://auth.prod.fuzefront.com"},
+        "tenants": [
+            {"tenant": "FuzePlan", "repo": "izzywdev/FuzePlan", "enabled": True},
+        ],
+    }
+}
+
+
+def test_in_cluster_url_defaults_to_none():
+    """Unset -> None -> the generator's shared-server default. The shared deployment,
+    whose values file has no `inClusterUrl`, is therefore unchanged."""
+    assert load_config(VALUES).in_cluster_url is None
+
+
+def test_in_cluster_url_parsed_when_set():
+    cfg = load_config(PER_PRODUCT_VALUES)
+    assert cfg.in_cluster_url == "http://a2a-fuzeplan.fuzeplan.svc.cluster.local:8080/rpc"
+
+
+def test_empty_in_cluster_url_is_treated_as_unset():
+    """An empty string from a half-templated chart value must fall back to the default,
+    never be published as an empty `AgentInterface.url`."""
+    assert load_config({"a2a": {"enabled": True, "inClusterUrl": ""}}).in_cluster_url is None
+
+
+# --------------------------------------------------------------------------- #
+# the frozen values interface itself (additionalProperties:false at every level,
+# so a new key is only usable once the schema is versioned to accept it)
+# --------------------------------------------------------------------------- #
+def _values_validator() -> Draft202012Validator:
+    schema = json.loads(
+        (SCHEMA_DIR / "values-interface.schema.json").read_text(encoding="utf-8")
+    )
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema)
+
+
+@pytest.mark.parametrize("doc", [VALUES, PER_PRODUCT_VALUES])
+def test_values_documents_validate_against_the_frozen_interface(doc):
+    assert list(_values_validator().iter_errors(doc)) == []
+
+
+def test_interface_still_rejects_undeclared_keys():
+    """`additionalProperties: false` is what forces a key like `inClusterUrl` to be a
+    deliberate, versioned schema change rather than an ad-hoc value."""
+    bad = {"a2a": {"enabled": True, "inClusterUrlTypo": "http://x/rpc"}}
+    assert list(_values_validator().iter_errors(bad))
