@@ -1,0 +1,13 @@
+{
+  "extension": "https://contracts.fuzefront.com/a2a/ext/delegated-principal/v1",
+  "authzBaseUrl": "http://fuzefront-backend.fuzefront.svc.cluster.local:3001",
+  "skills": {
+    "plan-reader": "delegable",
+    "plan-editor": "principal-required",
+    "plan-purge": "never-delegable"
+  },
+  "brokerable": {
+    "repo:FuzeExecutive": ["plan-reader", "plan-editor"],
+    "repo:FuzeSales": ["plan-reader"]
+  }
+}
