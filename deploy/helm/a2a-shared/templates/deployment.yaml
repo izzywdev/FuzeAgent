@@ -41,21 +41,44 @@ spec:
             - sh
             - -c
             - |
-              set -eu
+              # NOTE: intentionally NOT `set -e` at the top level. A single tenant's clone
+              # failing must never abort the whole init container -- see the per-tenant
+              # guard below for why.
+              set -u
               {{- if .Values.deploy.reposGitTokenSecretRef }}
               AUTH="${A2A_REPOS_GIT_TOKEN}@"
               {{- else }}
               AUTH=""
               {{- end }}
+              sync_failed=0
               {{- range .Values.a2a.tenants }}
               {{- if .enabled }}
               name="{{ .tenant }}"   # server resolves /repos/<tenant> (case-preserved), NOT the repo slug
               echo "cloning {{ .repo }}@{{ .ref | default "main" }} -> /repos/${name}"
-              rm -rf "/repos/${name}"
-              git clone --depth 1 --branch "{{ .ref | default "main" }}" \
-                "https://${AUTH}github.com/{{ .repo }}.git" "/repos/${name}"
+              if ( set -e
+                   rm -rf "/repos/${name}"
+                   git clone --depth 1 --branch "{{ .ref | default "main" }}" \
+                     "https://${AUTH}github.com/{{ .repo }}.git" "/repos/${name}" ); then
+                echo "synced {{ .tenant }}"
+              else
+                echo "WARNING: failed to sync tenant {{ .tenant }} ({{ .repo }}@{{ .ref | default "main" }}) -- server will start WITHOUT this tenant; its A2A requests will fail until the clone is fixed (bad ref, missing repo access, or an invalid a2a-repos-git token). This must never crash-loop the whole shared pod for every other tenant." >&2
+                sync_failed=1
+              fi
               {{- end }}
               {{- end }}
+              # A per-tenant clone failure is logged and skipped, never fatal: one
+              # misconfigured/inaccessible tenant repo must not block every other
+              # already-working tenant from serving. Root cause of the fleet's observed
+              # "two a2a-shared deployments" (one Running, one Init:CrashLoopBackOff,
+              # 38+ restarts): the old `set -eu` aborted this whole script on the FIRST
+              # failing clone, so the new ReplicaSet's pod could never pass its
+              # startupProbe/become Ready, and the old ReplicaSet's pod was kept alive by
+              # the default RollingUpdate strategy forever -- a permanently stuck rollout,
+              # not two independent Deployments/releases.
+              if [ "$sync_failed" = "1" ]; then
+                echo "repo-sync finished with at least one tenant sync failure (see WARNINGs above); continuing startup" >&2
+              fi
+              exit 0
           {{- if .Values.deploy.reposGitTokenSecretRef }}
           env:
             - name: A2A_REPOS_GIT_TOKEN
