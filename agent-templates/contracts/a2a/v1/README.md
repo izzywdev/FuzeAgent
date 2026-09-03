@@ -38,6 +38,7 @@ are human→agent; A2A is agent→agent. Both remain first-class (FuzeSDLC basel
 | [`card-projection.md`](card-projection.md) | How a card is **derived** from `.fuze/manifest.json` + `agent-templates/roles/*/role.json`. Product **and** exec tier. |
 | [`state-mapping.md`](state-mapping.md) | A2A ↔ `agent-templates/providers/base.py`. The pod is an **adapter**. |
 | [`authz.md`](authz.md) | Callee enforces, caller is untrusted, `providesTo` is the grant, absence **denies**. |
+| [`tenant-registration.md`](tenant-registration.md) | (v1.3.0) Runtime tenant registry: the two orchestrator HTTP operations, idempotent upsert, self-registration authz, card-as-data. |
 | [`CHANGELOG.md`](CHANGELOG.md) | SemVer policy, decisions recorded, known gaps. |
 
 ## Layout
@@ -50,9 +51,12 @@ schema/
   manifest-a2a-extension.schema.json .fuze/manifest.json additions (providesTo, a2a block)
   role-a2a-extension.schema.json     optional a2a block on role.json
   values-interface.schema.json       shared-server Helm values INTERFACE (no chart)
+  tenant-registration.schema.json    (v1.3.0) runtime registry record + register req/resp
+tenant-registration.md               (v1.3.0) runtime tenant registration (NORMATIVE)
 client/                              generated Pydantic models + typed A2AClient
 mock/                                servable card + canned responses
 examples/                            FuzePlan (product) and CTO (exec) cards
+examples/registration/               (v1.3.0) a worked tenant-registration request
 VERSION  CHANGELOG.md
 ```
 
