@@ -6,7 +6,7 @@
   "description": "Accepts a delegated goal and runs a managed Claude agent to accomplish it, returning the outcome and any artifacts. FuzeAgent selects and dispatches the appropriate managed-agent role, drives it to completion (pausing for human approval on always_ask/production actions), and hands the result back — the caller needs no agent-runtime knowledge, tools, or credentials of its own.",
   "model": "claude-opus-4-8",
   "environment": "cloud-orchestrator",
-  "skills": [],
+  "skills": ["fuzeagent-expert"],
   "services": { "github": "none", "k8s": "none", "cloud": "none" },
   "a2a": {
     "examples": [
