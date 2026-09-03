@@ -88,6 +88,18 @@
         "repoName": "izzywdev/FuzeAgent"
       }
     },
+    ".github/workflows/fuze-auto-pr.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/fuze-auto-pr.yml",
+      "sourceSha256": "a066aa0c1fb0843482ad74445ba2783b90aa41bfdb6cc908c11cc2d2d81c4889",
+      "renderedSha256": "a066aa0c1fb0843482ad74445ba2783b90aa41bfdb6cc908c11cc2d2d81c4889",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
     ".github/workflows/fuze-ci-autofix.yml": {
       "capability": "workflows",
       "mode": "stamped",
@@ -106,6 +118,18 @@
       "sourcePath": "workflow-templates/fuze-code-review.yml",
       "sourceSha256": "d8c46216212e373a19ace47c387cf382d57df352987ff1d85cf8b16ec4ce43da",
       "renderedSha256": "d8c46216212e373a19ace47c387cf382d57df352987ff1d85cf8b16ec4ce43da",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/fuze.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/fuze.yml",
+      "sourceSha256": "94880c4f76a38aaee7c356d8aeed23e5dea01c563a8ef3db878a428212b71022",
+      "renderedSha256": "94880c4f76a38aaee7c356d8aeed23e5dea01c563a8ef3db878a428212b71022",
       "renderVars": {
         "defaultBranch": "main",
         "baselineRef": "v1",
