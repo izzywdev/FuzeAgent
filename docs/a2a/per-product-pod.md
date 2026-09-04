@@ -154,7 +154,15 @@ a2a:
       external: false
       provider:
         name: anthropic
-        apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
+        # NOT a raw Anthropic key. Seal a per-product LiteLLM VIRTUAL key here and pair it
+        # with deploy.providerBaseUrl below (a sibling deploy: value, NOT a field of this
+        # provider block -- the Anthropic SDK reads ANTHROPIC_BASE_URL from the process
+        # environment, not from anything this app's own values.json config parses). This
+        # is what makes budgeting, observability, guardrails and cross-vendor fallback
+        # apply to every A2A pod: they are LiteLLM's job, not this pod's, and LiteLLM only
+        # sees them if the pod is actually behind it. Named a2a-provider-fuze, not
+        # a2a-provider-anthropic, so the name itself does not imply a raw vendor key.
+        apiKeySecretRef: { name: a2a-provider-fuze, key: api-key }
 ```
 
 ### Values that are NOT in the `a2a` block
@@ -165,6 +173,11 @@ does not define (no templates are implied by an interface). Copy the shape from
 `replicas`, `imagePullSecrets`, `resources`, `ingressClassName`, `externalDomain`,
 `agentProvider`, `gitImage`, `reposGitTokenSecretRef`, `providerApiKeySecretRef`,
 `stateConfigMap`.
+
+**`providerBaseUrl`** is also here, not in `a2a.tenants[0].provider` -- set it to
+`http://litellm.fuzeinfra.svc.cluster.local:4000` to route this pod through the LiteLLM
+gateway. Unset by default (the exec-tenant deployment does not set it), so a per-product
+pod opts in explicitly rather than inheriting it silently.
 
 **`inClusterUrl` is deliberately NOT one of them.** It sits inside `a2a` because that
 block is what the chart serialises verbatim into the `values.json` the server parses
@@ -188,7 +201,7 @@ scope and **cannot be reused in another namespace** — you must seal your own.
 
 | Secret | Referenced by | Required? |
 |---|---|---|
-| `a2a-provider-anthropic` (`api-key`) | `provider.apiKeySecretRef` + `deploy.providerApiKeySecretRef` (exported as `ANTHROPIC_API_KEY`) | Yes, for any real provider |
+| `a2a-provider-fuze` (`api-key`) | `provider.apiKeySecretRef` + `deploy.providerApiKeySecretRef` (exported as `ANTHROPIC_API_KEY`) -- a per-product **LiteLLM virtual key**, not a raw Anthropic key; mint with `mint-litellm-fuze-key.sh` | Yes, for any real provider |
 | `a2a-card-signing` (`jws.key`) | `cardSigning.keySecretRef` | Yes in prod — the Fuze profile requires non-empty `signatures[]` |
 | `a2a-repos-git` (`token`) | `deploy.reposGitTokenSecretRef` | Only if YOUR repo is private (the init container clones it) |
 | `a2a-mtls-ca` (`ca.crt`) | `auth.mtls.caSecretRef` | Only if `auth.mtls.enabled: true` |
@@ -216,7 +229,8 @@ with your names. What the container actually requires:
 | `A2A_REPOS_DIR` | `/repos` |
 | `AGENT_PROVIDER` | `anthropic` |
 | `FUZE_STATE_DIR` | `/state` |
-| `ANTHROPIC_API_KEY` | from `providerApiKeySecretRef` |
+| `ANTHROPIC_BASE_URL` | from `deploy.providerBaseUrl`, when set -- routes through the gateway instead of api.anthropic.com |
+| `ANTHROPIC_API_KEY` | from `deploy.providerApiKeySecretRef` (`a2a-provider-fuze`) -- a LiteLLM virtual key, the SDK does not know the difference |
 
 **Volumes**
 

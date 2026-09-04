@@ -22,7 +22,7 @@ operator runbook that consumes them.
 
    | SealedSecret | key | what |
    |---|---|---|
-   | `a2a-provider-anthropic` | `api-key` | the Managed-Agents provider key |
+   | `a2a-provider-fuze` | `api-key` | a per-product LiteLLM VIRTUAL key (mint-litellm-fuze-key.sh), NOT a raw Anthropic key -- routes through the gateway via ANTHROPIC_BASE_URL |
    | `ghcr-pull` | `.dockerconfigjson` | pull the private image |
    | `a2a-mtls-ca` | `ca.crt` | in-cluster mTLS CA (defence in depth) |
    | `a2a-card-signing` | `jws.key` | JWS key that signs the served card |
@@ -46,8 +46,13 @@ a2a:
       enabled: true            # only after the serving role (precondition 2) ships
       entryRole: product-manager
       external: false
-      provider: { name: anthropic, apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key } }
+      provider: { name: anthropic, apiKeySecretRef: { name: a2a-provider-fuze, key: api-key } }
 ```
+
+Route through the LiteLLM gateway by also setting the sibling `deploy.providerBaseUrl:
+http://litellm.fuzeinfra.svc.cluster.local:4000` (per-product-pod.md section 2) -- it is
+a `deploy:` value, not a field of `provider:` above, because the Anthropic SDK reads
+`ANTHROPIC_BASE_URL` from the process environment, not from this app's own config.
 
 Commit → Argo syncs → the shared server clones the tenant repo and serves its card.
 

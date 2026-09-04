@@ -121,6 +121,16 @@ spec:
               value: /state
             - name: PYTHONUNBUFFERED
               value: "1"
+            {{- with .Values.deploy.providerBaseUrl }}
+            # Routes the Anthropic SDK through the in-cluster LiteLLM gateway instead of
+            # api.anthropic.com -- the SDK honours this env var natively, same mechanism
+            # fuze.yml already relies on. Unset by default so the exec-tenant deployment,
+            # which does not set this yet, is unaffected; a per-product pod opts in by
+            # setting deploy.providerBaseUrl and pairing it with a LiteLLM VIRTUAL key in
+            # providerApiKeySecretRef below, not a raw Anthropic key.
+            - name: ANTHROPIC_BASE_URL
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.deploy.providerApiKeySecretRef }}
             # Managed-Agents API key for session provisioning (sync/common.py _api_key()).
             - name: ANTHROPIC_API_KEY
