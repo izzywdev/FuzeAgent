@@ -11,6 +11,16 @@
   "class": "oss-public",
   "tier": "product",
   "expert": "fuzeagent-expert",
+  "expertMonitors": [
+    "deploy/helm/",
+    "deploy/argocd/",
+    "services/database_service/",
+    "mcp-servers/fuzeagent-server/",
+    "contracts/openapi.yaml",
+    "docker-compose.yml",
+    "agent-templates/roles/",
+    ".fuze/manifest.json"
+  ],
   "baselineRef": "v1",
   "agents": [
     "fuzeagent-expert",

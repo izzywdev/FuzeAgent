@@ -75,13 +75,33 @@ spec:
                   name: {{ include "fuzeagent.secretName" . }}
                   key: ENCRYPTION_KEY
                   optional: true
-            # main:app enforces global auth (Depends(get_current_user)) and fails
-            # CLOSED without JWT material (PR #6/#7). JWT_SECRET is required.
+            # Identity + authorization delegated to the FuzeFront Security API.
+            # When securityBaseUrl is set the orchestrator resolves callers via
+            # GET /v1/security/session and asks POST /v1/security/authz/check for
+            # every decision — no signing key, and no identity/policy vendor, is
+            # known to FuzeAgent. Leave empty to keep the legacy local-JWT path.
+            {{- with .Values.orchestrator.auth.securityBaseUrl }}
+            - name: FUZEFRONT_SECURITY_BASE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: FUZEFRONT_SECURITY_TIMEOUT_SECONDS
+              value: {{ .Values.orchestrator.auth.securityTimeoutSeconds | quote }}
+            # Optional machine token for calls FuzeAgent makes on its OWN behalf
+            # (not on behalf of a signed-in user). Distinct from user identity.
+            - name: FUZEFRONT_SECURITY_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: FUZEFRONT_SECURITY_SERVICE_TOKEN
+                  optional: true
+            # Legacy fallback: used ONLY when FUZEFRONT_SECURITY_BASE_URL is unset.
+            # main:app fails CLOSED without one of the two (PR #6/#7).
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "fuzeagent.secretName" . }}
                   key: JWT_SECRET
+                  optional: true
             - name: JWT_ALGORITHM
               value: {{ .Values.orchestrator.auth.jwtAlgorithm | quote }}
             - name: JWT_AUDIENCE

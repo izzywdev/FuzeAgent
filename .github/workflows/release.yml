@@ -150,6 +150,37 @@ jobs:
           GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr review "${PR_URL}" --approve -b "Automated GitOps release"
           GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr merge "${PR_URL}" --admin --squash --delete-branch
 
+      - name: Create GitHub Release
+        # Every prior run of this job built and shipped images but never recorded
+        # a tag or a Release object anywhere -- `gh api repos/.../releases/latest`
+        # 404s and `tags` is empty even though dozens of these runs have succeeded.
+        # This closes that gap: one Release per successful build, named after the
+        # same short SHA already used for the image tags above, so the Release is
+        # directly traceable to what actually got built and rolled out. Uses the
+        # job's default GITHUB_TOKEN (contents: write, already granted) -- this
+        # only creates a tag + Release via the API, it never pushes to the
+        # protected `main` branch, so it needs no elevated/admin token.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA="${{ steps.tag.outputs.sha }}"
+          TAG="release-${SHA}"
+          cat > /tmp/release-notes.md <<EOF
+          Images built and published from commit \`${GITHUB_SHA}\`, then rolled
+          out to prod via the GitOps bump PR merged to \`main\` earlier in this
+          same workflow run.
+
+          - \`ghcr.io/izzywdev/fuzeagent-orchestrator:${SHA}\`
+          - \`ghcr.io/izzywdev/fuzeagent-hierarchy-api:${SHA}\`
+          - \`ghcr.io/izzywdev/fuzeagent-ui:${SHA}\`
+          - \`ghcr.io/izzywdev/fuzeagent-mcp-server:${SHA}\`
+          - \`ghcr.io/izzywdev/fuze-a2a:${SHA}\`
+          EOF
+          gh release create "${TAG}" \
+            --target "${GITHUB_SHA}" \
+            --title "FuzeAgent ${TAG}" \
+            --notes-file /tmp/release-notes.md
+
   # ---------------------------------------------------------------------------
   # claude-runner image library (Track 4)
   # Base image must finish before variants — they all FROM it.

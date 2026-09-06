@@ -121,7 +121,8 @@ def _resolve_jwks_url(auth, discovery_fetcher) -> str:
     """Decide where signing keys are fetched from.
 
     * ``oidc_discovery_url`` set  -> fetch that discovery document and use its
-      ``jwks_uri`` (typically an in-cluster Authentik URL). Keys come from in-cluster.
+      ``jwks_uri`` (typically an in-cluster identity-provider URL — the provider is
+      deployment config, never named here). Keys come from in-cluster.
     * ``oidc_discovery_url`` unset -> issuer-derived certs path — the UNCHANGED default.
 
     Both the discovery URL and the ``jwks_uri`` it yields are scheme-guarded to http(s)

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { getToken } from '../lib/security/client'
 
 export interface WebSocketMessage {
   id: string
@@ -79,7 +80,14 @@ export function useWebSocket(url: string, options: WebSocketOptions = {}): WebSo
 
     try {
       const wsUrl = buildUrl()
-      wsRef.current = new WebSocket(wsUrl)
+      // A browser cannot set an Authorization header on a WS handshake, so the
+      // FuzeFront session token rides the subprotocol as `bearer, <token>` — the form
+      // the orchestrator's authenticate_websocket() accepts. Unauthenticated
+      // handshakes are closed server-side with 1008 (fail-closed), not upgraded.
+      const wsToken = getToken()
+      wsRef.current = wsToken
+        ? new WebSocket(wsUrl, ['bearer', wsToken])
+        : new WebSocket(wsUrl)
 
       wsRef.current.onopen = () => {
         setIsConnected(true)

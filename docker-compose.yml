@@ -58,10 +58,21 @@ services:
       ENABLE_MCP_INTEGRATION: "true"
       # Security and encryption
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      # Authentication (issue #6 / PR #7): JWT verification material so the
+      # Identity + authorization via the FuzeFront Security API. Set this to the
+      # FuzeFront API base (including /api) and the orchestrator resolves callers
+      # with GET /v1/security/session and asks POST /v1/security/authz/check for
+      # every decision — no signing key, no identity/policy vendor. Empty by
+      # default so a standalone `docker compose up` keeps working on the legacy
+      # local-verification path below.
+      FUZEFRONT_SECURITY_BASE_URL: ${FUZEFRONT_SECURITY_BASE_URL:-}
+      FUZEFRONT_SECURITY_TIMEOUT_SECONDS: ${FUZEFRONT_SECURITY_TIMEOUT_SECONDS:-5}
+      # Machine token for calls FuzeAgent makes on its OWN behalf (not a user's).
+      FUZEFRONT_SECURITY_SERVICE_TOKEN: ${FUZEFRONT_SECURITY_SERVICE_TOKEN:-}
+      # Legacy fallback (issue #6 / PR #7): local JWT verification material so the
       # global Depends(get_current_user) fails CLOSED (401) for unauthenticated
-      # requests on the published :8000 surface. Required — the app rejects all
-      # non-public routes when no secret/key is configured.
+      # requests on the published :8000 surface. Used ONLY when
+      # FUZEFRONT_SECURITY_BASE_URL is empty — the app rejects all non-public
+      # routes when neither is configured.
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-}

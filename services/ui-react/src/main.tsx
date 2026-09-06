@@ -3,6 +3,8 @@ import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import AppRouter from './components/AppRouter.tsx'
+import { SecurityProvider } from './lib/security/SecurityProvider'
+import AuthGate from './components/auth/AuthGate'
 
 // ---------------------------------------------------------------------------
 // Optional FuzeFront platform integration
@@ -35,7 +37,16 @@ function inPlatform(): boolean {
 }
 
 function AppWithPlatform(): React.ReactElement {
-  const app = <AppRouter />
+  // Identity + permissions come from the FuzeFront Security API (or, when embedded,
+  // from the shell). AuthGate shows the sign-in redirect surface only when the
+  // platform actually advertises sign-in methods — see AuthGate for why.
+  const app = (
+    <SecurityProvider>
+      <AuthGate>
+        <AppRouter />
+      </AuthGate>
+    </SecurityProvider>
+  )
 
   if (PlatformProvider && inPlatform()) {
     return <PlatformProvider>{app}</PlatformProvider>

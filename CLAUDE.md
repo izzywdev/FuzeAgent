@@ -600,7 +600,12 @@ RABBITMQ_URL=amqp://admin:password@rabbitmq:5672/
 # Cache
 REDIS_URL=redis://redis:6379
 
-# Security
+# Security — identity + authorization delegated to the FuzeFront Security API.
+# Set this to the FuzeFront API base INCLUDING /api and the orchestrator resolves
+# callers via GET /v1/security/session and asks POST /v1/security/authz/check for
+# every decision; it then needs no signing key and names no identity/policy vendor.
+FUZEFRONT_SECURITY_BASE_URL=
+# Legacy local-verification fallback, used only when the above is empty.
 JWT_SECRET=your-jwt-secret
 ```
 
@@ -659,7 +664,11 @@ JWT_SECRET=your-jwt-secret
 ## Security Best Practices
 
 ### API Security
-- JWT-based authentication for all endpoints
+- Authentication on all endpoints. Identity is resolved by the FuzeFront Security
+  API (`GET /v1/security/session`) when `FUZEFRONT_SECURITY_BASE_URL` is configured;
+  local JWT verification is the standalone fallback. Authorization decisions come
+  from `POST /v1/security/authz/check` using the bare resource/action keys declared
+  in `registration/policy.json` — FuzeAgent ships no policy engine and calls none.
 - Rate limiting on agent creation and task assignment
 - Input validation for all agent configurations
 - Audit logging for administrative actions

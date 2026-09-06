@@ -15,10 +15,10 @@ from a2a.runtime import _build_verifier
 
 ISSUER = "https://auth.prod.fuzefront.com"
 DISCOVERY = (
-    "http://authentik-server.identity.svc.cluster.local:9000"
+    "http://idp-server.identity.svc.cluster.local:9000"
     "/application/o/fuzeagent-a2a/.well-known/openid-configuration"
 )
-IN_CLUSTER_JWKS = "http://authentik-server.identity.svc.cluster.local:9000/application/o/fuzeagent-a2a/jwks/"
+IN_CLUSTER_JWKS = "http://idp-server.identity.svc.cluster.local:9000/application/o/fuzeagent-a2a/jwks/"
 
 
 class _FakeSigningKey:
@@ -71,7 +71,7 @@ def test_discovery_override_is_used_for_key_fetch_when_set():
 
     def discovery_fetcher(url: str) -> dict:
         fetched.append(url)
-        return {"issuer": "http://authentik-internal", "jwks_uri": IN_CLUSTER_JWKS}
+        return {"issuer": "http://idp-internal", "jwks_uri": IN_CLUSTER_JWKS}
 
     verify = _build_verifier(
         _config(discovery_url=DISCOVERY),
@@ -114,7 +114,7 @@ def test_iss_still_validated_against_issuer_even_with_discovery_override():
         jwk_client_factory=_FakeJwkClient,
         discovery_fetcher=lambda url: {"jwks_uri": IN_CLUSTER_JWKS},
         decoder=_claims_decoder(
-            {"iss": "http://authentik-server.identity.svc.cluster.local:9000", "sub": "FuzeSales"}
+            {"iss": "http://idp-server.identity.svc.cluster.local:9000", "sub": "FuzeSales"}
         ),
     )
     with pytest.raises(Exception):
@@ -151,7 +151,7 @@ def test_no_auth_returns_none_fail_closed():
     "bad_url",
     [
         "file:///etc/passwd",
-        "ftp://authentik/discovery",
+        "ftp://idp/discovery",
         "/etc/passwd",  # no scheme
     ],
 )
