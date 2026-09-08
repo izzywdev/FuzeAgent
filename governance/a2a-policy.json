@@ -1,0 +1,25 @@
+{
+  "$comment": "Policy for gate-a2a (FuzeSDLC scripts/gate_a2a.py). See governance/a2a-runtime-standard.md in FuzeSDLC. IF THIS FILE IS ABSENT THE GATE RUNS IN STRICT DEFAULTS -- absence is not permission. Every entry below documents a real, already-verified piece of wiring; none of it grants a soft pass on a gap that hasn't been checked.",
+  "version": 1,
+  "image": {
+    "repository": "ghcr.io/izzywdev/fuze-a2a",
+    "$comment": "The ONE shared A2A runtime image (agent-templates/a2a/Dockerfile, built by .github/workflows/release.yml). FuzeAgent owns the image and the frozen contract; it never builds a second one."
+  },
+  "creds": {
+    "sealedSecretDirs": ["deploy/sealed-secrets", "deploy/contabo/sealed"],
+    "externallyProvisioned": {
+      "a2a-provider-anthropic": "Sealed for namespace `fuzeagent` in deploy/helm/a2a-shared/templates/a2a-sealed-secrets.yaml (SealedSecret, key `api-key`). Not under deploy/sealed-secrets/ because it is templated behind `{{- if .Values.a2a.enabled }}` inside a multi-document Helm template, which gate-a2a's plain YAML loader cannot parse (Go template control-flow syntax + multiple `---` documents in one file, verified against the loader's yaml.safe_load call). The SealedSecret is real and already applied via the `a2a-shared` Argo Application (deploy/helm/a2a-shared, Argo renders the chart, not this gate). Follow-up owed to devops-engineer: split that file into one gate-parseable SealedSecret document per file under deploy/sealed-secrets/ so this override can be removed. Confirmed present in the fuzeagent namespace at go-live per deploy/helm/a2a-shared/GO-LIVE.md §2.",
+      "a2a-mtls-ca": "Same file/reason as a2a-provider-anthropic above (key `ca.crt`, deploy/helm/a2a-shared/GO-LIVE.md §2).",
+      "a2a-card-signing": "Same file/reason as a2a-provider-anthropic above (key `jws.key`, deploy/helm/a2a-shared/GO-LIVE.md §2).",
+      "a2a-repos-git": "Same file/reason as a2a-provider-anthropic above (key `token`). GO-LIVE.md notes this one is not actually required for the FuzeAgent-first tenant (public repo, anonymous clone) but is sealed and referenced for when a private tenant is onboarded."
+    }
+  },
+  "memory": {
+    "mode": "client-only",
+    "$comment": "The A2A pod is a Chroma CLIENT of the family's existing Chroma service (services/orchestrator/rag_integration.py: chromadb.HttpClient against CHROMA_HOST/CHROMA_PORT), per-tenant collection. It never runs a Chroma server -- chromadb carries PYSEC-2026-311 (unfixable pre-auth code injection in the SERVER's collections handler); FuzeAgent is unaffected only because it never serves that endpoint."
+  },
+  "apiSurface": {
+    "mode": "mcp-only",
+    "$comment": "FuzeAgent's MCP server (mcp-servers/fuzeagent-server/server.py) exposes the product's real operations 1:1; there is no raw-REST fallback and none is added by this repo's A2A surface."
+  }
+}
