@@ -80,8 +80,8 @@
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/design-review-notify.yml",
-      "sourceSha256": "2d86c2c70163765b7149fc091f211b918d29d68fb856ed45b3b551b3bb7ff59a",
-      "renderedSha256": "2d86c2c70163765b7149fc091f211b918d29d68fb856ed45b3b551b3bb7ff59a",
+      "sourceSha256": "cda334aac760c458cf44e78abd25213a3cc7144f83b940f824293b3ea4e703fc",
+      "renderedSha256": "cda334aac760c458cf44e78abd25213a3cc7144f83b940f824293b3ea4e703fc",
       "renderVars": {
         "defaultBranch": "main",
         "baselineRef": "v1",
@@ -104,8 +104,8 @@
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/fuze-code-review.yml",
-      "sourceSha256": "d8c46216212e373a19ace47c387cf382d57df352987ff1d85cf8b16ec4ce43da",
-      "renderedSha256": "d8c46216212e373a19ace47c387cf382d57df352987ff1d85cf8b16ec4ce43da",
+      "sourceSha256": "940d1ea7a9408a3ee766a98c1ff29ab7a073f21b6b0667eddde17273403251b6",
+      "renderedSha256": "940d1ea7a9408a3ee766a98c1ff29ab7a073f21b6b0667eddde17273403251b6",
       "renderVars": {
         "defaultBranch": "main",
         "baselineRef": "v1",

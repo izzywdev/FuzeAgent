@@ -2,9 +2,9 @@
 
 Frozen against A2A specification 1.0.0 (`lf.a2a.v1`).
 
-`wire_models` and `card_models` are GENERATED from the schemas in ../../schema/ by
-`regenerate.sh`; do not hand-edit them. Editing a generated model instead of the
-schema is how a contract silently forks from its spec.
+`wire_models`, `card_models` and `registration_models` are GENERATED from the schemas
+in ../../schema/ by `regenerate.sh`; do not hand-edit them. Editing a generated model
+instead of the schema is how a contract silently forks from its spec.
 """
 from .card_models import FuzeA2AAgentCard as AgentCard
 from .client import (
@@ -24,13 +24,23 @@ from .errors import (
     UnsupportedOperationError,
     VersionNotSupportedError,
 )
+from .registration_models import (
+    RegisteredTenant,
+    RegisterTenantRequest,
+    RegisterTenantResponse,
+    TenantList,
+)
 from .wire_models import Artifact, Message, Part, Role, Task, TaskState, TaskStatus
 
-__version__ = "1.0.0"
+__version__ = "1.3.0"
 
 __all__ = [
     "A2AClient",
     "AgentCard",
+    "RegisterTenantRequest",
+    "RegisteredTenant",
+    "RegisterTenantResponse",
+    "TenantList",
     "A2A_VERSION",
     "WELL_KNOWN_CARD_PATH",
     "TERMINAL_STATES",

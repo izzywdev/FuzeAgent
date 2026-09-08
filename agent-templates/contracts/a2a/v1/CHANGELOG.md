@@ -14,6 +14,55 @@ protocol version appears in the card as `AgentInterface.protocolVersion` and on 
 
 ---
 
+## 1.3.0 — 2026-08-27
+
+Additive, backward-compatible MINOR bump within v1. **Runtime tenant registration.** Tenants may now
+be resolved from a runtime DB registry owned by the orchestrator instead of the static
+`a2a.tenants[]` values array. Tracking issue: [izzywdev/FuzeAgent#203](https://github.com/izzywdev/FuzeAgent/issues/203).
+
+This freezes the **interface** for the new topology; it is the gate the implementer slices build on
+(Slice 1 migration, the orchestrator handlers, Slice 3 server reader, tests, docs). No handler, SQL
+or chart is added here.
+
+### Added
+
+- `schema/tenant-registration.schema.json` — the runtime-registry shapes:
+  - `RegisteredTenant` — the canonical `a2a_tenants` record (`tenant` unique key, `repo`, `ref`,
+    `entryRole`, `servingRoles[]`, `external`, `provider`, `card`, `enabled`, `createdAt`,
+    `updatedAt`). Frozen ONCE here so the DB migration and the A2A server reader target one shape.
+  - `RegisterTenantRequest` / `RegisterTenantResponse` — the self-registration payload and its
+    upsert result.
+  - `TenantList` — the `GET /a2a/tenants` response (marked `x-pagination: exempt`: a bounded
+    whole-set config read the A2A server resolves atomically).
+  - The `card` field **reuses `agent-card.schema.json` by reference** — the projected card shape is
+    **not** redefined and remains byte-identical to a card projected from a cloned repo. A pushed
+    card MUST additionally satisfy `fuze-profile.schema.json`.
+- `tenant-registration.md` — NORMATIVE spec for the two orchestrator HTTP operations
+  (`POST /a2a/tenants/register`, `GET /a2a/tenants` [+ `/{tenant}`]): idempotent-upsert semantics,
+  the OIDC caller-repo self-registration security rule (a registration whose `tenant`/`repo` ≠ the
+  authenticated identity is rejected `403` and never written), and the two-schema card-validation
+  rule.
+- `examples/registration/fuzeplan.tenant-registration.json` — a worked registration built from the
+  frozen FuzePlan card, doubling as a fixture. Placed in a subdirectory so the card-conformance
+  suite's `examples/*.json` glob (which treats every flat entry as an Agent Card) does not mistake
+  the registration wrapper for a card.
+- `client/fuze_a2a_client/registration_models.py` — GENERATED Pydantic models for the new shapes;
+  `regenerate.sh` now emits it (bundling the cross-file card ref for single-file codegen). Exported
+  from `fuze_a2a_client` (`RegisterTenantRequest`, `RegisteredTenant`, `RegisterTenantResponse`,
+  `TenantList`). Client package bumped `1.0.0` → `1.3.0` — the first bump since freeze that changes
+  the generated surface, so the package version now tracks the contract version again.
+
+### Backward compatibility
+
+Purely additive. `values-interface.schema.json` and the static `a2a.tenants[]` topology are
+**unchanged and still valid**; `agent-card.schema.json`, `fuze-profile.schema.json`,
+`a2a-wire.schema.json`, `card-projection.md`, `binding.md`, `state-mapping.md` and `authz.md` are
+untouched. A v1 consumer that does not use runtime registration is unaffected; the two topologies
+serve **byte-identical cards**. No wire/card *shape* changed, so existing `wire_models` / `card_models`
+are byte-identical after regeneration.
+
+---
+
 ## 1.2.0 — 2026-08-10
 
 Additive, backward-compatible MINOR bump within v1. **Per-product A2A pods become deployable.**
