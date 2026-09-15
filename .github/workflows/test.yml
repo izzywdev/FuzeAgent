@@ -269,10 +269,22 @@ jobs:
       #   `ecdsa!=0.15` install_requires in this dependency tree -- verified
       #   by resolving the full, updated requirements.txt: no `ecdsa` package
       #   appears anywhere in the resolved set. No ignore needed.
+      #
+      # CVE-2026-45830 / CVE-2026-45831 / CVE-2026-45833 -- chromadb
+      #   ACCEPTED per owner decision (2026-09-06): same chromadb package as
+      #   PYSEC-2026-311 above, same reachability analysis (client-only via
+      #   HttpClient; the vulnerable server surface is FuzeInfra's to harden),
+      #   and every published chromadb release is flagged by these three with no
+      #   fixed version available -- while crewai's `chromadb~=1.1.0` pin caps
+      #   the resolvable version at the latest 1.1.x regardless. A version bump
+      #   cannot clear them, so per the owner they are accepted, not blocking.
       run: |
         pip-audit -r requirements.txt --format=json --output=pip-audit-report.json || true
         pip-audit -r requirements.txt \
-          --ignore-vuln PYSEC-2026-311
+          --ignore-vuln PYSEC-2026-311 \
+          --ignore-vuln CVE-2026-45830 \
+          --ignore-vuln CVE-2026-45831 \
+          --ignore-vuln CVE-2026-45833
 
     - name: Upload security reports
       uses: actions/upload-artifact@v7

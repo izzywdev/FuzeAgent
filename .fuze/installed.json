@@ -80,20 +80,8 @@
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/design-review-notify.yml",
-      "sourceSha256": "2d86c2c70163765b7149fc091f211b918d29d68fb856ed45b3b551b3bb7ff59a",
-      "renderedSha256": "2d86c2c70163765b7149fc091f211b918d29d68fb856ed45b3b551b3bb7ff59a",
-      "renderVars": {
-        "defaultBranch": "main",
-        "baselineRef": "v1",
-        "repoName": "izzywdev/FuzeAgent"
-      }
-    },
-    ".github/workflows/fuze-auto-pr.yml": {
-      "capability": "workflows",
-      "mode": "stamped",
-      "sourcePath": "workflow-templates/fuze-auto-pr.yml",
-      "sourceSha256": "a066aa0c1fb0843482ad74445ba2783b90aa41bfdb6cc908c11cc2d2d81c4889",
-      "renderedSha256": "a066aa0c1fb0843482ad74445ba2783b90aa41bfdb6cc908c11cc2d2d81c4889",
+      "sourceSha256": "cda334aac760c458cf44e78abd25213a3cc7144f83b940f824293b3ea4e703fc",
+      "renderedSha256": "cda334aac760c458cf44e78abd25213a3cc7144f83b940f824293b3ea4e703fc",
       "renderVars": {
         "defaultBranch": "main",
         "baselineRef": "v1",
@@ -116,20 +104,8 @@
       "capability": "workflows",
       "mode": "stamped",
       "sourcePath": "workflow-templates/fuze-code-review.yml",
-      "sourceSha256": "d8c46216212e373a19ace47c387cf382d57df352987ff1d85cf8b16ec4ce43da",
-      "renderedSha256": "d8c46216212e373a19ace47c387cf382d57df352987ff1d85cf8b16ec4ce43da",
-      "renderVars": {
-        "defaultBranch": "main",
-        "baselineRef": "v1",
-        "repoName": "izzywdev/FuzeAgent"
-      }
-    },
-    ".github/workflows/fuze.yml": {
-      "capability": "workflows",
-      "mode": "stamped",
-      "sourcePath": "workflow-templates/fuze.yml",
-      "sourceSha256": "94880c4f76a38aaee7c356d8aeed23e5dea01c563a8ef3db878a428212b71022",
-      "renderedSha256": "94880c4f76a38aaee7c356d8aeed23e5dea01c563a8ef3db878a428212b71022",
+      "sourceSha256": "940d1ea7a9408a3ee766a98c1ff29ab7a073f21b6b0667eddde17273403251b6",
+      "renderedSha256": "940d1ea7a9408a3ee766a98c1ff29ab7a073f21b6b0667eddde17273403251b6",
       "renderVars": {
         "defaultBranch": "main",
         "baselineRef": "v1",
@@ -307,6 +283,30 @@
       "sourcePath": "scripts/stamp-frames.mjs",
       "sourceSha256": "71ede05b3cf69848c595302b4d80a041d2e7cb177e7afa8b2fe68ace2d04d6b9",
       "renderedSha256": "71ede05b3cf69848c595302b4d80a041d2e7cb177e7afa8b2fe68ace2d04d6b9"
+    },
+    ".github/workflows/fuze.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/fuze.yml",
+      "sourceSha256": "94880c4f76a38aaee7c356d8aeed23e5dea01c563a8ef3db878a428212b71022",
+      "renderedSha256": "94880c4f76a38aaee7c356d8aeed23e5dea01c563a8ef3db878a428212b71022",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
+      }
+    },
+    ".github/workflows/fuze-auto-pr.yml": {
+      "capability": "workflows",
+      "mode": "stamped",
+      "sourcePath": "workflow-templates/fuze-auto-pr.yml",
+      "sourceSha256": "a066aa0c1fb0843482ad74445ba2783b90aa41bfdb6cc908c11cc2d2d81c4889",
+      "renderedSha256": "a066aa0c1fb0843482ad74445ba2783b90aa41bfdb6cc908c11cc2d2d81c4889",
+      "renderVars": {
+        "defaultBranch": "main",
+        "baselineRef": "v1",
+        "repoName": "izzywdev/FuzeAgent"
+      }
     }
   },
   "workflows": {

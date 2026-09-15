@@ -211,7 +211,7 @@ async def test_authz_check_sends_bare_policy_keys(monkeypatch):
         resource="Agent",
         action="deploy",
         resource_key="agent-7",
-        token="caller-token",
+        token="caller-token",  # nosec B106 - fake token literal in a test fixture, not a real credential
     )
 
     assert allowed is True
