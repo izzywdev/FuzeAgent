@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/izzywdev/FuzeAgent/agent-templates/contracts/a2a/v1/schema/tenant-registration.schema.json",
+  "title": "A2A runtime tenant registration (v1)",
+  "description": "The RUNTIME tenant registry contract (added in contract v1.3.0). Until now the shared A2A server resolved its tenant set from the STATIC `a2a.tenants[]` array in the chart's values (values-interface.schema.json), rendered to a ConfigMap the server read at boot, and an initContainer cloned each tenant repo so the server could PROJECT the card. This file freezes the shapes for the alternative topology decided in izzywdev/FuzeAgent#203: consumers SELF-REGISTER at runtime into a DB registry owned by the orchestrator, PUSH their already-projected Agent Card as data, and the stateless/DB-free A2A server fetches the resolved set over HTTP. \n\nThis is PURELY ADDITIVE to v1. It does not remove, rename or re-type any field of values-interface.schema.json — the static `a2a.tenants[]` topology is unchanged and remains valid; a deployment that never calls these endpoints behaves exactly as before. \n\nThree shapes are frozen here as `$defs`: `RegisteredTenant` (the canonical `a2a_tenants` record — the row the Slice-1 migration creates and the row the Slice-3 server reader consumes, frozen ONCE here so the DB, the orchestrator writer and the server reader all target the same shape), `RegisterTenantRequest` (the self-registration payload) and `RegisterTenantResponse` (the upsert result), plus the `TenantList` read response. The two orchestrator HTTP operations that carry these shapes, their idempotent-upsert semantics, the OIDC self-registration security rule and the card-validation rule are NORMATIVE in tenant-registration.md — read it alongside this schema.\n\nThe `card` field REUSES the frozen agent-card.schema.json BY REFERENCE and is NOT redefined here: the projected card that arrives via registration is byte-identical to the card the generator used to project from a cloned repo. A pushed card MUST additionally satisfy fuze-profile.schema.json (signed, single JSONRPC interface, etc.) exactly as a served card does today — a structural agent-card is necessary but not sufficient; see tenant-registration.md §4.",
+  "$defs": {
+    "tenantSlug": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "description": "The tenant routing key AND the unique registry key (the record's natural id — there is no separate minted uuid; identifier-standard §4.2 client-assigned-id is `allowed` for exactly this reason, see RegisterTenantRequest). MUST equal the card's `supportedInterfaces[].tenant` (card-projection.md §2) and, for the self-registration security rule, MUST be derivable from the authenticated caller repo (tenant-registration.md §3)."
+    },
+    "repoName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+      "description": "owner/name of the repo whose manifest + roles were the projection source for `card`. Same shape as values-interface tenant.repo. For the self-registration rule this MUST match the authenticated caller identity (auth.callerClaim, authz.md §2)."
+    },
+    "roleKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]+$",
+      "description": "A role key; the join key an adapter uses to resolve an incoming skill id back to a role (card-projection.md §3)."
+    },
+    "secretRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "key"],
+      "description": "Reference to an existing Kubernetes Secret (SealedSecret-provisioned). A REFERENCE only — secret VALUES never appear on the wire, in the registry, or in git (same rule as values-interface §secretRef).",
+      "properties": {
+        "name": { "type": "string" },
+        "key": { "type": "string" }
+      }
+    },
+    "Provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Managed-Agents runtime binding for THIS tenant's sessions (the values that reach agent-templates/providers/*). Mirrors values-interface tenant.provider; the consumer declares how ITS OWN sessions are provisioned. Secret material is by reference only (secretRef), never inline literals, and is NEVER projected onto the card.",
+      "properties": {
+        "name": { "type": "string", "default": "anthropic", "description": "AgentProvider implementation id (base.py `name`)." },
+        "environmentId": { "type": "string", "description": "Environment the sessions bind to. Resolved from the role's `environment` when unset." },
+        "apiKeySecretRef": { "$ref": "#/$defs/secretRef" },
+        "vaultIds": { "type": "array", "items": { "type": "string" }, "description": "Vault ids passed to create_session. NEVER projected onto the card." },
+        "memoryResources": { "type": "array", "items": { "type": "string" }, "description": "Memory stores mounted into sessions (e.g. the shared handoff store)." }
+      }
+    },
+    "RegisterTenantRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-client-assigned-id": "allowed",
+      "x-client-assigned-id-reason": "The registry key IS the tenant slug (`tenant`), a caller-supplied natural id, not a server-minted surrogate: it must equal the card's AgentInterface.tenant and be derivable from the authenticated caller repo, so the orchestrator cannot mint it. No separate `id`/`uuid` is declared for the resource; identifier-standard §4.2 is satisfied by the explicit `x-client-assigned-id: allowed` marker plus additionalProperties:false.",
+      "description": "The self-registration payload a consumer PUSHes to `POST /a2a/tenants/register`. Carries the tenant identity, its routing/serving config and its already-projected Agent Card. The server assigns nothing except timestamps (createdAt/updatedAt live only on the stored RegisteredTenant, never in the request). SECURITY (normative, tenant-registration.md §3): `tenant` and `repo` MUST match the authenticated caller identity (the same `auth.callerClaim` the A2A server validates, authz.md §2); a payload whose tenant/repo differs from the credential is REJECTED (403) and never written.",
+      "required": ["tenant", "repo", "entryRole", "servingRoles", "card"],
+      "properties": {
+        "tenant": { "$ref": "#/$defs/tenantSlug" },
+        "repo": { "$ref": "#/$defs/repoName" },
+        "ref": { "type": "string", "default": "main", "description": "Git ref the manifest/roles the card was projected from were read at. Provenance for the pushed card; the server does NOT clone it." },
+        "entryRole": { "$ref": "#/$defs/roleKey", "description": "The role that serves a SendMessage naming no skill (mirrors values-interface tenant.entryRole / manifest.a2a.entryRole)." },
+        "servingRoles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/roleKey" },
+          "description": "The roles projected into card `skills`. Kept in the record so the adapter can resolve an incoming skill id back to a role; the card already encodes the skills but the join set is stored explicitly."
+        },
+        "external": { "type": "boolean", "default": false, "description": "Published through the Cloudflare tunnel with an https interface URL. MUST be false for exec-tier tenants (card-projection.md §5)." },
+        "provider": { "$ref": "#/$defs/Provider" },
+        "enabled": { "type": "boolean", "default": true, "description": "Whether this tenant is served once registered. Self-registration intent is to be served, so it defaults true; the orchestrator may later disable a tenant without a re-register. Independent of the authz `providesTo` grant, which is still enforced fail-closed by the callee (authz.md §3) and is NOT set here.", "x-registration-note": "A consumer enabling itself does NOT grant itself any caller access; `providesTo` lives in the callee manifest and is unaffected." },
+        "card": {
+          "$ref": "agent-card.schema.json",
+          "description": "The consumer's PROJECTED Agent Card, pushed as data (decision #2 of #203). Byte-identical to what the generator used to project from a cloned repo — this contract changes only HOW the card arrives, not what it looks like. Structurally an agent-card.schema.json card; the server MUST ADDITIONALLY validate it against fuze-profile.schema.json (non-empty signatures[], single JSONRPC/1.0 interface, capabilities constants) before storing — see tenant-registration.md §4. A card that fails either validation is REJECTED (422) and never written.",
+          "x-fuze-card-profile": "fuze-profile.schema.json"
+        }
+      }
+    },
+    "RegisteredTenant": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The canonical `a2a_tenants` registry record: the row the orchestrator stores and serves, the shape the Slice-1 DB migration targets and the Slice-3 A2A server reader consumes. Frozen ONCE here so DB, writer and reader cannot drift. It is the RegisterTenantRequest fields, fully defaulted, plus server-owned `createdAt`/`updatedAt`. `tenant` is the unique key.",
+      "required": ["tenant", "repo", "ref", "entryRole", "servingRoles", "external", "enabled", "card", "createdAt", "updatedAt"],
+      "properties": {
+        "tenant": { "$ref": "#/$defs/tenantSlug" },
+        "repo": { "$ref": "#/$defs/repoName" },
+        "ref": { "type": "string", "description": "Git ref the card was projected from (default `main` applied at registration)." },
+        "entryRole": { "$ref": "#/$defs/roleKey" },
+        "servingRoles": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/roleKey" } },
+        "external": { "type": "boolean", "description": "See RegisterTenantRequest.external." },
+        "provider": { "$ref": "#/$defs/Provider" },
+        "enabled": { "type": "boolean", "description": "Whether the A2A server should serve this tenant. The read endpoint may filter on it; see tenant-registration.md §2." },
+        "card": {
+          "$ref": "agent-card.schema.json",
+          "description": "The stored projected Agent Card. Validated against agent-card.schema.json AND fuze-profile.schema.json at registration.",
+          "x-fuze-card-profile": "fuze-profile.schema.json"
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server-set. ISO 8601, UTC, `Z` suffix. Set on first registration; unchanged by subsequent upserts." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server-set. ISO 8601, UTC, `Z` suffix. Advanced on every upsert." }
+      }
+    },
+    "RegisterTenantResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The result of `POST /a2a/tenants/register`. `created` distinguishes the two idempotent-upsert outcomes (201 first registration vs 200 update); `record` is the resolved stored row.",
+      "required": ["created", "record"],
+      "properties": {
+        "created": { "type": "boolean", "description": "true when this call inserted a new tenant (HTTP 201); false when it updated an existing one (HTTP 200). See tenant-registration.md §2 for upsert semantics." },
+        "record": { "$ref": "#/$defs/RegisteredTenant" }
+      }
+    },
+    "TenantList": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-pagination": "exempt",
+      "x-pagination-reason": "This is a bounded whole-set configuration read, not an open-ended collection. Its sole consumer is the stateless A2A server resolving its COMPLETE routing table at boot/refresh (decision #1 of #203); it needs every enabled tenant atomically, and the set is bounded by the number of products in the family (~two dozen). Cursoring it would force the server to page its own config and risk a torn routing table. Marked exempt per pagination-standard rather than wrapped in an items/page envelope.",
+      "description": "The response of `GET /a2a/tenants` — the full registered-tenant set the A2A server resolves. Not paginated (see x-pagination-reason).",
+      "required": ["tenants"],
+      "properties": {
+        "tenants": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RegisteredTenant" },
+          "description": "All registered tenants. When `?enabled=true` is passed the server returns only enabled tenants (the default the A2A server uses); otherwise all rows are returned (operator view)."
+        },
+        "count": { "type": "integer", "minimum": 0, "description": "Number of entries in `tenants` (convenience; equals tenants.length)." }
+      }
+    }
+  }
+}

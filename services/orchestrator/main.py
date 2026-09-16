@@ -28,6 +28,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
+from a2a_tenant_registration import router as a2a_tenant_registration_router
 from hierarchy_endpoints import router as hierarchy_router
 
 from .agent_manager import AgentManager
@@ -645,6 +646,9 @@ app.add_middleware(
 
 # Include hierarchy router for organizational visualization
 app.include_router(hierarchy_router)
+
+# A2A runtime tenant registration (izzywdev/FuzeAgent#203 slice 2)
+app.include_router(a2a_tenant_registration_router)
 
 
 # Health check endpoint
