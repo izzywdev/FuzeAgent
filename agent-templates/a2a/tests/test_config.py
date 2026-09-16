@@ -6,7 +6,7 @@ import json
 
 import pytest
 from a2a._contract import SCHEMA_DIR
-from a2a.config import load_config
+from a2a.config import TenantConfig, load_config, merge_tenant_sources, tenant_from_registered
 from jsonschema import Draft202012Validator
 
 VALUES = {
@@ -166,3 +166,83 @@ def test_interface_still_rejects_undeclared_keys():
     deliberate, versioned schema change rather than an ad-hoc value."""
     bad = {"a2a": {"enabled": True, "inClusterUrlTypo": "http://x/rpc"}}
     assert list(_values_validator().iter_errors(bad))
+
+
+# --------------------------------------------------------------------------- #
+# runtime tenant registry — union of static + HTTP-registry sources (#203,
+# tenant-registration.md, contract v1.3.0). The HTTP fetch itself is
+# tests/test_registry.py; these cover the pure merge.
+# --------------------------------------------------------------------------- #
+def test_tenant_from_registered_maps_all_fields():
+    record = {
+        "tenant": "FuzePlan",
+        "repo": "izzywdev/FuzePlan",
+        "ref": "main",
+        "entryRole": "product-manager",
+        "servingRoles": ["product-manager", "ux-designer"],
+        "external": False,
+        "enabled": True,
+        "provider": {"name": "anthropic", "environmentId": "env-1", "vaultIds": ["v1"]},
+        "card": {"name": "FuzePlan agent"},
+        "createdAt": "2026-09-01T00:00:00Z",
+        "updatedAt": "2026-09-01T00:00:00Z",
+    }
+    tenant = tenant_from_registered(record)
+    assert tenant.tenant == "FuzePlan"
+    assert tenant.repo == "izzywdev/FuzePlan"
+    assert tenant.entry_role == "product-manager"
+    assert tenant.serving_roles == ("product-manager", "ux-designer")
+    assert tenant.external is False
+    assert tenant.enabled is True
+    assert tenant.provider.environment_id == "env-1"
+    assert tenant.card == {"name": "FuzePlan agent"}
+
+
+def test_merge_is_a_union_of_disjoint_tenant_sets():
+    static = (TenantConfig(tenant="FuzeFront", repo="izzywdev/FuzeFront", enabled=True),)
+    registry = (
+        TenantConfig(
+            tenant="FuzePlan",
+            repo="izzywdev/FuzePlan",
+            enabled=True,
+            card={"name": "FuzePlan agent"},
+        ),
+    )
+
+    merged = merge_tenant_sources(static, registry)
+
+    names = {t.tenant for t in merged}
+    assert names == {"FuzeFront", "FuzePlan"}
+
+
+def test_merge_registry_wins_on_conflicting_tenant_key():
+    static = (TenantConfig(tenant="FuzePlan", repo="izzywdev/FuzePlan", enabled=True, ref="main"),)
+    registry = (
+        TenantConfig(
+            tenant="FuzePlan",
+            repo="izzywdev/FuzePlan",
+            enabled=True,
+            ref="release",
+            card={"name": "FuzePlan agent (from registry)"},
+        ),
+    )
+
+    merged = merge_tenant_sources(static, registry)
+
+    assert len(merged) == 1
+    assert merged[0].ref == "release"
+    assert merged[0].card == {"name": "FuzePlan agent (from registry)"}
+
+
+def test_merge_falls_back_to_static_when_registry_is_empty():
+    """The shape an unreachable registry degrades to (registry.fetch_registry_tenants
+    returns ``()`` on failure) -- the union must be byte-identical to the static set,
+    i.e. pre-#203 behaviour, never a gap."""
+    static = (
+        TenantConfig(tenant="FuzeFront", repo="izzywdev/FuzeFront", enabled=True),
+        TenantConfig(tenant="FuzePlan", repo="izzywdev/FuzePlan", enabled=True),
+    )
+
+    merged = merge_tenant_sources(static, ())
+
+    assert merged == static

@@ -87,10 +87,11 @@ exactly. **Exactly these 4 SealedSecrets are required for the FuzeAgent-first ro
 | `a2a-mtls-ca` | `ca.crt` | In-cluster mTLS CA (defence-in-depth) — `a2a.auth.mtls.enabled: true` | **Yes (Option B)** |
 | `a2a-card-signing` | `jws.key` | JWS key to sign Agent Cards — `a2a.cardSigning` kept | **Yes (Option B)** |
 
-> **`a2a-repos-git` is NOT needed for this bring-up.** The only tenant (`izzywdev/FuzeAgent`) is a
-> PUBLIC repo, so the repo-sync init container clones anonymously and `deploy.reposGitTokenSecretRef`
-> is `null`. Seal an `a2a-repos-git` (`token`) and repoint that ref ONLY when a PRIVATE tenant repo is
-> onboarded.
+> **`a2a-repos-git` no longer exists.** `#203` slice 3 removed the `repo-sync` init
+> container and `deploy.reposGitTokenSecretRef` entirely — cards for a registry-sourced
+> tenant now arrive as data (`tenant-registration.md`), no server-side clone; a static
+> `a2a.tenants[]` entry with no matching registry record simply finds `/repos/<tenant>`
+> empty until Slice 5 retires that topology. There is no git-token SealedSecret to seal.
 >
 > Lighter (non-hardened) alternative: set `a2a.auth.mtls.enabled: false` and comment out the
 > `a2a.cardSigning` block to drop `a2a-mtls-ca` + `a2a-card-signing` (down to 2 secrets). Option B

@@ -47,6 +47,13 @@ class TenantConfig:
     serving_roles: tuple[str, ...] = ()
     external: bool = False
     provider: ProviderBinding = field(default_factory=ProviderBinding)
+    #: The tenant's already-projected Agent Card, present ONLY for a tenant sourced
+    #: from the HTTP registry (tenant-registration.schema.json ``RegisteredTenant.card``,
+    #: contract v1.3.0 / #203 decision #2). ``None`` for a tenant sourced from the
+    #: static ``A2A_VALUES_FILE`` ConfigMap, which still projects its card from a repo
+    #: checkout (``adapter._card_for``). When set, the adapter serves it VERBATIM —
+    #: no repo clone, no re-projection.
+    card: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -94,6 +101,49 @@ def _tenant(d: dict) -> TenantConfig:
         external=bool(d.get("external", False)),
         provider=_provider(d.get("provider")),
     )
+
+
+def tenant_from_registered(record: dict[str, Any]) -> TenantConfig:
+    """Map a ``RegisteredTenant`` (tenant-registration.schema.json, contract v1.3.0)
+    fetched from the orchestrator's HTTP registry into the SAME ``TenantConfig`` shape
+    a static ``a2a.tenants[]`` entry parses into (``#203`` decision #1). The pushed
+    ``card`` arrives fully projected as data and is carried through verbatim — there is
+    no manifest/roles checkout to derive it from, and none is needed (decision #2).
+    """
+    return TenantConfig(
+        tenant=record["tenant"],
+        repo=record["repo"],
+        enabled=bool(record.get("enabled", True)),
+        ref=record.get("ref", "main"),
+        entry_role=record.get("entryRole"),
+        serving_roles=tuple(record.get("servingRoles") or ()),
+        external=bool(record.get("external", False)),
+        provider=_provider(record.get("provider")),
+        card=record.get("card"),
+    )
+
+
+def merge_tenant_sources(
+    static_tenants: tuple[TenantConfig, ...],
+    registry_tenants: tuple[TenantConfig, ...],
+) -> tuple[TenantConfig, ...]:
+    """UNION the static (``A2A_VALUES_FILE`` ConfigMap) and HTTP-registry tenant
+    sources, keyed on ``tenant`` (tenant-registration.md; ``#203`` decision #1: "never a
+    window where an enabled tenant resolves from neither").
+
+    An unreachable registry is represented by an EMPTY ``registry_tenants`` (the caller
+    already logged the failure) so this degrades to ``static_tenants`` unchanged —
+    exactly pre-#203 behaviour, never a crash.
+
+    When the same ``tenant`` key is present in BOTH sources, the registry entry wins:
+    it is the newer, self-registered source of truth and carries the pushed card as
+    data, so the static entry for that key is superseded wholesale rather than merged
+    field-by-field.
+    """
+    by_name: dict[str, TenantConfig] = {t.tenant: t for t in static_tenants}
+    for t in registry_tenants:
+        by_name[t.tenant] = t
+    return tuple(by_name.values())
 
 
 def load_config(values: dict[str, Any]) -> ServerConfig:

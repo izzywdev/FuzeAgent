@@ -102,7 +102,7 @@ a2a:
       provider:
         name: anthropic
         apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }   # SealedSecret
-    # FuzeFront — public repo (clones tokenless), default branch master, shared app-layer role.
+    # FuzeFront — default branch master, shared app-layer role.
     - tenant: FuzeFront
       repo: izzywdev/FuzeFront
       ref: master
@@ -112,7 +112,7 @@ a2a:
       provider:
         name: anthropic
         apiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }   # SealedSecret
-    # FuzePlan — PRIVATE (a2a-repos-git token), default branch main, product-manager role.
+    # FuzePlan — default branch main, product-manager role.
     - tenant: FuzePlan
       repo: izzywdev/FuzePlan
       ref: main
@@ -129,20 +129,14 @@ deploy:
   imagePullSecrets:
     - name: ghcr-pull
   resources:
-    # Bumped for multi-tenant serving under cluster strain: more memory headroom (repo
-    # clones + Managed-Agents + serving several tenant cards) + CPU burst so /healthz
-    # stays responsive. Requests kept modest to still schedule on the strained durable nodes.
+    # Bumped for multi-tenant serving under cluster strain: more memory headroom
+    # (Managed-Agents + serving several tenant cards) + CPU burst so /healthz stays
+    # responsive. Requests kept modest to still schedule on the strained durable nodes.
     requests: { cpu: 150m, memory: 384Mi }
     limits: { cpu: 1000m, memory: 896Mi }
   externalDomain: prod.fuzefront.com
   ingressClassName: traefik
   agentProvider: anthropic
-  gitImage: alpine/git:latest
-  # FuzeAgent-first bring-up: the only tenant (izzywdev/FuzeAgent) is a PUBLIC repo, so the
-  # repo-sync init container clones anonymously — no a2a-repos-git SealedSecret needed. Set this
-  # to { name: a2a-repos-git, key: token } (+ seal that secret) ONLY when a PRIVATE tenant repo
-  # is onboarded. Keeping the hardened operator secret set to exactly 4 (GO-LIVE §2).
-  reposGitTokenSecretRef: { name: a2a-repos-git, key: token }          # PRIVATE tenants (FuzeAgent, FuzePlan, …) — sealed gh token
   providerApiKeySecretRef: { name: a2a-provider-anthropic, key: api-key }
   stateConfigMap: a2a-state                                            # Managed-Agents id-state
   # MCP endpoints for the served agents' _base github/handoff tools (FA-13). Until these

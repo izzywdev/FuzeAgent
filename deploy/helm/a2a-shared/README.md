@@ -40,8 +40,6 @@ byte-conformant to the interface.
 1. Provision the SealedSecrets in `deploy/contabo/sealed/` (synced by `fuzeagent-sealed`):
    - `a2a-provider-anthropic` (key `api-key`) — Managed-Agents key, exported as
      `ANTHROPIC_API_KEY` for session provisioning; set `deploy.providerApiKeySecretRef`.
-   - `a2a-repos-git` (key `token`) — token for cloning PRIVATE tenant repos in the
-     repo-sync init container; set `deploy.reposGitTokenSecretRef`. Omit for public repos.
    - `a2a-mtls-ca` (key `ca.crt`) if in-cluster mTLS is enabled.
    - Card-signing: the server reads `cardSigning.keyId` from the values doc; the JWS
      signer injection is still a server-side TODO ("production injects a real JWS signer"
@@ -54,15 +52,20 @@ byte-conformant to the interface.
    issuer) + `cardSigning`, and add the `tenants[]` (only repos whose `providesTo` is
    backfilled). Keep the single `tag:` line — `release.yml` owns it.
 4. Merge → Argo syncs the Deployment/Service (+ the `values.json` ConfigMap the server
-   reads via `A2A_VALUES_FILE`, the repo-sync init container, per-external-tenant Ingress).
+   reads via `A2A_VALUES_FILE`, per-external-tenant Ingress).
 
 ### Runtime shape (matches the merged server, `agent-templates/a2a/`)
 - Entrypoint `python -m a2a.runtime` → `build_from_env()` reads `A2A_VALUES_FILE`
-  (the `a2a` block as JSON), `A2A_REPOS_DIR=/repos`, `AGENT_PROVIDER`, `HOST`.
+  (the `a2a` block as JSON), `A2A_REPOS_DIR=/repos`, `AGENT_PROVIDER`, `HOST`, and
+  (contract v1.3.0, `#203`) the optional `A2A_REGISTRY_URL`.
 - The image vendors `a2a/` + `providers/` + `sync/` (runtime imports `providers`, whose
   anthropic adapter delegates to the `sync/` modules) + the frozen `fuze_a2a_client`.
-- Per-tenant card projection reads each repo's `.fuze/manifest.json` + `roles/` from
-  `/repos/<repo-name>`, populated by the `repo-sync` init container at each tenant `ref`.
+- Per-tenant card projection for a STATIC (`a2a.tenants[]`) tenant reads each repo's
+  `.fuze/manifest.json` + `roles/` from `/repos/<repo-name>` — as of `#203` slice 3
+  there is no `repo-sync` init container populating that path anymore, so a static
+  tenant with no matching HTTP-registry entry finds it empty (Slice 5 retires this
+  topology). A registry-sourced tenant instead carries its already-projected Agent
+  Card as data (`tenant-registration.md`) and needs no checkout at all.
 
 ## Validate (matches `helm-validate.yml`)
 

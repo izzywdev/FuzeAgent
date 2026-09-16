@@ -128,6 +128,14 @@ class A2AAdapter:
         return self.config.auth.oidc_issuer_url if self.config.auth else cg.DEFAULT_ISSUER
 
     def _card_for(self, tenant: TenantConfig, *, visibility: str) -> dict:
+        if tenant.card is not None:
+            # Registry-sourced tenant (tenant-registration.md, contract v1.3.0 /
+            # #203 decision #2): the card arrives already projected as DATA at
+            # registration time. Serve it verbatim -- no repo clone, no
+            # re-projection, and no local manifest/roles tree to derive a
+            # narrower visibility cut from (the registrant already published the
+            # single card it wants served, for both well-known and extended reads).
+            return tenant.card
         manifest, roles = self.resolve_repo(tenant)
         # Every card THIS pod serves must advertise THIS pod's endpoint. On the shared
         # server `in_cluster_url` is unset and the generator falls back to the shared
@@ -170,6 +178,12 @@ class A2AAdapter:
         """Authenticated extended card, computed per caller (authz.md §5)."""
         tenant = self._tenant_or_none(tenant_name)
         if tenant is None:
+            raise we.task_not_found()
+        if tenant.card is not None:
+            # Registry-sourced tenant: RegisteredTenant carries the projected card,
+            # NOT a manifest, so there is nothing to run `authorize()` against here.
+            # Fail closed (same non-disclosure response as DENY) rather than calling
+            # `resolve_repo` against a checkout that was never cloned for this tenant.
             raise we.task_not_found()
         manifest, _ = self.resolve_repo(tenant)
         res = authorize(ctx, manifest)

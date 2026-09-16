@@ -2,24 +2,29 @@
 
 Wires the pure pieces (``config`` -> ``adapter`` -> ``server``) to the concrete
 Managed-Agents provider (``providers.get_provider``), a repo resolver that reads each
-tenant's projection inputs from a checked-out tree, and an OIDC authenticator.
+tenant's projection inputs from a checked-out tree, an OIDC authenticator, and
+(contract v1.3.0, ``#203``) the orchestrator's HTTP tenant registry (``registry.py``).
 
-Deliberately dependency-light so unit tests never import it: the git-sync of a
-tenant's ``ref`` and the JWKS verifier construction are runtime concerns. The Helm
-chart, image and secret wiring that supply ``VALUES_FILE`` / issuer URL are
+Deliberately dependency-light so unit tests never import ``providers``/the SDK: the
+git-sync of a tenant's ``ref``, the JWKS verifier construction, and the registry fetch
+are all runtime concerns exercised here via injectable collaborators. The Helm chart,
+image and secret wiring that supply ``VALUES_FILE`` / issuer URL / registry URL are
 devops-engineer's slice — this module only consumes them.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 from pathlib import Path
 
 from .adapter import A2AAdapter
-from .config import ServerConfig, TenantConfig, load_config
+from .config import ServerConfig, TenantConfig, load_config, merge_tenant_sources
 from .identity import OidcAuthenticator
 from .loader import load_repo
+from .net import require_http_url
+from .registry import HttpGetJson, fetch_registry_tenants
 
 
 class LocalRepoResolver:
@@ -49,6 +54,33 @@ def _read_values(path: str | None) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def _resolve_config_with_registry(
+    static_config: ServerConfig,
+    registry_url: str | None,
+    *,
+    http_get: HttpGetJson | None = None,
+) -> ServerConfig:
+    """UNION ``static_config.tenants`` with the HTTP registry's, if configured.
+
+    Kept as its own env-free, provider-free helper (mirrors ``_build_verifier``'s
+    injectable collaborators) so it is unit-testable with a mocked ``http_get`` and
+    without importing ``providers`` — ``build_from_env``'s module docstring: "dependency-
+    light so unit tests never import it".
+
+    An unset/empty ``registry_url`` is a no-op: ``static_config`` is returned unchanged,
+    matching pre-#203 behaviour exactly (purely additive). When set, an unreachable
+    registry (``fetch_registry_tenants`` already logged + returned ``()``) also degrades
+    to ``static_config.tenants`` unchanged — never a crash, never an outage window.
+    """
+    if not registry_url:
+        return static_config
+    registry_tenants = fetch_registry_tenants(registry_url, http_get=http_get)
+    return dataclasses.replace(
+        static_config,
+        tenants=merge_tenant_sources(static_config.tenants, registry_tenants),
+    )
+
+
 def build_from_env():
     """Build ``(config, app)`` from environment.
 
@@ -56,10 +88,20 @@ def build_from_env():
         A2A_VALUES_FILE   JSON of the values-interface document (a2a.* block).
         A2A_REPOS_DIR     directory holding tenant repo checkouts (default /repos).
         AGENT_PROVIDER    provider id (default anthropic).
+        A2A_REGISTRY_URL  OPTIONAL orchestrator base URL (contract v1.3.0). When set,
+                          the runtime tenant set is the UNION of this HTTP registry
+                          (``GET {url}/a2a/tenants?enabled=true``) and the static
+                          ``A2A_VALUES_FILE`` tenants (``config.merge_tenant_sources``);
+                          an unreachable registry falls back to the static source alone
+                          (``registry.fetch_registry_tenants``) rather than crashing.
+                          Unset -> behaviour is byte-identical to pre-#203 (static only).
     """
     from providers import get_provider  # imported here so tests never need the SDK
 
-    config: ServerConfig = load_config(_read_values(os.environ.get("A2A_VALUES_FILE")))
+    config: ServerConfig = _resolve_config_with_registry(
+        load_config(_read_values(os.environ.get("A2A_VALUES_FILE"))),
+        os.environ.get("A2A_REGISTRY_URL"),
+    )
     provider = get_provider(os.environ.get("AGENT_PROVIDER") or "anthropic")
     resolver = LocalRepoResolver(os.environ.get("A2A_REPOS_DIR", "/repos"))
     adapter = A2AAdapter(config, provider, resolver)
@@ -81,27 +123,12 @@ class _TokenIssuerMismatch(Exception):
     """
 
 
-#: Only network schemes are ever fetched. ``urllib`` also honours ``file://``/``ftp://``
-#: which, on a config-supplied URL, would let a discovery URL read local files (Semgrep
-#: ``dynamic-urllib-use-detected``). ``oidcDiscoveryUrl`` is trusted operator config, but
-#: rejecting non-http(s) schemes up front is cheap, correct hardening.
-_ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
-
-
-def _require_http_url(url: str, what: str) -> str:
-    """Return ``url`` if it is an ``http(s)`` URL, else raise a config error.
-
-    Guards every fetch of a config-supplied URL against ``file://``/``ftp://``/etc. so a
-    dynamic URL can never be coerced into reading local files or other schemes.
-    """
-    from urllib.parse import urlparse
-
-    scheme = urlparse(url).scheme.lower()
-    if scheme not in _ALLOWED_URL_SCHEMES:
-        raise RuntimeError(
-            f"{what} must be an http(s) URL (got scheme {scheme or '(none)'!r}): {url!r}"
-        )
-    return url
+#: ``oidcDiscoveryUrl`` is trusted operator config, but rejecting non-http(s) schemes up
+#: front (``net.require_http_url``, shared with ``registry.py``'s registry-URL guard) is
+#: cheap, correct hardening — ``urllib`` also honours ``file://``/``ftp://``, which on a
+#: config-supplied URL would let a discovery URL read local files (Semgrep
+#: ``dynamic-urllib-use-detected``).
+_require_http_url = require_http_url
 
 
 def _http_get_json(url: str) -> dict:  # pragma: no cover - network
