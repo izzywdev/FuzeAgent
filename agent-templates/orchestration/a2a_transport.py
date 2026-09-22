@@ -24,8 +24,15 @@ on the callee, below the A2A seam (state-mapping.md, top).
 
 Configuration (all optional; sensible in-cluster defaults):
 
-  A2A_TOKEN                OIDC bearer presented on every call (held server-side,
-                           never in an agent sandbox — like ANTHROPIC_API_KEY).
+  A2A_TOKEN                Static OIDC bearer presented on every call (held server-side,
+                           never in an agent sandbox — like ANTHROPIC_API_KEY). If set,
+                           it wins and no token is minted.
+  A2A_CLIENT_ID /          When A2A_TOKEN is NOT set, these drive a client-credentials
+  A2A_CLIENT_SECRET(_FILE) token provider (fuze_a2a_client.auth) that mints, caches and
+  A2A_OIDC_DISCOVERY_URL / refreshes an `aud=a2a` token on demand. See
+  A2A_OIDC_ISSUER_URL      token_provider_from_env() for the full env contract. The
+  A2A_TOKEN_AUDIENCE       secret is read from a mounted file/env, never hardcoded.
+  A2A_TOKEN_SCOPE
   A2A_TARGETS              JSON object mapping target key -> spec (see TargetSpec).
                            Alternatively a file `<state>/a2a-targets.json`.
   A2A_DISCOVERY_DOMAIN     in-cluster DNS domain for per-tenant discovery Services
@@ -43,7 +50,7 @@ import json
 import os
 import sys
 import threading
-from typing import Any
+from typing import Any, Callable
 
 # -- make the FROZEN generated client importable ----------------------------
 # Prefer an installed `fuze_a2a_client`; otherwise add the in-repo client dir to
@@ -62,6 +69,7 @@ from fuze_a2a_client import (  # noqa: E402
     A2AError,
     Task,
     TaskState,
+    token_provider_from_env,
 )
 
 # Legacy status strings the existing MCP tools already return (driver.run_until_block
@@ -93,7 +101,7 @@ class TargetSpec:
     __slots__ = ("key", "discovery_url", "skill_id", "tenant", "token")
 
     def __init__(self, key: str, discovery_url: str, skill_id: str | None,
-                 tenant: str | None = None, token: str | None = None):
+                 tenant: str | None = None, token: "str | Callable[[], str] | None" = None):
         self.key = key
         self.discovery_url = discovery_url
         self.skill_id = skill_id
@@ -131,6 +139,33 @@ def _convention_discovery_url(tenant: str) -> str:
     return f"{scheme}://{host}:{port}" if port else f"{scheme}://{host}"
 
 
+# A process-wide client-credentials token provider, built lazily from the environment
+# the FIRST time a call needs a token and no static A2A_TOKEN is set. Shared across all
+# targets so the minted token is cached/refreshed once, not per target.
+_provider_lock = threading.Lock()
+_provider_built = False
+_token_provider = None  # ClientCredentialsTokenProvider | None
+
+
+def _default_token_source():
+    """Token to present when a target carries none of its own.
+
+    Precedence: a static ``A2A_TOKEN`` wins (explicit operator override). Otherwise a
+    shared client-credentials provider is used if the environment configures one
+    (``A2A_CLIENT_ID`` …). Returns a ``str``, a zero-arg callable (the provider), or
+    ``None`` — all three are accepted by ``A2AClient(token=...)``.
+    """
+    static = os.environ.get("A2A_TOKEN")
+    if static:
+        return static
+    global _provider_built, _token_provider
+    with _provider_lock:
+        if not _provider_built:
+            _token_provider = token_provider_from_env()
+            _provider_built = True
+        return _token_provider
+
+
 def resolve_target(target: str) -> TargetSpec:
     """Resolve a target key to a TargetSpec.
 
@@ -138,12 +173,16 @@ def resolve_target(target: str) -> TargetSpec:
     ``discovery_url``, ``skill_id``, ``tenant`` (asserted against the card), ``token``.
     The convention treats the key as the tenant, discovers it at its own per-tenant
     in-cluster Service, and uses the key as the skill id.
+
+    ``token`` is a per-target static bearer if the registry sets one; otherwise the
+    shared token source (static ``A2A_TOKEN``, or a client-credentials provider that
+    mints/caches/refreshes an ``aud=a2a`` token — see ``_default_token_source``).
     """
     reg = _registry().get(target, {})
     tenant = reg.get("tenant", target)
     discovery_url = reg.get("discovery_url") or _convention_discovery_url(tenant)
     skill_id = reg.get("skill_id", target)
-    token = reg.get("token") or os.environ.get("A2A_TOKEN")
+    token = reg.get("token") or _default_token_source()
     return TargetSpec(target, discovery_url, skill_id, tenant=tenant, token=token)
 
 
