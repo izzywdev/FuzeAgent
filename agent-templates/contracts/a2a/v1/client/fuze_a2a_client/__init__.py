@@ -6,6 +6,11 @@ Frozen against A2A specification 1.0.0 (`lf.a2a.v1`).
 in ../../schema/ by `regenerate.sh`; do not hand-edit them. Editing a generated model
 instead of the schema is how a contract silently forks from its spec.
 """
+from .auth import (
+    ClientCredentialsTokenProvider,
+    TokenFetchError,
+    token_provider_from_env,
+)
 from .card_models import FuzeA2AAgentCard as AgentCard
 from .client import (
     A2A_VERSION,
@@ -13,6 +18,7 @@ from .client import (
     TERMINAL_STATES,
     WELL_KNOWN_CARD_PATH,
     A2AClient,
+    TokenSource,
 )
 from .errors import (
     A2AError,
@@ -32,11 +38,15 @@ from .registration_models import (
 )
 from .wire_models import Artifact, Message, Part, Role, Task, TaskState, TaskStatus
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 __all__ = [
     "A2AClient",
     "AgentCard",
+    "ClientCredentialsTokenProvider",
+    "TokenFetchError",
+    "TokenSource",
+    "token_provider_from_env",
     "RegisterTenantRequest",
     "RegisteredTenant",
     "RegisterTenantResponse",
