@@ -501,6 +501,12 @@ class AgentManager:
         if not self.sandbox_manager:
             raise RuntimeError("Sandbox manager not initialized")
 
+        if getattr(self.sandbox_manager, "provider", "docker") == "fuze-sandbox":
+            raise RuntimeError(
+                "Fuze Sandbox workspaces do not run the FuzeAgent autonomous "
+                "container process; keep Docker selected for memory-enabled agents"
+            )
+
         try:
             # Create sandbox for memory-enabled agent
             sandbox = await self.sandbox_manager.create_sandbox(
