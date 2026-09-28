@@ -13,8 +13,12 @@ command/file methods, and preview-grant creation.
 The Fuze Sandbox API key is held by the FuzeAgent service configuration and is
 never sent to a workspace. FuzeAgent's Anthropic/provider keys and its
 database credentials stay server-side. Remote workspaces receive no arbitrary
-environment variables or secrets. Sandbox image, profile, CPU/memory/storage
-limits, runtime class, namespace, and TTL are enforced by the Sandbox service.
+provider credentials or secret values. FuzeAgent may request non-secret
+environment values, references to operator-provisioned Secrets in that tenant's
+namespace, and a bounded non-root init script. The Sandbox API rejects
+credential-like environment names; `secret_env` carries only Secret name/key
+references and never values. Sandbox image, profile, CPU/memory/storage limits,
+runtime class, namespace, and TTL are enforced by the Sandbox service.
 The API key must be tenant-bound and include only the operations FuzeAgent
 needs: `sandbox:create`, `sandbox:read`, `sandbox:cancel`, `workspace:exec`,
 `workspace:files:read`, `workspace:files:write`, and `workspace:preview` when
@@ -79,11 +83,13 @@ The existing `TaskExecutionEngine` Git workflow, `FileOperationsEngine`, and
 process in that local filesystem. They have not yet been migrated to remote
 filesystem/command operations. Selecting the remote provider for autonomous
 TaskExecutionEngine jobs therefore fails closed and is not an end-to-end
-supported configuration. Private repository checkout also needs a safe,
-short-lived Git credential design that does not expose repository tokens to
-untrusted workspace commands. Keep Docker selected for TaskExecutionEngine
-jobs; use the remote provider through the direct sandbox API only until that
-migration is designed and implemented.
+supported configuration. No model-token broker or restricted GitHub App
+credential broker has been implemented. Private repository checkout still
+needs a safe, short-lived GitHub App credential design that does not expose
+repository tokens to untrusted workspace commands. Keep Docker selected for
+TaskExecutionEngine jobs; use the remote provider through the direct sandbox
+API only until that migration, broker, runner image, and end-to-end acceptance
+are implemented.
 
 The Sandbox API currently has machine workspace operations disabled by default.
 The Seaw operator must add the shared API/worker secret in Vault, deploy the

@@ -60,6 +60,9 @@ class FuzeSandboxClient:
         ports: list[int] | None = None,
         command: list[str] | None = None,
         args: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        secret_env: list[dict[str, str]] | None = None,
+        init_script: str = "",
     ) -> dict:
         return await self._request(
             "create",
@@ -75,6 +78,9 @@ class FuzeSandboxClient:
                 "ports": ports or [],
                 "command": command or [],
                 "args": args or [],
+                "env": env or {},
+                "secret_env": secret_env or [],
+                "init_script": init_script,
             },
         )
 

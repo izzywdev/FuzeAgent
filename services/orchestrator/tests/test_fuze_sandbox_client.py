@@ -9,7 +9,7 @@ from services.orchestrator.fuze_sandbox_client import (
 
 
 @pytest.mark.asyncio
-async def test_client_supports_jobs_and_workspace_operations_without_env_injection():
+async def test_client_supports_jobs_workspace_and_scoped_runtime_configuration():
     calls = []
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -19,6 +19,13 @@ async def test_client_supports_jobs_and_workspace_operations_without_env_injecti
             payload = __import__("json").loads(request.content)
             assert payload["kind"] in {"job", "workspace"}
             assert "environment" not in payload
+            assert "ANTHROPIC_API_KEY" not in payload.get("env", {})
+            if payload["kind"] == "workspace":
+                assert payload["env"] == {"TASK_MODE": "review"}
+                assert payload["secret_env"] == [
+                    {"name": "GH_TOKEN", "secret_name": "github-app", "key": "token"}
+                ]
+                assert payload["init_script"] == "mkdir -p src"
             return httpx.Response(202, json={"id": "remote-1", "status": "pending"})
         if request.url.path == "/readyz":
             return httpx.Response(
@@ -60,7 +67,10 @@ async def test_client_supports_jobs_and_workspace_operations_without_env_injecti
             name="job", image="image", kind="job", command=["echo", "ok"]
         )
         workspace = await client.create_sandbox(
-            name="work", image="image", kind="workspace", ports=[3000]
+            name="work", image="image", kind="workspace", ports=[3000],
+            env={"TASK_MODE": "review"},
+            secret_env=[{"name": "GH_TOKEN", "secret_name": "github-app", "key": "token"}],
+            init_script="mkdir -p src",
         )
         assert job["id"] == workspace["id"] == "remote-1"
         assert (await client.get_readiness())["machine_workspace_enabled"] is True

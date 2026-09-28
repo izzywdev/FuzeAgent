@@ -202,7 +202,7 @@ class AgentSandboxManager:
 
         if self.provider == "fuze-sandbox":
             return await self._create_remote_workspace(
-                agent_id, task_id, agent_template, ttl_seconds
+                agent_id, task_id, agent_template, ttl_seconds, custom_settings
             )
 
         sandbox_id = f"agent-{agent_id[:8]}-task-{task_id[:8]}-{uuid.uuid4().hex[:8]}"
@@ -272,6 +272,7 @@ class AgentSandboxManager:
         task_id: str,
         agent_template: str,
         ttl_seconds: Optional[int] = None,
+        custom_settings: Optional[Dict[str, Any]] = None,
     ) -> Sandbox:
         if not self.remote_client:
             raise RuntimeError("Fuze Sandbox provider is not configured")
@@ -310,6 +311,12 @@ class AgentSandboxManager:
                     for port in os.getenv("FUZE_SANDBOX_PREVIEW_PORTS", "").split(",")
                     if port.strip()
                 ],
+                # Only pass caller-selected runtime inputs supported by the
+                # Sandbox contract. Provider credentials are never inherited
+                # from the FuzeAgent process environment.
+                "env": (custom_settings or {}).get("env", {}),
+                "secret_env": (custom_settings or {}).get("secret_env", []),
+                "init_script": (custom_settings or {}).get("init_script", ""),
             }
             created = await self.remote_client.create_sandbox(**payload)
             remote_id = created["id"]
