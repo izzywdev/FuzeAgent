@@ -23,7 +23,11 @@ async def test_client_supports_jobs_workspace_and_scoped_runtime_configuration()
             if payload["kind"] == "workspace":
                 assert payload["env"] == {"TASK_MODE": "review"}
                 assert payload["secret_env"] == [
-                    {"name": "GH_TOKEN", "secret_name": "github-app", "key": "token"}
+                    {
+                        "name": "GH_TOKEN",
+                        "secret_name": "tenant-repo-ref",
+                        "key": "token",
+                    }
                 ]
                 assert payload["init_script"] == "mkdir -p src"
             return httpx.Response(202, json={"id": "remote-1", "status": "pending"})
@@ -67,9 +71,14 @@ async def test_client_supports_jobs_workspace_and_scoped_runtime_configuration()
             name="job", image="image", kind="job", command=["echo", "ok"]
         )
         workspace = await client.create_sandbox(
-            name="work", image="image", kind="workspace", ports=[3000],
+            name="work",
+            image="image",
+            kind="workspace",
+            ports=[3000],
             env={"TASK_MODE": "review"},
-            secret_env=[{"name": "GH_TOKEN", "secret_name": "github-app", "key": "token"}],
+            secret_env=[
+                {"name": "GH_TOKEN", "secret_name": "tenant-repo-ref", "key": "token"}
+            ],
             init_script="mkdir -p src",
         )
         assert job["id"] == workspace["id"] == "remote-1"
