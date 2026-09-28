@@ -1,7 +1,10 @@
 import asyncio
+import base64
 import json
 import logging
 import os
+import posixpath
+import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import date, datetime
@@ -111,6 +114,28 @@ class TaskCreateRequest(BaseModel):
     metadata: Dict[str, Any] = Field(
         default_factory=dict, description="Additional task metadata"
     )
+
+
+class SandboxCreateRequest(BaseModel):
+    template_id: str = Field(default="python_developer", min_length=1, max_length=64)
+    kind: str = Field(default="workspace", pattern="^(job|workspace)$")
+    command: List[str] = Field(default_factory=list, max_length=32)
+    args: List[str] = Field(default_factory=list, max_length=64)
+    ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+
+
+class SandboxFileWriteRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=4096)
+    content_base64: str = Field(max_length=1_400_000)
+
+
+class SandboxPreviewGrantRequest(BaseModel):
+    port: int = Field(ge=1, le=65535)
+
+
+class SandboxCommandRequest(BaseModel):
+    command: str = Field(min_length=1, max_length=4096)
+    working_dir: Optional[str] = Field(default=None, max_length=4096)
 
 
 class HumanResponseRequest(BaseModel):
@@ -1606,12 +1631,96 @@ async def get_task_messages(task_id: str):
 
 
 # Sandbox management endpoints
+def _require_sandbox_owner(authenticated_user: Optional[dict]) -> str:
+    if not isinstance(authenticated_user, dict) or not authenticated_user.get("sub"):
+        raise HTTPException(
+            status_code=401, detail="Authenticated user subject is required"
+        )
+    return str(authenticated_user["sub"])
+
+
+async def _get_owned_sandbox(sandbox_id: str, owner_id: str):
+    sandbox = await app.state.sandbox_manager.get_sandbox(sandbox_id)
+    if not sandbox or sandbox.agent_id != owner_id:
+        raise HTTPException(status_code=404, detail="Sandbox not found")
+    return sandbox
+
+
+def _validate_remote_workspace_path(path: str) -> str:
+    normalized = posixpath.normpath(path)
+    if (
+        normalized == "/workspace"
+        or not normalized.startswith("/workspace/")
+        or "\x00" in path
+    ):
+        raise HTTPException(
+            status_code=422, detail="File path must be under /workspace"
+        )
+    return normalized
+
+
+@app.post("/sandboxes", tags=["sandboxes"])
+async def create_sandbox(
+    request: SandboxCreateRequest, authenticated_user=Depends(require_auth)
+):
+    """Create an isolated remote workspace for the authenticated FuzeAgent user."""
+    owner_id = _require_sandbox_owner(authenticated_user)
+    manager = app.state.sandbox_manager
+    if getattr(manager, "provider", "docker") != "fuze-sandbox":
+        raise HTTPException(
+            status_code=503, detail="Remote Fuze Sandbox provider is not enabled"
+        )
+    try:
+        task_id = str(uuid.uuid4())
+        if request.kind == "job":
+            sandbox = await manager.create_remote_job(
+                agent_id=owner_id,
+                task_id=task_id,
+                command=request.command,
+                args=request.args,
+                ttl_seconds=request.ttl_seconds,
+            )
+        else:
+            sandbox = await manager.create_sandbox(
+                agent_id=owner_id,
+                task_id=task_id,
+                agent_template=request.template_id,
+                repository_settings={},
+                ttl_seconds=request.ttl_seconds,
+            )
+        return {
+            "sandbox_id": sandbox.sandbox_id,
+            "agent_id": sandbox.agent_id,
+            "task_id": sandbox.task_id,
+            "status": sandbox.status.value,
+            "workspace_path": sandbox.workspace_path,
+            "created_at": sandbox.created_at.isoformat(),
+            "resource_limits": sandbox.resource_limits,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Remote workspace creation failed for authenticated user")
+        raise HTTPException(
+            status_code=502, detail="Remote workspace creation failed"
+        ) from exc
+
+
 @app.get("/sandboxes")
-async def list_sandboxes(agent_id: str = None, status: str = None):
-    """List active sandboxes"""
+async def list_sandboxes(
+    agent_id: str = None, status: str = None, authenticated_user=Depends(require_auth)
+):
+    """List only sandboxes owned by the authenticated FuzeAgent user."""
     try:
         from .sandbox_manager import SandboxStatus
 
+        manager = app.state.sandbox_manager
+        if getattr(manager, "provider", "docker") == "fuze-sandbox":
+            owner_id = _require_sandbox_owner(authenticated_user)
+            if agent_id and agent_id != owner_id:
+                raise HTTPException(status_code=404, detail="Sandbox not found")
+        else:
+            owner_id = agent_id
         sandbox_status = None
         if status:
             try:
@@ -1620,9 +1729,8 @@ async def list_sandboxes(agent_id: str = None, status: str = None):
                 raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
         sandboxes = await app.state.sandbox_manager.list_sandboxes(
-            agent_id=agent_id, status=sandbox_status
+            agent_id=owner_id, status=sandbox_status
         )
-
         return {
             "sandboxes": [
                 {
@@ -1638,41 +1746,174 @@ async def list_sandboxes(agent_id: str = None, status: str = None):
             ]
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to list sandboxes: {str(e)}"
         )
 
 
+@app.get("/sandboxes/{sandbox_id}")
+async def get_sandbox(sandbox_id: str, authenticated_user=Depends(require_auth)):
+    manager = app.state.sandbox_manager
+    if getattr(manager, "provider", "docker") == "fuze-sandbox":
+        owner_id = _require_sandbox_owner(authenticated_user)
+        sandbox = await _get_owned_sandbox(sandbox_id, owner_id)
+    else:
+        sandbox = await manager.get_sandbox(sandbox_id)
+        if not sandbox:
+            raise HTTPException(status_code=404, detail="Sandbox not found")
+    return {
+        "sandbox_id": sandbox.sandbox_id,
+        "agent_id": sandbox.agent_id,
+        "task_id": sandbox.task_id,
+        "status": sandbox.status.value,
+        "workspace_path": sandbox.workspace_path,
+        "created_at": sandbox.created_at.isoformat(),
+        "resource_limits": sandbox.resource_limits,
+    }
+
+
+@app.get("/sandboxes/{sandbox_id}/logs")
+async def get_sandbox_logs(sandbox_id: str, authenticated_user=Depends(require_auth)):
+    owner_id = _require_sandbox_owner(authenticated_user)
+    await _get_owned_sandbox(sandbox_id, owner_id)
+    try:
+        return await app.state.sandbox_manager.get_logs(sandbox_id)
+    except Exception as exc:
+        logger.info("Remote sandbox logs unavailable for %s", sandbox_id)
+        raise HTTPException(
+            status_code=502, detail="Sandbox logs are unavailable"
+        ) from exc
+
+
 @app.post("/sandboxes/{sandbox_id}/execute")
-async def execute_command_in_sandbox(sandbox_id: str, command_data: dict):
+async def execute_command_in_sandbox(
+    sandbox_id: str,
+    command_data: SandboxCommandRequest,
+    authenticated_user=Depends(require_auth),
+):
     """Execute a command in a sandbox"""
     try:
-        command = command_data.get("command")
-        working_dir = command_data.get("working_dir")
-
-        if not command:
-            raise HTTPException(status_code=400, detail="Command is required")
-
+        manager = app.state.sandbox_manager
+        if getattr(manager, "provider", "docker") == "fuze-sandbox":
+            owner_id = _require_sandbox_owner(authenticated_user)
+            await _get_owned_sandbox(sandbox_id, owner_id)
         result = await app.state.sandbox_manager.execute_command(
-            sandbox_id=sandbox_id, command=command, working_dir=working_dir
+            sandbox_id=sandbox_id,
+            command=command_data.command,
+            working_dir=command_data.working_dir,
         )
 
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to execute command: {str(e)}"
         )
 
 
+@app.post("/sandboxes/{sandbox_id}/files")
+async def write_sandbox_file(
+    sandbox_id: str,
+    body: SandboxFileWriteRequest,
+    authenticated_user=Depends(require_auth),
+):
+    owner_id = _require_sandbox_owner(authenticated_user)
+    await _get_owned_sandbox(sandbox_id, owner_id)
+    manager = app.state.sandbox_manager
+    if getattr(manager, "provider", "docker") != "fuze-sandbox":
+        raise HTTPException(
+            status_code=503, detail="Remote workspace file API is unavailable"
+        )
+    try:
+        path = _validate_remote_workspace_path(body.path)
+        content = base64.b64decode(body.content_base64, validate=True)
+        if len(content) > 1_000_000:
+            raise HTTPException(
+                status_code=413, detail="File content is limited to 1 MB"
+            )
+        return await manager.write_workspace_file(sandbox_id, path, content)
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail="content_base64 is invalid"
+        ) from exc
+    except Exception as exc:
+        logger.info("Remote workspace file write failed for %s", sandbox_id)
+        raise HTTPException(
+            status_code=502, detail="Workspace file write failed"
+        ) from exc
+
+
+@app.get("/sandboxes/{sandbox_id}/files")
+async def read_sandbox_file(
+    sandbox_id: str,
+    path: str = Query(..., min_length=1, max_length=4096),
+    authenticated_user=Depends(require_auth),
+):
+    owner_id = _require_sandbox_owner(authenticated_user)
+    await _get_owned_sandbox(sandbox_id, owner_id)
+    manager = app.state.sandbox_manager
+    if getattr(manager, "provider", "docker") != "fuze-sandbox":
+        raise HTTPException(
+            status_code=503, detail="Remote workspace file API is unavailable"
+        )
+    try:
+        normalized = _validate_remote_workspace_path(path)
+        content = await manager.read_workspace_file(sandbox_id, normalized)
+        return {
+            "path": normalized,
+            "content_base64": base64.b64encode(content).decode("ascii"),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.info("Remote workspace file read failed for %s", sandbox_id)
+        raise HTTPException(
+            status_code=502, detail="Workspace file read failed"
+        ) from exc
+
+
+@app.post("/sandboxes/{sandbox_id}/preview-grants")
+async def create_sandbox_preview_grant(
+    sandbox_id: str,
+    body: SandboxPreviewGrantRequest,
+    authenticated_user=Depends(require_auth),
+):
+    owner_id = _require_sandbox_owner(authenticated_user)
+    await _get_owned_sandbox(sandbox_id, owner_id)
+    manager = app.state.sandbox_manager
+    if getattr(manager, "provider", "docker") != "fuze-sandbox":
+        raise HTTPException(
+            status_code=503, detail="Remote preview grants are unavailable"
+        )
+    try:
+        return await manager.create_preview_grant(sandbox_id, body.port)
+    except Exception as exc:
+        logger.info("Remote preview grant failed for %s", sandbox_id)
+        raise HTTPException(
+            status_code=502, detail="Preview grant creation failed"
+        ) from exc
+
+
 @app.delete("/sandboxes/{sandbox_id}")
-async def destroy_sandbox(sandbox_id: str):
+async def destroy_sandbox(sandbox_id: str, authenticated_user=Depends(require_auth)):
     """Destroy a sandbox"""
     try:
-        await app.state.sandbox_manager.destroy_sandbox(sandbox_id)
+        manager = app.state.sandbox_manager
+        if getattr(manager, "provider", "docker") == "fuze-sandbox":
+            owner_id = _require_sandbox_owner(authenticated_user)
+            await _get_owned_sandbox(sandbox_id, owner_id)
+        await manager.destroy_sandbox(sandbox_id)
         return {"status": "destroyed", "sandbox_id": sandbox_id}
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to destroy sandbox: {str(e)}"
