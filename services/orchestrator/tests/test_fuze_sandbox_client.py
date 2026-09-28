@@ -7,6 +7,8 @@ from services.orchestrator.fuze_sandbox_client import (
     FuzeSandboxError,
 )
 
+SANDBOX_CREDENTIAL_REF = "tenant-repo-ref"
+
 
 @pytest.mark.asyncio
 async def test_client_supports_jobs_workspace_and_scoped_runtime_configuration():
@@ -25,7 +27,7 @@ async def test_client_supports_jobs_workspace_and_scoped_runtime_configuration()
                 assert payload["secret_env"] == [
                     {
                         "name": "GH_TOKEN",
-                        "secret_name": "tenant-repo-ref",
+                        "secret_name": SANDBOX_CREDENTIAL_REF,
                         "key": "token",
                     }
                 ]
@@ -77,7 +79,11 @@ async def test_client_supports_jobs_workspace_and_scoped_runtime_configuration()
             ports=[3000],
             env={"TASK_MODE": "review"},
             secret_env=[
-                {"name": "GH_TOKEN", "secret_name": "tenant-repo-ref", "key": "token"}
+                {
+                    "name": "GH_TOKEN",
+                    "secret_name": SANDBOX_CREDENTIAL_REF,
+                    "key": "token",
+                }
             ],
             init_script="mkdir -p src",
         )
