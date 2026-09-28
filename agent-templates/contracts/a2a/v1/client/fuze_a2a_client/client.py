@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any, Iterator, Protocol
+from typing import Any, Callable, Iterator, Protocol, Union
 
 from .card_models import FuzeA2AAgentCard as AgentCard
 from .errors import from_json_rpc_error
@@ -31,6 +31,11 @@ from .wire_models import (
 
 A2A_VERSION = "1.0"
 WELL_KNOWN_CARD_PATH = "/.well-known/agent-card.json"
+
+#: A bearer token, or a zero-arg callable returning one. The callable form lets a token
+#: provider (see ``auth.py``) mint/cache/refresh transparently — the client resolves it
+#: per request, so an expiring token is re-minted without the caller doing anything.
+TokenSource = Union[str, Callable[[], str], None]
 
 #: Task states from which no further transition occurs (spec 1.0.0 §4.1.2).
 TERMINAL_STATES: frozenset[TaskState] = frozenset(
@@ -75,7 +80,7 @@ class A2AClient:
         self,
         card: AgentCard,
         *,
-        token: str | None = None,
+        token: TokenSource = None,
         transport: Transport | None = None,
     ):
         self.card = card
@@ -196,10 +201,17 @@ class A2AClient:
             ).model_dump(exclude_none=True)
         return params
 
+    def _resolve_token(self) -> str | None:
+        """A static token is returned as-is; a callable (a token provider) is invoked
+        per request so a fresh, unexpired token is sent every call."""
+        tok = self._token
+        return tok() if callable(tok) else tok
+
     def _headers(self) -> dict:
         h = {"Content-Type": "application/json", "A2A-Version": A2A_VERSION}
-        if self._token:
-            h["Authorization"] = f"Bearer {self._token}"
+        token = self._resolve_token()
+        if token:
+            h["Authorization"] = f"Bearer {token}"
         return h
 
     def _envelope(self, method: str, params: dict) -> dict:

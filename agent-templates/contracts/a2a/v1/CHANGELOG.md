@@ -14,6 +14,45 @@ protocol version appears in the card as `AgentInterface.protocolVersion` and on 
 
 ---
 
+## 1.4.0 — 2026-09-22
+
+Additive, backward-compatible MINOR bump within v1. **Caller-side client-credentials
+token minting.** The generated client (`fuze_a2a_client`) gains a token *provider* so a
+pod that calls a peer can obtain its own `aud=a2a` access token instead of relying on a
+statically injected bearer. No wire change: the schemas, cards, error codes, JSON-RPC
+methods and state mapping are untouched — this is purely how the CALLER acquires the
+bearer it already had to present (`authz.md` §2, `binding.md` §1). Closes the runtime
+gap left after FuzeFront-side OIDC provisioning
+([izzywdev/FuzeInfra#981](https://github.com/izzywdev/FuzeInfra/issues/981)).
+
+### Added
+
+- `client/fuze_a2a_client/auth.py`:
+  - `ClientCredentialsTokenProvider` — mints a token via the OAuth 2.0
+    client-credentials grant (RFC 6749 §4.4), resolving `token_endpoint` from the
+    provider's OIDC discovery document (`oidcDiscoveryUrl`, fetched in-cluster per
+    `deploy/helm/a2a-shared/GO-LIVE.md` §1b), caching the access token and re-minting
+    on expiry (with a configurable pre-expiry skew). Thread-safe. Transport-injectable
+    like `A2AClient`, so it is unit-testable without a network or `httpx`.
+  - `token_provider_from_env()` — builds a provider from the caller-side `A2A_*`
+    environment (`A2A_CLIENT_ID`, `A2A_CLIENT_SECRET`/`A2A_CLIENT_SECRET_FILE`,
+    `A2A_OIDC_DISCOVERY_URL`/`A2A_OIDC_ISSUER_URL`, `A2A_TOKEN_AUDIENCE`,
+    `A2A_TOKEN_SCOPE`), or `None` when unconfigured so a static `A2A_TOKEN` still
+    works. The client secret is read from a mounted secret file or env — never
+    hardcoded, never projected onto a card.
+  - `TokenFetchError`.
+- `A2AClient(token=...)` now also accepts a **zero-arg callable** (`TokenSource`), not
+  only a `str`. The header is resolved per request, so a provider's refresh is
+  transparent to callers. Passing a `str` is unchanged.
+
+### Changed
+
+- `agent-templates/orchestration/a2a_transport.py` (caller runtime) now falls back to a
+  `token_provider_from_env()` provider when no static `A2A_TOKEN` is set, so every
+  outbound A2A call presents a freshly minted, unexpired `aud=a2a` token.
+
+---
+
 ## 1.3.0 — 2026-08-27
 
 Additive, backward-compatible MINOR bump within v1. **Runtime tenant registration.** Tenants may now
