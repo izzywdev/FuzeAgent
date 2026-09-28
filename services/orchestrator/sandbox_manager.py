@@ -86,7 +86,9 @@ class AgentSandboxManager:
 
     def __init__(self, database_url: str):
         self.database_url = database_url
-        self.provider = os.environ.get("FUZE_SANDBOX_PROVIDER", "docker").strip().lower()
+        self.provider = (
+            os.environ.get("FUZE_SANDBOX_PROVIDER", "docker").strip().lower()
+        )
         if self.provider not in {"docker", "fuze-sandbox"}:
             raise ValueError("FUZE_SANDBOX_PROVIDER must be 'docker' or 'fuze-sandbox'")
         self.remote_client = None
@@ -98,7 +100,9 @@ class AgentSandboxManager:
             self.remote_image = os.environ.get("FUZE_SANDBOX_IMAGE", "")
             self.remote_profile = os.environ.get("FUZE_SANDBOX_PROFILE", "agent-small")
             if not self.remote_image:
-                raise ValueError("FUZE_SANDBOX_IMAGE must be set for the Fuze Sandbox provider")
+                raise ValueError(
+                    "FUZE_SANDBOX_IMAGE must be set for the Fuze Sandbox provider"
+                )
             self.remote_client = FuzeSandboxClient(base_url, api_key)
             self.docker_client = None
         else:
@@ -141,10 +145,12 @@ class AgentSandboxManager:
             if not self.remote_client:
                 raise RuntimeError("Fuze Sandbox provider is not configured")
             readiness = await self.remote_client.get_readiness()
-            if not (readiness.get("status") == "ready"
-                    and readiness.get("execution_enabled") is True
-                    and readiness.get("worker") == "ready"
-                    and readiness.get("machine_workspace_enabled") is True):
+            if not (
+                readiness.get("status") == "ready"
+                and readiness.get("execution_enabled") is True
+                and readiness.get("worker") == "ready"
+                and readiness.get("machine_workspace_enabled") is True
+            ):
                 raise RuntimeError("Fuze Sandbox is not ready for machine workspaces")
 
         # Start cleanup task
@@ -195,7 +201,9 @@ class AgentSandboxManager:
         """Create a new sandbox for an agent"""
 
         if self.provider == "fuze-sandbox":
-            return await self._create_remote_workspace(agent_id, task_id, agent_template, ttl_seconds)
+            return await self._create_remote_workspace(
+                agent_id, task_id, agent_template, ttl_seconds
+            )
 
         sandbox_id = f"agent-{agent_id[:8]}-task-{task_id[:8]}-{uuid.uuid4().hex[:8]}"
 
@@ -258,9 +266,13 @@ class AgentSandboxManager:
                 await self._update_sandbox_status(sandbox.id, SandboxStatus.ERROR)
             raise
 
-    async def _create_remote_workspace(self, agent_id: str, task_id: str,
-                                       agent_template: str,
-                                       ttl_seconds: Optional[int] = None) -> Sandbox:
+    async def _create_remote_workspace(
+        self,
+        agent_id: str,
+        task_id: str,
+        agent_template: str,
+        ttl_seconds: Optional[int] = None,
+    ) -> Sandbox:
         if not self.remote_client:
             raise RuntimeError("Fuze Sandbox provider is not configured")
         remote_id = None
@@ -281,13 +293,23 @@ class AgentSandboxManager:
                 "image": self.remote_image,
                 "kind": "workspace",
                 "profile": self.remote_profile,
-                "ttl_seconds": min(86400, max(60, int(
-                    ttl_seconds if ttl_seconds is not None else
-                    os.getenv("FUZE_SANDBOX_TTL_SECONDS", "86400")
-                ))),
+                "ttl_seconds": min(
+                    86400,
+                    max(
+                        60,
+                        int(
+                            ttl_seconds
+                            if ttl_seconds is not None
+                            else os.getenv("FUZE_SANDBOX_TTL_SECONDS", "86400")
+                        ),
+                    ),
+                ),
                 "storage": os.getenv("FUZE_SANDBOX_WORKSPACE_STORAGE", "5Gi"),
-                "ports": [int(port.strip()) for port in
-                          os.getenv("FUZE_SANDBOX_PREVIEW_PORTS", "").split(",") if port.strip()],
+                "ports": [
+                    int(port.strip())
+                    for port in os.getenv("FUZE_SANDBOX_PREVIEW_PORTS", "").split(",")
+                    if port.strip()
+                ],
             }
             created = await self.remote_client.create_sandbox(**payload)
             remote_id = created["id"]
@@ -295,54 +317,94 @@ class AgentSandboxManager:
             record.container_id = f"fuze-sandbox:{remote_id}"
             await self._store_sandbox(record)
             self.active_sandboxes[remote_id] = record
-            timeout = max(10, int(os.getenv("FUZE_SANDBOX_CREATE_TIMEOUT_SECONDS", "180")))
+            timeout = max(
+                10, int(os.getenv("FUZE_SANDBOX_CREATE_TIMEOUT_SECONDS", "180"))
+            )
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:
                 current = await self.remote_client.get_sandbox(remote_id)
                 status = current.get("status")
                 if status == "running":
                     record.status = SandboxStatus.RUNNING
-                    await self._update_sandbox_status(record.id, record.status, record.container_id)
-                    logger.info("Fuze Sandbox workspace %s is ready for agent %s", remote_id, agent_id)
+                    await self._update_sandbox_status(
+                        record.id, record.status, record.container_id
+                    )
+                    logger.info(
+                        "Fuze Sandbox workspace %s is ready for agent %s",
+                        remote_id,
+                        agent_id,
+                    )
                     return record
                 if status in {"failed", "deleted", "succeeded", "cancelled"}:
-                    raise RuntimeError(f"Fuze Sandbox workspace entered terminal state: {status}")
+                    raise RuntimeError(
+                        f"Fuze Sandbox workspace entered terminal state: {status}"
+                    )
                 await asyncio.sleep(2)
-            raise TimeoutError("Fuze Sandbox workspace did not become ready before the configured timeout")
+            raise TimeoutError(
+                "Fuze Sandbox workspace did not become ready before the configured timeout"
+            )
         except Exception as exc:
             if remote_id:
                 try:
                     await self.remote_client.cancel_sandbox(remote_id)
                 except Exception:
-                    logger.exception("Failed to cancel incomplete Fuze Sandbox workspace %s", remote_id)
+                    logger.exception(
+                        "Failed to cancel incomplete Fuze Sandbox workspace %s",
+                        remote_id,
+                    )
                 self.active_sandboxes.pop(remote_id, None)
             record.status = SandboxStatus.ERROR
             if remote_id:
-                await self._update_sandbox_status(record.id, SandboxStatus.ERROR, record.container_id)
-            logger.error("Fuze Sandbox workspace creation failed for agent %s: %s", agent_id, exc)
+                await self._update_sandbox_status(
+                    record.id, SandboxStatus.ERROR, record.container_id
+                )
+            logger.error(
+                "Fuze Sandbox workspace creation failed for agent %s: %s", agent_id, exc
+            )
             raise
 
-    async def create_remote_job(self, agent_id: str, task_id: str,
-                                command: list[str], args: list[str] | None = None,
-                                ttl_seconds: int = 3600) -> Sandbox:
+    async def create_remote_job(
+        self,
+        agent_id: str,
+        task_id: str,
+        command: list[str],
+        args: list[str] | None = None,
+        ttl_seconds: int = 3600,
+    ) -> Sandbox:
         if self.provider != "fuze-sandbox" or not self.remote_client:
             raise RuntimeError("Jobs require the Fuze Sandbox provider")
-        if not command or len(command) > 32 or any(len(part) > 4096 for part in command):
-            raise ValueError("Job command must contain 1-32 arguments of at most 4096 characters")
+        if (
+            not command
+            or len(command) > 32
+            or any(len(part) > 4096 for part in command)
+        ):
+            raise ValueError(
+                "Job command must contain 1-32 arguments of at most 4096 characters"
+            )
         if args and (len(args) > 64 or any(len(part) > 4096 for part in args)):
-            raise ValueError("Job args must contain at most 64 arguments of at most 4096 characters")
+            raise ValueError(
+                "Job args must contain at most 64 arguments of at most 4096 characters"
+            )
         remote = await self.remote_client.create_sandbox(
-            name=f"fa-job-{uuid.uuid4().hex[:20]}", image=self.remote_image,
-            kind="job", profile=self.remote_profile,
+            name=f"fa-job-{uuid.uuid4().hex[:20]}",
+            image=self.remote_image,
+            kind="job",
+            profile=self.remote_profile,
             ttl_seconds=min(86400, max(60, int(ttl_seconds))),
-            command=command, args=args or [],
+            command=command,
+            args=args or [],
         )
         remote_id = remote["id"]
         record = Sandbox(
-            id=str(uuid.uuid4()), sandbox_id=remote_id, agent_id=agent_id,
-            task_id=task_id, container_id=f"fuze-sandbox:{remote_id}",
-            status=SandboxStatus.CREATING, workspace_path="",
-            resource_limits={"profile": self.remote_profile}, created_at=datetime.now(),
+            id=str(uuid.uuid4()),
+            sandbox_id=remote_id,
+            agent_id=agent_id,
+            task_id=task_id,
+            container_id=f"fuze-sandbox:{remote_id}",
+            status=SandboxStatus.CREATING,
+            workspace_path="",
+            resource_limits={"profile": self.remote_profile},
+            created_at=datetime.now(),
         )
         await self._store_sandbox(record)
         self.active_sandboxes[remote_id] = record
@@ -355,7 +417,9 @@ class AgentSandboxManager:
         try:
             remote = await self.remote_client.get_sandbox(sandbox.sandbox_id)
         except Exception:
-            logger.warning("Unable to refresh remote sandbox status for %s", sandbox.sandbox_id)
+            logger.warning(
+                "Unable to refresh remote sandbox status for %s", sandbox.sandbox_id
+            )
             return
         remote_status = remote.get("status")
         status_map = {
@@ -370,10 +434,18 @@ class AgentSandboxManager:
         mapped = status_map.get(remote_status)
         if mapped and mapped != sandbox.status:
             sandbox.status = mapped
-            if mapped in {SandboxStatus.SUCCEEDED, SandboxStatus.ERROR, SandboxStatus.DESTROYED}:
+            if mapped in {
+                SandboxStatus.SUCCEEDED,
+                SandboxStatus.ERROR,
+                SandboxStatus.DESTROYED,
+            }:
                 sandbox.destroyed_at = datetime.now()
-            await self._update_sandbox_status(sandbox.id, mapped, sandbox.container_id,
-                destroyed_at=sandbox.destroyed_at)
+            await self._update_sandbox_status(
+                sandbox.id,
+                mapped,
+                sandbox.container_id,
+                destroyed_at=sandbox.destroyed_at,
+            )
 
     async def destroy_sandbox(self, sandbox_id: str):
         """Destroy a sandbox and cleanup resources"""
@@ -389,16 +461,24 @@ class AgentSandboxManager:
             if not self.remote_client:
                 raise RuntimeError("Fuze Sandbox provider is not configured")
             sandbox.status = SandboxStatus.DESTROYING
-            await self._update_sandbox_status(sandbox.id, sandbox.status, sandbox.container_id)
+            await self._update_sandbox_status(
+                sandbox.id, sandbox.status, sandbox.container_id
+            )
             await self.remote_client.cancel_sandbox(sandbox.sandbox_id)
-            deadline = time.monotonic() + max(10, int(os.getenv("FUZE_SANDBOX_DELETE_TIMEOUT_SECONDS", "120")))
+            deadline = time.monotonic() + max(
+                10, int(os.getenv("FUZE_SANDBOX_DELETE_TIMEOUT_SECONDS", "120"))
+            )
             while time.monotonic() < deadline:
                 remote = await self.remote_client.get_sandbox(sandbox.sandbox_id)
                 if remote.get("status") == "deleted":
                     sandbox.status = SandboxStatus.DESTROYED
                     sandbox.destroyed_at = datetime.now()
-                    await self._update_sandbox_status(sandbox.id, sandbox.status,
-                        sandbox.container_id, destroyed_at=sandbox.destroyed_at)
+                    await self._update_sandbox_status(
+                        sandbox.id,
+                        sandbox.status,
+                        sandbox.container_id,
+                        destroyed_at=sandbox.destroyed_at,
+                    )
                     self.active_sandboxes.pop(sandbox_id, None)
                     return
                 await asyncio.sleep(2)
@@ -490,26 +570,41 @@ class AgentSandboxManager:
 
         if self.provider == "fuze-sandbox":
             sandbox = self.active_sandboxes.get(sandbox_id)
-            if not sandbox or sandbox.status != SandboxStatus.RUNNING or not self.remote_client:
+            if (
+                not sandbox
+                or sandbox.status != SandboxStatus.RUNNING
+                or not self.remote_client
+            ):
                 raise ValueError(f"Sandbox {sandbox_id} not found or not running")
             if not command or len(command) > 4096:
-                raise ValueError("Fuze Sandbox commands must be between 1 and 4096 characters")
+                raise ValueError(
+                    "Fuze Sandbox commands must be between 1 and 4096 characters"
+                )
             directory = posixpath.normpath(working_dir or "/workspace")
             if directory != "/workspace" and not directory.startswith("/workspace/"):
                 raise ValueError("remote working directory must be inside /workspace")
-            wrapped = (f"cd -- {shlex.quote(directory)} && {command}; "
-                       "_fuze_code=$?; printf '\\n__FUZE_EXIT_CODE__%s\\n' \"$_fuze_code\"")
+            wrapped = (
+                f"cd -- {shlex.quote(directory)} && {command}; "
+                "_fuze_code=$?; printf '\\n__FUZE_EXIT_CODE__%s\\n' \"$_fuze_code\""
+            )
             if len(wrapped) > 4096:
-                raise ValueError("command exceeds the Fuze Sandbox API limit after wrapping")
+                raise ValueError(
+                    "command exceeds the Fuze Sandbox API limit after wrapping"
+                )
             try:
-                result = await self.remote_client.execute_workspace(sandbox.sandbox_id, wrapped)
+                result = await self.remote_client.execute_workspace(
+                    sandbox.sandbox_id, wrapped
+                )
                 output = str(result.get("output", ""))
                 match = re.search(r"(?:^|\n)__FUZE_EXIT_CODE__(\d+)\s*$", output)
                 if not match:
                     return {"exit_code": -1, "output": output, "success": False}
                 exit_code = int(match.group(1))
-                return {"exit_code": exit_code, "output": output[:match.start()].rstrip(),
-                        "success": exit_code == 0}
+                return {
+                    "exit_code": exit_code,
+                    "output": output[: match.start()].rstrip(),
+                    "success": exit_code == 0,
+                }
             except Exception as exc:
                 logger.error("Fuze Sandbox command failed for %s: %s", sandbox_id, exc)
                 return {"exit_code": -1, "output": str(exc), "success": False}
@@ -537,17 +632,25 @@ class AgentSandboxManager:
             logger.error(f"Error executing command in sandbox {sandbox_id}: {e}")
             return {"exit_code": -1, "output": str(e), "success": False}
 
-    async def write_workspace_file(self, sandbox_id: str, path: str, content: bytes) -> dict:
+    async def write_workspace_file(
+        self, sandbox_id: str, path: str, content: bytes
+    ) -> dict:
         if self.provider != "fuze-sandbox" or not self.remote_client:
-            raise RuntimeError("workspace file API is only available with the Fuze Sandbox provider")
+            raise RuntimeError(
+                "workspace file API is only available with the Fuze Sandbox provider"
+            )
         sandbox = self.active_sandboxes.get(sandbox_id)
         if not sandbox or sandbox.status != SandboxStatus.RUNNING:
             raise ValueError(f"Sandbox {sandbox_id} not found or not running")
-        return await self.remote_client.write_workspace_file(sandbox.sandbox_id, path, content)
+        return await self.remote_client.write_workspace_file(
+            sandbox.sandbox_id, path, content
+        )
 
     async def read_workspace_file(self, sandbox_id: str, path: str) -> bytes:
         if self.provider != "fuze-sandbox" or not self.remote_client:
-            raise RuntimeError("workspace file API is only available with the Fuze Sandbox provider")
+            raise RuntimeError(
+                "workspace file API is only available with the Fuze Sandbox provider"
+            )
         sandbox = self.active_sandboxes.get(sandbox_id)
         if not sandbox or sandbox.status != SandboxStatus.RUNNING:
             raise ValueError(f"Sandbox {sandbox_id} not found or not running")
