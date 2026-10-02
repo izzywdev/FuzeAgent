@@ -29,6 +29,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from hierarchy_endpoints import router as hierarchy_router
+
 try:
     from .image_registry_router import router as image_registry_router
 except ImportError:
