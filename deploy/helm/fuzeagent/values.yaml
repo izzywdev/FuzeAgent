@@ -149,6 +149,7 @@ federatedMount:
   annotations: {}
   path: /apps/fuzeagent
 
+
 # --- Namespace guardrails on the shared node ----------------------------------
 resourceGovernance:
   enabled: true

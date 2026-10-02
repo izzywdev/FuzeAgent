@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle, FiUsers, FiBook, FiCode, FiHelpCircle } from 'react-icons/fi'
+import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle, FiUsers } from 'react-icons/fi'
 import AgentDashboard from './components/AgentDashboard'
 import CreateAgentModal from './components/CreateAgentModal'
 import TasksView from './components/TasksView'
@@ -8,12 +7,17 @@ import StatsCards from './components/StatsCards'
 import OrganizationSelector from './components/OrganizationSelector'
 import TeamSelector from './components/TeamSelector'
 import HierarchyView from './components/HierarchyView'
-import { api, createWebSocket } from './config/api'
+import ImageTemplateRegistry from './components/ImageTemplateRegistry'
+import BrainsMemoryHierarchy from './components/BrainsMemoryHierarchy'
+import SandboxesView from './components/SandboxesView'
+import EscalationsView from './components/EscalationsView'
+import { api, API_ENDPOINTS, createWebSocket } from './config/api'
 import type { 
   Agent, Task, AgentTemplate, 
   Organization, Team, 
   OrganizationCreate, TeamCreate 
 } from './types'
+
 
 function App() {
   // Hierarchy state
@@ -30,7 +34,55 @@ function App() {
   // UI state
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showHierarchy, setShowHierarchy] = useState(false)
+  const [activeTab, setActiveTab] = useState<'overview' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
+
+  // FuzeFront Platform Bridge: Register app-specific menu items into host shell
+  useEffect(() => {
+    const bridge = typeof window !== 'undefined' ? (window as any).__FUZEFRONT__ : null
+    if (bridge?.menu) {
+      bridge.menu.add('fuzeagent', [
+        { id: 'overview', label: 'Agents Overview', icon: '🤖', order: 1 },
+        { id: 'templates', label: 'Image Registry', icon: '📦', order: 2 },
+        { id: 'brains', label: 'Brains & Memory', icon: '🧠', order: 3 },
+        { id: 'sandboxes', label: 'Sandboxes & Runtime', icon: '🛡️', order: 4 },
+        { id: 'teams', label: 'Teams & Hierarchy', icon: '👥', order: 5 },
+        { id: 'escalations', label: 'Escalations & Approvals', icon: '⚡', order: 6 },
+      ])
+    }
+
+    const handleHostNav = (e: any) => {
+      const target = e.detail?.section || e.detail?.id || e.detail
+      if (typeof target === 'string') {
+        const clean = target.replace(/^\/?(app\/)?fuzeagent\/?/, '').replace(/^\//, '')
+        if (['overview', 'templates', 'brains', 'sandboxes', 'teams', 'escalations'].includes(clean)) {
+          setActiveTab(clean as any)
+        } else if (clean === '' || clean === 'agents') {
+          setActiveTab('overview')
+        }
+      }
+    }
+
+    const handleOrgSwitch = (e: any) => {
+      const org = e.detail?.organization
+      if (org?.id && organizations.length > 0) {
+        const found = organizations.find((o) => o.id === org.id || o.name === org.name)
+        if (found) setCurrentOrganization(found)
+      }
+    }
+
+    window.addEventListener('fuzefront:navigate', handleHostNav)
+    window.addEventListener('fuzefront:org-switched', handleOrgSwitch)
+    window.addEventListener('fuzefront:organization-switched', handleOrgSwitch)
+    return () => {
+      window.removeEventListener('fuzefront:navigate', handleHostNav)
+      window.removeEventListener('fuzefront:org-switched', handleOrgSwitch)
+      window.removeEventListener('fuzefront:organization-switched', handleOrgSwitch)
+      if (bridge?.menu) {
+        bridge.menu.remove('fuzeagent')
+      }
+    }
+  }, [organizations])
+
 
   // Helper function to deep compare arrays
   const arraysEqual = (a: any[], b: any[]): boolean => {
@@ -297,96 +349,95 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <nav className="bg-white shadow-lg border-b">
+      <nav className="bg-white shadow border-b">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
-                <FiUser className="text-3xl" />
-                FuzeAgent
-              </h1>
-              <span className="ml-2 text-sm text-gray-500">AI Team Manager</span>
-            </div>
-            <div className="flex space-x-4 items-center">
-              {/* Help Menu */}
-              <div className="relative group">
-                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center gap-2 transition-colors">
-                  <FiHelpCircle />
-                  Help
-                </button>
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="py-2">
-                    <Link
-                      to="/docs"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiBook className="w-4 h-4" />
-                      Documentation
-                    </Link>
-                    <Link
-                      to="/docs/getting-started"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiActivity className="w-4 h-4" />
-                      Getting Started
-                    </Link>
-                    <Link
-                      to="/docs/api-reference"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiCode className="w-4 h-4" />
-                      API Reference
-                    </Link>
-                    <Link
-                      to="/playground"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiCode className="w-4 h-4" />
-                      API Playground
-                    </Link>
-                    <Link
-                      to="/organization-chart"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiUsers className="w-4 h-4" />
-                      Organization Chart
-                    </Link>
-                    <div className="border-t border-gray-100 my-2"></div>
-                    <a
-                      href="https://github.com/yourusername/fuzeagent"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiBook className="w-4 h-4" />
-                      GitHub Repository
-                    </a>
-                  </div>
-                </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('overview')}>
+                <h1 className="text-xl font-bold text-blue-600 flex items-center gap-2">
+                  <FiUser className="text-2xl" />
+                  FuzeAgent
+                </h1>
+                <span className="ml-2 text-xs text-gray-400 font-mono">v1.0</span>
               </div>
 
-              <button
-                onClick={() => setShowHierarchy(!showHierarchy)}
-                className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
-                  showHierarchy 
-                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                <FiUsers />
-                {showHierarchy ? 'Hide Hierarchy' : 'Show Hierarchy'}
-              </button>
+              {/* In-App Tab Switcher (mirrors FuzeFront Left-Side Menu) */}
+              <div className="hidden md:flex items-center space-x-1">
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    activeTab === 'overview'
+                      ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  🤖 Overview
+                </button>
+                <button
+                  onClick={() => setActiveTab('templates')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    activeTab === 'templates'
+                      ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  📦 Image Registry
+                </button>
+                <button
+                  onClick={() => setActiveTab('brains')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    activeTab === 'brains'
+                      ? 'bg-purple-50 text-purple-700 font-bold border border-purple-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  🧠 Brains & Memory
+                </button>
+                <button
+                  onClick={() => setActiveTab('sandboxes')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    activeTab === 'sandboxes'
+                      ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  🛡️ Sandboxes
+                </button>
+                <button
+                  onClick={() => setActiveTab('teams')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    activeTab === 'teams'
+                      ? 'bg-cyan-50 text-cyan-700 font-bold border border-cyan-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  👥 Teams
+                </button>
+                <button
+                  onClick={() => setActiveTab('escalations')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    activeTab === 'escalations'
+                      ? 'bg-amber-50 text-amber-700 font-bold border border-amber-200'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  ⚡ Escalations
+                </button>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 items-center">
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center gap-1.5 text-xs transition-colors disabled:opacity-50"
               >
                 <FiRefreshCw className={loading ? 'animate-spin' : ''} />
                 Refresh
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 transition-colors"
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1.5 text-xs font-medium transition-colors"
               >
                 <FiPlus />
                 Create Agent
@@ -398,9 +449,13 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 px-4">
-        {/* Hierarchy View */}
-        {showHierarchy && (
-          <div className="mb-6">
+        {activeTab === 'templates' && <ImageTemplateRegistry />}
+        {activeTab === 'brains' && <BrainsMemoryHierarchy />}
+        {activeTab === 'sandboxes' && <SandboxesView />}
+        {activeTab === 'escalations' && <EscalationsView />}
+
+        {activeTab === 'teams' && (
+          <div className="space-y-6">
             <HierarchyView
               organizations={organizations}
               teams={teams}
@@ -409,97 +464,119 @@ function App() {
               onSelectOrganization={handleSelectOrganization}
               onSelectTeam={handleSelectTeam}
             />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <OrganizationSelector
+                organizations={organizations}
+                currentOrganization={currentOrganization}
+                loading={loading}
+                onSelectOrganization={handleSelectOrganization}
+                onCreateOrganization={handleCreateOrganization}
+              />
+              <TeamSelector
+                teams={teams}
+                currentTeam={currentTeam}
+                currentOrganization={currentOrganization}
+                loading={loading}
+                onSelectTeam={handleSelectTeam}
+                onCreateTeam={handleCreateTeam}
+              />
+            </div>
           </div>
         )}
 
-        {/* Organization and Team Selection */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <OrganizationSelector
-            organizations={organizations}
-            currentOrganization={currentOrganization}
-            loading={loading}
-            onSelectOrganization={handleSelectOrganization}
-            onCreateOrganization={handleCreateOrganization}
-          />
-          <TeamSelector
-            teams={teams}
-            currentTeam={currentTeam}
-            currentOrganization={currentOrganization}
-            loading={loading}
-            onSelectTeam={handleSelectTeam}
-            onCreateTeam={handleCreateTeam}
-          />
-        </div>
+        {activeTab === 'overview' && (
+          <>
+            {/* Organization and Team Selection */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <OrganizationSelector
+                organizations={organizations}
+                currentOrganization={currentOrganization}
+                loading={loading}
+                onSelectOrganization={handleSelectOrganization}
+                onCreateOrganization={handleCreateOrganization}
+              />
+              <TeamSelector
+                teams={teams}
+                currentTeam={currentTeam}
+                currentOrganization={currentOrganization}
+                loading={loading}
+                onSelectTeam={handleSelectTeam}
+                onCreateTeam={handleCreateTeam}
+              />
+            </div>
 
-        {/* Context Information */}
-        {currentOrganization && currentTeam && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600">
-                  Current Context: <span className="font-medium">{currentOrganization.name}</span> → <span className="font-medium">{currentTeam.name}</span>
+            {/* Context Information */}
+            {currentOrganization && currentTeam && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-600">
+                      Current Context: <span className="font-medium">{currentOrganization.name}</span> → <span className="font-medium">{currentTeam.name}</span>
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    disabled={!currentTeam}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FiPlus />
+                    Add Agent to Team
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Show message if no team selected */}
+            {!currentTeam ? (
+              <div className="bg-white rounded-lg shadow p-8 text-center">
+                <FiUsers className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Team</h3>
+                <p className="text-gray-600">
+                  {!currentOrganization 
+                    ? "Please select an organization and team to view agents" 
+                    : "Please select or create a team to view agents"}
                 </p>
               </div>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                disabled={!currentTeam}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FiPlus />
-                Add Agent to Team
-              </button>
-            </div>
-          </div>
-        )}
+            ) : (
+              <>
+                {/* Statistics */}
+                <StatsCards agents={memoizedAgents} tasks={memoizedTasks} />
 
-        {/* Show message if no team selected */}
-        {!currentTeam ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <FiUsers className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Team</h3>
-            <p className="text-gray-600">
-              {!currentOrganization 
-                ? "Please select an organization and team to view agents" 
-                : "Please select or create a team to view agents"}
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Statistics */}
-            <StatsCards agents={memoizedAgents} tasks={memoizedTasks} />
+                {/* Agents Grid */}
+                <div className="bg-white rounded-lg shadow mb-6">
+                  <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      <FiActivity />
+                      AI Agents
+                      <span className="text-sm font-normal text-blue-600">({currentTeam.name})</span>
+                    </h2>
+                    <p className="text-gray-600 mt-1">Manage your AI team members</p>
+                  </div>
+                  <div className="p-6">
+                    <AgentDashboard 
+                      agents={memoizedAgents} 
+                      tasks={memoizedTasks}
+                      onAssignTask={handleAssignTask}
+                    />
+                  </div>
+                </div>
 
-            {/* Agents Grid */}
-            <div className="bg-white rounded-lg shadow mb-6">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <FiActivity />
-                  AI Agents
-                  <span className="text-sm font-normal text-blue-600">({currentTeam.name})</span>
-                </h2>
-                <p className="text-gray-600 mt-1">Manage your AI team members</p>
-              </div>
-              <div className="p-6">
-                <AgentDashboard 
-                  agents={memoizedAgents} 
-                  tasks={memoizedTasks}
-                  onAssignTask={handleAssignTask}
-                />
-              </div>
-            </div>
-
-            {/* Tasks Section */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <FiCheckCircle />
-                  Recent Tasks
-                </h2>
-                <p className="text-gray-600 mt-1">Track task assignments and progress</p>
-              </div>
-              <div className="p-6">
-                <TasksView tasks={memoizedTasks} agents={memoizedAgents} />
-              </div>
-            </div>
+                {/* Tasks Section */}
+                <div className="bg-white rounded-lg shadow">
+                  <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      <FiCheckCircle />
+                      Recent Tasks
+                    </h2>
+                    <p className="text-gray-600 mt-1">Track task assignments and progress</p>
+                  </div>
+                  <div className="p-6">
+                    <TasksView tasks={memoizedTasks} agents={memoizedAgents} />
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
       </main>
@@ -518,3 +595,4 @@ function App() {
 }
 
 export default App
+
