@@ -11,7 +11,7 @@ import ImageTemplateRegistry from './components/ImageTemplateRegistry'
 import BrainsMemoryHierarchy from './components/BrainsMemoryHierarchy'
 import SandboxesView from './components/SandboxesView'
 import EscalationsView from './components/EscalationsView'
-import { api, API_ENDPOINTS, createWebSocket } from './config/api'
+import { api, createWebSocket } from './config/api'
 import type { 
   Agent, Task, AgentTemplate, 
   Organization, Team, 
