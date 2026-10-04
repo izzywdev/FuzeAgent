@@ -113,7 +113,7 @@ export function BrainsMemoryHierarchy() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [querySimulation, setQuerySimulation] = useState('How do we authenticate with FuzeKeys in the bank scraper?');
   const [isSimulating, setIsSimulating] = useState(false);
-  const [isWikiOpen, setIsWikiOpen] = useState(false);
+  const [activeMode, setActiveMode] = useState<'wiki' | 'hierarchy'>('wiki');
   const [simulationResult, setSimulationResult] = useState<string | null>(null);
 
   // New Custom Brain form state
@@ -184,19 +184,6 @@ export function BrainsMemoryHierarchy() {
     }
   };
 
-  if (isWikiOpen) {
-    return (
-      <div className="h-full flex flex-col min-h-[700px] rounded-xl border border-slate-800 overflow-hidden">
-        <BrainWikiExplorer
-          brainId={selectedBrain.id}
-          brainName={selectedBrain.name}
-          brainTier={selectedBrain.scope.toUpperCase()}
-          onClose={() => setIsWikiOpen(false)}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -223,6 +210,57 @@ export function BrainsMemoryHierarchy() {
           </button>
         </div>
       </div>
+
+      {/* Mode Switcher */}
+      <div className="flex items-center gap-2 border-b pb-3" style={{ borderColor: 'var(--border-color, #232c3d)' }}>
+        <button
+          onClick={() => setActiveMode('wiki')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+            activeMode === 'wiki'
+              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+              : 'hover:opacity-100 opacity-70'
+          }`}
+          style={{
+            backgroundColor: activeMode === 'wiki' ? undefined : 'var(--bg-tertiary, #141a26)',
+            border: activeMode === 'wiki' ? 'none' : '1px solid var(--border-color, #232c3d)',
+            color: activeMode === 'wiki' ? '#fff' : 'var(--text-secondary, #9fa9bc)'
+          }}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Wiki Documents & RAG Chat Explorer</span>
+        </button>
+
+        <button
+          onClick={() => setActiveMode('hierarchy')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+            activeMode === 'hierarchy'
+              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+              : 'hover:opacity-100 opacity-70'
+          }`}
+          style={{
+            backgroundColor: activeMode === 'hierarchy' ? undefined : 'var(--bg-tertiary, #141a26)',
+            border: activeMode === 'hierarchy' ? 'none' : '1px solid var(--border-color, #232c3d)',
+            color: activeMode === 'hierarchy' ? '#fff' : 'var(--text-secondary, #9fa9bc)'
+          }}
+        >
+          <Brain className="w-4 h-4" />
+          <span>5-Tier Memory Architecture & Access Control</span>
+        </button>
+      </div>
+
+      {activeMode === 'wiki' && (
+        <div className="h-[750px] rounded-xl border border-slate-800 overflow-hidden shadow-xl">
+          <BrainWikiExplorer
+            brainId={selectedBrain.id}
+            brainName={selectedBrain.name}
+            brainTier={selectedBrain.scope.toUpperCase()}
+            onClose={() => setActiveMode('hierarchy')}
+          />
+        </div>
+      )}
+
+      {activeMode === 'hierarchy' && (
+        <>
 
       {/* Memory Distinction Banner */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -264,32 +302,44 @@ export function BrainsMemoryHierarchy() {
                 onClick={() => setSelectedBrain(brain)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer ${
                   isSelected 
-                    ? 'bg-purple-950/20 border-purple-500/80 shadow-md ring-1 ring-purple-500/40' 
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    ? 'shadow-md' 
+                    : 'hover:border-slate-600'
                 }`}
+                style={{
+                  backgroundColor: isSelected ? 'rgba(110, 92, 255, 0.15)' : 'var(--bg-tertiary, #141a26)',
+                  borderColor: isSelected ? 'var(--accent-color, #6e5cff)' : 'var(--border-color, #232c3d)',
+                  color: 'var(--text-primary, #e7ecf5)'
+                }}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <span className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                    <span className="p-2 rounded-lg text-purple-400 border" style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: 'rgba(168, 85, 247, 0.3)' }}>
                       <Brain className="w-4 h-4" />
                     </span>
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">{brain.name}</h3>
+                      <h3 className="text-sm font-bold text-white">{brain.name}</h3>
                       <div className="mt-1">{getScopeBadge(brain.scope)}</div>
                     </div>
                   </div>
-                  <span className="text-xs font-mono text-slate-500">
+                  <span className="text-xs font-mono" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
                     {brain.itemCount} items
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-2 line-clamp-2">{brain.description}</p>
+                <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>{brain.description}</p>
               </div>
             );
           })}
         </div>
 
         {/* Selected Brain Detail & Access Control */}
-        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-6">
+        <div 
+          className="lg:col-span-7 rounded-xl border shadow-sm p-6 space-y-6"
+          style={{
+            backgroundColor: 'var(--bg-tertiary, #141a26)',
+            borderColor: 'var(--border-color, #232c3d)',
+            color: 'var(--text-primary, #e7ecf5)'
+          }}
+        >
           <div className="border-b border-slate-200 dark:border-slate-800 pb-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -305,7 +355,7 @@ export function BrainsMemoryHierarchy() {
                 <span>Updated: <strong>{selectedBrain.lastUpdated}</strong></span>
               </div>
               <button
-                onClick={() => setIsWikiOpen(true)}
+                onClick={() => setActiveMode('wiki')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
               >
                 <BookOpen className="w-3.5 h-3.5" />
@@ -404,6 +454,8 @@ export function BrainsMemoryHierarchy() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Modal: Create Custom Brain */}
       {showCreateModal && (

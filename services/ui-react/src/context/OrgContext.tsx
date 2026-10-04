@@ -11,7 +11,7 @@ export interface Organization {
   id: string;
   name: string;
   slug?: string;
-  tier?: 'free' | 'pro' | 'enterprise';
+  tier?: 'free' | 'pro' | 'enterprise' | string;
 }
 
 export interface OrgEventNotification {
@@ -23,35 +23,28 @@ export interface OrgEventNotification {
 
 export interface OrgContextValue {
   activeOrg: Organization | null;
+  isPersonal: boolean;
   user: OrgUser | null;
   organizations: Organization[];
   switchOrg: (orgId: string) => void;
   recentEvents: OrgEventNotification[];
   clearEvents: () => void;
   isPlatformMode: boolean;
+  allowInAppOrgManagement: boolean; // Unleash kill-switch wrapped
 }
-
-const DEFAULT_ORGS: Organization[] = [
-  { id: '00000000-0000-0000-0000-000000000010', name: 'FuzeSuite Core Org', slug: 'fuzesuite', tier: 'enterprise' },
-  { id: 'org_dev_team', name: 'Engineering & DevOps', slug: 'engineering', tier: 'pro' },
-  { id: 'org_growth', name: 'Product & Growth', slug: 'growth', tier: 'pro' },
-];
-
-const DEFAULT_USER: OrgUser = {
-  id: 'usr_izzy',
-  email: 'izzy@fuzefront.com',
-  name: 'Izzy W.',
-  roles: ['admin', 'architect', 'owner'],
-};
 
 const OrgContext = createContext<OrgContextValue | undefined>(undefined);
 
 export const OrgProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [organizations, setOrganizations] = useState<Organization[]>(DEFAULT_ORGS);
-  const [activeOrg, setActiveOrg] = useState<Organization | null>(DEFAULT_ORGS[0]);
-  const [user, setUser] = useState<OrgUser | null>(DEFAULT_USER);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [activeOrg, setActiveOrg] = useState<Organization | null>(null);
+  const [isPersonal, setIsPersonal] = useState<boolean>(true);
+  const [user, setUser] = useState<OrgUser | null>(null);
   const [recentEvents, setRecentEvents] = useState<OrgEventNotification[]>([]);
   const [isPlatformMode, setIsPlatformMode] = useState<boolean>(false);
+  
+  // Unleash Feature Flag Kill-Switch: default OFF in platform mode so org management is delegated strictly to FuzeFront
+  const [allowInAppOrgManagement, setAllowInAppOrgManagement] = useState<boolean>(false);
 
   const addEvent = useCallback((type: OrgEventNotification['type'], message: string) => {
     const event: OrgEventNotification = {
@@ -67,50 +60,97 @@ export const OrgProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRecentEvents([]);
   }, []);
 
-  // Initialize from window.__FUZEFRONT__ bridge if loaded in portal shell
+  // Sync state from snapshot/context
+  const syncPlatformSnapshot = useCallback((snapshot: any) => {
+    if (!snapshot) return;
+
+    // Check Unleash kill-switch feature toggle
+    const bridge = typeof window !== 'undefined' ? (window as any).__FUZEFRONT__ : null;
+    const flagFromBridge = bridge?.features?.isEnabled?.('fuzeagent.in-app-org-management') ??
+      bridge?.unleash?.isEnabled?.('fuzeagent.in-app-org-management') ?? false;
+    setAllowInAppOrgManagement(Boolean(flagFromBridge));
+
+    // Handle user identity
+    if (snapshot.user) {
+      setUser({
+        id: snapshot.user.id || 'usr_current',
+        email: snapshot.user.email || 'user@fuzefront.com',
+        name: snapshot.user.name || snapshot.user.email?.split('@')[0] || 'User',
+        roles: snapshot.user.roles || ['member'],
+      });
+    }
+
+    // Handle Organization vs Personal Context
+    // In FuzeFront: null activeOrganization means Personal account context
+    if (snapshot.activeOrganization) {
+      setActiveOrg({
+        id: snapshot.activeOrganization.id,
+        name: snapshot.activeOrganization.name || 'Organization',
+        slug: snapshot.activeOrganization.slug || snapshot.activeOrganization.id,
+        tier: snapshot.activeOrganization.tier || 'enterprise',
+      });
+      setIsPersonal(false);
+    } else if (snapshot.activeOrganization === null || snapshot.activeOrganizationId === null || snapshot.isPersonal) {
+      setActiveOrg(null);
+      setIsPersonal(true);
+    }
+  }, []);
+
+  // Initialize and subscribe to window.__FUZEFRONT__ host bridge
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const bridge = (window as any).__FUZEFRONT__;
     if (bridge) {
       setIsPlatformMode(true);
-      const snapshot = bridge.getContext ? bridge.getContext() : null;
-      if (snapshot) {
-        if (snapshot.activeOrganization) {
-          setActiveOrg(snapshot.activeOrganization);
-        }
-        if (snapshot.user) {
-          setUser(snapshot.user);
-        }
+
+      // 1. Initial snapshot sync
+      if (typeof bridge.getContext === 'function') {
+        syncPlatformSnapshot(bridge.getContext());
       }
 
-      // Subscribe to bridge context updates
+      // 2. Subscribe to general bridge updates
       const unsubBridge = bridge.subscribe?.((ctx: any) => {
+        syncPlatformSnapshot(ctx);
         if (ctx.activeOrganization) {
-          setActiveOrg(ctx.activeOrganization);
           addEvent('org:switched', `Organization switched to ${ctx.activeOrganization.name}`);
-        }
-        if (ctx.user) {
-          setUser(ctx.user);
+        } else {
+          addEvent('org:switched', `Switched to Personal Context`);
         }
       });
 
-      // Subscribe to specific bridge hooks
+      // 3. onOrgSwitch listener
       const unsubOrg = bridge.onOrgSwitch?.((org: any) => {
         if (org) {
-          setActiveOrg(org);
-          addEvent('org:switched', `Switched context to organization: ${org.name}`);
+          setActiveOrg({
+            id: org.id,
+            name: org.name || 'Organization',
+            slug: org.slug || org.id,
+            tier: org.tier || 'pro',
+          });
+          setIsPersonal(false);
+          addEvent('org:switched', `Organization switched to ${org.name}`);
+        } else {
+          setActiveOrg(null);
+          setIsPersonal(true);
+          addEvent('org:switched', `Switched to Personal Context`);
         }
       });
 
+      // 4. onAccountSwitch listener
       const unsubAccount = bridge.onAccountSwitch?.((u: any) => {
         if (u) {
-          setUser(u);
-          addEvent('user:created', `Active account switched to ${u.email}`);
+          setUser({
+            id: u.id,
+            email: u.email,
+            name: u.name || u.email?.split('@')[0],
+            roles: u.roles || [],
+          });
+          addEvent('user:created', `Account switched to ${u.email}`);
         }
       });
 
-      // Socket event listeners on bridge.socket
+      // 5. Socket events for live tenant lifecycle
       const socket = bridge.socket;
       if (socket && typeof socket.on === 'function') {
         const handleOrgCreated = (payload: any) => {
@@ -126,12 +166,15 @@ export const OrgProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const handleOrgDeleted = (payload: any) => {
           const deletedId = payload.id || payload.organizationId;
           setOrganizations(prev => prev.filter(o => o.id !== deletedId));
-          setActiveOrg(curr => (curr?.id === deletedId ? DEFAULT_ORGS[0] : curr));
-          addEvent('org:deleted', `Organization ${payload.name || deletedId} was deleted`);
+          if (activeOrg?.id === deletedId) {
+            setActiveOrg(null);
+            setIsPersonal(true);
+          }
+          addEvent('org:deleted', `Organization was deleted`);
         };
 
         const handleUserCreated = (payload: any) => {
-          addEvent('user:created', `New user registered: ${payload.email || payload.name}`);
+          addEvent('user:created', `User registered: ${payload.email || payload.name}`);
         };
 
         const handleUserDeleted = (payload: any) => {
@@ -139,11 +182,11 @@ export const OrgProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         const handleMemberAdded = (payload: any) => {
-          addEvent('member:added', `User ${payload.email || payload.userId} added to organization`);
+          addEvent('member:added', `Member ${payload.email || payload.userId} added to organization`);
         };
 
         const handleMemberRemoved = (payload: any) => {
-          addEvent('member:removed', `User ${payload.email || payload.userId} removed from organization`);
+          addEvent('member:removed', `Member ${payload?.email || payload?.userId || ''} removed from organization`);
         };
 
         socket.on('organization:created', handleOrgCreated);
@@ -159,73 +202,98 @@ export const OrgProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubOrg?.();
         unsubAccount?.();
       };
+    } else {
+      // Standalone dev mode: allow in-app switcher if running outside FuzeFront
+      setIsPlatformMode(false);
+      setAllowInAppOrgManagement(true);
+      setUser({
+        id: 'usr_dev',
+        email: 'developer@local.test',
+        name: 'Local Developer',
+        roles: ['owner'],
+      });
+      setActiveOrg({
+        id: 'org_dev_standalone',
+        name: 'Local Dev Org',
+        slug: 'dev-org',
+        tier: 'enterprise',
+      });
+      setIsPersonal(false);
     }
-  }, [addEvent]);
+  }, [syncPlatformSnapshot, addEvent, activeOrg?.id]);
 
-  // Global DOM Event Listeners for FuzeFront shell events
+  // Global DOM Event Listeners for FuzeFront portal shell broadcast events
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleOrgSwitch = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const detail = customEvent.detail;
-      if (detail?.organization) {
-        setActiveOrg(detail.organization);
-        addEvent('org:switched', `Switched organization: ${detail.organization.name}`);
-      } else if (detail?.organizationId) {
-        const found = organizations.find(o => o.id === detail.organizationId);
-        if (found) {
-          setActiveOrg(found);
-          addEvent('org:switched', `Switched organization: ${found.name}`);
-        }
+    const handleContextChange = (e: any) => {
+      const detail = e.detail;
+      if (detail) {
+        syncPlatformSnapshot(detail);
       }
     };
 
-    const handleAccountSwitch = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const detail = customEvent.detail;
+    const handleOrgSwitch = (e: any) => {
+      const detail = e.detail;
+      if (detail?.organization) {
+        setActiveOrg(detail.organization);
+        setIsPersonal(false);
+        addEvent('org:switched', `Switched organization: ${detail.organization.name}`);
+      } else if (detail === null || detail?.organization === null || detail?.isPersonal) {
+        setActiveOrg(null);
+        setIsPersonal(true);
+        addEvent('org:switched', `Switched to Personal Context`);
+      }
+    };
+
+    const handleAccountSwitch = (e: any) => {
+      const detail = e.detail;
       if (detail?.user) {
         setUser(detail.user);
         addEvent('user:created', `Account switched: ${detail.user.email}`);
       }
     };
 
+    window.addEventListener('fuzefront:context:change', handleContextChange);
+    window.addEventListener('fuzefront:organization:change', handleOrgSwitch);
     window.addEventListener('fuzefront:org-switched', handleOrgSwitch);
     window.addEventListener('fuzefront:organization-switched', handleOrgSwitch);
     window.addEventListener('fuzefront:account-switched', handleAccountSwitch);
 
     return () => {
+      window.removeEventListener('fuzefront:context:change', handleContextChange);
+      window.removeEventListener('fuzefront:organization:change', handleOrgSwitch);
       window.removeEventListener('fuzefront:org-switched', handleOrgSwitch);
       window.removeEventListener('fuzefront:organization-switched', handleOrgSwitch);
       window.removeEventListener('fuzefront:account-switched', handleAccountSwitch);
     };
-  }, [organizations, addEvent]);
+  }, [syncPlatformSnapshot, addEvent]);
 
   const switchOrg = useCallback((orgId: string) => {
+    if (!allowInAppOrgManagement) {
+      console.warn('Organization switching is managed exclusively by the FuzeFront portal shell');
+      return;
+    }
     const target = organizations.find(o => o.id === orgId);
     if (target) {
       setActiveOrg(target);
-      addEvent('org:switched', `Manually switched to ${target.name}`);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('fuzefront:org-switched', {
-            detail: { organizationId: target.id, organization: target },
-          })
-        );
-      }
+      setIsPersonal(false);
+      addEvent('org:switched', `Switched to ${target.name}`);
     }
-  }, [organizations, addEvent]);
+  }, [allowInAppOrgManagement, organizations, addEvent]);
 
   return (
     <OrgContext.Provider
       value={{
         activeOrg,
+        isPersonal,
         user,
         organizations,
         switchOrg,
         recentEvents,
         clearEvents,
         isPlatformMode,
+        allowInAppOrgManagement,
       }}
     >
       {children}
