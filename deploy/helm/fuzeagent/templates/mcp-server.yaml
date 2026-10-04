@@ -34,6 +34,13 @@ spec:
               value: "http://hierarchy-api:{{ .Values.hierarchyApi.port }}"
             - name: PYTHONUNBUFFERED
               value: "1"
+            - name: FUZEFRONT_SECURITY_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: FUZEFRONT_SECURITY_SERVICE_TOKEN
+                  optional: true
+
           readinessProbe:
             httpGet:
               path: /health

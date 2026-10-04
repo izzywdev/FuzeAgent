@@ -85,6 +85,11 @@ app.add_middleware(
 # Database connection pool
 db_pool = None
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "hierarchy-api"}
+
+
 # WebSocket connection manager
 class ConnectionManager:
     def __init__(self):
