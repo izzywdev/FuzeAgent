@@ -39,8 +39,10 @@ SUFFIX = "01h455vb4pex5vsknk084sn02q"
 BID = f"front_abs_{SUFFIX}"
 ORG = f"org_{SUFFIX}"
 USR = f"usr_{SUFFIX}"
-TOKEN = "inbound-secret-token"
-REG_TOKEN = "registration-token"
+TOKEN = "inbound-secret-token"  # nosec B105 -- test-only fixture, not a real credential
+REG_TOKEN = (
+    "registration-token"  # nosec B105 -- test-only fixture, not a real credential
+)
 API = "http://fuzefront-applications.fuzefront.svc:3003"
 PUBLIC = "https://app.fuzefront.com"
 CB_PATH = f"/api/v1/app-registry/build-sessions/{BID}/status"
@@ -377,13 +379,13 @@ def test_settings_fail_closed_listing():
     assert settings().missing_for_launch() == ()
     s = Settings.from_env(
         {
-            "APP_BUILD_API_TOKEN": " t ",
+            "APP_BUILD_API_TOKEN": " t ",  # nosec B105 -- test-only fixture, not a real credential
             "FUZEFRONT_API_URL": "http://x/",
             "APP_BUILD_CALLBACK_MAX_ATTEMPTS": "abc",
         }
     )
     assert (
-        s.inbound_token == "t"
+        s.inbound_token == "t"  # nosec B105 -- test-only fixture, not a real credential
         and s.fuzefront_api_url == "http://x"
         and s.callback_max_attempts == 5
     )
@@ -428,7 +430,9 @@ async def test_auth_missing_bad_and_valid_token():
 @pytest.mark.asyncio
 async def test_unset_inbound_token_fails_closed():
     ff = FakeFuzeFront()
-    rt, _ = make_runtime(ff, inbound_token="")
+    rt, _ = make_runtime(
+        ff, inbound_token=""
+    )  # nosec B106 -- test-only fixture, not a real credential
     async with http_client(app_for(rt)) as c:
         for hdr in (
             {},
@@ -448,7 +452,9 @@ async def test_no_runtime_and_missing_registry_config_fail_closed():
         assert (
             await c.post("/api/v1/app-builds", json=body(), headers=AUTH)
         ).status_code == 503
-    rt, _ = make_runtime(FakeFuzeFront(), fuzefront_token="")
+    rt, _ = make_runtime(
+        FakeFuzeFront(), fuzefront_token=""
+    )  # nosec B106 -- test-only fixture, not a real credential
     async with http_client(app_for(rt)) as c:
         r = await c.post("/api/v1/app-builds", json=body(), headers=AUTH)
         assert r.status_code == 503 and r.json()["error"] == "builder_unavailable"
@@ -1025,7 +1031,7 @@ async def test_token_and_brief_never_logged(caplog):
     caplog.set_level("DEBUG")
     ff = FakeFuzeFront()
     rt, _ = make_runtime(ff)
-    secret_brief = "SUPER-SECRET-BRIEF-CONTENT"
+    secret_brief = "SUPER-SECRET-BRIEF-CONTENT"  # nosec B105 -- test-only fixture, not a real credential
     async with http_client(app_for(rt)) as c:
         await c.post("/api/v1/app-builds", json=body(brief=secret_brief), headers=AUTH)
         await c.post(
