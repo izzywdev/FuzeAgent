@@ -487,7 +487,9 @@ async def list_brain_documents(brain_id: str):
     return docs
 
 
-@router.post("/brains/{brain_id}/documents", summary="Ingest Document into Brain Knowledge Base")
+@router.post(
+    "/brains/{brain_id}/documents", summary="Ingest Document into Brain Knowledge Base"
+)
 async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
     new_doc = {
         "id": f"doc_{uuid.uuid4().hex[:8]}",
