@@ -11,6 +11,9 @@
 imagePullSecrets:
   - name: ghcr-pull
 
+imageRegistry:
+  secretName: harbor-registry-creds
+
 orchestrator:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-orchestrator

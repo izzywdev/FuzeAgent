@@ -56,7 +56,7 @@ data:
               name: DOCKERFILE_CONFIG_MAP_NAME
           - name: registry-creds
             secret:
-              secretName: {{ .Values.imageRegistry.secretName | default "harbor-registry-creds" }}
+              secretName: {{ if and .Values.imageRegistry .Values.imageRegistry.secretName }}{{ .Values.imageRegistry.secretName }}{{ else }}harbor-registry-creds{{ end }}
               items:
               - key: .dockerconfigjson
                 path: config.json
