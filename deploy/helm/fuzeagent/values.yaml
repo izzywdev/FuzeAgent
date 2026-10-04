@@ -24,6 +24,10 @@ imagePullSecrets: []
 secret:
   existingSecret: fuzeagent-secrets
 
+# Image registry configuration (e.g. Harbor or private registry for dynamic agent builds)
+imageRegistry:
+  secretName: harbor-registry-creds
+
 # --- Application services -----------------------------------------------------
 orchestrator:
   enabled: true
@@ -148,6 +152,7 @@ federatedMount:
   host: ""
   annotations: {}
   path: /apps/fuzeagent
+
 
 # --- Namespace guardrails on the shared node ----------------------------------
 resourceGovernance:

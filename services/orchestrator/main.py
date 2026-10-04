@@ -30,6 +30,11 @@ from pydantic import BaseModel, Field
 
 from hierarchy_endpoints import router as hierarchy_router
 
+try:
+    from .image_registry_router import router as image_registry_router
+except ImportError:
+    from image_registry_router import router as image_registry_router
+
 from .agent_manager import AgentManager
 from .container_manager import ContainerConfig, ContainerStatus, container_manager
 from .context_service import ContextService
@@ -637,7 +642,9 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:3031",
         "http://localhost",
+        "https://app.fuzefront.com",
     ],
+    allow_origin_regex=r"https://.*\.fuzefront\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -645,6 +652,8 @@ app.add_middleware(
 
 # Include hierarchy router for organizational visualization
 app.include_router(hierarchy_router)
+# Include image registry, sandboxes, brains & escalations router
+app.include_router(image_registry_router)
 
 
 # Health check endpoint
