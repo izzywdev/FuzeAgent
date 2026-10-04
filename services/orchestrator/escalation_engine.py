@@ -107,7 +107,7 @@ class EscalationEngine:
             }
             await websocket_manager.broadcast(ws_msg)
         except Exception:
-            pass
+            logger.warning("Escalation websocket notification failed")
 
     async def create_escalation(
         self,
