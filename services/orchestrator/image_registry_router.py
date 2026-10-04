@@ -299,7 +299,6 @@ async def launch_sandbox(req: SandboxLaunchRequest):
 
 @router.post("/sandboxes/{sandbox_id}/terminate", summary="Terminate Active Sandbox")
 async def terminate_sandbox(sandbox_id: str):
-    global ACTIVE_SANDBOXES
     target = next((s for s in ACTIVE_SANDBOXES if s["id"] == sandbox_id), None)
     if not target:
         raise HTTPException(status_code=404, detail="Sandbox not found")
@@ -397,7 +396,6 @@ async def list_escalations():
 
 @router.post("/escalations/{escalation_id}/resolve", summary="Resolve Human Escalation")
 async def resolve_escalation(escalation_id: str, req: EscalationResolutionRequest):
-    global PENDING_ESCALATIONS
     target = next((e for e in PENDING_ESCALATIONS if e["id"] == escalation_id), None)
     if not target:
         raise HTTPException(status_code=404, detail="Escalation not found")
