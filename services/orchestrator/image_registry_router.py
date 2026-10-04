@@ -2,9 +2,10 @@
 Image Template Registry, Sandboxes, Brains & Escalations API Router for FuzeAgent.
 Provides REST and WebSocket-backed interfaces for:
 1. Agent Image Templates (Dockerfiles, FuzeKeys secrets, timeouts, eventBus)
-2. Live Sandboxes monitoring and lifecycle (spawn, list, stop)
-3. 5-Tier Brains & Memory hierarchy management and RAG retrieval
-4. Human-in-the-loop decision escalation approval
+2. Live Sandboxes monitoring and lifecycle (Track #1: Kubernetes Sandbox Driver)
+3. FuzeKeys Vault Secret Resolution (Track #2: Live cluster secret injection)
+4. 5-Tier Brains & Memory hierarchy management, Wiki & RAG retrieval (Track #4)
+5. Real-Time Human-in-the-loop decision escalation approval (Track #3: RabbitMQ + WebSocket)
 """
 
 import logging
@@ -14,6 +15,24 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+
+# Track #1: Kubernetes Pod Sandbox Driver
+try:
+    from .kubernetes_sandbox_driver import k8s_sandbox_driver
+except ImportError:
+    from kubernetes_sandbox_driver import k8s_sandbox_driver
+
+# Track #2: FuzeKeys Vault Secret Resolution
+try:
+    from .fuzekeys_resolver import fuzekeys_resolver
+except ImportError:
+    from fuzekeys_resolver import fuzekeys_resolver
+
+# Track #3: Real-Time Human Escalation Engine (RabbitMQ + WS)
+try:
+    from .escalation_engine import escalation_engine
+except ImportError:
+    from escalation_engine import escalation_engine
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +92,17 @@ class SandboxLaunchRequest(BaseModel):
     agentName: Optional[str] = None
     timeoutSeconds: Optional[int] = None
     envOverrides: Optional[Dict[str, str]] = None
+    orgId: Optional[str] = None
+
+
+class EscalationCreateRequest(BaseModel):
+    agentId: str
+    agentName: str
+    category: str
+    title: str
+    detail: str
+    costUsd: Optional[float] = 0.0
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class EscalationResolutionRequest(BaseModel):
@@ -88,6 +118,19 @@ class BrainQueryRequest(BaseModel):
     orgId: Optional[str] = None
     userId: Optional[str] = None
     tiers: Optional[List[str]] = None
+
+
+class BrainDocumentCreateRequest(BaseModel):
+    title: str
+    category: Optional[str] = "General"
+    content: str
+    author: Optional[str] = "Platform Architect"
+    tags: Optional[List[str]] = Field(default_factory=list)
+
+
+class BrainChatRequest(BaseModel):
+    message: str
+    sessionHistory: Optional[List[Dict[str, str]]] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +234,7 @@ ACTIVE_SANDBOXES: List[Dict[str, Any]] = [
         "name": "Python Dev (FastAPI Migration)",
         "templateId": "python-dev-v2",
         "status": "running",
-        "podName": "fuzeagent-sbx-python-dev-v2-7721",
+        "podName": "agent-sbx-python-dev-7721",
         "startedAt": datetime.now(timezone.utc).isoformat(),
         "timeoutSeconds": 1800,
         "secondsRemaining": 1420,
@@ -199,7 +242,7 @@ ACTIVE_SANDBOXES: List[Dict[str, Any]] = [
         "memUsage": "1.1Gi / 4Gi",
         "currentTask": "Refactoring PostgreSQL connection pool for asyncpg",
         "logs": [
-            "[INIT] Container spun up from ghcr.io/izzywdev/fuzeagent/claude-runner-python-dev:latest",
+            "[INIT] Kubernetes Pod spawned from ghcr.io/izzywdev/fuzeagent/claude-runner-python-dev:latest",
             "[FUZEKEYS] Injected 2 secrets via zero-trust API (ANTHROPIC_API_KEY, DATABASE_URL)",
             "[STREAM] Linked session to agent.stream.python-dev-v2",
             "[EXEC] Analyzing models/database.py syntax...",
@@ -207,19 +250,41 @@ ACTIVE_SANDBOXES: List[Dict[str, Any]] = [
     }
 ]
 
-PENDING_ESCALATIONS: List[Dict[str, Any]] = [
-    {
-        "id": "esc-101",
-        "agentId": "python-dev-v2",
-        "agentName": "Python Dev (FastAPI Migration)",
-        "category": "destructive_operation",
-        "title": "Drop and recreate table 'billing_ledger'",
-        "detail": "Agent attempted to run 'DROP TABLE billing_ledger CASCADE;' during migration script execution.",
-        "costUsd": 0.12,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "status": "pending",
-    }
-]
+# Track #4: In-Memory / pgvector backed documents store
+BRAIN_DOCUMENTS: Dict[str, List[Dict[str, Any]]] = {
+    "default": [
+        {
+            "id": "doc_arch_01",
+            "title": "Module Federation & Multi-Tenant MFE Architecture",
+            "category": "Architecture",
+            "content": "FuzeFront uses Webpack & Vite Module Federation to stitch autonomous microfrontends into a cohesive portal shell. React 19 is shared singleton across all remotes.",
+            "author": "Platform Architect",
+            "updatedAt": "2 hours ago",
+            "tags": ["mfe", "vite", "federation", "architecture"],
+            "chunksCount": 8,
+        },
+        {
+            "id": "doc_agents_02",
+            "title": "Autonomous Agent Sandboxing & TTL Policies",
+            "category": "Agent Ops",
+            "content": "All agent pods (Python, React, DevOps, Marketing) run with strict rootless execution, default 30m auto-shutdown TTL, and FuzeKeys zero-exposure secrets injection.",
+            "author": "DevOps Lead",
+            "updatedAt": "Yesterday",
+            "tags": ["security", "sandboxes", "agents", "ttl"],
+            "chunksCount": 5,
+        },
+        {
+            "id": "doc_fuzekeys_03",
+            "title": "FuzeKeys Zero-Exposure Vault Protocol",
+            "category": "Security",
+            "content": "Credentials never touch disk or git repos. They are dynamically resolved over internal cluster HTTP API via opaque tokenized references.",
+            "author": "Security Architect",
+            "updatedAt": "3 days ago",
+            "tags": ["fuzekeys", "security", "zero-exposure", "vault"],
+            "chunksCount": 6,
+        },
+    ]
+}
 
 # ---------------------------------------------------------------------------
 # Router Endpoints
@@ -264,8 +329,22 @@ async def trigger_kaniko_build(template_id: str):
     )
 
 
+# ---------------------------------------------------------------------------
+# Track #1 & #2: Sandboxes Lifecycle & Live FuzeKeys Secret Resolution
+# ---------------------------------------------------------------------------
+
+
 @router.get("/sandboxes", summary="List Active Sandboxed Containers")
 async def list_sandboxes():
+    # Sync with live Kubernetes pods if available
+    try:
+        k8s_pods = await k8s_sandbox_driver.list_sandbox_pods()
+        live_names = {p["podName"] for p in k8s_pods}
+        for sbx in ACTIVE_SANDBOXES:
+            if sbx.get("podName") and sbx["podName"] in live_names:
+                sbx["status"] = "running"
+    except Exception as e:
+        logger.debug(f"K8s pod list sync: {e}")
     return ACTIVE_SANDBOXES
 
 
@@ -275,25 +354,52 @@ async def launch_sandbox(req: SandboxLaunchRequest):
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    sbx_id = f"sbx-{req.templateId[:4]}-{uuid.uuid4().hex[:4]}"
     timeout = req.timeoutSeconds or template["sandboxing"]["defaultTimeoutSeconds"]
+
+    # 1. Track #2: Live FuzeKeys Secret Resolution
+    secret_bindings = template.get("fuzeKeysSecrets", [])
+    resolved_secrets = await fuzekeys_resolver.resolve_secrets(
+        secret_bindings=secret_bindings,
+        org_id=req.orgId,
+    )
+
+    # Combine environment variables
+    env_vars = {
+        **template.get("envVars", {}),
+        **resolved_secrets,
+        **(req.envOverrides or {}),
+    }
+
+    # 2. Track #1: Kubernetes Sandbox Driver Pod Creation
+    k8s_res = await k8s_sandbox_driver.spawn_sandbox_pod(
+        template_id=template["id"],
+        image=template["image"],
+        env_vars=env_vars,
+        timeout_seconds=timeout,
+        cpu_limit=template["sandboxing"]["cpuLimit"],
+        memory_limit=template["sandboxing"]["memoryLimit"],
+    )
+
+    sbx_id = k8s_res["id"]
+    pod_name = k8s_res["podName"]
 
     new_sbx = {
         "id": sbx_id,
         "name": req.agentName or f"{template['name']} ({sbx_id})",
         "templateId": template["id"],
         "status": "running",
-        "podName": f"fuzeagent-{sbx_id}",
-        "startedAt": datetime.now(timezone.utc).isoformat(),
+        "podName": pod_name,
+        "startedAt": k8s_res["startedAt"],
         "timeoutSeconds": timeout,
         "secondsRemaining": timeout,
         "cpuUsage": f"0.1 / {template['sandboxing']['cpuLimit']}",
         "memUsage": f"512Mi / {template['sandboxing']['memoryLimit']}",
-        "currentTask": "Container initialized. Waiting for task assignment.",
+        "currentTask": "Container initialized via K8s driver. Waiting for task assignment.",
         "logs": [
-            f"[INIT] Booting container {template['image']}",
-            f"[SANDBOX] Configured {timeout}s auto-shutdown countdown timer",
-            "[FUZEKEYS] Resolving bound secrets...",
+            f"[K8S] Pod {pod_name} scheduled in namespace {k8s_res.get('namespace', 'fuzeagent')}",
+            f"[INIT] Booting image {template['image']}",
+            f"[SANDBOX] Configured {timeout}s auto-shutdown countdown timer (activeDeadlineSeconds)",
+            f"[FUZEKEYS] Injected {len(resolved_secrets)} resolved vault secrets into Pod spec",
             f"[EVENTBUS] Connected to {template['eventBus']['channel']}",
         ],
     }
@@ -307,10 +413,19 @@ async def terminate_sandbox(sandbox_id: str):
     if not target:
         raise HTTPException(status_code=404, detail="Sandbox not found")
 
+    # Track #1: Terminate K8s Pod
+    if target.get("podName"):
+        await k8s_sandbox_driver.terminate_sandbox_pod(target["podName"])
+
     target["status"] = "terminated"
     target["secondsRemaining"] = 0
-    target["logs"].append(f"[SHUTDOWN] Sandbox terminated by supervisor.")
+    target["logs"].append("[SHUTDOWN] Sandbox Pod terminated by supervisor.")
     return {"status": "terminated", "sandboxId": sandbox_id}
+
+
+# ---------------------------------------------------------------------------
+# Track #4: 5-Tier Brains, Wiki Documents & RAG Chat Retrieval
+# ---------------------------------------------------------------------------
 
 
 @router.get("/brains/hierarchy", summary="Get 5-Tier Memory & Brains Hierarchy")
@@ -366,6 +481,72 @@ async def get_brains_hierarchy():
     }
 
 
+@router.get("/brains/{brain_id}/documents", summary="List Documents in Brain Wiki")
+async def list_brain_documents(brain_id: str):
+    docs = BRAIN_DOCUMENTS.get(brain_id) or BRAIN_DOCUMENTS.get("default", [])
+    return docs
+
+
+@router.post("/brains/{brain_id}/documents", summary="Ingest Document into Brain Knowledge Base")
+async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
+    new_doc = {
+        "id": f"doc_{uuid.uuid4().hex[:8]}",
+        "title": doc.title,
+        "category": doc.category or "General",
+        "content": doc.content,
+        "author": doc.author or "Human Architect",
+        "updatedAt": "Just now",
+        "tags": doc.tags or [],
+        "chunksCount": max(1, len(doc.content) // 250),
+    }
+
+    if brain_id not in BRAIN_DOCUMENTS:
+        BRAIN_DOCUMENTS[brain_id] = list(BRAIN_DOCUMENTS["default"])
+    BRAIN_DOCUMENTS[brain_id].insert(0, new_doc)
+
+    logger.info(f"📚 Brain Document ingested: '{doc.title}' into brain '{brain_id}'")
+    return {"status": "ingested", "document": new_doc}
+
+
+@router.post("/brains/{brain_id}/chat", summary="Chat with Brain Knowledge Base")
+async def chat_with_brain(brain_id: str, req: BrainChatRequest):
+    docs = BRAIN_DOCUMENTS.get(brain_id) or BRAIN_DOCUMENTS.get("default", [])
+    query_lower = req.message.lower()
+
+    # Find matching documents
+    matches = []
+    for d in docs:
+        score = 0
+        if any(w in d["title"].lower() for w in query_lower.split()):
+            score += 0.5
+        if any(w in d["content"].lower() for w in query_lower.split()):
+            score += 0.4
+        if score > 0:
+            matches.append((score, d))
+
+    matches.sort(key=lambda x: x[0], reverse=True)
+    top_matches = matches[:2]
+
+    citations = [
+        {
+            "title": m[1]["title"],
+            "excerpt": m[1]["content"][:180] + "...",
+        }
+        for m in top_matches
+    ]
+
+    if citations:
+        answer = f"Based on indexed documents in '{brain_id}': {citations[0]['excerpt']} All operations follow these architectural patterns."
+    else:
+        answer = f"I've searched the '{brain_id}' knowledge store for '{req.message}'. No direct conflicts were found in the current architectural standards."
+
+    return {
+        "reply": answer,
+        "citations": citations,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @router.post("/brains/query", summary="Multi-Tier Cascading RAG Retrieval")
 async def query_brains(req: BrainQueryRequest):
     return {
@@ -393,20 +574,37 @@ async def query_brains(req: BrainQueryRequest):
     }
 
 
+# ---------------------------------------------------------------------------
+# Track #3: Real-Time Human Decision Escalation Engine (RabbitMQ + WS)
+# ---------------------------------------------------------------------------
+
+
 @router.get("/escalations", summary="List Pending Human Escalations")
 async def list_escalations():
-    return PENDING_ESCALATIONS
+    return escalation_engine.list_escalations()
+
+
+@router.post("/escalations", summary="Create Escalation from Agent Sandbox")
+async def create_escalation(req: EscalationCreateRequest):
+    return await escalation_engine.create_escalation(
+        agent_id=req.agentId,
+        agent_name=req.agentName,
+        category=req.category,
+        title=req.title,
+        detail=req.detail,
+        cost_usd=req.costUsd or 0.0,
+        metadata=req.metadata,
+    )
 
 
 @router.post("/escalations/{escalation_id}/resolve", summary="Resolve Human Escalation")
 async def resolve_escalation(escalation_id: str, req: EscalationResolutionRequest):
-    target = next((e for e in PENDING_ESCALATIONS if e["id"] == escalation_id), None)
-    if not target:
+    res = await escalation_engine.resolve_escalation(
+        escalation_id=escalation_id,
+        decision=req.decision,
+        approver_id=req.approverId or "admin",
+        notes=req.notes,
+    )
+    if not res:
         raise HTTPException(status_code=404, detail="Escalation not found")
-
-    target["status"] = req.decision
-    target["resolvedAt"] = datetime.now(timezone.utc).isoformat()
-    target["approverId"] = req.approverId
-    target["notes"] = req.notes
-
-    return {"status": "resolved", "escalation": target}
+    return {"status": "resolved", "escalation": res}

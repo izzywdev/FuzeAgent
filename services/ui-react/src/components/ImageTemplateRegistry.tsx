@@ -333,9 +333,14 @@ export function ImageTemplateRegistry() {
                 onClick={() => setSelectedTemplate(tmpl)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer ${
                   isSelected 
-                    ? 'bg-indigo-950/20 border-indigo-500/80 shadow-md ring-1 ring-indigo-500/40' 
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    ? 'ring-1 ring-indigo-500/40 shadow-lg' 
+                    : 'hover:border-slate-600'
                 }`}
+                style={{
+                  backgroundColor: isSelected ? 'rgba(110, 92, 255, 0.14)' : 'var(--bg-tertiary, #141a26)',
+                  borderColor: isSelected ? 'var(--accent-color, #6e5cff)' : 'var(--border-color, #232c3d)',
+                  color: 'var(--text-primary, #e7ecf5)'
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
@@ -367,13 +372,25 @@ export function ImageTemplateRegistry() {
         </div>
 
         {/* Selected Template Deep-Dive Inspector */}
-        <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+        <div 
+          className="lg:col-span-8 rounded-xl border shadow-lg overflow-hidden flex flex-col"
+          style={{
+            backgroundColor: 'var(--bg-tertiary, #141a26)',
+            borderColor: 'var(--border-color, #232c3d)'
+          }}
+        >
           {/* Header */}
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50">
+          <div 
+            className="p-6 border-b flex flex-col md:flex-row md:items-center justify-between gap-4"
+            style={{
+              backgroundColor: 'var(--bg-secondary, #0b0e15)',
+              borderColor: 'var(--border-color, #232c3d)'
+            }}
+          >
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{selectedTemplate.name}</h3>
-                <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-mono">
+                <h3 className="text-lg font-bold text-white">{selectedTemplate.name}</h3>
+                <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-950 text-indigo-300 font-mono border border-indigo-800/50">
                   {selectedTemplate.id}
                 </span>
               </div>
