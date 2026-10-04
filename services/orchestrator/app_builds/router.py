@@ -24,12 +24,24 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from . import flags
+from .fuzefront import CallbackUrlRejected
 from .models import BUILD_SESSION_ID_PATTERN, BuildRecord, LaunchRequest
 from .runtime import BuildRuntime, IdempotencyConflict
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/app-builds", tags=["app-builds"])
+
+# Fixed, caller-safe explanations for a rejected callbackUrl, keyed by the short code that
+# CallbackUrlRejected carries. Nothing from the exception itself reaches the response.
+CALLBACK_REJECTION_DEFAULT = "callbackUrl is not acceptable"
+CALLBACK_REJECTION_MESSAGES: Dict[str, str] = {
+    "not_a_url": "callbackUrl is not a valid URL",
+    "bad_scheme_or_credentials": "callbackUrl must be an http(s) URL without credentials",
+    "origin_not_allowed": "callbackUrl origin is not an allowed FuzeFront origin",
+    "wrong_path": "callbackUrl path must be this session's status endpoint",
+    "relative_without_base": "a relative callbackUrl cannot be resolved by this service",
+}
 
 MAX_BODY_BYTES = 32 * 1024
 _ID_RE = re.compile(BUILD_SESSION_ID_PATTERN)
@@ -162,13 +174,18 @@ async def launch_build(
         )
     try:
         rec, created = await runtime.accept(req)
-    except ValueError as exc:  # callbackUrl rejected
+    except CallbackUrlRejected as exc:
+        # Fixed messages keyed by a short code: never echo exception text to the caller.
+        message = CALLBACK_REJECTION_MESSAGES.get(exc.code, CALLBACK_REJECTION_DEFAULT)
+        logger.info(
+            "app_builds launch callbackUrl rejected req_id=%s code=%s", req_id, exc.code
+        )
         return JSONResponse(
             status_code=400,
             content={
                 "error": "validation_error",
                 "message": "Request body failed validation",
-                "fields": [{"path": "callbackUrl", "message": str(exc)}],
+                "fields": [{"path": "callbackUrl", "message": message}],
             },
         )
     except IdempotencyConflict:

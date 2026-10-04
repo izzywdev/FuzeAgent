@@ -41,6 +41,16 @@ class SlugConflict(RegistryError):
     pass
 
 
+class CallbackUrlRejected(ValueError):
+    """``callbackUrl`` failed validation. Carries only a short stable ``code``; the HTTP layer
+    maps it to a fixed message (router.CALLBACK_REJECTION_MESSAGES) so no exception text, and no
+    server configuration detail, is ever echoed to the caller."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
 def resolve_callback_url(raw: str, build_session_id: str, settings: Settings) -> str:
     """Resolve + validate ``callbackUrl``. The registration token is sent there, so it must
     only ever point at FuzeFront: allowed origins are the configured FuzeFront bases (plus an
@@ -49,24 +59,22 @@ def resolve_callback_url(raw: str, build_session_id: str, settings: Settings) ->
     if raw.startswith("/") and not raw.startswith("//"):
         base = settings.callback_base
         if not base:
-            raise ValueError(
-                "relative callbackUrl but FUZEFRONT_PUBLIC_BASE_URL/FUZEFRONT_API_URL unset"
-            )
+            raise CallbackUrlRejected("relative_without_base")
         url = base.rstrip("/") + raw
     else:
         url = raw
     try:
         p = urlsplit(url)
     except ValueError as exc:
-        raise ValueError("callbackUrl is not a valid URL") from exc
+        raise CallbackUrlRejected("not_a_url") from exc
     if p.scheme not in ("http", "https") or not p.hostname or p.username or p.password:
-        raise ValueError("callbackUrl must be an http(s) URL without credentials")
+        raise CallbackUrlRejected("bad_scheme_or_credentials")
     port = f":{p.port}" if p.port else ""
     origin = f"{p.scheme}://{p.hostname.lower()}{port}"
     if origin not in settings.allowed_callback_origins():
-        raise ValueError("callbackUrl origin is not an allowed FuzeFront origin")
+        raise CallbackUrlRejected("origin_not_allowed")
     if p.path != expected_path or p.query or p.fragment:
-        raise ValueError("callbackUrl path must be this session's status endpoint")
+        raise CallbackUrlRejected("wrong_path")
     return url
 
 

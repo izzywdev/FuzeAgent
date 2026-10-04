@@ -532,6 +532,29 @@ async def test_validation_malformed_json_and_oversize():
 
 @pytest.mark.api
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad,expected",
+    [
+        ("https://evil.example" + CB_PATH, "origin is not an allowed FuzeFront origin"),
+        (PUBLIC + "/api/v1/other", "path must be this session's status endpoint"),
+        ("ftp://app.fuzefront.com" + CB_PATH, "http(s) URL without credentials"),
+    ],
+)
+async def test_callback_rejection_message_is_fixed_and_leaks_nothing(bad, expected):
+    """The 400 carries a fixed message chosen by reason code, never exception text (CodeQL
+    py/stack-trace-exposure) and never server configuration detail."""
+    ff = FakeFuzeFront()
+    rt, _ = make_runtime(ff)
+    async with http_client(app_for(rt)) as c:
+        r = await c.post("/api/v1/app-builds", json=body(callbackUrl=bad), headers=AUTH)
+    assert r.status_code == 400
+    msg = r.json()["fields"][0]["message"]
+    assert expected in msg
+    assert "FUZEFRONT_" not in r.text and "Traceback" not in r.text
+
+
+@pytest.mark.api
+@pytest.mark.asyncio
 async def test_relative_callback_url_accepted_and_resolved():
     ff = FakeFuzeFront()
     rt, _ = make_runtime(ff)
