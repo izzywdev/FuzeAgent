@@ -68,9 +68,7 @@ class FuzeKeysResolver:
                 env_val = os.getenv(key_name)
                 if env_val:
                     resolved[key_name] = env_val
-                    logger.info(
-                        f"🔑 FuzeKeys: Resolved {key_name} from ambient environment"
-                    )
+                    logger.debug("Resolved sandbox credential from environment")
                     continue
 
                 # 2. Query FuzeKeys cluster backend
@@ -84,18 +82,13 @@ class FuzeKeysResolver:
                         )
                         if val:
                             resolved[key_name] = str(val)
-                            logger.info(
-                                f"🔒 FuzeKeys: Decrypted live secret '{secret_ref}' -> {key_name}"
-                            )
+                            logger.debug("Resolved sandbox credential from vault")
                             continue
-                except Exception as e:
-                    logger.debug(f"FuzeKeys API lookup failed for {secret_ref}: {e}")
+                except Exception:
+                    logger.warning("Sandbox credential lookup failed")
 
-                # 3. Fallback: masked token representation to avoid crash
-                resolved[key_name] = f"fk_live_{secret_ref[:12]}"
-                logger.info(
-                    f"🛡️ FuzeKeys: Injected opaque zero-trust ref for {key_name}"
-                )
+                # Do not launch a sandbox with a fabricated or missing credential.
+                raise RuntimeError("Required sandbox credential could not be resolved")
 
         return resolved
 
