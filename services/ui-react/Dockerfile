@@ -35,7 +35,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy built app from build stage to both root and /apps/fuzeagent
 COPY --from=build /app/dist /usr/share/nginx/html
-RUN mkdir -p /usr/share/nginx/html/apps/fuzeagent && cp -r /app/dist/* /usr/share/nginx/html/apps/fuzeagent/
+COPY --from=build /app/dist /usr/share/nginx/html/apps/fuzeagent
 
 
 # Add healthcheck
