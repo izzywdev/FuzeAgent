@@ -2,12 +2,15 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: redis-data
+  name: {{ .Values.redis.claimName | default "redis-data" }}
   labels:
     {{- include "fuzeagent.labels" . | nindent 4 }}
     app.kubernetes.io/component: redis
 spec:
   accessModes: ["ReadWriteOnce"]
+  {{- if .Values.redis.storageClassName }}
+  storageClassName: {{ .Values.redis.storageClassName | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.redis.storage }}
@@ -58,7 +61,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: redis-data
+            claimName: {{ .Values.redis.claimName | default "redis-data" }}
 ---
 apiVersion: v1
 kind: Service

@@ -11,6 +11,8 @@ import ImageTemplateRegistry from './components/ImageTemplateRegistry'
 import BrainsMemoryHierarchy from './components/BrainsMemoryHierarchy'
 import SandboxesView from './components/SandboxesView'
 import EscalationsView from './components/EscalationsView'
+import { MultiAgentChatWorkspace } from './components/MultiAgentChatWorkspace'
+import { OrgProvider, useOrgContext } from './context/OrgContext'
 import { api, createWebSocket } from './config/api'
 import type { 
   Agent, Task, AgentTemplate, 
@@ -19,7 +21,7 @@ import type {
 } from './types'
 
 
-function App() {
+function FuzeAgentDashboard() {
   // Hierarchy state
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -34,7 +36,9 @@ function App() {
   // UI state
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'workspace' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
+  const [showEventsDropdown, setShowEventsDropdown] = useState(false)
+  const { activeOrg, user: orgUser, organizations: platformOrgs, switchOrg, recentEvents } = useOrgContext()
 
   // FuzeFront Platform Bridge: Register app-specific menu items into host shell
   useEffect(() => {
@@ -42,11 +46,12 @@ function App() {
     if (bridge?.menu) {
       bridge.menu.add('fuzeagent', [
         { id: 'overview', label: 'Agents Overview', icon: '🤖', order: 1 },
-        { id: 'templates', label: 'Image Registry', icon: '📦', order: 2 },
-        { id: 'brains', label: 'Brains & Memory', icon: '🧠', order: 3 },
-        { id: 'sandboxes', label: 'Sandboxes & Runtime', icon: '🛡️', order: 4 },
-        { id: 'teams', label: 'Teams & Hierarchy', icon: '👥', order: 5 },
-        { id: 'escalations', label: 'Escalations & Approvals', icon: '⚡', order: 6 },
+        { id: 'workspace', label: 'Agent Workspace (VS Code)', icon: '🖥️', order: 2 },
+        { id: 'templates', label: 'Image Registry', icon: '📦', order: 3 },
+        { id: 'brains', label: 'Brains & Memory Wiki', icon: '🧠', order: 4 },
+        { id: 'sandboxes', label: 'Sandboxes & Runtime', icon: '🛡️', order: 5 },
+        { id: 'teams', label: 'Teams & Hierarchy', icon: '👥', order: 6 },
+        { id: 'escalations', label: 'Escalations & Approvals', icon: '⚡', order: 7 },
       ])
     }
 
@@ -54,7 +59,7 @@ function App() {
       const target = e.detail?.section || e.detail?.id || e.detail
       if (typeof target === 'string') {
         const clean = target.replace(/^\/?(app\/)?fuzeagent\/?/, '').replace(/^\//, '')
-        if (['overview', 'templates', 'brains', 'sandboxes', 'teams', 'escalations'].includes(clean)) {
+        if (['overview', 'workspace', 'templates', 'brains', 'sandboxes', 'teams', 'escalations'].includes(clean)) {
           setActiveTab(clean as any)
         } else if (clean === '' || clean === 'agents') {
           setActiveTab('overview')
@@ -374,6 +379,16 @@ function App() {
                   🤖 Overview
                 </button>
                 <button
+                  onClick={() => setActiveTab('workspace')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    activeTab === 'workspace'
+                      ? 'bg-purple-100 text-purple-700 font-bold border border-purple-300'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  🖥️ Workspace (VS Code)
+                </button>
+                <button
                   onClick={() => setActiveTab('templates')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     activeTab === 'templates'
@@ -427,6 +442,64 @@ function App() {
             </div>
 
             <div className="flex space-x-3 items-center">
+              {/* Organization & Context Switcher */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+                <span className="text-[11px] text-slate-500 font-medium">Org:</span>
+                <select
+                  value={activeOrg?.id || ''}
+                  onChange={(e) => switchOrg(e.target.value)}
+                  className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer"
+                >
+                  {platformOrgs.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
+                {activeOrg?.tier && (
+                  <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                    {activeOrg.tier}
+                  </span>
+                )}
+                {orgUser && (
+                  <span className="text-[11px] text-slate-600 font-medium pl-1.5 border-l border-slate-200">
+                    👤 {orgUser.name || orgUser.email}
+                  </span>
+                )}
+              </div>
+
+              {/* Real-time Global Event Notifications */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowEventsDropdown(!showEventsDropdown)}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1.5 text-xs transition-colors"
+                  title="Global Platform Events"
+                >
+                  <span>⚡</span>
+                  <span className="font-semibold">{recentEvents.length}</span>
+                </button>
+                {showEventsDropdown && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 z-50 animate-in fade-in">
+                    <div className="flex items-center justify-between border-b pb-2 mb-2">
+                      <span className="text-xs font-bold text-slate-800">Global Events Feed</span>
+                      <span className="text-[10px] text-slate-400">Live platform bus</span>
+                    </div>
+                    {recentEvents.length === 0 ? (
+                      <div className="text-xs text-slate-400 py-3 text-center">No recent events</div>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto space-y-1.5">
+                        {recentEvents.map((evt) => (
+                          <div key={evt.id} className="text-xs p-1.5 rounded bg-slate-50 border border-slate-100">
+                            <div className="font-mono text-[10px] text-purple-600 font-bold uppercase">{evt.type}</div>
+                            <div className="text-slate-700 text-[11px]">{evt.message}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={handleRefresh}
                 disabled={loading}
@@ -449,6 +522,11 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 px-4">
+        {activeTab === 'workspace' && (
+          <div className="h-[800px] rounded-xl overflow-hidden border border-slate-800 shadow-xl mb-6">
+            <MultiAgentChatWorkspace />
+          </div>
+        )}
         {activeTab === 'templates' && <ImageTemplateRegistry />}
         {activeTab === 'brains' && <BrainsMemoryHierarchy />}
         {activeTab === 'sandboxes' && <SandboxesView />}
@@ -594,5 +672,11 @@ function App() {
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <OrgProvider>
+      <FuzeAgentDashboard />
+    </OrgProvider>
+  )
+}
 

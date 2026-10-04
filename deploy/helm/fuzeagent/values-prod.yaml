@@ -79,3 +79,16 @@ ingress:
 federatedMount:
   enabled: true
   host: app.fuzefront.com
+
+postgres:
+  storageClassName: local-path
+  claimName: postgres-data-v2
+
+redis:
+  storageClassName: local-path
+  claimName: redis-data-v2
+
+rabbitmq:
+  storageClassName: local-path
+  claimName: rabbitmq-data-v2
+

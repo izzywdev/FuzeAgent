@@ -1,0 +1,66 @@
+/* ============================================================
+   FuzeFront Design System Tokens — FuzeAgent Consuming Layer
+   Matches FuzeFront DS tokens 1:1 for seamless host embedding
+   ============================================================ */
+
+:root,
+[data-theme='dark'] {
+  /* Surface hierarchy */
+  --bg-secondary:  #0b0e15;  /* Deepest shell / top bar */
+  --bg-primary:    #0f131c;  /* Main content canvas */
+  --bg-tertiary:   #141a26;  /* Cards, panels, sidebars */
+  --bg-quaternary: #1c2433;  /* Raised elements, inputs, hover states */
+
+  /* Borders */
+  --border-color:  #232c3d;
+  --border-strong: #303b50;
+
+  /* Typography */
+  --text-primary:   #e7ecf5;
+  --text-secondary: #9fa9bc;
+  --text-tertiary:  #66718a;
+
+  /* The Fuse — signature brand gradient */
+  --accent-color: #6e5cff;
+  --accent-hover: #5847e6;
+  --accent-soft:  rgba(110, 92, 255, 0.14);
+  --accent-2:     #29d3e6;
+  --seam:         linear-gradient(90deg, #6e5cff 0%, #29d3e6 100%);
+
+  /* Status Colors */
+  --success-color: #34d399;
+  --success-soft:  rgba(52, 211, 153, 0.12);
+  --warning-color: #f5a623;
+  --warning-soft:  rgba(245, 166, 35, 0.12);
+  --error-color:   #f26b7a;
+  --error-soft:    rgba(243, 105, 127, 0.12);
+
+  /* Shadows & Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* Fonts */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Dockview theme compatibility overrides */
+  --dockview-theme-background-color: var(--bg-primary);
+  --dockview-theme-border-color: var(--border-color);
+  --dockview-theme-header-color: var(--bg-secondary);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+}

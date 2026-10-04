@@ -11,8 +11,10 @@ import {
   Eye, 
   Edit3, 
   Search, 
-  Plus
+  Plus,
+  BookOpen
 } from 'lucide-react';
+import { BrainWikiExplorer } from './BrainWikiExplorer';
 
 export interface BrainItem {
   id: string;
@@ -111,6 +113,7 @@ export function BrainsMemoryHierarchy() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [querySimulation, setQuerySimulation] = useState('How do we authenticate with FuzeKeys in the bank scraper?');
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isWikiOpen, setIsWikiOpen] = useState(false);
   const [simulationResult, setSimulationResult] = useState<string | null>(null);
 
   // New Custom Brain form state
@@ -180,6 +183,19 @@ export function BrainsMemoryHierarchy() {
         return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300"><Database className="w-3 h-3" /> Custom Brain</span>;
     }
   };
+
+  if (isWikiOpen) {
+    return (
+      <div className="h-full flex flex-col min-h-[700px] rounded-xl border border-slate-800 overflow-hidden">
+        <BrainWikiExplorer
+          brainId={selectedBrain.id}
+          brainName={selectedBrain.name}
+          brainTier={selectedBrain.scope.toUpperCase()}
+          onClose={() => setIsWikiOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -282,10 +298,19 @@ export function BrainsMemoryHierarchy() {
               {getScopeBadge(selectedBrain.scope)}
             </div>
             <p className="text-xs text-slate-500 mt-1">{selectedBrain.description}</p>
-            <div className="mt-3 flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
-              <span>Indexed Items: <strong>{selectedBrain.itemCount}</strong></span>
-              <span>Persistence: <strong>{selectedBrain.isPersistent ? 'Permanent DB (pgvector)' : 'Ephemeral In-Memory'}</strong></span>
-              <span>Updated: <strong>{selectedBrain.lastUpdated}</strong></span>
+            <div className="mt-3 flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
+                <span>Indexed Items: <strong>{selectedBrain.itemCount}</strong></span>
+                <span>Persistence: <strong>{selectedBrain.isPersistent ? 'Permanent DB (pgvector)' : 'Ephemeral In-Memory'}</strong></span>
+                <span>Updated: <strong>{selectedBrain.lastUpdated}</strong></span>
+              </div>
+              <button
+                onClick={() => setIsWikiOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                Explore Wiki & Chat
+              </button>
             </div>
           </div>
 

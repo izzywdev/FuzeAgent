@@ -105,6 +105,8 @@ postgres:
   database: ai_context
   user: postgres
   storage: 5Gi
+  storageClassName: local-path
+  claimName: postgres-data-v2
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits: { cpu: "1", memory: 1Gi }
@@ -114,6 +116,8 @@ redis:
   image: redis:7-alpine
   port: 6379
   storage: 1Gi
+  storageClassName: local-path
+  claimName: redis-data-v2
   resources:
     requests: { cpu: 25m, memory: 64Mi }
     limits: { cpu: 250m, memory: 256Mi }
@@ -125,6 +129,8 @@ rabbitmq:
   managementPort: 15672
   user: admin
   storage: 2Gi
+  storageClassName: local-path
+  claimName: rabbitmq-data-v2
   resources:
     requests: { cpu: 50m, memory: 256Mi }
     limits: { cpu: 500m, memory: 512Mi }

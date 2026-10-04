@@ -35,6 +35,8 @@
     "axios": "^1.11.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "dockview": "^8.4.0",
+    "dockview-react": "^8.4.0",
     "fuse.js": "^7.1.0",
     "lucide-react": "^0.469.0",
     "prism-react-renderer": "^2.4.1",
