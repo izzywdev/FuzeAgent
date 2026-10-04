@@ -60,6 +60,21 @@ orchestrator:
     jwtAudience: ""
     jwtIssuer: ""
     corsAllowOrigins: "http://localhost:3000,http://localhost:3031"
+  # FuzeFront "build your application" API (docs/app-builds.md). Every key is optional and
+  # the defaults FAIL CLOSED: `enabled: false` is the release flag
+  # fuzeagent.app-builds.enabled (default OFF -> 503), and with no APP_BUILD_API_TOKEN the
+  # endpoint refuses every request (503) rather than accepting unauthenticated callers.
+  appBuilds:
+    enabled: false
+    # Public FuzeFront base used to resolve a relative callbackUrl and to allow-list the
+    # callback origin. Empty -> falls back to fuzefront.apiUrl (cluster-internal).
+    fuzefrontPublicBaseUrl: ""
+    # Optional UI deep link; "{agentSessionRef}" is substituted. Empty -> no agentSessionUrl.
+    sessionUrlTemplate: ""
+    # Secrets (never inline): APP_BUILD_API_TOKEN lives in the SealedSecret
+    # `fuzeagent-secrets` (inbound bearer; FuzeFront's FUZEAGENT_BUILD_API_TOKEN must equal
+    # it). FUZEFRONT_REGISTRATION_TOKEN is REUSED from the `fuzefront-registration` secret
+    # the UI init container already consumes (key: token).
   resources:
     requests: { cpu: 150m, memory: 384Mi }
     limits: { cpu: "1", memory: 1Gi }

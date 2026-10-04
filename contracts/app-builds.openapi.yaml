@@ -1,0 +1,105 @@
+openapi: 3.1.0
+info:
+  title: FuzeAgent App Builds API
+  version: 0.1.0
+  summary: Machine-to-machine API FuzeFront calls to start/cancel "build your application" sessions.
+  description: >-
+    Served by the orchestrator (services/orchestrator/app_builds). Bearer auth with the shared
+    APP_BUILD_API_TOKEN; behind release flag fuzeagent.app-builds.enabled (default OFF -> 503).
+    Deliberately NOT part of contracts/openapi.yaml (the MCP-gateway surface): this is a
+    service-to-service endpoint, not an agent tool. See docs/app-builds.md.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/app-builds:
+    post:
+      operationId: launchAppBuild
+      summary: Create an agent session that builds and deploys an app
+      description: Idempotent on buildSessionId. Returns once the session is persisted and queued.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LaunchAppBuildRequest' }
+      responses:
+        '201': { description: Session created, content: { application/json: { schema: { $ref: '#/components/schemas/AppBuildSession' } } } }
+        '200': { description: Idempotent replay, content: { application/json: { schema: { $ref: '#/components/schemas/AppBuildSession' } } } }
+        '400': { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { description: Missing or invalid bearer token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: buildSessionId reused with a different request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: Body too large, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: Feature flag off, or builder not configured (fail closed), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/app-builds/{buildSessionId}:
+    get:
+      operationId: getAppBuild
+      summary: Read a build session
+      parameters:
+        - { $ref: '#/components/parameters/BuildSessionId' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AppBuildSession' } } } }
+        '401': { description: Unauthorized, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: Flag off / not configured, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/app-builds/{buildSessionId}/cancel:
+    post:
+      operationId: cancelAppBuild
+      summary: Cancel a non-terminal build session (no-op on terminal ones)
+      parameters:
+        - { $ref: '#/components/parameters/BuildSessionId' }
+      responses:
+        '200':
+          description: Current state; `cancelled` is false when the session was already terminal.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/AppBuildSession' }
+                  - type: object
+                    required: [cancelled]
+                    properties: { cancelled: { type: boolean } }
+        '401': { description: Unauthorized, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: Flag off / not configured, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    BuildSessionId:
+      name: buildSessionId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[a-z][a-z_]{0,60}_[0-9a-hjkmnp-tv-z]{26}$' }
+  schemas:
+    LaunchAppBuildRequest:
+      type: object
+      additionalProperties: false
+      required: [buildSessionId, organizationId, requestedByUserId, context, name, brief, callbackUrl]
+      properties:
+        buildSessionId: { type: string, description: FuzeFront's prefixed build-session id (a reference, not minted here) }
+        organizationId: { type: string, pattern: '^org_[0-9a-hj-km-np-tv-z]{26}$' }
+        requestedByUserId: { type: string, pattern: '^usr_[0-9a-hj-km-np-tv-z]{26}$' }
+        context: { type: string, enum: [personal, organization] }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        brief: { type: string, minLength: 1, maxLength: 4000 }
+        callbackUrl: { type: string, maxLength: 2048, description: Absolute FuzeFront status URL, or its relative path }
+    AppBuildSession:
+      type: object
+      required: [agentSessionRef, buildSessionId, status]
+      properties:
+        agentSessionRef: { type: string, description: Server-minted (agent_abs_…) }
+        buildSessionId: { type: string }
+        status: { type: string, enum: [accepted, building, deploying, deployed, failed, cancelled] }
+        agentSessionUrl: { type: string }
+        appSlug: { type: string }
+        errorCode: { type: string }
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
+        fields:
+          type: array
+          items: { type: object, properties: { path: { type: string }, message: { type: string } } }
