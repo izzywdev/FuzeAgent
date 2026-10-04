@@ -19,7 +19,7 @@ a2a:
 
   image:
     repository: ghcr.io/izzywdev/fuze-a2a
-    tag: dbb26705564b
+    tag: cb3a7f62d402
     pullPolicy: IfNotPresent
 
   service:
