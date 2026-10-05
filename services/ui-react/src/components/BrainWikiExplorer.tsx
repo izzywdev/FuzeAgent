@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Badge, Card, Input } from '../design-system';
+import { apiClient } from '../services/api';
 import {
   BookOpen,
   MessageSquare,
@@ -28,7 +29,7 @@ export interface BrainChatMsg {
   id: string;
   role: 'user' | 'brain';
   content: string;
-  citations?: Array<{ title: string; excerpt: string; page?: number }>;
+  citations?: Array<{ title: string; excerpt: string; page?: number; score?: number }>;
   timestamp: string;
 }
 
@@ -118,6 +119,7 @@ export const BrainWikiExplorer: React.FC<BrainWikiProps> = ({
   brainTier = 'Tier 4: Org Global',
   onClose,
 }) => {
+  const effectiveBrainId = _brainId || 'brain_org_global';
   const [activeTab, setActiveTab] = useState<'wiki' | 'chat'>('wiki');
   const [documents, setDocuments] = useState<WikiDocument[]>(SAMPLE_DOCS.default);
   const [selectedDocId, setSelectedDocId] = useState<string>(SAMPLE_DOCS.default[0].id);
@@ -127,6 +129,26 @@ export const BrainWikiExplorer: React.FC<BrainWikiProps> = ({
   const [newCategory, setNewCategory] = useState('Architecture');
   const [newContent, setNewContent] = useState('');
   const [newTags, setNewTags] = useState('');
+  const [isCreatingDoc, setIsCreatingDoc] = useState(false);
+
+  // Fetch real documents on load or when brainId changes
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const remoteDocs = await apiClient.getBrainDocuments(effectiveBrainId);
+        if (mounted && Array.isArray(remoteDocs) && remoteDocs.length > 0) {
+          setDocuments(remoteDocs);
+          setSelectedDocId(remoteDocs[0].id);
+        }
+      } catch (err) {
+        console.warn('Failed to load remote brain docs, using defaults:', err);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [effectiveBrainId]);
 
   // Brain Chat state
   const [chatMessages, setChatMessages] = useState<BrainChatMsg[]>([
@@ -149,24 +171,39 @@ export const BrainWikiExplorer: React.FC<BrainWikiProps> = ({
       d.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleCreateDocument = () => {
-    if (!newTitle.trim()) return;
-    const doc: WikiDocument = {
-      id: `doc_${Date.now()}`,
-      title: newTitle,
-      category: newCategory,
-      content: newContent || `# ${newTitle}\n\nEnter document content here...`,
-      author: 'You (Current User)',
-      updatedAt: 'Just now',
-      tags: newTags ? newTags.split(',').map(t => t.trim()) : ['general'],
-      chunksCount: Math.max(1, Math.ceil(newContent.length / 400)),
-    };
-    setDocuments(prev => [doc, ...prev]);
-    setSelectedDocId(doc.id);
-    setNewDocModalOpen(false);
-    setNewTitle('');
-    setNewContent('');
-    setNewTags('');
+  const handleCreateDocument = async () => {
+    if (!newTitle.trim() || isCreatingDoc) return;
+    setIsCreatingDoc(true);
+    const parsedTags = newTags ? newTags.split(',').map(t => t.trim()).filter(Boolean) : ['general'];
+    try {
+      const res = await apiClient.ingestBrainDocument(effectiveBrainId, {
+        title: newTitle,
+        content: newContent || `# ${newTitle}\n\nEnter document content here...`,
+        category: newCategory,
+        author: 'Human Architect',
+        tags: parsedTags,
+      });
+      const doc: WikiDocument = res?.document || {
+        id: `doc_${Date.now()}`,
+        title: newTitle,
+        category: newCategory,
+        content: newContent || `# ${newTitle}\n\nEnter document content here...`,
+        author: 'Human Architect',
+        updatedAt: 'Just now',
+        tags: parsedTags,
+        chunksCount: Math.max(1, Math.ceil(newContent.length / 400)),
+      };
+      setDocuments(prev => [doc, ...prev]);
+      setSelectedDocId(doc.id);
+      setNewDocModalOpen(false);
+      setNewTitle('');
+      setNewContent('');
+      setNewTags('');
+    } catch (err) {
+      console.error('Failed to index document:', err);
+    } finally {
+      setIsCreatingDoc(false);
+    }
   };
 
   const handleDeleteDocument = (id: string, e: React.MouseEvent) => {
@@ -177,7 +214,7 @@ export const BrainWikiExplorer: React.FC<BrainWikiProps> = ({
     }
   };
 
-  const handleSendChat = () => {
+  const handleSendChat = async () => {
     if (!chatInput.trim() || isQuerying) return;
     const userMsg: BrainChatMsg = {
       id: `usr_${Date.now()}`,
@@ -191,30 +228,45 @@ export const BrainWikiExplorer: React.FC<BrainWikiProps> = ({
     setChatInput('');
     setIsQuerying(true);
 
-    // Simulate grounded RAG answer from Brain knowledge
-    setTimeout(() => {
-      const matchDoc = documents.find(d =>
-        d.title.toLowerCase().includes(query.toLowerCase()) ||
-        d.content.toLowerCase().includes(query.toLowerCase())
-      ) || documents[0];
+    try {
+      const res = await apiClient.chatWithBrain(effectiveBrainId, query);
+      if (res && res.reply) {
+        const brainResponse: BrainChatMsg = {
+          id: `brn_${Date.now()}`,
+          role: 'brain',
+          content: res.reply,
+          citations: res.citations || [],
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatMessages(prev => [...prev, brainResponse]);
+      } else {
+        // Fallback grounded answer
+        const matchDoc = documents.find(d =>
+          d.title.toLowerCase().includes(query.toLowerCase()) ||
+          d.content.toLowerCase().includes(query.toLowerCase())
+        ) || documents[0];
 
-      const brainResponse: BrainChatMsg = {
-        id: `brn_${Date.now()}`,
-        role: 'brain',
-        content: `Based on **${brainName}** knowledge, here is what is recorded:\n\n${
-          matchDoc.content.slice(0, 320)
-        }...\n\nAll autonomous agents consulting this brain abide by this specification.`,
-        citations: [
-          {
-            title: matchDoc.title,
-            excerpt: matchDoc.content.slice(0, 140) + '...',
-          },
-        ],
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setChatMessages(prev => [...prev, brainResponse]);
+        const brainResponse: BrainChatMsg = {
+          id: `brn_${Date.now()}`,
+          role: 'brain',
+          content: `Based on **${brainName}** knowledge, here is what is recorded:\n\n${
+            matchDoc.content.slice(0, 320)
+          }...\n\nAll autonomous agents consulting this brain abide by this specification.`,
+          citations: [
+            {
+              title: matchDoc.title,
+              excerpt: matchDoc.content.slice(0, 140) + '...',
+            },
+          ],
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatMessages(prev => [...prev, brainResponse]);
+      }
+    } catch (err) {
+      console.error('Brain chat query error:', err);
+    } finally {
       setIsQuerying(false);
-    }, 700);
+    }
   };
 
   return (
@@ -563,6 +615,11 @@ export const BrainWikiExplorer: React.FC<BrainWikiProps> = ({
                           }}
                         >
                           <FileText size={10} /> {c.title}
+                          {typeof c.score === 'number' && (
+                            <span style={{ opacity: 0.8, fontSize: '10px' }}>
+                              ({Math.round(c.score * 100)}%)
+                            </span>
+                          )}
                         </span>
                       ))}
                     </div>
@@ -697,11 +754,11 @@ export const BrainWikiExplorer: React.FC<BrainWikiProps> = ({
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-              <Button variant="ghost" onClick={() => setNewDocModalOpen(false)}>
+              <Button variant="ghost" onClick={() => setNewDocModalOpen(false)} disabled={isCreatingDoc}>
                 Cancel
               </Button>
-              <Button variant="seam" onClick={handleCreateDocument}>
-                Index Document
+              <Button variant="seam" onClick={handleCreateDocument} disabled={isCreatingDoc || !newTitle.trim()}>
+                {isCreatingDoc ? 'Embedding into pgvector...' : 'Index Document'}
               </Button>
             </div>
           </Card>
