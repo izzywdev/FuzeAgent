@@ -165,9 +165,9 @@ jobs:
         python -m pytest tests/ -m "goals" -v --cov=. --cov-append --cov-report=xml --cov-report=term-missing || [ $? -eq 5 ]
     
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: ./.github/actions/upload-coverage
       with:
-        file: services/orchestrator/coverage.xml
+        files: services/orchestrator/coverage.xml
         flags: backend
         name: fuzeagent-backend
         fail_ci_if_error: false
@@ -406,9 +406,9 @@ jobs:
       run: npm run test:coverage
     
     - name: Upload frontend coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: ./.github/actions/upload-coverage
       with:
-        file: services/ui-react/coverage/coverage-summary.json
+        files: services/ui-react/coverage/coverage-summary.json
         flags: frontend
         name: fuzeagent-frontend
         fail_ci_if_error: false

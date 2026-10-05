@@ -50,7 +50,7 @@ async def _ensure_table(conn) -> None:
     if _table_ready:
         return
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    await conn.execute(f"""
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS brain_documents (
             id TEXT PRIMARY KEY,
             brain_id TEXT NOT NULL,
@@ -58,8 +58,8 @@ async def _ensure_table(conn) -> None:
             category TEXT NOT NULL DEFAULT 'General',
             content TEXT NOT NULL,
             author TEXT NOT NULL DEFAULT 'unknown',
-            tags TEXT[] NOT NULL DEFAULT '{{}}',
-            embedding vector({EMBEDDING_DIM}),
+            tags TEXT[] NOT NULL DEFAULT '{}',
+            embedding vector(384),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
         """)
