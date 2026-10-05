@@ -1,6 +1,13 @@
 import axios from 'axios';
+import { authHeader } from '../lib/security/client';
 
-const ORCHESTRATOR_BASE = '/api/orchestrator/image-registry';
+const IS_LOCAL = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+// In production the UI nginx proxies /apps/fuzeagent/api/ -> orchestrator /api/.
+const ORCHESTRATOR_BASE = IS_LOCAL ? 'http://localhost:8000/api' : '/apps/fuzeagent/api';
+axios.interceptors.request.use((cfg) => {
+  Object.assign(cfg.headers, authHeader());
+  return cfg;
+});
 const FUZEKEYS_BASE = '/api/fuzekeys';
 
 export interface FuzeKeySecret {
@@ -61,7 +68,7 @@ export const apiClient = {
   // Brains Hierarchy
   async getBrainsHierarchy() {
     try {
-      const res = await axios.get(`${ORCHESTRATOR_BASE}/brains`, { timeout: 3000 });
+      const res = await axios.get(`${ORCHESTRATOR_BASE}/brains/hierarchy`, { timeout: 3000 });
       return res.data;
     } catch {
       return null;
@@ -80,9 +87,10 @@ export const apiClient = {
 
   async decideEscalation(escalationId: string, approved: boolean, notes?: string) {
     try {
-      const res = await axios.post(`${ORCHESTRATOR_BASE}/escalations/${escalationId}/decision`, {
-        approved,
+      const res = await axios.post(`${ORCHESTRATOR_BASE}/escalations/${escalationId}/resolve`, {
+        decision: approved ? 'approved' : 'rejected',
         notes,
+        approverId: 'portal-user',
       }, { timeout: 3000 });
       return res.data;
     } catch {
@@ -97,6 +105,34 @@ export const apiClient = {
       return res.data.secrets || FALLBACK_FUZEKEYS_SECRETS;
     } catch {
       return FALLBACK_FUZEKEYS_SECRETS;
+    }
+  },
+
+  // Brains Wiki & RAG Chat
+  async getBrainDocuments(brainId: string) {
+    try {
+      const res = await axios.get(`${ORCHESTRATOR_BASE}/brains/${encodeURIComponent(brainId)}/documents`, { timeout: 4000 });
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  async ingestBrainDocument(brainId: string, doc: { title: string; content: string; category?: string; author?: string; tags?: string[] }) {
+    try {
+      const res = await axios.post(`${ORCHESTRATOR_BASE}/brains/${encodeURIComponent(brainId)}/documents`, doc, { timeout: 8000 });
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  async chatWithBrain(brainId: string, message: string) {
+    try {
+      const res = await axios.post(`${ORCHESTRATOR_BASE}/brains/${encodeURIComponent(brainId)}/chat`, { message }, { timeout: 8000 });
+      return res.data;
+    } catch {
+      return null;
     }
   },
 };

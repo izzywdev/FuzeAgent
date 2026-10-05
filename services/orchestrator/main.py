@@ -433,7 +433,9 @@ async def lifespan(app: FastAPI):
         app.state.org_rag_manager = OrganizationRAGManager(database_url)
         await app.state.org_rag_manager.initialize()
 
-        app.state.team_knowledge_manager = TeamKnowledgeManager(database_url)
+        app.state.team_knowledge_manager = TeamKnowledgeManager(
+            database_url, app.state.org_rag_manager
+        )
         await app.state.team_knowledge_manager.initialize()
 
         app.state.knowledge_propagation_engine = KnowledgePropagationEngine(

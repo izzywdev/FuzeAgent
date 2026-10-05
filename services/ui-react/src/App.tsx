@@ -108,7 +108,7 @@ function FuzeAgentDashboard() {
       // Load organizations from hierarchy API and templates from orchestrator API (optional)
       const results = await Promise.allSettled([
         api.hierarchy.get('/organizations'),
-        api.orchestrator.get('/templates').then((res) => res.templates)
+        api.orchestrator.get('/templates').then((res) => (Array.isArray(res) ? res : res.templates))
       ])
 
       const newOrganizations = results[0].status === 'fulfilled' ? results[0].value : []
