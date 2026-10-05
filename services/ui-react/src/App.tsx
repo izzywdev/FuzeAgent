@@ -7,11 +7,11 @@ import StatsCards from './components/StatsCards'
 import OrganizationSelector from './components/OrganizationSelector'
 import TeamSelector from './components/TeamSelector'
 import HierarchyView from './components/HierarchyView'
-import ImageTemplateRegistry from './components/ImageTemplateRegistry'
+import { TemplatesHub } from './components/TemplatesHub'
 import BrainsMemoryHierarchy from './components/BrainsMemoryHierarchy'
 import SandboxesView from './components/SandboxesView'
 import EscalationsView from './components/EscalationsView'
-import { MultiAgentChatWorkspace } from './components/MultiAgentChatWorkspace'
+import { AgentChatWorkspace } from './components/AgentChatWorkspace'
 import { AppBuildsStudio } from './components/AppBuildsStudio'
 import { OrgProvider, useOrgContext } from './context/OrgContext'
 import { api, createWebSocket } from './config/api'
@@ -53,11 +53,11 @@ function FuzeAgentDashboard() {
     if (bridge?.menu) {
       bridge.menu.add('fuzeagent', [
         { id: 'overview', label: 'Agents Overview', icon: '🤖', order: 1 },
-        { id: 'workspace', label: 'Agent Workspace (VS Code)', icon: '🖥️', order: 2 },
+        { id: 'workspace', label: 'Agent Chat', icon: '💬', order: 2 },
         { id: 'builds', label: 'App Builds & Deploy', icon: '🚀', order: 3 },
-        { id: 'templates', label: 'Image Registry', icon: '📦', order: 4 },
+        { id: 'templates', label: 'Templates & Blueprints', icon: '📦', order: 4 },
         { id: 'brains', label: 'Brains & Memory Wiki', icon: '🧠', order: 5 },
-        { id: 'sandboxes', label: 'Sandboxes & Runtime', icon: '🛡️', order: 6 },
+        { id: 'sandboxes', label: 'Active Agents', icon: '🛡️', order: 6 },
         { id: 'teams', label: 'Teams & Hierarchy', icon: '👥', order: 7 },
         { id: 'escalations', label: 'Escalations & Approvals', icon: '⚡', order: 8 },
       ])
@@ -383,11 +383,11 @@ function FuzeAgentDashboard() {
               <div className="hidden md:flex items-center space-x-1">
                 {[
                   { id: 'overview', label: 'Overview', icon: '🤖' },
-                  { id: 'workspace', label: 'Workspace (VS Code)', icon: '🖥️' },
+                  { id: 'workspace', label: 'Agent Chat', icon: '💬' },
                   { id: 'builds', label: 'App Builds', icon: '🚀' },
-                  { id: 'templates', label: 'Image Registry', icon: '📦' },
+                  { id: 'templates', label: 'Templates', icon: '📦' },
                   { id: 'brains', label: 'Brains & Memory', icon: '🧠' },
-                  { id: 'sandboxes', label: 'Sandboxes', icon: '🛡️' },
+                  { id: 'sandboxes', label: 'Active Agents', icon: '🛡️' },
                   { id: 'teams', label: 'Teams', icon: '👥' },
                   { id: 'escalations', label: 'Escalations', icon: '⚡' },
                 ].map(tab => {
@@ -415,45 +415,46 @@ function FuzeAgentDashboard() {
               </div>
             </div>
 
-            <div className="flex space-x-3 items-center">
-              {/* Organization & Context Indicator wrapped with Unleash Kill Switch */}
+            <div className="flex items-center gap-3">
+              {/* Organization & Context Indicator */}
               <div 
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs shadow-sm"
+                className="flex items-center gap-3 px-3.5 py-1.5 rounded-xl border text-xs shadow-sm"
                 style={{
                   backgroundColor: 'var(--bg-tertiary, #141a26)',
                   borderColor: 'var(--border-color, #232c3d)'
                 }}
               >
                 {isPersonal || !activeOrg ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-cyan-400 font-semibold flex items-center gap-1">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-cyan-400 font-semibold flex items-center gap-1.5">
                       👤 Personal Context
                     </span>
                     {orgUser && (
-                      <span className="text-[11px] opacity-75 font-mono text-[var(--text-secondary)] pl-1.5 border-l" style={{ borderColor: 'var(--border-color)' }}>
+                      <span className="text-[11px] opacity-75 font-mono text-[var(--text-secondary)] pl-2 border-l" style={{ borderColor: 'var(--border-color)' }}>
                         {orgUser.email || orgUser.name}
                       </span>
                     )}
-                    <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: 'rgba(41, 211, 230, 0.15)', color: '#29d3e6' }}>
+                    <span className="text-[9px] uppercase px-2 py-0.5 rounded font-bold tracking-wide" style={{ backgroundColor: 'rgba(41, 211, 230, 0.15)', color: '#29d3e6' }}>
                       Portal Context
                     </span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-indigo-400 font-semibold flex items-center gap-1">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-indigo-400 font-semibold flex items-center gap-1.5">
                       🏢 {activeOrg.name}
                     </span>
                     {activeOrg.tier && (
-                      <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded" style={{ backgroundColor: 'rgba(110, 92, 255, 0.2)', color: '#a78bfa' }}>
+                      <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md" style={{ backgroundColor: 'rgba(110, 92, 255, 0.2)', color: '#a78bfa', border: '1px solid rgba(110, 92, 255, 0.35)' }}>
                         {activeOrg.tier}
                       </span>
                     )}
                     {orgUser && (
-                      <span className="text-[11px] text-[var(--text-secondary)] pl-1.5 border-l" style={{ borderColor: 'var(--border-color)' }}>
-                        👤 {orgUser.name || orgUser.email}
+                      <span className="text-[11px] text-[var(--text-secondary)] pl-2 border-l flex items-center gap-1" style={{ borderColor: 'var(--border-color)' }}>
+                        <span>👤</span>
+                        <span>{orgUser.name || orgUser.email}</span>
                       </span>
                     )}
-                    <span className="text-[9px] uppercase px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)' }}>
+                    <span className="text-[9px] uppercase px-2 py-0.5 rounded-md font-bold tracking-wide" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
                       Platform Managed
                     </span>
                   </div>
@@ -558,17 +559,15 @@ function FuzeAgentDashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 px-4">
-        {activeTab === 'workspace' && (
-          <div className="h-[800px] rounded-xl overflow-hidden border border-slate-800 shadow-xl mb-6">
-            <MultiAgentChatWorkspace />
-          </div>
-        )}
+        {activeTab === 'workspace' && <AgentChatWorkspace />}
         {activeTab === 'builds' && (
           <div className="h-[800px] rounded-xl overflow-hidden border border-slate-800 shadow-xl mb-6">
             <AppBuildsStudio />
           </div>
         )}
-        {activeTab === 'templates' && <ImageTemplateRegistry />}
+        {activeTab === 'templates' && (
+          <TemplatesHub onUseTemplateToCreateAgent={() => setShowCreateModal(true)} />
+        )}
         {activeTab === 'brains' && <BrainsMemoryHierarchy />}
         {activeTab === 'sandboxes' && <SandboxesView />}
         {activeTab === 'escalations' && <EscalationsView />}
@@ -736,6 +735,7 @@ function FuzeAgentDashboard() {
           currentTeam={currentTeam}
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleCreateAgent}
+          onOpenTemplatesHub={() => setActiveTab('templates')}
         />
       )}
     </div>
