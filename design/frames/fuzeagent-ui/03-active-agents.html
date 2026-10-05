@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FuzeAgent — Active Agents & Isolation Monitor</title>
+  <link rel="stylesheet" href="./tokens.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    .layout { display: grid; grid-template-columns: 420px 1fr; gap: 20px; height: calc(100vh - 120px); }
+    .card { background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; }
+    .header-bar { background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; }
+    .pill-running { background: rgba(52, 211, 153, 0.12); color: var(--success-color); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .terminal-body { background: #080b11; color: #e2e8f0; font-family: var(--font-mono); font-size: 12px; padding: 20px; flex: 1; overflow-y: auto; line-height: 1.6; }
+    .btn-action { background: var(--bg-quaternary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 12px; border-radius: var(--radius-md); font-size: 11px; font-weight: 600; cursor: pointer; }
+    .btn-danger { background: rgba(242, 107, 122, 0.15); border: 1px solid rgba(242, 107, 122, 0.4); color: var(--error-color); padding: 6px 12px; border-radius: var(--radius-md); font-size: 11px; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div style="padding: 24px; max-width: 1400px; margin: 0 auto;">
+    <!-- Shell Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.3); padding: 8px; border-radius: var(--radius-md); color: var(--success-color); font-size: 18px;">🛡️</div>
+        <div>
+          <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);">Active Agents & Isolation Monitor</h1>
+          <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-secondary);">Live Kubernetes pods executing containerized agent runtimes with strict resource boundaries and enforced auto-shutdown timers.</p>
+        </div>
+      </div>
+      <div class="pill pill-running">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--success-color); box-shadow: 0 0 6px var(--success-color);"></span>
+        2 Active Pods Running
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="layout">
+      <!-- Pod List -->
+      <div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px;">Active Container Runtimes</div>
+
+        <!-- Selected Pod Card -->
+        <div style="padding: 16px; border-radius: var(--radius-md); background: rgba(52, 211, 153, 0.08); border: 1px solid var(--success-color); cursor: pointer;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success-color); box-shadow: 0 0 8px var(--success-color);"></span>
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">Python Dev #1</span>
+            </div>
+            <span style="font-size: 10px; font-family: var(--font-mono); background: var(--bg-quaternary); padding: 2px 6px; border-radius: 4px; color: var(--text-secondary);">Core Eng</span>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin: 6px 0 12px 16px;">fuzeagent-runner-py-9df82</div>
+          <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 10px; font-size: 11px;">
+            <span style="color: var(--warning-color);">⏱️ Shutdown in: <strong>22m 50s</strong></span>
+            <span style="font-family: var(--font-mono); color: var(--accent-2);">⚡ 34.2% | 412MB</span>
+          </div>
+        </div>
+
+        <!-- Idle Pod Card -->
+        <div style="padding: 16px; border-radius: var(--radius-md); background: var(--bg-quaternary); border: 1px solid var(--border-color); cursor: pointer;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #66718a;"></span>
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">React Developer #2</span>
+            </div>
+            <span style="font-size: 10px; font-family: var(--font-mono); background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; color: var(--text-secondary);">Core Eng</span>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin: 6px 0 12px 16px;">fuzeagent-runner-react-4aa12</div>
+          <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 10px; font-size: 11px;">
+            <span style="color: var(--text-secondary);">⏱️ Shutdown in: 13m 30s</span>
+            <span style="font-family: var(--font-mono); color: var(--text-tertiary);">⚡ 4.1% | 528MB</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Stream Console -->
+      <div class="card" style="display: flex; flex-direction: column;">
+        <div class="header-bar">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--success-color); box-shadow: 0 0 8px var(--success-color);"></span>
+            <span style="font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-primary);">fuzeagent-runner-py-9df82</span>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">(python-dev)</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-action">+15m Timeout</button>
+            <button class="btn-danger">Stop Container</button>
+          </div>
+        </div>
+
+        <div class="terminal-body">
+          <div style="color: var(--success-color); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">
+            [Centralized Bus Relay Stream Connected — ws://orchestrator:8000/ws]
+          </div>
+          <div><span style="color: var(--text-tertiary);">1</span> [session-relay] Agent Python Dev #1 starting, relay: wss://fuzeagent.prod.fuzefront.com/ws/stream</div>
+          <div><span style="color: var(--text-tertiary);">2</span> [init] Starting Python sandbox container...</div>
+          <div><span style="color: var(--text-tertiary);">3</span> [init] Synchronizing zero-exposure secrets from FuzeKeys API...</div>
+          <div><span style="color: var(--text-tertiary);">4</span> [runner] Received task: "Implement zero-exposure credential relay"</div>
+          <div><span style="color: var(--text-tertiary);">5</span> [claude] Inspecting tests/test_fuzekeys_bridge.py...</div>
+          <div><span style="color: var(--text-tertiary);">6</span> [tool_call] exec: pytest -v tests/test_fuzekeys_bridge.py</div>
+          <div style="color: var(--success-color); font-weight: 700;"><span style="color: var(--text-tertiary);">7</span> [output] ================= 4 passed in 0.42s =================</div>
+        </div>
+
+        <div style="background: var(--bg-secondary); border-top: 1px solid var(--border-color); padding: 10px 20px; display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary);">
+          <span>Streaming active stdout/stderr over WebSocket bridge</span>
+          <span style="font-family: var(--font-mono); color: var(--success-color);">Heartbeat OK (ping 29s)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
