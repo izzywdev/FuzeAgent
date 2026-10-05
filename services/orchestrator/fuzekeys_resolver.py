@@ -39,6 +39,9 @@ class FuzeKeysResolver:
         plain environment variable key-value pairs.
         """
         resolved: Dict[str, str] = {}
+        # Counters only: never log key names, secret references or lookup errors, which
+        # can embed the vault reference (CWE-312/532).
+        from_env = from_vault = opaque = 0
         headers = {
             "Content-Type": "application/json",
             "X-Caller-Service": "fuzeagent-orchestrator",
@@ -68,9 +71,7 @@ class FuzeKeysResolver:
                 env_val = os.getenv(key_name)
                 if env_val:
                     resolved[key_name] = env_val
-                    logger.info(
-                        f"🔑 FuzeKeys: Resolved {key_name} from ambient environment"
-                    )
+                    from_env += 1
                     continue
 
                 # 2. Query FuzeKeys cluster backend
@@ -84,19 +85,23 @@ class FuzeKeysResolver:
                         )
                         if val:
                             resolved[key_name] = str(val)
-                            logger.info(
-                                f"🔒 FuzeKeys: Decrypted live secret '{secret_ref}' -> {key_name}"
-                            )
+                            from_vault += 1
                             continue
                 except Exception as e:
-                    logger.debug(f"FuzeKeys API lookup failed for {secret_ref}: {e}")
+                    # Exception text can include the request URL (and so the secret ref).
+                    logger.debug("FuzeKeys API lookup failed (%s)", type(e).__name__)
 
                 # 3. Fallback: masked token representation to avoid crash
                 resolved[key_name] = f"fk_live_{secret_ref[:12]}"
-                logger.info(
-                    f"🛡️ FuzeKeys: Injected opaque zero-trust ref for {key_name}"
-                )
+                opaque += 1
 
+        logger.info(
+            "FuzeKeys: resolved %d binding(s) (ambient env=%d, vault=%d, opaque ref=%d)",
+            len(resolved),
+            from_env,
+            from_vault,
+            opaque,
+        )
         return resolved
 
 
