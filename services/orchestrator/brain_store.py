@@ -20,6 +20,8 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 EMBEDDING_DIM = 384
+# The brain_documents DDL below hardcodes vector(384) (no SQL string formatting).
+assert EMBEDDING_DIM == 384, "update the brain_documents DDL in _ensure_table"
 _model = None
 _table_ready = False
 
@@ -50,9 +52,7 @@ async def _ensure_table(conn) -> None:
     if _table_ready:
         return
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    # EMBEDDING_DIM is a module-level int constant, never user input; DDL cannot be parameterized.
-    await conn.execute(  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
-        f"""
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS brain_documents (
             id TEXT PRIMARY KEY,
             brain_id TEXT NOT NULL,
@@ -60,12 +60,11 @@ async def _ensure_table(conn) -> None:
             category TEXT NOT NULL DEFAULT 'General',
             content TEXT NOT NULL,
             author TEXT NOT NULL DEFAULT 'unknown',
-            tags TEXT[] NOT NULL DEFAULT '{{}}',
-            embedding vector({EMBEDDING_DIM}),
+            tags TEXT[] NOT NULL DEFAULT '{}',
+            embedding vector(384),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
-        """
-    )
+        """)
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_brain_documents_brain ON brain_documents(brain_id)"
     )
