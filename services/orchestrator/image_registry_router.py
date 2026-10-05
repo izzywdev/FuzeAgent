@@ -34,6 +34,12 @@ try:
 except ImportError:
     from escalation_engine import escalation_engine
 
+# Track #4: pgvector-backed Brains document store
+try:
+    from . import brain_store
+except ImportError:
+    import brain_store
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["agent-platform"])
@@ -480,12 +486,27 @@ async def get_brains_hierarchy():
 
 @router.get("/brains/{brain_id}/documents", summary="List Documents in Brain Wiki")
 async def list_brain_documents(brain_id: str):
-    docs = BRAIN_DOCUMENTS.get(brain_id) or BRAIN_DOCUMENTS.get("default", [])
-    return docs
+    stored = await brain_store.list_documents(brain_id)
+    seed = BRAIN_DOCUMENTS.get(brain_id) or BRAIN_DOCUMENTS.get("default", [])
+    # Persisted (pgvector) docs first, then the built-in seed docs.
+    return (stored or []) + seed
 
 
 @router.post("/brains/{brain_id}/documents", summary="Ingest Document into Brain Knowledge Base")
 async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
+    persisted = await brain_store.add_document(
+        brain_id=brain_id,
+        title=doc.title,
+        content=doc.content,
+        category=doc.category or "General",
+        author=doc.author or "Human Architect",
+        tags=doc.tags or [],
+    )
+    if persisted:
+        logger.info(f"📚 Brain Document embedded into pgvector: '{doc.title}' ({brain_id})")
+        return {"status": "ingested", "persisted": True, "document": persisted}
+
+    # Fallback: in-memory only (lost on restart)
     new_doc = {
         "id": f"doc_{uuid.uuid4().hex[:8]}",
         "title": doc.title,
@@ -496,46 +517,47 @@ async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
         "tags": doc.tags or [],
         "chunksCount": max(1, len(doc.content) // 250),
     }
-
     if brain_id not in BRAIN_DOCUMENTS:
         BRAIN_DOCUMENTS[brain_id] = list(BRAIN_DOCUMENTS["default"])
     BRAIN_DOCUMENTS[brain_id].insert(0, new_doc)
-
-    logger.info(f"📚 Brain Document ingested: '{doc.title}' into brain '{brain_id}'")
-    return {"status": "ingested", "document": new_doc}
+    logger.warning(f"Brain Document stored in memory only (pgvector unavailable): '{doc.title}'")
+    return {"status": "ingested", "persisted": False, "document": new_doc}
 
 
 @router.post("/brains/{brain_id}/chat", summary="Chat with Brain Knowledge Base")
 async def chat_with_brain(brain_id: str, req: BrainChatRequest):
-    docs = BRAIN_DOCUMENTS.get(brain_id) or BRAIN_DOCUMENTS.get("default", [])
-    query_lower = req.message.lower()
+    # 1) Real vector similarity search over pgvector-stored documents
+    hits = await brain_store.search(brain_id, req.message, limit=3)
+    hits = [h for h in (hits or []) if h.get("score", 0) >= 0.25]
 
-    # Find matching documents
-    matches = []
-    for d in docs:
-        score = 0
-        if any(w in d["title"].lower() for w in query_lower.split()):
+    # 2) Keyword fallback over the built-in seed docs
+    seed = BRAIN_DOCUMENTS.get(brain_id) or BRAIN_DOCUMENTS.get("default", [])
+    words = req.message.lower().split()
+    kw = []
+    for d in seed:
+        score = 0.0
+        if any(w in d["title"].lower() for w in words):
             score += 0.5
-        if any(w in d["content"].lower() for w in query_lower.split()):
+        if any(w in d["content"].lower() for w in words):
             score += 0.4
         if score > 0:
-            matches.append((score, d))
+            kw.append({**d, "score": score})
+    kw.sort(key=lambda x: x["score"], reverse=True)
 
-    matches.sort(key=lambda x: x[0], reverse=True)
-    top_matches = matches[:2]
-
+    top = (hits + kw)[:3]
     citations = [
         {
-            "title": m[1]["title"],
-            "excerpt": m[1]["content"][:180] + "...",
+            "title": d["title"],
+            "excerpt": d["content"][:180] + ("..." if len(d["content"]) > 180 else ""),
+            "score": round(d.get("score", 0), 3),
         }
-        for m in top_matches
+        for d in top
     ]
 
     if citations:
-        answer = f"Based on indexed documents in '{brain_id}': {citations[0]['excerpt']} All operations follow these architectural patterns."
+        answer = f"Based on indexed documents in '{brain_id}': {citations[0]['excerpt']}"
     else:
-        answer = f"I've searched the '{brain_id}' knowledge store for '{req.message}'. No direct conflicts were found in the current architectural standards."
+        answer = f"I searched the '{brain_id}' knowledge store for '{req.message}' but found no relevant documents."
 
     return {
         "reply": answer,
