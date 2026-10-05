@@ -36,6 +36,7 @@ class KubernetesSandboxDeployer(AppDeployer):
         if sandbox_driver is None:
             try:
                 from ..kubernetes_sandbox_driver import k8s_sandbox_driver
+
                 self._driver = k8s_sandbox_driver
             except ImportError:
                 self._driver = None
@@ -46,18 +47,29 @@ class KubernetesSandboxDeployer(AppDeployer):
         """Scaffolds, builds and tests the app inside a sandbox pod."""
         sid = ctx.build_session_id
         slug = derive_base_slug(ctx.name, sid)
-        append_build_log(sid, f"[1/6] 🚀 Initiating autonomous app build for '{ctx.name}' (slug: {slug})")
+        append_build_log(
+            sid,
+            f"[1/6] 🚀 Initiating autonomous app build for '{ctx.name}' (slug: {slug})",
+        )
         append_build_log(sid, f"[2/6] 📋 Brief: {ctx.brief[:120]}...")
-        append_build_log(sid, f"[3/6] 🔒 Tenant isolation: Organization ID {ctx.organization_id}")
+        append_build_log(
+            sid, f"[3/6] 🔒 Tenant isolation: Organization ID {ctx.organization_id}"
+        )
 
         await asyncio.sleep(0.4)
-        append_build_log(sid, "[4/6] 📦 Scaffolding Vite + React 19 MFE template with FuzeFront DS tokens")
+        append_build_log(
+            sid,
+            "[4/6] 📦 Scaffolding Vite + React 19 MFE template with FuzeFront DS tokens",
+        )
         await asyncio.sleep(0.4)
 
         # If Kubernetes sandbox driver is available, spawn an ephemeral sandbox pod
         if self._driver:
             try:
-                append_build_log(sid, "[5/6] 🛡️ Spawning ephemeral build runner pod in 'fuzeagent' namespace")
+                append_build_log(
+                    sid,
+                    "[5/6] 🛡️ Spawning ephemeral build runner pod in 'fuzeagent' namespace",
+                )
                 pod_result = await self._driver.spawn_sandbox_pod(
                     template_id="node20-vite-mfe",
                     image="node:20-alpine",
@@ -69,13 +81,19 @@ class KubernetesSandboxDeployer(AppDeployer):
                     timeout_seconds=900,
                     command=["sh", "-c", "echo 'Building MFE bundle...' && exit 0"],
                 )
-                append_build_log(sid, f"   ✓ Pod spawned: {pod_result.get('pod_name', 'sbx-runner')} (status: {pod_result.get('status')})")
+                append_build_log(
+                    sid,
+                    f"   ✓ Pod spawned: {pod_result.get('pod_name', 'sbx-runner')} (status: {pod_result.get('status')})",
+                )
             except Exception as e:
                 logger.warning(f"Sandbox pod spawn fell back to internal runner: {e}")
                 append_build_log(sid, f"   ℹ️ Internal build runner engaged: {e}")
 
         await asyncio.sleep(0.4)
-        append_build_log(sid, "[6/6] ✅ Compilation, linting, and Module Federation chunk generation passed (0 errors)")
+        append_build_log(
+            sid,
+            "[6/6] ✅ Compilation, linting, and Module Federation chunk generation passed (0 errors)",
+        )
 
         return {
             "slug": slug,
@@ -86,14 +104,23 @@ class KubernetesSandboxDeployer(AppDeployer):
             "entrypoint": f"https://app.fuzefront.com/apps/{slug}/remoteEntry.js",
         }
 
-    async def deploy(self, ctx: DeployContext, artifact: Dict[str, Any]) -> DeployResult:
+    async def deploy(
+        self, ctx: DeployContext, artifact: Dict[str, Any]
+    ) -> DeployResult:
         """Registers and exposes the deployed application."""
         sid = ctx.build_session_id
         slug = artifact.get("slug", derive_base_slug(ctx.name, sid))
-        entrypoint = artifact.get("entrypoint", f"https://app.fuzefront.com/apps/{slug}/remoteEntry.js")
+        entrypoint = artifact.get(
+            "entrypoint", f"https://app.fuzefront.com/apps/{slug}/remoteEntry.js"
+        )
 
-        append_build_log(sid, "🌐 Registering microfrontend with FuzeFront portal registry...")
-        append_build_log(sid, f"   ✓ Manifest: slug='{slug}', orgId='{ctx.organization_id}', entrypoint='{entrypoint}'")
+        append_build_log(
+            sid, "🌐 Registering microfrontend with FuzeFront portal registry..."
+        )
+        append_build_log(
+            sid,
+            f"   ✓ Manifest: slug='{slug}', orgId='{ctx.organization_id}', entrypoint='{entrypoint}'",
+        )
         append_build_log(sid, "🎉 Application deployment complete and active!")
 
         integration = {
