@@ -40,6 +40,9 @@ __all__ = [
 ]
 
 
+from .sandbox_deployer import KubernetesSandboxDeployer
+
+
 async def start_app_builds(
     connect: Callable[[], Any], deployer: Optional[AppDeployer] = None
 ) -> BuildRuntime:
@@ -47,9 +50,10 @@ async def start_app_builds(
 
     ``connect`` is ``database.get_db_connection``. Safe to call with the feature flag OFF: the
     router answers 503 and the loops only touch an (empty) table."""
+    active_deployer = deployer or KubernetesSandboxDeployer()
     runtime = BuildRuntime(
         PostgresBuildStore(connect),
-        deployer or NotConfiguredDeployer(),
+        active_deployer,
         settings=Settings.from_env(),
     )
     set_runtime(runtime)

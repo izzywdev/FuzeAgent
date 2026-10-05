@@ -12,6 +12,7 @@ import BrainsMemoryHierarchy from './components/BrainsMemoryHierarchy'
 import SandboxesView from './components/SandboxesView'
 import EscalationsView from './components/EscalationsView'
 import { MultiAgentChatWorkspace } from './components/MultiAgentChatWorkspace'
+import { AppBuildsStudio } from './components/AppBuildsStudio'
 import { OrgProvider, useOrgContext } from './context/OrgContext'
 import { api, createWebSocket } from './config/api'
 import type { 
@@ -36,7 +37,7 @@ function FuzeAgentDashboard() {
   // UI state
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'workspace' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'workspace' | 'builds' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
   const [showEventsDropdown, setShowEventsDropdown] = useState(false)
   const { activeOrg, isPersonal, user: orgUser, organizations: platformOrgs, switchOrg, recentEvents, allowInAppOrgManagement } = useOrgContext()
 
@@ -53,11 +54,12 @@ function FuzeAgentDashboard() {
       bridge.menu.add('fuzeagent', [
         { id: 'overview', label: 'Agents Overview', icon: '🤖', order: 1 },
         { id: 'workspace', label: 'Agent Workspace (VS Code)', icon: '🖥️', order: 2 },
-        { id: 'templates', label: 'Image Registry', icon: '📦', order: 3 },
-        { id: 'brains', label: 'Brains & Memory Wiki', icon: '🧠', order: 4 },
-        { id: 'sandboxes', label: 'Sandboxes & Runtime', icon: '🛡️', order: 5 },
-        { id: 'teams', label: 'Teams & Hierarchy', icon: '👥', order: 6 },
-        { id: 'escalations', label: 'Escalations & Approvals', icon: '⚡', order: 7 },
+        { id: 'builds', label: 'App Builds & Deploy', icon: '🚀', order: 3 },
+        { id: 'templates', label: 'Image Registry', icon: '📦', order: 4 },
+        { id: 'brains', label: 'Brains & Memory Wiki', icon: '🧠', order: 5 },
+        { id: 'sandboxes', label: 'Sandboxes & Runtime', icon: '🛡️', order: 6 },
+        { id: 'teams', label: 'Teams & Hierarchy', icon: '👥', order: 7 },
+        { id: 'escalations', label: 'Escalations & Approvals', icon: '⚡', order: 8 },
       ])
     }
 
@@ -65,7 +67,7 @@ function FuzeAgentDashboard() {
       const target = e.detail?.section || e.detail?.id || e.detail
       if (typeof target === 'string') {
         const clean = target.replace(/^\/?(app\/)?fuzeagent\/?/, '').replace(/^\//, '')
-        if (['overview', 'workspace', 'templates', 'brains', 'sandboxes', 'teams', 'escalations'].includes(clean)) {
+        if (['overview', 'workspace', 'builds', 'templates', 'brains', 'sandboxes', 'teams', 'escalations'].includes(clean)) {
           setActiveTab(clean as any)
         } else if (clean === '' || clean === 'agents') {
           setActiveTab('overview')
@@ -382,6 +384,7 @@ function FuzeAgentDashboard() {
                 {[
                   { id: 'overview', label: 'Overview', icon: '🤖' },
                   { id: 'workspace', label: 'Workspace (VS Code)', icon: '🖥️' },
+                  { id: 'builds', label: 'App Builds', icon: '🚀' },
                   { id: 'templates', label: 'Image Registry', icon: '📦' },
                   { id: 'brains', label: 'Brains & Memory', icon: '🧠' },
                   { id: 'sandboxes', label: 'Sandboxes', icon: '🛡️' },
@@ -558,6 +561,11 @@ function FuzeAgentDashboard() {
         {activeTab === 'workspace' && (
           <div className="h-[800px] rounded-xl overflow-hidden border border-slate-800 shadow-xl mb-6">
             <MultiAgentChatWorkspace />
+          </div>
+        )}
+        {activeTab === 'builds' && (
+          <div className="h-[800px] rounded-xl overflow-hidden border border-slate-800 shadow-xl mb-6">
+            <AppBuildsStudio />
           </div>
         )}
         {activeTab === 'templates' && <ImageTemplateRegistry />}

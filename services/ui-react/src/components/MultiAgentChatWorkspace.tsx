@@ -92,6 +92,28 @@ interface ChatMessage {
   toolCall?: { tool: string; output: string };
 }
 
+type AgentWsListener = (data: any) => void;
+const wsListeners = new Set<AgentWsListener>();
+
+function subscribeAgentWs(fn: AgentWsListener) {
+  wsListeners.add(fn);
+  return () => wsListeners.delete(fn);
+}
+
+function broadcastAgentWs(data: any) {
+  wsListeners.forEach(fn => fn(data));
+}
+
+let activeWs: WebSocket | null = null;
+
+function sendToAgentWs(payload: any) {
+  if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+    activeWs.send(JSON.stringify(payload));
+    return true;
+  }
+  return false;
+}
+
 // Individual Agent Chat Panel
 const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = props => {
   const agent = props.params.agent;
@@ -111,6 +133,55 @@ const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = p
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
 
+  // Subscribe to live agent WebSocket stream
+  useEffect(() => {
+    const unsub = subscribeAgentWs((evt) => {
+      if (evt.agentId !== agent.id) return;
+
+      if (evt.type === 'agent_chunk') {
+        setIsThinking(false);
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'agent' && last.id.startsWith('live_')) {
+            return [
+              ...prev.slice(0, -1),
+              { ...last, content: evt.accumulated || last.content + evt.chunk },
+            ];
+          } else {
+            return [
+              ...prev,
+              {
+                id: `live_${Date.now()}`,
+                role: 'agent',
+                content: evt.chunk,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              },
+            ];
+          }
+        });
+      } else if (evt.type === 'agent_thought') {
+        setIsThinking(true);
+      } else if (evt.type === 'agent_message') {
+        setIsThinking(false);
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.id.startsWith('live_'));
+          return [
+            ...filtered,
+            {
+              id: `msg_${Date.now()}`,
+              role: 'agent',
+              content: evt.content,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ];
+        });
+      }
+    });
+    return () => {
+      unsub();
+    };
+  }, [agent.id]);
+
   const handleSend = () => {
     if (!input.trim() || isThinking) return;
     const userText = input;
@@ -125,35 +196,43 @@ const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = p
     setInput('');
     setIsThinking(true);
 
-    // Simulate Agent autonomous response
-    setTimeout(() => {
-      let agentReply = '';
-      let toolCall = undefined;
+    const sent = sendToAgentWs({
+      action: 'chat',
+      agentId: agent.id,
+      message: userText,
+    });
 
-      if (agent.id === 'python-dev') {
-        agentReply = `I've analyzed the request for Python services. Using asyncpg connection pools and validating OpenAPI schema contracts at \`/app/contracts/openapi.yaml\`.`;
-        toolCall = { tool: 'pytest -v tests/test_hierarchy.py', output: '42 passed, 0 failed in 1.4s' };
-      } else if (agent.id === 'devops-lead') {
-        agentReply = `Checked the Helm templates. Verified \`local-path\` storageClass binding on active worker node \`fuzeinfra-prod-elastic-v2\`. Deploying with zero downtime.`;
-        toolCall = { tool: 'kubectl get pods -n fuzeagent', output: 'All pods 1/1 Running' };
-      } else if (agent.id === 'react-dev') {
-        agentReply = `Configured Dockview layout manager with FuzeFront DS tokens. Multi-chat tabs and drag-and-drop window docking are active.`;
-      } else {
-        agentReply = `Received prompt: "${userText}". Executing autonomous task in sandbox with 30m timeout and streaming outputs to centralized bus.`;
-      }
+    if (!sent) {
+      // Fallback local simulation if WebSocket is offline
+      setTimeout(() => {
+        let agentReply = '';
+        let toolCall = undefined;
 
-      setMessages(prev => [
-        ...prev,
-        {
-          id: `agt_${Date.now()}`,
-          role: 'agent',
-          content: agentReply,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          toolCall,
-        },
-      ]);
-      setIsThinking(false);
-    }, 800);
+        if (agent.id === 'python-dev') {
+          agentReply = `I've analyzed the request for Python services. Using asyncpg connection pools and validating OpenAPI schema contracts at \`/app/contracts/openapi.yaml\`.`;
+          toolCall = { tool: 'pytest -v tests/test_hierarchy.py', output: '42 passed, 0 failed in 1.4s' };
+        } else if (agent.id === 'devops-lead') {
+          agentReply = `Checked the Helm templates. Verified \`local-path\` storageClass binding on active worker node \`fuzeinfra-prod-elastic-v2\`. Deploying with zero downtime.`;
+          toolCall = { tool: 'kubectl get pods -n fuzeagent', output: 'All pods 1/1 Running' };
+        } else if (agent.id === 'react-dev') {
+          agentReply = `Configured Dockview layout manager with FuzeFront DS tokens. Multi-chat tabs and drag-and-drop window docking are active.`;
+        } else {
+          agentReply = `Received prompt: "${userText}". Executing autonomous task in sandbox with 30m timeout and streaming outputs to centralized bus.`;
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `agt_${Date.now()}`,
+            role: 'agent',
+            content: agentReply,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            toolCall,
+          },
+        ]);
+        setIsThinking(false);
+      }, 700);
+    }
   };
 
   return (
@@ -315,6 +394,60 @@ const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = p
 export const MultiAgentChatWorkspace: React.FC = () => {
   const [api, setApi] = useState<DockviewApi | null>(null);
   const [activeLayout, setActiveLayout] = useState<string>('dual');
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'offline'>('connecting');
+
+  // Multi-Agent WebSocket lifecycle
+  useEffect(() => {
+    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = typeof window !== 'undefined' ? window.location.host : 'localhost:8000';
+    const url = isLocal
+      ? 'ws://localhost:8000/api/ws/multi-agent'
+      : `${proto}//${host}/apps/fuzeagent/api/ws/multi-agent`;
+
+    let ws: WebSocket | null = null;
+    let pingInterval: any = null;
+
+    try {
+      ws = new WebSocket(url);
+      activeWs = ws;
+
+      ws.onopen = () => {
+        setWsStatus('connected');
+        pingInterval = setInterval(() => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ action: 'ping' }));
+          }
+        }, 15000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          broadcastAgentWs(data);
+        } catch {
+          // ignore
+        }
+      };
+
+      ws.onclose = () => {
+        setWsStatus('offline');
+        clearInterval(pingInterval);
+      };
+
+      ws.onerror = () => {
+        setWsStatus('offline');
+      };
+    } catch {
+      setWsStatus('offline');
+    }
+
+    return () => {
+      clearInterval(pingInterval);
+      if (ws) ws.close();
+      activeWs = null;
+    };
+  }, []);
 
   const onReady = (event: DockviewReadyEvent) => {
     setApi(event.api);
@@ -427,6 +560,11 @@ export const MultiAgentChatWorkspace: React.FC = () => {
             <span style={{ fontWeight: 600, fontSize: '14px' }}>Multi-Agent Workspace</span>
             <Badge variant="seam" size="sm">VSCode Dock</Badge>
           </div>
+
+          <StatusPill
+            status={wsStatus === 'connected' ? 'online' : wsStatus === 'connecting' ? 'pending' : 'idle'}
+            label={wsStatus === 'connected' ? '⚡ Live WebSocket Bus' : wsStatus === 'connecting' ? 'Connecting...' : 'Offline Fallback'}
+          />
 
           <span style={{ color: 'var(--border-strong, #303b50)' }}>|</span>
 

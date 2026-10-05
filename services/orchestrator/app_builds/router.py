@@ -208,6 +208,20 @@ async def launch_build(
     )
 
 
+@router.get("")
+async def list_builds(
+    runtime: Optional[BuildRuntime] = Depends(get_runtime),
+):
+    if runtime is None:
+        return []
+    try:
+        active = await runtime.store.list_active()
+        return [_view(r, runtime) for r in active]
+    except Exception as e:
+        logger.warning("Failed to list active builds: %s", e)
+        return []
+
+
 @router.get("/{build_session_id}")
 async def get_build(
     build_session_id: str,
@@ -225,6 +239,20 @@ async def get_build(
     if rec is None:
         return _err(404, "not_found", "Build session not found")
     return _view(rec, runtime)
+
+
+@router.get("/{build_session_id}/logs")
+async def get_build_logs(
+    build_session_id: str,
+):
+    from .sandbox_deployer import get_session_build_logs
+
+    logs = get_session_build_logs(build_session_id)
+    return {
+        "buildSessionId": build_session_id,
+        "logs": logs,
+        "totalLines": len(logs),
+    }
 
 
 @router.post("/{build_session_id}/cancel")

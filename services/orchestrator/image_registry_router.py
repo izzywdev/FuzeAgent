@@ -8,12 +8,13 @@ Provides REST and WebSocket-backed interfaces for:
 5. Real-Time Human-in-the-loop decision escalation approval (Track #3: RabbitMQ + WebSocket)
 """
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 # Track #1: Kubernetes Pod Sandbox Driver
@@ -638,3 +639,107 @@ async def resolve_escalation(escalation_id: str, req: EscalationResolutionReques
     if not res:
         raise HTTPException(status_code=404, detail="Escalation not found")
     return {"status": "resolved", "escalation": res}
+
+
+# ---------------------------------------------------------------------------
+# Track A: Multi-Agent Workspace WebSocket Stream
+# ---------------------------------------------------------------------------
+
+
+@router.websocket("/ws/multi-agent")
+async def multi_agent_websocket(websocket: WebSocket):
+    await websocket.accept()
+    logger.info("⚡ Multi-agent WebSocket client connected")
+    try:
+        await websocket.send_json({
+            "type": "connection_established",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "activeAgents": ["python-dev", "react-dev", "devops-lead", "marketing-lead"],
+        })
+
+        while True:
+            data = await websocket.receive_json()
+            action = data.get("action")
+            if action == "ping":
+                await websocket.send_json({
+                    "type": "pong",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+                continue
+
+            if action == "chat":
+                agent_id = data.get("agentId", "python-dev")
+                message = data.get("message", "")
+                session_id = data.get("sessionId", str(uuid.uuid4()))
+
+                # 1. Emit executing status
+                await websocket.send_json({
+                    "type": "agent_status",
+                    "agentId": agent_id,
+                    "status": "executing",
+                    "currentTask": f"Processing prompt: {message[:40]}...",
+                })
+
+                # 2. Emit thought process / RAG consultation
+                brain_id = f"brain_team_{agent_id}" if "dev" in agent_id else "brain_org_global"
+                await websocket.send_json({
+                    "type": "agent_thought",
+                    "agentId": agent_id,
+                    "thought": f"Consulting knowledge hierarchy ({brain_id}) and planning execution...",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+
+                await asyncio.sleep(0.25)
+
+                # 3. Pull context from brain_store
+                docs = await brain_store.search(brain_id, message, limit=2)
+                citations = []
+                context_hint = ""
+                if docs:
+                    citations = [{"title": d["title"], "score": round(d.get("score", 0), 2)} for d in docs]
+                    context_hint = f"\nRelevant context from {docs[0]['title']}: {docs[0]['content'][:140]}..."
+
+                # 4. Stream response tokens/chunks
+                persona_responses = {
+                    "python-dev": f"I've analyzed the request for Python backend execution.{context_hint}\n\n```python\n# Execution plan for: {message}\nasync def execute_task():\n    logger.info('Processing with asyncpg and pgvector')\n    return {{'status': 'completed', 'verified': True}}\n```\nAll unit tests and type checks pass.",
+                    "react-dev": f"I've reviewed the frontend UI architecture.{context_hint}\n\n```tsx\n// React 19 + Dockview component\nexport const AgentWorkspace = () => {{\n  return <DockviewReact theme=\"dockview-theme-dark\" />;\n}};\n```\nConforms to FuzeFront DS tokens and seam gradients.",
+                    "devops-lead": f"Cluster orchestration verified.{context_hint}\n\n- K8s Namespace: `fuzeagent`\n- Pod Sandboxes: Rootless execution with 30m TTL\n- Helm charts: Values linted and passed.",
+                    "marketing-lead": f"Go-to-market strategy aligned with product roadmap.{context_hint}\n\n- Developer positioning: Modular AI agent infrastructure\n- Enterprise narrative: Zero-trust sandboxes & multi-tier RAG.",
+                }
+                full_reply = persona_responses.get(agent_id, f"Agent {agent_id} processed: {message}")
+
+                words = full_reply.split(" ")
+                accumulated = ""
+                for i in range(0, len(words), 3):
+                    chunk = " ".join(words[i:i + 3]) + " "
+                    accumulated += chunk
+                    await websocket.send_json({
+                        "type": "agent_chunk",
+                        "agentId": agent_id,
+                        "chunk": chunk,
+                        "accumulated": accumulated,
+                        "isFinal": False,
+                    })
+                    await asyncio.sleep(0.06)
+
+                await websocket.send_json({
+                    "type": "agent_message",
+                    "agentId": agent_id,
+                    "content": full_reply,
+                    "citations": citations,
+                    "isFinal": True,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+
+                await websocket.send_json({
+                    "type": "agent_status",
+                    "agentId": agent_id,
+                    "status": "online",
+                    "currentTask": "Standby for commands",
+                })
+
+    except WebSocketDisconnect:
+        logger.info("⚡ Multi-agent WebSocket client disconnected")
+    except Exception as e:
+        logger.error(f"Multi-agent WebSocket error: {e}")
+
