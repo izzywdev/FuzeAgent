@@ -231,6 +231,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           litellm-key: ${{ secrets.LITELLM_FUZE_KEY }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # fuze:secret-sourcing CLAUDE_CODE_OAUTH_TOKEN=fleet — distributed by provision-llm-vendor-keys.yml (optional, skipped-by-name when unset); tracked separately from the provision-secrets.yml SRC_ block that FLEET_SOURCED mirrors
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
           claude-args: '--allowedTools "Read,Grep,Glob"'
