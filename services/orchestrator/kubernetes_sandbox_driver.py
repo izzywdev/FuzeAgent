@@ -16,10 +16,13 @@ logger = logging.getLogger(__name__)
 try:
     from kubernetes import client, config
     from kubernetes.client.rest import ApiException
+
     K8S_AVAILABLE = True
 except ImportError:
     K8S_AVAILABLE = False
-    logger.warning("kubernetes python package not installed; KubernetesSandboxDriver will run in simulated mode")
+    logger.warning(
+        "kubernetes python package not installed; KubernetesSandboxDriver will run in simulated mode"
+    )
 
 
 class KubernetesSandboxDriver:
@@ -37,14 +40,20 @@ class KubernetesSandboxDriver:
         try:
             config.load_incluster_config()
             self.k8s_core_api = client.CoreV1Api()
-            logger.info(f"✅ KubernetesSandboxDriver: Connected via in-cluster serviceaccount (namespace: {self.namespace})")
+            logger.info(
+                f"✅ KubernetesSandboxDriver: Connected via in-cluster serviceaccount (namespace: {self.namespace})"
+            )
         except Exception:
             try:
                 config.load_kube_config()
                 self.k8s_core_api = client.CoreV1Api()
-                logger.info(f"✅ KubernetesSandboxDriver: Connected via local kubeconfig (namespace: {self.namespace})")
+                logger.info(
+                    f"✅ KubernetesSandboxDriver: Connected via local kubeconfig (namespace: {self.namespace})"
+                )
             except Exception as e:
-                logger.warning(f"⚠️ KubernetesSandboxDriver: K8s cluster API not reachable ({e}). Falling back to simulation mode.")
+                logger.warning(
+                    f"⚠️ KubernetesSandboxDriver: K8s cluster API not reachable ({e}). Falling back to simulation mode."
+                )
                 self.k8s_core_api = None
 
     async def spawn_sandbox_pod(
@@ -119,7 +128,9 @@ class KubernetesSandboxDriver:
                         body=pod_spec,
                     ),
                 )
-                logger.info(f"🚀 K8s Pod {pod_name} successfully spawned in namespace {self.namespace}")
+                logger.info(
+                    f"🚀 K8s Pod {pod_name} successfully spawned in namespace {self.namespace}"
+                )
                 return {
                     "id": f"sbx-{short_id}",
                     "podName": pod_name,
@@ -145,7 +156,9 @@ class KubernetesSandboxDriver:
                     "error": str(e),
                 }
 
-        logger.info(f"⚡ [Simulated K8s Driver] Spawning virtual runner pod {pod_name} with {timeout_seconds}s TTL")
+        logger.info(
+            f"⚡ [Simulated K8s Driver] Spawning virtual runner pod {pod_name} with {timeout_seconds}s TTL"
+        )
         return {
             "id": f"sbx-{short_id}",
             "podName": pod_name,
@@ -200,13 +213,19 @@ class KubernetesSandboxDriver:
             )
             results = []
             for pod in pod_list.items:
-                results.append({
-                    "podName": pod.metadata.name,
-                    "phase": pod.status.phase,
-                    "startTime": pod.status.start_time.isoformat() if pod.status.start_time else None,
-                    "templateId": pod.metadata.labels.get("template-id", "unknown"),
-                    "sandboxId": pod.metadata.labels.get("sandbox-id", "unknown"),
-                })
+                results.append(
+                    {
+                        "podName": pod.metadata.name,
+                        "phase": pod.status.phase,
+                        "startTime": (
+                            pod.status.start_time.isoformat()
+                            if pod.status.start_time
+                            else None
+                        ),
+                        "templateId": pod.metadata.labels.get("template-id", "unknown"),
+                        "sandboxId": pod.metadata.labels.get("sandbox-id", "unknown"),
+                    }
+                )
             return results
         except Exception as e:
             logger.error(f"Failed to query K8s sandbox pods: {e}")
@@ -215,7 +234,9 @@ class KubernetesSandboxDriver:
     async def get_sandbox_logs(self, pod_name: str, tail_lines: int = 50) -> str:
         """Fetch logs from sandbox container."""
         if not self.k8s_core_api:
-            return f"[SIMULATED LOGS] Pod {pod_name} running smoothly. No errors detected."
+            return (
+                f"[SIMULATED LOGS] Pod {pod_name} running smoothly. No errors detected."
+            )
 
         try:
             loop = asyncio.get_event_loop()

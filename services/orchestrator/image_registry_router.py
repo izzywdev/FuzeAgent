@@ -193,7 +193,11 @@ TEMPLATES_REGISTRY: Dict[str, Dict[str, Any]] = {
         "image": "ghcr.io/izzywdev/fuzeagent/claude-runner-react-dev:latest",
         "description": "Pre-configured Node.js 24 environment with Vite, Tailwind CSS, TypeScript, and Playwright browser sandbox.",
         "dockerfile": """# syntax=docker/dockerfile:1\nFROM ghcr.io/izzywdev/fuzeagent/claude-runner-base:latest\nUSER root\nRUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs git\nRUN npm install -g typescript vite @playwright/test\nCOPY session-relay.sh /usr/local/bin/session-relay\nRUN chmod +x /usr/local/bin/session-relay\nUSER agent\nWORKDIR /home/agent/workspace\nCMD [\"/usr/local/bin/session-relay\"]""",
-        "envVars": {"NODE_ENV": "development", "VITE_HOST": "0.0.0.0", "PORT": "3000"},
+        "envVars": {
+            "NODE_ENV": "development",
+            "VITE_HOST": "0.0.0.0",
+            "PORT": "3000",
+        },  # nosec B104 -- sandbox dev server must listen on all interfaces inside its pod
         "fuzeKeysSecrets": [
             {
                 "keyName": "GITHUB_ACCESS_TOKEN",
@@ -405,7 +409,6 @@ async def launch_sandbox(req: SandboxLaunchRequest):
 
 @router.post("/sandboxes/{sandbox_id}/terminate", summary="Terminate Active Sandbox")
 async def terminate_sandbox(sandbox_id: str):
-    global ACTIVE_SANDBOXES
     target = next((s for s in ACTIVE_SANDBOXES if s["id"] == sandbox_id), None)
     if not target:
         raise HTTPException(status_code=404, detail="Sandbox not found")
@@ -484,7 +487,9 @@ async def list_brain_documents(brain_id: str):
     return docs
 
 
-@router.post("/brains/{brain_id}/documents", summary="Ingest Document into Brain Knowledge Base")
+@router.post(
+    "/brains/{brain_id}/documents", summary="Ingest Document into Brain Knowledge Base"
+)
 async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
     new_doc = {
         "id": f"doc_{uuid.uuid4().hex[:8]}",
