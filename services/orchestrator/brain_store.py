@@ -50,7 +50,9 @@ async def _ensure_table(conn) -> None:
     if _table_ready:
         return
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    await conn.execute(f"""
+    # EMBEDDING_DIM is a module-level int constant, never user input; DDL cannot be parameterized.
+    await conn.execute(  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+        f"""
         CREATE TABLE IF NOT EXISTS brain_documents (
             id TEXT PRIMARY KEY,
             brain_id TEXT NOT NULL,
@@ -62,7 +64,8 @@ async def _ensure_table(conn) -> None:
             embedding vector({EMBEDDING_DIM}),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
-        """)
+        """
+    )
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_brain_documents_brain ON brain_documents(brain_id)"
     )
