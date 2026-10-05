@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FuzeAgent — Design System UX Frames (FuzeFront v2)</title>
+  <link rel="stylesheet" href="./tokens.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-secondary);
+      font-family: var(--font-sans);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .top-nav {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      height: 58px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      background: var(--seam);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      color: #fff;
+    }
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tag-badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: var(--radius-sm);
+      background: var(--accent-soft);
+      color: var(--accent-color);
+      border: 1px solid rgba(110, 92, 255, 0.3);
+    }
+    .tabs-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-tertiary);
+      padding: 4px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+    }
+    .frame-tab {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.15s ease;
+    }
+    .frame-tab:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .frame-tab.active {
+      background: var(--accent-color);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(110, 92, 255, 0.35);
+    }
+    .actions-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-action {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .btn-action:hover {
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+      background: var(--bg-quaternary);
+    }
+    .viewport-container {
+      flex: 1;
+      position: relative;
+      background: var(--bg-primary);
+      overflow: hidden;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+    .frame-info-bar {
+      height: 32px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation & Switcher -->
+  <header class="top-nav">
+    <div class="brand-section">
+      <div class="brand-logo">⚡</div>
+      <div class="brand-title">
+        <span>FuzeAgent</span>
+        <span style="color: var(--text-tertiary); font-weight: 400;">/</span>
+        <span style="font-weight: 500; color: var(--text-secondary);">UX Frames</span>
+        <span class="tag-badge">FuzeFront DS v2 Approved</span>
+      </div>
+    </div>
+
+    <!-- Interactive Frame Tabs -->
+    <nav class="tabs-wrapper" id="tabs-container">
+      <button class="frame-tab active" onclick="loadFrame('01-agent-chat.html', this)">
+        <span>💬</span>
+        <span>1. Agent Chat</span>
+      </button>
+      <button class="frame-tab" onclick="loadFrame('02-templates-blueprints.html', this)">
+        <span>📦</span>
+        <span>2. Templates & Blueprints</span>
+      </button>
+      <button class="frame-tab" onclick="loadFrame('03-active-agents.html', this)">
+        <span>⚡</span>
+        <span>3. Active Agents Monitor</span>
+      </button>
+      <button class="frame-tab" onclick="loadFrame('04-app-builds-studio.html', this)">
+        <span>🚀</span>
+        <span>4. App Builds Studio</span>
+      </button>
+    </nav>
+
+    <!-- External Controls -->
+    <div class="actions-section">
+      <a id="open-external-btn" href="./01-agent-chat.html" target="_blank" class="btn-action" title="Open frame in new tab">
+        <span>↗</span>
+        <span>Fullscreen Frame</span>
+      </a>
+      <a href="./manifest.json" target="_blank" class="btn-action" title="Inspect UI contract manifest">
+        <span>📄</span>
+        <span>manifest.json</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Viewport displaying active frame -->
+  <main class="viewport-container">
+    <iframe id="frame-viewport" src="./01-agent-chat.html" title="UX Frame Viewport"></iframe>
+  </main>
+
+  <!-- Sub-footer status bar -->
+  <footer class="frame-info-bar">
+    <div id="frame-status">Active Frame: 01-agent-chat.html • Route: /apps/fuzeagent?tab=workspace</div>
+    <div>Tokens: FuzeFront Seam (#6e5cff &rarr; #29d3e6) • Surface: #0b0e15 / #0f131c / #141a26</div>
+  </footer>
+
+  <script>
+    const routes = {
+      '01-agent-chat.html': '/apps/fuzeagent?tab=workspace',
+      '02-templates-blueprints.html': '/apps/fuzeagent?tab=templates',
+      '03-active-agents.html': '/apps/fuzeagent?tab=sandboxes',
+      '04-app-builds-studio.html': '/apps/fuzeagent?tab=builds'
+    };
+
+    function loadFrame(file, btn) {
+      document.getElementById('frame-viewport').src = file;
+      document.getElementById('open-external-btn').href = file;
+      document.querySelectorAll('.frame-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('frame-status').textContent = `Active Frame: ${file} • Route: ${routes[file] || ''}`;
+    }
+  </script>
+</body>
+</html>
