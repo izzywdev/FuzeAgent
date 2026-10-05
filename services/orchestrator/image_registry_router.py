@@ -508,7 +508,9 @@ async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
         tags=doc.tags or [],
     )
     if persisted:
-        logger.info(f"📚 Brain Document embedded into pgvector: '{doc.title}' ({brain_id})")
+        logger.info(
+            f"📚 Brain Document embedded into pgvector: '{doc.title}' ({brain_id})"
+        )
         return {"status": "ingested", "persisted": True, "document": persisted}
 
     # Fallback: in-memory only (lost on restart)
@@ -525,7 +527,9 @@ async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
     if brain_id not in BRAIN_DOCUMENTS:
         BRAIN_DOCUMENTS[brain_id] = list(BRAIN_DOCUMENTS["default"])
     BRAIN_DOCUMENTS[brain_id].insert(0, new_doc)
-    logger.warning(f"Brain Document stored in memory only (pgvector unavailable): '{doc.title}'")
+    logger.warning(
+        f"Brain Document stored in memory only (pgvector unavailable): '{doc.title}'"
+    )
     return {"status": "ingested", "persisted": False, "document": new_doc}
 
 
@@ -560,7 +564,9 @@ async def chat_with_brain(brain_id: str, req: BrainChatRequest):
     ]
 
     if citations:
-        answer = f"Based on indexed documents in '{brain_id}': {citations[0]['excerpt']}"
+        answer = (
+            f"Based on indexed documents in '{brain_id}': {citations[0]['excerpt']}"
+        )
     else:
         answer = f"I searched the '{brain_id}' knowledge store for '{req.message}' but found no relevant documents."
 
