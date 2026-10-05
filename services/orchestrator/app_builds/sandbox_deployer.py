@@ -11,7 +11,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from .deployer import AppDeployer, DeployContext, DeployResult
-from .slug import slugify
+from .slug import derive_base_slug
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class KubernetesSandboxDeployer(AppDeployer):
     async def build(self, ctx: DeployContext) -> Dict[str, Any]:
         """Scaffolds, builds and tests the app inside a sandbox pod."""
         sid = ctx.build_session_id
-        slug = slugify(ctx.name)
+        slug = derive_base_slug(ctx.name, sid)
         append_build_log(sid, f"[1/6] 🚀 Initiating autonomous app build for '{ctx.name}' (slug: {slug})")
         append_build_log(sid, f"[2/6] 📋 Brief: {ctx.brief[:120]}...")
         append_build_log(sid, f"[3/6] 🔒 Tenant isolation: Organization ID {ctx.organization_id}")
@@ -89,7 +89,7 @@ class KubernetesSandboxDeployer(AppDeployer):
     async def deploy(self, ctx: DeployContext, artifact: Dict[str, Any]) -> DeployResult:
         """Registers and exposes the deployed application."""
         sid = ctx.build_session_id
-        slug = artifact.get("slug", slugify(ctx.name))
+        slug = artifact.get("slug", derive_base_slug(ctx.name, sid))
         entrypoint = artifact.get("entrypoint", f"https://app.fuzefront.com/apps/{slug}/remoteEntry.js")
 
         append_build_log(sid, "🌐 Registering microfrontend with FuzeFront portal registry...")
