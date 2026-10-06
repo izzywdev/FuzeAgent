@@ -32,9 +32,19 @@ jobs:
       packages: write # push to GHCR
       pull-requests: write # open the gitops bump PR
     steps:
+      # A GITHUB_TOKEN push does not start downstream workflows. Mint the fleet
+      # App identity before checkout so the release PR receives the same required
+      # checks as every other change to production GitOps state.
+      - name: Mint fuze-agent App token
+        id: release_app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.FUZE_AGENT_APP_ID }}
+          private-key: ${{ secrets.FUZE_AGENT_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.release_app.outputs.token }}
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
@@ -125,7 +135,7 @@ jobs:
 
       - name: Bump image tags in values-prod.yaml (GitOps)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.release_app.outputs.token }}
         run: |
           SHA="${{ steps.tag.outputs.sha }}"
           BRANCH="release/gitops-bump-${SHA}"
@@ -138,17 +148,33 @@ jobs:
           git config user.name "github-actions[bot]"
           git checkout -b "${BRANCH}"
           git add deploy/helm/fuzeagent/values-prod.yaml deploy/helm/a2a-shared/values-prod.yaml
-          git commit -m "release: fuzeagent images ${SHA} [skip ci]" || exit 0
+          git commit -m "release: fuzeagent images ${SHA}" || exit 0
           git push origin "${BRANCH}"
-          # Bot (GITHUB_TOKEN) creates PR; owner (GH_APPROVE_TOKEN) approves then admin-merges
-          # GitHub blocks self-approval: same user cannot create AND approve a PR
-          # --admin bypasses required gate checks ([skip ci] means they never run anyway)
+          # The App opens the PR; the owner identity may review it because GitHub
+          # correctly forbids self-approval. Required checks then run normally.
           PR_URL=$(gh pr create \
             --title "release: fuzeagent images ${SHA}" \
             --body "Automated GitOps image-tag bump. Images built from CI-tested code." \
             --base main --head "${BRANCH}")
-          GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr review "${PR_URL}" --approve -b "Automated GitOps release"
-          GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr merge "${PR_URL}" --admin --squash --delete-branch
+          GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh api \
+            --method POST "repos/${GITHUB_REPOSITORY}/pulls/${PR_URL##*/}/reviews" \
+            -f event=APPROVE -f body="Automated GitOps release"
+          GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr merge "${PR_URL}" --auto --squash --delete-branch
+          # Do not publish a GitHub Release until ordinary branch protection has
+          # actually merged the GitOps PR. Failed checks leave the PR open.
+          for _ in $(seq 1 180); do
+            STATE=$(GH_TOKEN="${{ secrets.GH_APPROVE_TOKEN }}" gh pr view "${PR_URL}" --json state --jq .state)
+            if [ "${STATE}" = "MERGED" ]; then
+              exit 0
+            fi
+            if [ "${STATE}" = "CLOSED" ]; then
+              echo "::error::Release PR closed without merging"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "::error::Release PR did not satisfy required checks within 30 minutes"
+          exit 1
 
       - name: Create GitHub Release
         # Every prior run of this job built and shipped images but never recorded
