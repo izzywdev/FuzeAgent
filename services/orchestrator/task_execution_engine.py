@@ -537,6 +537,13 @@ class TaskExecutionEngine:
         self, execution: ExecutionContext, iteration: TaskIteration
     ):
         """Set up sandbox environment for the agent"""
+        if getattr(self.sandbox_manager, "provider", "docker") == "fuze-sandbox":
+            raise RuntimeError(
+                "Fuze Sandbox workspaces are not yet compatible with the local "
+                "GitWorkflowManager, FileOperationsEngine, and ClaudeSDKManager; "
+                "use Docker for TaskExecutionEngine jobs until remote filesystem "
+                "support is enabled"
+            )
         execution.status = TaskStatus.SETTING_UP
         await self._update_task_status(execution.task_id, TaskStatus.SETTING_UP)
 
