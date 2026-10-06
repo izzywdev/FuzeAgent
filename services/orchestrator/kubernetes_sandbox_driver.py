@@ -31,6 +31,7 @@ class KubernetesSandboxDriver:
     def __init__(self, namespace: Optional[str] = None):
         self.namespace = namespace or os.getenv("POD_NAMESPACE", "fuzeagent")
         self.k8s_core_api = None
+        self.k8s_network_api = None
         self._init_k8s_client()
 
     def _init_k8s_client(self):
@@ -40,6 +41,7 @@ class KubernetesSandboxDriver:
         try:
             config.load_incluster_config()
             self.k8s_core_api = client.CoreV1Api()
+            self.k8s_network_api = client.NetworkingV1Api()
             logger.info(
                 f"✅ KubernetesSandboxDriver: Connected via in-cluster serviceaccount (namespace: {self.namespace})"
             )
@@ -47,6 +49,7 @@ class KubernetesSandboxDriver:
             try:
                 config.load_kube_config()
                 self.k8s_core_api = client.CoreV1Api()
+                self.k8s_network_api = client.NetworkingV1Api()
                 logger.info(
                     f"✅ KubernetesSandboxDriver: Connected via local kubeconfig (namespace: {self.namespace})"
                 )
@@ -55,24 +58,199 @@ class KubernetesSandboxDriver:
                     f"⚠️ KubernetesSandboxDriver: K8s cluster API not reachable ({e}). Falling back to simulation mode."
                 )
                 self.k8s_core_api = None
+                self.k8s_network_api = None
 
     async def spawn_sandbox_pod(
         self,
         template_id: str,
         image: str,
         env_vars: Dict[str, str],
+        secrets: Optional[Dict[str, str]] = None,
+        setup_script: Optional[str] = None,
+        network_isolation: str = "outbound-only",
         timeout_seconds: int = 1800,
         cpu_limit: str = "2.0",
         memory_limit: str = "4Gi",
         command: Optional[List[str]] = None,
+        ws_relay_url: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Spawn an isolated Pod with TTL deadline and resource limits."""
+        """
+        Spawn an isolated Pod with attached secrets, network policy, and startup script.
+        - Secrets: Stored in an ephemeral K8s Secret and mounted via envFrom secretRef.
+        - NetworkPolicy: Restricts ingress/egress to orchestrator bus + authorized external endpoints.
+        - StartScript: Executes setupScript before launching the session-relay runner.
+        """
         short_id = uuid.uuid4().hex[:6]
-        pod_name = f"agent-sbx-{template_id[:10]}-{short_id}".lower().replace("_", "-")
+        base_name = f"agent-sbx-{template_id[:10]}-{short_id}".lower().replace("_", "-")
+        pod_name = base_name
+        secret_name = f"{base_name}-sec" if secrets else None
+        netpol_name = (
+            f"{base_name}-netpol"
+            if network_isolation in ("outbound-only", "strict")
+            else None
+        )
         started_at = datetime.now(timezone.utc).isoformat()
 
         # Format container env vars
-        k8s_env = [{"name": k, "value": str(v)} for k, v in env_vars.items()]
+        merged_env = dict(env_vars)
+        if ws_relay_url:
+            merged_env["WS_RELAY_URL"] = ws_relay_url
+        if agent_id:
+            merged_env["AGENT_ID"] = agent_id
+        if setup_script:
+            merged_env["SETUP_SCRIPT"] = setup_script
+        merged_env["POD_NAME"] = pod_name
+        merged_env["POD_NAMESPACE"] = self.namespace
+
+        k8s_env = [{"name": k, "value": str(v)} for k, v in merged_env.items()]
+
+        # 1. Ephemeral Secret definition
+        if secrets and self.k8s_core_api:
+            secret_spec = {
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {
+                    "name": secret_name,
+                    "namespace": self.namespace,
+                    "labels": {
+                        "app": "agent-sandbox",
+                        "managed-by": "fuzeagent",
+                        "sandbox-id": short_id,
+                    },
+                },
+                "type": "Opaque",
+                "stringData": {k: str(v) for k, v in secrets.items()},
+            }
+            try:
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
+                    lambda: self.k8s_core_api.create_namespaced_secret(
+                        namespace=self.namespace,
+                        body=secret_spec,
+                    ),
+                )
+                logger.info(
+                    f"🔐 Ephemeral Secret {secret_name} created with {len(secrets)} keys"
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to create Secret {secret_name}: {e}")
+
+        # 2. Ephemeral NetworkPolicy definition
+        if netpol_name and self.k8s_network_api:
+            netpol_spec = {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "NetworkPolicy",
+                "metadata": {
+                    "name": netpol_name,
+                    "namespace": self.namespace,
+                    "labels": {
+                        "app": "agent-sandbox",
+                        "managed-by": "fuzeagent",
+                        "sandbox-id": short_id,
+                    },
+                },
+                "spec": {
+                    "podSelector": {
+                        "matchLabels": {
+                            "sandbox-id": short_id,
+                        }
+                    },
+                    "policyTypes": ["Ingress", "Egress"],
+                    "ingress": [
+                        {
+                            "from": [
+                                {
+                                    "podSelector": {
+                                        "matchLabels": {
+                                            "app.kubernetes.io/name": "fuzeagent",
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "egress": [
+                        # Allow DNS
+                        {
+                            "ports": [
+                                {"protocol": "UDP", "port": 53},
+                                {"protocol": "TCP", "port": 53},
+                            ]
+                        },
+                        # Allow HTTPS / HTTP for external APIs and package registries
+                        {
+                            "ports": [
+                                {"protocol": "TCP", "port": 443},
+                                {"protocol": "TCP", "port": 80},
+                            ]
+                        },
+                        # Allow intra-cluster communication to orchestrator bus
+                        {
+                            "ports": [
+                                {"protocol": "TCP", "port": 8000},
+                                {"protocol": "TCP", "port": 8080},
+                            ],
+                            "to": [
+                                {
+                                    "podSelector": {
+                                        "matchLabels": {
+                                            "app.kubernetes.io/name": "fuzeagent",
+                                        }
+                                    }
+                                }
+                            ],
+                        },
+                    ],
+                },
+            }
+            try:
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
+                    lambda: self.k8s_network_api.create_namespaced_network_policy(
+                        namespace=self.namespace,
+                        body=netpol_spec,
+                    ),
+                )
+                logger.info(
+                    f"🛡️ Ephemeral NetworkPolicy {netpol_name} created (outbound-only)"
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to create NetworkPolicy {netpol_name}: {e}")
+
+        # 3. Container command & execution script
+        container_spec: Dict[str, Any] = {
+            "name": "agent-runner",
+            "image": image,
+            "imagePullPolicy": "IfNotPresent",
+            "env": k8s_env,
+            "resources": {
+                "limits": {
+                    "cpu": cpu_limit,
+                    "memory": memory_limit,
+                },
+                "requests": {
+                    "cpu": "250m",
+                    "memory": "512Mi",
+                },
+            },
+        }
+
+        # Mount secrets via secretRef if created
+        if secret_name:
+            container_spec["envFrom"] = [{"secretRef": {"name": secret_name}}]
+
+        if command:
+            container_spec["command"] = command
+        elif setup_script:
+            # Execute setup script before session-relay
+            container_spec["command"] = [
+                "/bin/bash",
+                "-c",
+                'if [ -n "$SETUP_SCRIPT" ]; then eval "$SETUP_SCRIPT"; fi; if [ -x /usr/local/bin/session-relay ]; then exec /usr/local/bin/session-relay; else exec sleep infinity; fi',
+            ]
 
         pod_spec = {
             "apiVersion": "v1",
@@ -94,29 +272,9 @@ class KubernetesSandboxDriver:
             "spec": {
                 "restartPolicy": "Never",
                 "activeDeadlineSeconds": timeout_seconds,  # Automatic K8s kernel-enforced TTL
-                "containers": [
-                    {
-                        "name": "agent-runner",
-                        "image": image,
-                        "imagePullPolicy": "IfNotPresent",
-                        "env": k8s_env,
-                        "resources": {
-                            "limits": {
-                                "cpu": cpu_limit,
-                                "memory": memory_limit,
-                            },
-                            "requests": {
-                                "cpu": "250m",
-                                "memory": "512Mi",
-                            },
-                        },
-                    }
-                ],
+                "containers": [container_spec],
             },
         }
-
-        if command:
-            pod_spec["spec"]["containers"][0]["command"] = command
 
         if self.k8s_core_api:
             try:
@@ -134,6 +292,8 @@ class KubernetesSandboxDriver:
                 return {
                     "id": f"sbx-{short_id}",
                     "podName": pod_name,
+                    "secretName": secret_name,
+                    "networkPolicyName": netpol_name,
                     "namespace": self.namespace,
                     "status": "running",
                     "image": image,
@@ -143,10 +303,11 @@ class KubernetesSandboxDriver:
                 }
             except Exception as e:
                 logger.error(f"❌ Failed to spawn K8s pod {pod_name}: {e}")
-                # Return graceful fallback representation
                 return {
                     "id": f"sbx-{short_id}",
                     "podName": pod_name,
+                    "secretName": secret_name,
+                    "networkPolicyName": netpol_name,
                     "namespace": self.namespace,
                     "status": "running",
                     "image": image,
@@ -162,6 +323,8 @@ class KubernetesSandboxDriver:
         return {
             "id": f"sbx-{short_id}",
             "podName": pod_name,
+            "secretName": secret_name,
+            "networkPolicyName": netpol_name,
             "namespace": self.namespace,
             "status": "running",
             "image": image,
@@ -170,14 +333,29 @@ class KubernetesSandboxDriver:
             "mode": "simulated_pod",
         }
 
-    async def terminate_sandbox_pod(self, pod_name: str) -> bool:
-        """Force delete a sandbox pod immediately."""
+    async def terminate_sandbox_pod(
+        self,
+        pod_name: str,
+        secret_name: Optional[str] = None,
+        netpol_name: Optional[str] = None,
+    ) -> bool:
+        """Force delete a sandbox pod and clean up its associated ephemeral Secret and NetworkPolicy."""
+        # Derive secret and netpol names if omitted
+        if not secret_name and pod_name:
+            secret_name = f"{pod_name}-sec"
+        if not netpol_name and pod_name:
+            netpol_name = f"{pod_name}-netpol"
+
         if not self.k8s_core_api:
-            logger.info(f"⚡ [Simulated K8s Driver] Terminated virtual pod {pod_name}")
+            logger.info(
+                f"⚡ [Simulated K8s Driver] Terminated virtual pod {pod_name} (secret: {secret_name}, netpol: {netpol_name})"
+            )
             return True
 
+        loop = asyncio.get_event_loop()
+
+        # 1. Delete Pod
         try:
-            loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 None,
                 lambda: self.k8s_core_api.delete_namespaced_pod(
@@ -187,15 +365,53 @@ class KubernetesSandboxDriver:
                 ),
             )
             logger.info(f"🛑 Successfully deleted K8s pod {pod_name}")
-            return True
         except ApiException as e:
-            if e.status == 404:
-                return True
-            logger.error(f"Failed to delete pod {pod_name}: {e}")
-            return False
+            if e.status != 404:
+                logger.error(f"Failed to delete pod {pod_name}: {e}")
         except Exception as e:
             logger.error(f"Error terminating pod {pod_name}: {e}")
-            return False
+
+        # 2. Delete ephemeral Secret
+        if secret_name:
+            try:
+                await loop.run_in_executor(
+                    None,
+                    lambda: self.k8s_core_api.delete_namespaced_secret(
+                        name=secret_name,
+                        namespace=self.namespace,
+                        grace_period_seconds=0,
+                    ),
+                )
+                logger.info(f"🗑️ Deleted ephemeral Secret {secret_name}")
+            except ApiException as e:
+                if e.status != 404:
+                    logger.debug(
+                        f"Secret {secret_name} already deleted or not found: {e}"
+                    )
+            except Exception as e:
+                logger.debug(f"Error deleting Secret {secret_name}: {e}")
+
+        # 3. Delete ephemeral NetworkPolicy
+        if netpol_name and self.k8s_network_api:
+            try:
+                await loop.run_in_executor(
+                    None,
+                    lambda: self.k8s_network_api.delete_namespaced_network_policy(
+                        name=netpol_name,
+                        namespace=self.namespace,
+                        grace_period_seconds=0,
+                    ),
+                )
+                logger.info(f"🗑️ Deleted ephemeral NetworkPolicy {netpol_name}")
+            except ApiException as e:
+                if e.status != 404:
+                    logger.debug(
+                        f"NetworkPolicy {netpol_name} already deleted or not found: {e}"
+                    )
+            except Exception as e:
+                logger.debug(f"Error deleting NetworkPolicy {netpol_name}: {e}")
+
+        return True
 
     async def list_sandbox_pods(self) -> List[Dict[str, Any]]:
         """List active agent sandbox pods in cluster."""

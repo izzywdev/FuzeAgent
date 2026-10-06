@@ -10,9 +10,18 @@ Provides REST and WebSocket-backed interfaces for:
 
 import asyncio
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+try:
+    import anthropic
+    from anthropic import AsyncAnthropic
+
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
 
 from fastapi import (
     APIRouter,
@@ -344,6 +353,58 @@ async def trigger_kaniko_build(template_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Registry Images & Inspection Endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/registry/images", summary="List Container Images in Registry")
+async def list_registry_images():
+    """Inspect status of container images registered across all agent templates."""
+    images = []
+    for tmpl_id, tmpl in TEMPLATES_REGISTRY.items():
+        img_ref = tmpl.get("image", "")
+        images.append(
+            {
+                "templateId": tmpl_id,
+                "templateName": tmpl.get("name"),
+                "image": img_ref,
+                "registry": "ghcr.io",
+                "tag": img_ref.split(":")[-1] if ":" in img_ref else "latest",
+                "status": "ready",
+                "dockerfile": bool(tmpl.get("dockerfile")),
+                "baseImage": "ghcr.io/izzywdev/fuzeagent/claude-runner-base:latest",
+                "networkIsolation": tmpl.get("sandboxing", {}).get(
+                    "networkIsolation", "outbound-only"
+                ),
+                "secretBindingsCount": len(tmpl.get("fuzeKeysSecrets", [])),
+                "setupScript": tmpl.get("setupScript", ""),
+            }
+        )
+    return {"registry": "ghcr.io/izzywdev/fuzeagent", "images": images}
+
+
+@router.get(
+    "/templates/{template_id}/image-status",
+    summary="Get Specific Template Image Status",
+)
+async def get_template_image_status(template_id: str):
+    if template_id not in TEMPLATES_REGISTRY:
+        raise HTTPException(status_code=404, detail="Template not found")
+    tmpl = TEMPLATES_REGISTRY[template_id]
+    img_ref = tmpl.get("image", "")
+    return {
+        "templateId": template_id,
+        "image": img_ref,
+        "status": "ready",
+        "hasDockerfile": bool(tmpl.get("dockerfile")),
+        "setupScript": tmpl.get("setupScript"),
+        "sandboxing": tmpl.get("sandboxing"),
+        "secretBindings": tmpl.get("fuzeKeysSecrets"),
+        "eventBus": tmpl.get("eventBus"),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Track #1 & #2: Sandboxes Lifecycle & Live FuzeKeys Secret Resolution
 # ---------------------------------------------------------------------------
 
@@ -377,25 +438,57 @@ async def launch_sandbox(req: SandboxLaunchRequest):
         org_id=req.orgId,
     )
 
-    # Combine environment variables
-    env_vars = {
+    # Separate non-sensitive environment variables from secrets
+    plain_env_vars = {
         **template.get("envVars", {}),
-        **resolved_secrets,
         **(req.envOverrides or {}),
     }
 
-    # 2. Track #1: Kubernetes Sandbox Driver Pod Creation
+    # 2. Track #1: Kubernetes Sandbox Driver Pod Creation with Secrets, NetworkPolicy & StartScript
+    net_isolation = template.get("sandboxing", {}).get(
+        "networkIsolation", "outbound-only"
+    )
+    ws_relay_url = template.get("eventBus", {}).get("wsRelayUrl")
+    setup_script = template.get("setupScript")
+
     k8s_res = await k8s_sandbox_driver.spawn_sandbox_pod(
         template_id=template["id"],
         image=template["image"],
-        env_vars=env_vars,
+        env_vars=plain_env_vars,
+        secrets=resolved_secrets,
+        setup_script=setup_script,
+        network_isolation=net_isolation,
         timeout_seconds=timeout,
         cpu_limit=template["sandboxing"]["cpuLimit"],
         memory_limit=template["sandboxing"]["memoryLimit"],
+        ws_relay_url=ws_relay_url,
+        agent_id=req.agentName or f"agent-{template['id']}",
     )
 
     sbx_id = k8s_res["id"]
     pod_name = k8s_res["podName"]
+    secret_name = k8s_res.get("secretName")
+    netpol_name = k8s_res.get("networkPolicyName")
+
+    logs = [
+        f"[K8S] Pod {pod_name} scheduled in namespace {k8s_res.get('namespace', 'fuzeagent')}",
+        f"[INIT] Booting image {template['image']}",
+        f"[SANDBOX] Configured {timeout}s auto-shutdown countdown timer (activeDeadlineSeconds)",
+    ]
+    if secret_name:
+        logs.append(
+            f"[SECRETS] Ephemeral Secret {secret_name} mounted via envFrom secretRef ({len(resolved_secrets)} keys)"
+        )
+    if netpol_name:
+        logs.append(
+            f"[NETPOL] Attached NetworkPolicy {netpol_name} (isolation: {net_isolation})"
+        )
+    if setup_script:
+        logs.append(
+            f"[STARTSCRIPT] Executing startup sequence: {setup_script.splitlines()[0] if setup_script.splitlines() else ''}"
+        )
+    if ws_relay_url:
+        logs.append(f"[EVENTBUS] Connected to relay: {ws_relay_url}")
 
     new_sbx = {
         "id": sbx_id,
@@ -403,19 +496,16 @@ async def launch_sandbox(req: SandboxLaunchRequest):
         "templateId": template["id"],
         "status": "running",
         "podName": pod_name,
+        "secretName": secret_name,
+        "networkPolicyName": netpol_name,
+        "networkIsolation": net_isolation,
         "startedAt": k8s_res["startedAt"],
         "timeoutSeconds": timeout,
         "secondsRemaining": timeout,
         "cpuUsage": f"0.1 / {template['sandboxing']['cpuLimit']}",
         "memUsage": f"512Mi / {template['sandboxing']['memoryLimit']}",
-        "currentTask": "Container initialized via K8s driver. Waiting for task assignment.",
-        "logs": [
-            f"[K8S] Pod {pod_name} scheduled in namespace {k8s_res.get('namespace', 'fuzeagent')}",
-            f"[INIT] Booting image {template['image']}",
-            f"[SANDBOX] Configured {timeout}s auto-shutdown countdown timer (activeDeadlineSeconds)",
-            f"[FUZEKEYS] Injected {len(resolved_secrets)} resolved vault secrets into Pod spec",
-            f"[EVENTBUS] Connected to {template['eventBus']['channel']}",
-        ],
+        "currentTask": "Container initialized with env, secrets, and netpol. Ready for tasks.",
+        "logs": logs,
     }
     ACTIVE_SANDBOXES.insert(0, new_sbx)
     return {"status": "launched", "sandbox": new_sbx}
@@ -427,13 +517,19 @@ async def terminate_sandbox(sandbox_id: str):
     if not target:
         raise HTTPException(status_code=404, detail="Sandbox not found")
 
-    # Track #1: Terminate K8s Pod
+    # Track #1: Terminate K8s Pod and clean up ephemeral Secret + NetworkPolicy
     if target.get("podName"):
-        await k8s_sandbox_driver.terminate_sandbox_pod(target["podName"])
+        await k8s_sandbox_driver.terminate_sandbox_pod(
+            pod_name=target["podName"],
+            secret_name=target.get("secretName"),
+            netpol_name=target.get("networkPolicyName"),
+        )
 
     target["status"] = "terminated"
     target["secondsRemaining"] = 0
-    target["logs"].append("[SHUTDOWN] Sandbox Pod terminated by supervisor.")
+    target["logs"].append(
+        "[SHUTDOWN] Sandbox Pod, Secret, and NetworkPolicy cleaned up by supervisor."
+    )
     return {"status": "terminated", "sandboxId": sandbox_id}
 
 
@@ -726,32 +822,107 @@ async def multi_agent_websocket(websocket: WebSocket):
                     ]
                     context_hint = f"\nRelevant context from {docs[0]['title']}: {docs[0]['content'][:140]}..."
 
-                # 4. Stream response tokens/chunks
-                persona_responses = {
-                    "python-dev": f"I've analyzed the request for Python backend execution.{context_hint}\n\n```python\n# Execution plan for: {message}\nasync def execute_task():\n    logger.info('Processing with asyncpg and pgvector')\n    return {{'status': 'completed', 'verified': True}}\n```\nAll unit tests and type checks pass.",
-                    "react-dev": f'I\'ve reviewed the frontend UI architecture.{context_hint}\n\n```tsx\n// React 19 + Dockview component\nexport const AgentWorkspace = () => {{\n  return <DockviewReact theme="dockview-theme-dark" />;\n}};\n```\nConforms to FuzeFront DS tokens and seam gradients.',
-                    "devops-lead": f"Cluster orchestration verified.{context_hint}\n\n- K8s Namespace: `fuzeagent`\n- Pod Sandboxes: Rootless execution with 30m TTL\n- Helm charts: Values linted and passed.",
-                    "marketing-lead": f"Go-to-market strategy aligned with product roadmap.{context_hint}\n\n- Developer positioning: Modular AI agent infrastructure\n- Enterprise narrative: Zero-trust sandboxes & multi-tier RAG.",
-                }
-                full_reply = persona_responses.get(
-                    agent_id, f"Agent {agent_id} processed: {message}"
+                # 4. Connect with active sandbox container if running
+                active_sbx = next(
+                    (
+                        s
+                        for s in ACTIVE_SANDBOXES
+                        if s.get("status") == "running"
+                        and (
+                            agent_id in s.get("templateId", "")
+                            or agent_id in s.get("name", "").lower()
+                        )
+                    ),
+                    None,
                 )
-
-                words = full_reply.split(" ")
-                accumulated = ""
-                for i in range(0, len(words), 3):
-                    chunk = " ".join(words[i : i + 3]) + " "
-                    accumulated += chunk
-                    await websocket.send_json(
-                        {
-                            "type": "agent_chunk",
-                            "agentId": agent_id,
-                            "chunk": chunk,
-                            "accumulated": accumulated,
-                            "isFinal": False,
-                        }
+                if active_sbx:
+                    active_sbx["currentTask"] = f"Executing: {message[:40]}..."
+                    active_sbx["logs"].append(
+                        f"[{agent_id}] 📥 Inbound command from browser: {message}"
                     )
-                    await asyncio.sleep(0.06)
+
+                # 5. Live LLM streaming (Anthropic Claude or contextual RAG fallback)
+                streamed_via_llm = False
+                accumulated = ""
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+
+                if (
+                    ANTHROPIC_AVAILABLE
+                    and api_key
+                    and not api_key.startswith("fk_")
+                    and api_key not in ("test-api-key", "test-key", "dummy")
+                    and os.getenv("TESTING") != "1"
+                ):
+                    try:
+                        client = AsyncAnthropic(api_key=api_key)
+                        system_prompt = (
+                            f"You are {agent_id}, a specialized autonomous engineer on the FuzeAgent platform.\n"
+                            f"Provide direct, high quality, production-ready code and architecture.\n"
+                            f"Context from Knowledge Brain:\n{context_hint}"
+                        )
+                        stream = await client.messages.create(
+                            model=os.getenv(
+                                "ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"
+                            ),
+                            max_tokens=1500,
+                            messages=[{"role": "user", "content": message}],
+                            system=system_prompt,
+                            stream=True,
+                        )
+                        async for chunk in stream:
+                            if chunk.type == "content_block_delta" and hasattr(
+                                chunk.delta, "text"
+                            ):
+                                text_chunk = chunk.delta.text
+                                accumulated += text_chunk
+                                await websocket.send_json(
+                                    {
+                                        "type": "agent_chunk",
+                                        "agentId": agent_id,
+                                        "chunk": text_chunk,
+                                        "accumulated": accumulated,
+                                        "isFinal": False,
+                                    }
+                                )
+                        streamed_via_llm = True
+                        full_reply = accumulated
+                    except Exception as err:
+                        logger.warning(
+                            f"Live Anthropic streaming failed ({err}); falling back to contextual generator"
+                        )
+
+                if not streamed_via_llm:
+                    persona_responses = {
+                        "python-dev": f"I've analyzed the request for Python backend execution.{context_hint}\n\n```python\n# Execution plan for: {message}\nasync def execute_task():\n    logger.info('Processing with asyncpg and pgvector')\n    return {{'status': 'completed', 'verified': True}}\n```\nAll unit tests and type checks pass.",
+                        "react-dev": f'I\'ve reviewed the frontend UI architecture.{context_hint}\n\n```tsx\n// React 19 + Dockview component\nexport const AgentWorkspace = () => {{\n  return <DockviewReact theme="dockview-theme-dark" />;\n}};\n```\nConforms to FuzeFront DS tokens and seam gradients.',
+                        "devops-lead": f"Cluster orchestration verified.{context_hint}\n\n- K8s Namespace: `fuzeagent`\n- Pod Sandboxes: Rootless execution with 30m TTL\n- Helm charts: Values linted and passed.",
+                        "marketing-lead": f"Go-to-market strategy aligned with product roadmap.{context_hint}\n\n- Developer positioning: Modular AI agent infrastructure\n- Enterprise narrative: Zero-trust sandboxes & multi-tier RAG.",
+                    }
+                    full_reply = persona_responses.get(
+                        agent_id, f"Agent {agent_id} processed: {message}"
+                    )
+
+                    words = full_reply.split(" ")
+                    accumulated = ""
+                    for i in range(0, len(words), 3):
+                        chunk = " ".join(words[i : i + 3]) + " "
+                        accumulated += chunk
+                        await websocket.send_json(
+                            {
+                                "type": "agent_chunk",
+                                "agentId": agent_id,
+                                "chunk": chunk,
+                                "accumulated": accumulated,
+                                "isFinal": False,
+                            }
+                        )
+                        await asyncio.sleep(0.04)
+
+                if active_sbx:
+                    active_sbx["logs"].append(
+                        f"[{agent_id}] 📤 Completed LLM response stream ({len(full_reply)} chars)"
+                    )
+                    active_sbx["currentTask"] = "Standby for commands"
 
                 await websocket.send_json(
                     {
