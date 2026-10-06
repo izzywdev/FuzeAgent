@@ -50,8 +50,7 @@ async def _ensure_table(conn) -> None:
     if _table_ready:
         return
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    await conn.execute(
-        f"""
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS brain_documents (
             id TEXT PRIMARY KEY,
             brain_id TEXT NOT NULL,
@@ -59,12 +58,11 @@ async def _ensure_table(conn) -> None:
             category TEXT NOT NULL DEFAULT 'General',
             content TEXT NOT NULL,
             author TEXT NOT NULL DEFAULT 'unknown',
-            tags TEXT[] NOT NULL DEFAULT '{{}}',
-            embedding vector({EMBEDDING_DIM}),
+            tags TEXT[] NOT NULL DEFAULT '{}',
+            embedding vector(384),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
-        """
-    )
+        """)
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_brain_documents_brain ON brain_documents(brain_id)"
     )
@@ -134,7 +132,9 @@ async def add_document(
         return None
 
 
-async def search(brain_id: str, query: str, limit: int = 3) -> Optional[List[Dict[str, Any]]]:
+async def search(
+    brain_id: str, query: str, limit: int = 3
+) -> Optional[List[Dict[str, Any]]]:
     """Cosine-similarity search. Returns docs with a `score`, or None if unavailable."""
     try:
         vec = await _embed(query)

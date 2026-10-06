@@ -19,10 +19,13 @@ RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://admin:password@rabbitmq:5672/")
 
 try:
     import aio_pika
+
     RABBIT_AVAILABLE = True
 except ImportError:
     RABBIT_AVAILABLE = False
-    logger.warning("aio_pika not installed; RabbitMQ escalation events will run in in-memory relay mode")
+    logger.warning(
+        "aio_pika not installed; RabbitMQ escalation events will run in in-memory relay mode"
+    )
 
 
 class EscalationEngine:
@@ -64,9 +67,13 @@ class EscalationEngine:
                     aio_pika.ExchangeType.TOPIC,
                     durable=True,
                 )
-                logger.info("📡 EscalationEngine: Connected to RabbitMQ exchange 'agent.escalations'")
+                logger.info(
+                    "📡 EscalationEngine: Connected to RabbitMQ exchange 'agent.escalations'"
+                )
             except Exception as e:
-                logger.debug(f"EscalationEngine: RabbitMQ unavailable ({e}); using internal relay")
+                logger.debug(
+                    f"EscalationEngine: RabbitMQ unavailable ({e}); using internal relay"
+                )
                 self.connection = None
                 self.channel = None
                 self.exchange = None
@@ -83,12 +90,15 @@ class EscalationEngine:
                     delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
                 )
                 await self.exchange.publish(message, routing_key=routing_key)
-                logger.info(f"📤 Published escalation event to RabbitMQ ({routing_key})")
+                logger.info(
+                    f"📤 Published escalation event to RabbitMQ ({routing_key})"
+                )
             except Exception as e:
                 logger.warning(f"Failed to publish to RabbitMQ: {e}")
 
         # 2. WebSocket broadcast
         from .main import websocket_manager
+
         try:
             ws_msg = {
                 "type": f"escalation:{routing_key}",
@@ -97,7 +107,7 @@ class EscalationEngine:
             }
             await websocket_manager.broadcast(ws_msg)
         except Exception:
-            pass
+            logger.warning("Escalation websocket notification failed")
 
     async def create_escalation(
         self,
@@ -126,7 +136,9 @@ class EscalationEngine:
         }
         self.pending_escalations[esc_id] = item
         await self.publish_event("created", item)
-        logger.info(f"⚠️ Escalation {esc_id} created by agent '{agent_name}' ({category})")
+        logger.info(
+            f"⚠️ Escalation {esc_id} created by agent '{agent_name}' ({category})"
+        )
         return item
 
     async def resolve_escalation(
@@ -148,7 +160,9 @@ class EscalationEngine:
 
         routing = "approved" if decision == "approved" else "rejected"
         await self.publish_event(f"decision.{routing}", item)
-        logger.info(f"✅ Escalation {escalation_id} resolved: {decision.upper()} by {approver_id}")
+        logger.info(
+            f"✅ Escalation {escalation_id} resolved: {decision.upper()} by {approver_id}"
+        )
         return item
 
     def list_escalations(self) -> List[Dict[str, Any]]:

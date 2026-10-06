@@ -199,7 +199,11 @@ TEMPLATES_REGISTRY: Dict[str, Dict[str, Any]] = {
         "image": "ghcr.io/izzywdev/fuzeagent/claude-runner-react-dev:latest",
         "description": "Pre-configured Node.js 24 environment with Vite, Tailwind CSS, TypeScript, and Playwright browser sandbox.",
         "dockerfile": """# syntax=docker/dockerfile:1\nFROM ghcr.io/izzywdev/fuzeagent/claude-runner-base:latest\nUSER root\nRUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs git\nRUN npm install -g typescript vite @playwright/test\nCOPY session-relay.sh /usr/local/bin/session-relay\nRUN chmod +x /usr/local/bin/session-relay\nUSER agent\nWORKDIR /home/agent/workspace\nCMD [\"/usr/local/bin/session-relay\"]""",
-        "envVars": {"NODE_ENV": "development", "VITE_HOST": "0.0.0.0", "PORT": "3000"},
+        "envVars": {
+            "NODE_ENV": "development",
+            "VITE_HOST": "127.0.0.1",
+            "PORT": "3000",
+        },
         "fuzeKeysSecrets": [
             {
                 "keyName": "GITHUB_ACCESS_TOKEN",
@@ -411,7 +415,6 @@ async def launch_sandbox(req: SandboxLaunchRequest):
 
 @router.post("/sandboxes/{sandbox_id}/terminate", summary="Terminate Active Sandbox")
 async def terminate_sandbox(sandbox_id: str):
-    global ACTIVE_SANDBOXES
     target = next((s for s in ACTIVE_SANDBOXES if s["id"] == sandbox_id), None)
     if not target:
         raise HTTPException(status_code=404, detail="Sandbox not found")
@@ -492,7 +495,9 @@ async def list_brain_documents(brain_id: str):
     return (stored or []) + seed
 
 
-@router.post("/brains/{brain_id}/documents", summary="Ingest Document into Brain Knowledge Base")
+@router.post(
+    "/brains/{brain_id}/documents", summary="Ingest Document into Brain Knowledge Base"
+)
 async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
     persisted = await brain_store.add_document(
         brain_id=brain_id,
@@ -503,7 +508,9 @@ async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
         tags=doc.tags or [],
     )
     if persisted:
-        logger.info(f"📚 Brain Document embedded into pgvector: '{doc.title}' ({brain_id})")
+        logger.info(
+            f"📚 Brain Document embedded into pgvector: '{doc.title}' ({brain_id})"
+        )
         return {"status": "ingested", "persisted": True, "document": persisted}
 
     # Fallback: in-memory only (lost on restart)
@@ -520,7 +527,9 @@ async def ingest_brain_document(brain_id: str, doc: BrainDocumentCreateRequest):
     if brain_id not in BRAIN_DOCUMENTS:
         BRAIN_DOCUMENTS[brain_id] = list(BRAIN_DOCUMENTS["default"])
     BRAIN_DOCUMENTS[brain_id].insert(0, new_doc)
-    logger.warning(f"Brain Document stored in memory only (pgvector unavailable): '{doc.title}'")
+    logger.warning(
+        f"Brain Document stored in memory only (pgvector unavailable): '{doc.title}'"
+    )
     return {"status": "ingested", "persisted": False, "document": new_doc}
 
 
@@ -555,7 +564,9 @@ async def chat_with_brain(brain_id: str, req: BrainChatRequest):
     ]
 
     if citations:
-        answer = f"Based on indexed documents in '{brain_id}': {citations[0]['excerpt']}"
+        answer = (
+            f"Based on indexed documents in '{brain_id}': {citations[0]['excerpt']}"
+        )
     else:
         answer = f"I searched the '{brain_id}' knowledge store for '{req.message}' but found no relevant documents."
 

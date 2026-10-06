@@ -303,6 +303,41 @@ describe('CreateAgentPage', () => {
   })
 
   describe('Error Handling', () => {
+    it('normalizes a sparse API template and applies its default configuration', async () => {
+      mockFetch.success(mockApiResponses.teams)
+      mockFetch.success({ templates: [{
+        template_id: 'sparse-template',
+        name: 'Sparse Template',
+        description: 'Template with server defaults omitted'
+      }] })
+
+      renderWithRouter(<CreateAgentPage />)
+
+      const template = await screen.findByText('Sparse Template')
+      await user.click(template)
+
+      expect(screen.getByLabelText(/Model/)).toHaveValue('claude-sonnet-4-20250514')
+      expect(screen.getByLabelText(/Temperature/)).toHaveValue(0.7)
+    })
+
+    it('renders a raw template array from the legacy API', async () => {
+      mockFetch.success(mockApiResponses.teams)
+      mockFetch.success([mockApiResponses.templates.templates[0]])
+
+      renderWithRouter(<CreateAgentPage />)
+
+      expect(await screen.findByText('React Developer')).toBeInTheDocument()
+    })
+
+    it('falls back to bundled templates for an unrecognized API payload', async () => {
+      mockFetch.success(mockApiResponses.teams)
+      mockFetch.success({ templates: null })
+
+      renderWithRouter(<CreateAgentPage />)
+
+      expect(await screen.findByText('React Developer')).toBeInTheDocument()
+    })
+
     it('should show mock data when teams API fails', async () => {
       mockFetch.networkError() // Teams API fails
       mockFetch.success(mockApiResponses.templates)

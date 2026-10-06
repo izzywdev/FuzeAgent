@@ -6,13 +6,16 @@ Resolves zero-exposure vault secrets via FuzeKeys internal cluster API into sand
 import logging
 import os
 from typing import Any, Dict, List, Optional
+
 import httpx
 
 logger = logging.getLogger(__name__)
 
 FUZEKEYS_API_URL = os.getenv(
-    "FUZEKEYS_API_URL", 
-    os.getenv("FUZEKEYS_URL", "http://fuzekeys-backend.fuzekeys.svc.cluster.local:3000")
+    "FUZEKEYS_API_URL",
+    os.getenv(
+        "FUZEKEYS_URL", "http://fuzekeys-backend.fuzekeys.svc.cluster.local:3000"
+    ),
 )
 SERVICE_TOKEN = os.getenv("FUZEFRONT_SECURITY_SERVICE_TOKEN", "")
 
@@ -20,7 +23,9 @@ SERVICE_TOKEN = os.getenv("FUZEFRONT_SECURITY_SERVICE_TOKEN", "")
 class FuzeKeysResolver:
     """Queries FuzeKeys Vault and decrypts runtime secrets for sandboxed agent pods."""
 
-    def __init__(self, base_url: str = FUZEKEYS_API_URL, service_token: str = SERVICE_TOKEN):
+    def __init__(
+        self, base_url: str = FUZEKEYS_API_URL, service_token: str = SERVICE_TOKEN
+    ):
         self.base_url = base_url.rstrip("/")
         self.service_token = service_token
 
@@ -45,8 +50,16 @@ class FuzeKeysResolver:
 
         async with httpx.AsyncClient(timeout=4.0) as client:
             for binding in secret_bindings:
-                key_name = binding.get("keyName") if isinstance(binding, dict) else getattr(binding, "keyName", None)
-                secret_ref = binding.get("secretRef") if isinstance(binding, dict) else getattr(binding, "secretRef", None)
+                key_name = (
+                    binding.get("keyName")
+                    if isinstance(binding, dict)
+                    else getattr(binding, "keyName", None)
+                )
+                secret_ref = (
+                    binding.get("secretRef")
+                    if isinstance(binding, dict)
+                    else getattr(binding, "secretRef", None)
+                )
 
                 if not key_name or not secret_ref:
                     continue
@@ -55,7 +68,7 @@ class FuzeKeysResolver:
                 env_val = os.getenv(key_name)
                 if env_val:
                     resolved[key_name] = env_val
-                    logger.info(f"🔑 FuzeKeys: Resolved {key_name} from ambient environment")
+                    logger.debug("Resolved sandbox credential from environment")
                     continue
 
                 # 2. Query FuzeKeys cluster backend
@@ -64,17 +77,18 @@ class FuzeKeysResolver:
                     resp = await client.get(url, headers=headers)
                     if resp.status_code == 200:
                         data = resp.json()
-                        val = data.get("value") or data.get("secret") or data.get("data")
+                        val = (
+                            data.get("value") or data.get("secret") or data.get("data")
+                        )
                         if val:
                             resolved[key_name] = str(val)
-                            logger.info(f"🔒 FuzeKeys: Decrypted live secret '{secret_ref}' -> {key_name}")
+                            logger.debug("Resolved sandbox credential from vault")
                             continue
-                except Exception as e:
-                    logger.debug(f"FuzeKeys API lookup failed for {secret_ref}: {e}")
+                except Exception:
+                    logger.warning("Sandbox credential lookup failed")
 
-                # 3. Fallback: masked token representation to avoid crash
-                resolved[key_name] = f"fk_live_{secret_ref[:12]}"
-                logger.info(f"🛡️ FuzeKeys: Injected opaque zero-trust ref for {key_name}")
+                # Do not launch a sandbox with a fabricated or missing credential.
+                raise RuntimeError("Required sandbox credential could not be resolved")
 
         return resolved
 
