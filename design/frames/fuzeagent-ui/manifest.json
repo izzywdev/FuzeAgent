@@ -33,5 +33,6 @@
       "route": "/apps/fuzeagent?tab=builds",
       "acceptanceNotes": "Autonomous application production workspace with 6-stage deployment pipeline, pod sandbox execution, and FuzeFront portal registry integration."
     }
-  ]
+  ],
+  "stamp": "762a994020aa4865a87bb771ca7773dd9031156c93452f67e51854b3f378ae5f"
 }

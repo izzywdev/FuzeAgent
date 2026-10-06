@@ -324,7 +324,7 @@ export const SandboxesView: React.FC = () => {
                 className="text-[11px] pb-2 border-b flex items-center justify-between font-mono"
                 style={{ borderColor: '#1c2433', color: 'var(--success-color, #34d399)' }}
               >
-                <span>[Centralized Bus Relay Stream Connected — ws://orchestrator:8000/ws]</span>
+                <span>[Centralized Bus Relay Stream Connected — wss://orchestrator:8000/ws]</span>
                 <span className="text-slate-500">Namespace: fuzeagent</span>
               </div>
 

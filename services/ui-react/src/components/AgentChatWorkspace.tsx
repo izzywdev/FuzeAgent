@@ -78,7 +78,7 @@ export const AgentChatWorkspace: React.FC = () => {
     const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = typeof window !== 'undefined' ? window.location.host : 'localhost:8000';
     const url = isLocal
-      ? 'ws://localhost:8000/api/ws/multi-agent'
+      ? `${proto}//localhost:8000/api/ws/multi-agent`
       : `${proto}//${host}/apps/fuzeagent/api/ws/multi-agent`;
 
     try {
