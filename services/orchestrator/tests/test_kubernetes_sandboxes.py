@@ -74,7 +74,7 @@ class TestKubernetesSandboxDriverSimulation:
 
         result = await driver.terminate_sandbox_pod(
             pod_name="agent-sbx-sim-123",
-            secret_name="agent-sbx-sim-123-sec",
+            secret_name="agent-sbx-sim-123-sec",  # nosec B106
             netpol_name="agent-sbx-sim-123-netpol",
         )
         assert result is True
@@ -110,7 +110,10 @@ class TestKubernetesSandboxDriverNative:
             template_id="react-dev-v2",
             image="ghcr.io/izzywdev/fuzeagent/claude-runner-react-dev:latest",
             env_vars={"NODE_ENV": "development"},
-            secrets={"GITHUB_TOKEN": "ghp_mock123", "AUTH_KEY": "sec_456"},
+            secrets={
+                "GITHUB_TOKEN": "ghp_mock123",  # nosec B105
+                "AUTH_KEY": "sec_456",  # nosec B105
+            },
             setup_script="npm test",
             network_isolation="outbound-only",
             timeout_seconds=1200,
