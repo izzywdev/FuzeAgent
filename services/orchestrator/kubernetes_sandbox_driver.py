@@ -132,10 +132,14 @@ class KubernetesSandboxDriver:
                     ),
                 )
                 logger.info(
-                    f"🔐 Ephemeral Secret {secret_name} created with {len(secrets)} keys"
+                    "🔐 Ephemeral credential resource created for pod %s", pod_name
                 )
             except Exception as e:
-                logger.warning(f"⚠️ Failed to create Secret {secret_name}: {e}")
+                logger.warning(
+                    "⚠️ Failed to create credential resource for pod %s: %s",
+                    pod_name,
+                    type(e).__name__,
+                )
 
         # 2. Ephemeral NetworkPolicy definition
         if netpol_name and self.k8s_network_api:
@@ -279,7 +283,7 @@ class KubernetesSandboxDriver:
         if self.k8s_core_api:
             try:
                 loop = asyncio.get_event_loop()
-                created = await loop.run_in_executor(
+                await loop.run_in_executor(
                     None,
                     lambda: self.k8s_core_api.create_namespaced_pod(
                         namespace=self.namespace,
@@ -348,7 +352,9 @@ class KubernetesSandboxDriver:
 
         if not self.k8s_core_api:
             logger.info(
-                f"⚡ [Simulated K8s Driver] Terminated virtual pod {pod_name} (secret: {secret_name}, netpol: {netpol_name})"
+                "⚡ [Simulated K8s Driver] Terminated virtual pod %s (netpol: %s)",
+                pod_name,
+                netpol_name,
             )
             return True
 
@@ -364,12 +370,12 @@ class KubernetesSandboxDriver:
                     grace_period_seconds=0,
                 ),
             )
-            logger.info(f"🛑 Successfully deleted K8s pod {pod_name}")
+            logger.info("🛑 Successfully deleted K8s pod %s", pod_name)
         except ApiException as e:
             if e.status != 404:
-                logger.error(f"Failed to delete pod {pod_name}: {e}")
+                logger.error("Failed to delete pod %s: %s", pod_name, e.status)
         except Exception as e:
-            logger.error(f"Error terminating pod {pod_name}: {e}")
+            logger.error("Error terminating pod %s: %s", pod_name, type(e).__name__)
 
         # 2. Delete ephemeral Secret
         if secret_name:
@@ -382,14 +388,22 @@ class KubernetesSandboxDriver:
                         grace_period_seconds=0,
                     ),
                 )
-                logger.info(f"🗑️ Deleted ephemeral Secret {secret_name}")
+                logger.info(
+                    "🗑️ Deleted ephemeral credential resource for pod %s", pod_name
+                )
             except ApiException as e:
                 if e.status != 404:
                     logger.debug(
-                        f"Secret {secret_name} already deleted or not found: {e}"
+                        "Credential resource for pod %s already deleted or not found (status %s)",
+                        pod_name,
+                        e.status,
                     )
             except Exception as e:
-                logger.debug(f"Error deleting Secret {secret_name}: {e}")
+                logger.debug(
+                    "Error deleting credential resource for pod %s: %s",
+                    pod_name,
+                    type(e).__name__,
+                )
 
         # 3. Delete ephemeral NetworkPolicy
         if netpol_name and self.k8s_network_api:
