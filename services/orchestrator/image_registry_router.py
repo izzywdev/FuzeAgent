@@ -218,9 +218,9 @@ TEMPLATES_REGISTRY: Dict[str, Dict[str, Any]] = {
         "dockerfile": """# syntax=docker/dockerfile:1\nFROM ghcr.io/izzywdev/fuzeagent/claude-runner-base:latest\nUSER root\nRUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs git\nRUN npm install -g typescript vite @playwright/test\nCOPY session-relay.sh /usr/local/bin/session-relay\nRUN chmod +x /usr/local/bin/session-relay\nUSER agent\nWORKDIR /home/agent/workspace\nCMD [\"/usr/local/bin/session-relay\"]""",
         "envVars": {
             "NODE_ENV": "development",
-            "VITE_HOST": "0.0.0.0",
+            "VITE_HOST": "127.0.0.1",
             "PORT": "3000",
-        },  # nosec B104 -- sandbox dev server must listen on all interfaces inside its pod
+        },
         "fuzeKeysSecrets": [
             {
                 "keyName": "GITHUB_ACCESS_TOKEN",

@@ -106,9 +106,8 @@ class EscalationEngine:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             await websocket_manager.broadcast(ws_msg)
-        except Exception as exc:
-            # Broadcast is best-effort (a UI nicety); never fail the escalation on it.
-            logger.debug("Escalation websocket broadcast failed: %s", exc)
+        except Exception:
+            logger.warning("Escalation websocket notification failed")
 
     async def create_escalation(
         self,

@@ -286,23 +286,31 @@ class TestImageRegistryAndSandboxEndpoints:
             "timeoutSeconds": 600,
             "envOverrides": {"TEST_ENV_KEY": "test_env_val"},
         }
-        launch_res = client.post("/api/sandboxes/launch", json=launch_payload)
-        assert launch_res.status_code == 200
-        launch_data = launch_res.json()
-        assert launch_data["status"] == "launched"
+        with patch(
+            "image_registry_router.fuzekeys_resolver.resolve_secrets",
+            new_callable=AsyncMock,
+            return_value={
+                "ANTHROPIC_API_KEY": "sk-mock-key-123",
+                "DATABASE_URL": "postgresql://mock:5432/test",
+            },
+        ):
+            launch_res = client.post("/api/sandboxes/launch", json=launch_payload)
+            assert launch_res.status_code == 200
+            launch_data = launch_res.json()
+            assert launch_data["status"] == "launched"
 
-        sbx = launch_data["sandbox"]
-        assert sbx["name"] == "test-backend-agent"
-        assert sbx["templateId"] == "python-dev-v2"
-        assert sbx["status"] == "running"
-        assert sbx["podName"].startswith("agent-sbx-python-dev")
-        assert sbx["secretName"] is not None
-        assert sbx["networkPolicyName"] is not None
-        assert sbx["networkIsolation"] == "outbound-only"
-        assert any("[SECRETS]" in log for log in sbx["logs"])
-        assert any("[NETPOL]" in log for log in sbx["logs"])
+            sbx = launch_data["sandbox"]
+            assert sbx["name"] == "test-backend-agent"
+            assert sbx["templateId"] == "python-dev-v2"
+            assert sbx["status"] == "running"
+            assert sbx["podName"].startswith("agent-sbx-python-dev")
+            assert sbx["secretName"] is not None
+            assert sbx["networkPolicyName"] is not None
+            assert sbx["networkIsolation"] == "outbound-only"
+            assert any("[SECRETS]" in log for log in sbx["logs"])
+            assert any("[NETPOL]" in log for log in sbx["logs"])
 
-        sbx_id = sbx["id"]
+            sbx_id = sbx["id"]
 
         # 2. Verify sandbox listed in /api/sandboxes
         list_res = client.get("/api/sandboxes")

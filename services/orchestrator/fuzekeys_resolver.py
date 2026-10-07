@@ -39,9 +39,6 @@ class FuzeKeysResolver:
         plain environment variable key-value pairs.
         """
         resolved: Dict[str, str] = {}
-        # Counters only: never log key names, secret references or lookup errors, which
-        # can embed the vault reference (CWE-312/532).
-        from_env = from_vault = opaque = 0
         headers = {
             "Content-Type": "application/json",
             "X-Caller-Service": "fuzeagent-orchestrator",
@@ -71,7 +68,7 @@ class FuzeKeysResolver:
                 env_val = os.getenv(key_name)
                 if env_val:
                     resolved[key_name] = env_val
-                    from_env += 1
+                    logger.debug("Resolved sandbox credential from environment")
                     continue
 
                 # 2. Query FuzeKeys cluster backend
@@ -85,23 +82,14 @@ class FuzeKeysResolver:
                         )
                         if val:
                             resolved[key_name] = str(val)
-                            from_vault += 1
+                            logger.debug("Resolved sandbox credential from vault")
                             continue
-                except Exception as e:
-                    # Exception text can include the request URL (and so the secret ref).
-                    logger.debug("FuzeKeys API lookup failed (%s)", type(e).__name__)
+                except Exception:
+                    logger.warning("Sandbox credential lookup failed")
 
-                # 3. Fallback: masked token representation to avoid crash
-                resolved[key_name] = f"fk_live_{secret_ref[:12]}"
-                opaque += 1
+                # Do not launch a sandbox with a fabricated or missing credential.
+                raise RuntimeError("Required sandbox credential could not be resolved")
 
-        logger.info(
-            "FuzeKeys: resolved %d binding(s) (ambient env=%d, vault=%d, opaque ref=%d)",
-            len(resolved),
-            from_env,
-            from_vault,
-            opaque,
-        )
         return resolved
 
 
