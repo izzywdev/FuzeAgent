@@ -185,6 +185,16 @@ class TestKubernetesSandboxDriverNative:
         assert container["command"][0] == "/bin/bash"
         assert 'eval "$SETUP_SCRIPT"' in container["command"][2]
 
+        # Rootless security context & scratch volumes
+        assert container["securityContext"]["allowPrivilegeEscalation"] is False
+        assert container["securityContext"]["capabilities"]["drop"] == ["ALL"]
+        assert pod_body["spec"]["securityContext"]["runAsNonRoot"] is True
+        assert pod_body["spec"]["securityContext"]["runAsUser"] == 1001
+        assert any(
+            v["name"] == "workspace-storage" for v in pod_body["spec"]["volumes"]
+        )
+        assert any(v["name"] == "tmp-storage" for v in pod_body["spec"]["volumes"])
+
     @pytest.mark.asyncio
     async def test_terminate_sandbox_pod_cleans_resources(self):
         driver = KubernetesSandboxDriver(namespace="fuzeagent-test")

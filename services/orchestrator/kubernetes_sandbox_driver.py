@@ -277,6 +277,24 @@ class KubernetesSandboxDriver:
         if ghcr_secret and ghcr_secret not in pull_secret_names:
             pull_secret_names.append(ghcr_secret)
 
+        container_spec["securityContext"] = {
+            "allowPrivilegeEscalation": False,
+            "readOnlyRootFilesystem": False,
+            "capabilities": {
+                "drop": ["ALL"],
+            },
+        }
+        container_spec["volumeMounts"] = [
+            {
+                "name": "workspace-storage",
+                "mountPath": "/workspace",
+            },
+            {
+                "name": "tmp-storage",
+                "mountPath": "/tmp",
+            },
+        ]
+
         pod_spec = {
             "apiVersion": "v1",
             "kind": "Pod",
@@ -297,7 +315,30 @@ class KubernetesSandboxDriver:
             "spec": {
                 "restartPolicy": "Never",
                 "activeDeadlineSeconds": timeout_seconds,  # Automatic K8s kernel-enforced TTL
+                "securityContext": {
+                    "runAsNonRoot": True,
+                    "runAsUser": 1001,
+                    "runAsGroup": 1001,
+                    "fsGroup": 1001,
+                    "seccompProfile": {
+                        "type": "RuntimeDefault",
+                    },
+                },
                 "containers": [container_spec],
+                "volumes": [
+                    {
+                        "name": "workspace-storage",
+                        "emptyDir": {
+                            "sizeLimit": "2Gi",
+                        },
+                    },
+                    {
+                        "name": "tmp-storage",
+                        "emptyDir": {
+                            "sizeLimit": "1Gi",
+                        },
+                    },
+                ],
                 "imagePullSecrets": [{"name": s} for s in pull_secret_names],
             },
         }
