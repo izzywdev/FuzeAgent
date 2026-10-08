@@ -74,6 +74,7 @@ class KubernetesSandboxDriver:
         command: Optional[List[str]] = None,
         ws_relay_url: Optional[str] = None,
         agent_id: Optional[str] = None,
+        image_pull_secrets: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Spawn an isolated Pod with attached secrets, network policy, and startup script.
@@ -94,7 +95,13 @@ class KubernetesSandboxDriver:
 
         # Format container env vars
         merged_env = dict(env_vars)
-        if ws_relay_url:
+        intra_cluster_ws = os.getenv(
+            "INTRA_CLUSTER_WS_RELAY_URL",
+            f"ws://fuzeagent-orchestrator.{self.namespace}.svc.cluster.local:8000/api/ws/agent-relay/{agent_id or short_id}",
+        )
+        if not ws_relay_url or "fuzeagent.prod.fuzefront.com/ws/stream" in ws_relay_url:
+            merged_env["WS_RELAY_URL"] = intra_cluster_ws
+        else:
             merged_env["WS_RELAY_URL"] = ws_relay_url
         if agent_id:
             merged_env["AGENT_ID"] = agent_id
@@ -255,6 +262,20 @@ class KubernetesSandboxDriver:
                 "-c",
                 'if [ -n "$SETUP_SCRIPT" ]; then eval "$SETUP_SCRIPT"; fi; if [ -x /usr/local/bin/session-relay ]; then exec /usr/local/bin/session-relay; else exec sleep infinity; fi',
             ]
+        else:
+            container_spec["command"] = [
+                "/bin/bash",
+                "-c",
+                'if [ -x /usr/local/bin/session-relay ]; then exec /usr/local/bin/session-relay; else exec sleep infinity; fi',
+            ]
+
+        pull_secret_names = list(image_pull_secrets or [])
+        default_secret = os.getenv("HARBOR_PULL_SECRET", "harbor-pull-secret")
+        if default_secret and default_secret not in pull_secret_names:
+            pull_secret_names.append(default_secret)
+        ghcr_secret = os.getenv("GHCR_PULL_SECRET", "ghcr-pull")
+        if ghcr_secret and ghcr_secret not in pull_secret_names:
+            pull_secret_names.append(ghcr_secret)
 
         pod_spec = {
             "apiVersion": "v1",
@@ -277,6 +298,7 @@ class KubernetesSandboxDriver:
                 "restartPolicy": "Never",
                 "activeDeadlineSeconds": timeout_seconds,  # Automatic K8s kernel-enforced TTL
                 "containers": [container_spec],
+                "imagePullSecrets": [{"name": s} for s in pull_secret_names],
             },
         }
 
@@ -481,6 +503,70 @@ class KubernetesSandboxDriver:
             return logs
         except Exception as e:
             return f"Unable to fetch logs for {pod_name}: {e}"
+
+
+    async def execute_in_sandbox_pod(
+        self,
+        pod_name: str,
+        command: Any,
+        container: str = "agent-runner",
+        timeout_seconds: int = 60,
+    ) -> Dict[str, Any]:
+        """
+        Execute an ad-hoc command inside an active sandbox pod using Kubernetes exec.
+        Falls back to simulation mode if cluster API is not available.
+        """
+        cmd_str = " ".join(command) if isinstance(command, list) else str(command)
+        if not self.k8s_core_api:
+            return {
+                "status": "completed",
+                "mode": "simulated_exec",
+                "podName": pod_name,
+                "stdout": f"[SIMULATED_EXEC] {cmd_str}\nStatus: completed (0)",
+                "stderr": "",
+                "exitCode": 0,
+            }
+
+        cmd_list = (
+            ["/bin/bash", "-c", command]
+            if isinstance(command, str)
+            else list(command)
+        )
+
+        try:
+            from kubernetes.stream import stream
+
+            loop = asyncio.get_event_loop()
+            resp = await loop.run_in_executor(
+                None,
+                lambda: stream(
+                    self.k8s_core_api.connect_get_namespaced_pod_exec,
+                    name=pod_name,
+                    namespace=self.namespace,
+                    container=container,
+                    command=cmd_list,
+                    stderr=True,
+                    stdin=False,
+                    stdout=True,
+                    tty=False,
+                ),
+            )
+            return {
+                "status": "completed",
+                "podName": pod_name,
+                "stdout": resp,
+                "stderr": "",
+                "exitCode": 0,
+            }
+        except Exception as e:
+            logger.error(f"Exec in pod {pod_name} failed: {e}")
+            return {
+                "status": "error",
+                "podName": pod_name,
+                "stdout": "",
+                "stderr": str(e),
+                "exitCode": 1,
+            }
 
 
 # Global singleton instance

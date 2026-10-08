@@ -92,3 +92,11 @@ rabbitmq:
   storageClassName: local-path
   claimName: rabbitmq-data-v2
 
+# In-cluster Harbor Container Registry for runtime user & agent sandboxes
+sandboxes:
+  registry:
+    host: "harbor.prod.fuzefront.com"
+    inClusterHost: "harbor-core.harbor.svc.cluster.local"
+    project: "sandboxes"
+    pullSecretName: "harbor-pull-secret"
+

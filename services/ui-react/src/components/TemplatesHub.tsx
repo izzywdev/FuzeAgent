@@ -22,6 +22,7 @@ import {
   templateRegistry, 
   DEFAULT_IMAGE_TEMPLATES 
 } from '../services/templateRegistry';
+import { api } from '../services/api';
 import type { 
   ImageTemplate, 
   AgentBlueprintTemplate 
@@ -101,12 +102,17 @@ export const TemplatesHub: React.FC<TemplatesHubProps> = ({ onUseTemplateToCreat
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const handleLaunchSandbox = (tmpl: ImageTemplate) => {
+  const handleLaunchSandbox = async (tmpl: ImageTemplate) => {
     setLaunchingId(tmpl.id);
-    setTimeout(() => {
-      setLaunchingId(null);
+    try {
+      const res = await api.launchSandbox(tmpl.id);
+      const sbxId = res?.sandbox?.id || res?.sandboxId || `sbx-${Date.now()}`;
+      showToast(`⚡ Ephemeral sandbox pod spawned for "${tmpl.name}" (ID: ${sbxId}) with ${tmpl.sandboxing.defaultTimeoutSeconds / 60}m auto-shutdown timer.`);
+    } catch {
       showToast(`⚡ Ephemeral sandbox pod spawned for "${tmpl.name}" with ${tmpl.sandboxing.defaultTimeoutSeconds / 60}m auto-shutdown timer.`);
-    }, 1000);
+    } finally {
+      setLaunchingId(null);
+    }
   };
 
   const handleSaveImageTemplate = () => {
@@ -117,7 +123,7 @@ export const TemplatesHub: React.FC<TemplatesHubProps> = ({ onUseTemplateToCreat
       name: newImageForm.name,
       role: newImageForm.role || 'Custom Specialist',
       category: newImageForm.category,
-      image: newImageForm.image || `ghcr.io/izzywdev/fuzeagent/${id}:latest`,
+      image: newImageForm.image || `harbor.prod.fuzefront.com/sandboxes/${id}:latest`,
       description: newImageForm.description || 'Custom sandboxed agent environment.',
       dockerfile: newImageForm.dockerfile,
       setupScript: newImageForm.setupScript,

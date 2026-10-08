@@ -8,6 +8,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { Button, Badge } from '../design-system';
+import { api } from '../services/api';
 
 interface ActiveSandbox {
   id: string;
@@ -76,6 +77,43 @@ export const SandboxesView: React.FC = () => {
   const [selectedSandbox, setSelectedSandbox] = useState<ActiveSandbox>(INITIAL_SANDBOXES[0]);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
+  // Sync live sandboxes from orchestrator backend
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveSandboxes = async () => {
+      try {
+        const live = await api.getSandboxes();
+        if (Array.isArray(live) && live.length > 0 && isMounted) {
+          const mapped: ActiveSandbox[] = live.map((s: any) => ({
+            id: s.id,
+            podName: s.podName || s.id,
+            agentName: s.name || s.templateId,
+            templateId: s.templateId,
+            team: 'Core Engineering',
+            status: s.status === 'running' ? 'running' : 'idle',
+            uptimeSeconds: Math.max(1, (s.timeoutSeconds || 1800) - (s.secondsRemaining || 1800)),
+            timeoutSeconds: s.timeoutSeconds || 1800,
+            cpuPercent: 14.2,
+            memoryMb: 512,
+            memoryLimitMb: 4096,
+            lastEvent: s.currentTask || 'Ready for tasks',
+            logs: s.logs || [],
+          }));
+          setSandboxes(mapped);
+        }
+      } catch {
+        // keep fallback
+      }
+    };
+
+    fetchLiveSandboxes();
+    const interval = setInterval(fetchLiveSandboxes, 5000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   // Live timer tick
   useEffect(() => {
     const timer = setInterval(() => {
@@ -89,7 +127,12 @@ export const SandboxesView: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const handleTerminate = (id: string) => {
+  const handleTerminate = async (id: string) => {
+    try {
+      await api.terminateSandbox(id);
+    } catch {
+      // ignore
+    }
     setSandboxes(prev => prev.filter(sb => sb.id !== id));
     if (selectedSandbox?.id === id) {
       setSelectedSandbox(sandboxes.find(s => s.id !== id) || INITIAL_SANDBOXES[0]);

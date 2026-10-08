@@ -250,7 +250,10 @@ class TestImageRegistryAndSandboxEndpoints:
         response = client.get("/api/registry/images")
         assert response.status_code == 200
         data = response.json()
-        assert data["registry"] == "ghcr.io/izzywdev/fuzeagent"
+        assert data["registry"] in (
+            "harbor.prod.fuzefront.com/sandboxes",
+            "ghcr.io/izzywdev/fuzeagent",
+        )
         assert isinstance(data["images"], list)
         assert len(data["images"]) >= 2
 
@@ -400,3 +403,30 @@ class TestMultiAgentWebSocketStreaming:
 
                 assert "agent_chunk" in received_types
                 assert "agent_message" in received_types
+
+    def test_agent_relay_pod_connection_and_forwarding(self, client: TestClient):
+        with client.websocket_connect("/api/ws/agent-relay/test-agent-pod") as pod_ws:
+            pod_ws.send_json(
+                {
+                    "agentId": "test-agent-pod",
+                    "type": "agent_status",
+                    "status": "online",
+                    "currentTask": "Pod runner initialized",
+                }
+            )
+
+            with client.websocket_connect("/api/ws/multi-agent") as chat_ws:
+                init_msg = chat_ws.receive_json()
+                assert init_msg.get("type") == "connection_established"
+
+                pod_ws.send_json(
+                    {
+                        "agentId": "test-agent-pod",
+                        "type": "agent_chunk",
+                        "chunk": "Echo from sandbox pod container",
+                        "isFinal": False,
+                    }
+                )
+                received = chat_ws.receive_json()
+                assert received.get("type") == "agent_chunk"
+                assert received.get("chunk") == "Echo from sandbox pod container"

@@ -199,7 +199,10 @@ TEMPLATES_REGISTRY: Dict[str, Dict[str, Any]] = {
             "enabled": True,
             "channel": "agent.stream.python-dev-v2",
             "streamLlmChunks": True,
-            "wsRelayUrl": "wss://fuzeagent.prod.fuzefront.com/ws/stream",
+            "wsRelayUrl": os.getenv(
+                "INTRA_CLUSTER_WS_RELAY_URL",
+                "ws://fuzeagent-orchestrator.fuzeagent.svc.cluster.local:8000/api/ws/agent-relay",
+            ),
         },
         "escalation": {
             "requiresApprovalForDestructive": True,
@@ -240,7 +243,10 @@ TEMPLATES_REGISTRY: Dict[str, Dict[str, Any]] = {
             "enabled": True,
             "channel": "agent.stream.react-dev-v2",
             "streamLlmChunks": True,
-            "wsRelayUrl": "wss://fuzeagent.prod.fuzefront.com/ws/stream",
+            "wsRelayUrl": os.getenv(
+                "INTRA_CLUSTER_WS_RELAY_URL",
+                "ws://fuzeagent-orchestrator.fuzeagent.svc.cluster.local:8000/api/ws/agent-relay",
+            ),
         },
         "escalation": {
             "requiresApprovalForDestructive": True,
@@ -328,7 +334,12 @@ async def get_template(template_id: str):
 
 @router.post("/templates", summary="Register or Update Image Template")
 async def save_template(template: ImageTemplateModel):
-    TEMPLATES_REGISTRY[template.id] = template.model_dump()
+    data = template.model_dump()
+    harbor_host = os.getenv("HARBOR_REGISTRY_HOST", "harbor.prod.fuzefront.com")
+    harbor_project = os.getenv("HARBOR_PROJECT", "sandboxes")
+    if not data.get("image") or "/" not in data["image"]:
+        data["image"] = f"{harbor_host}/{harbor_project}/{template.id}:latest"
+    TEMPLATES_REGISTRY[template.id] = data
     return {"status": "saved", "template": TEMPLATES_REGISTRY[template.id]}
 
 
@@ -340,6 +351,10 @@ async def trigger_kaniko_build(template_id: str):
         raise HTTPException(status_code=404, detail="Template not found")
 
     tmpl = TEMPLATES_REGISTRY[template_id]
+    harbor_host = os.getenv("HARBOR_REGISTRY_HOST", "harbor.prod.fuzefront.com")
+    harbor_project = os.getenv("HARBOR_PROJECT", "sandboxes")
+    dest_image = tmpl.get("image") or f"{harbor_host}/{harbor_project}/{template_id}:latest"
+
     try:
         from .kaniko_builder import kaniko_builder
     except ImportError:
@@ -348,7 +363,7 @@ async def trigger_kaniko_build(template_id: str):
     return await kaniko_builder.build_image(
         template_id=template_id,
         dockerfile=tmpl.get("dockerfile", ""),
-        destination_image=tmpl["image"],
+        destination_image=dest_image,
     )
 
 
@@ -361,14 +376,22 @@ async def trigger_kaniko_build(template_id: str):
 async def list_registry_images():
     """Inspect status of container images registered across all agent templates."""
     images = []
+    harbor_host = os.getenv("HARBOR_REGISTRY_HOST", "harbor.prod.fuzefront.com")
+    harbor_project = os.getenv("HARBOR_PROJECT", "sandboxes")
+
     for tmpl_id, tmpl in TEMPLATES_REGISTRY.items():
         img_ref = tmpl.get("image", "")
+        reg = (
+            "harbor"
+            if harbor_host in img_ref
+            else ("ghcr.io" if "ghcr.io" in img_ref else "in-cluster")
+        )
         images.append(
             {
                 "templateId": tmpl_id,
                 "templateName": tmpl.get("name"),
                 "image": img_ref,
-                "registry": "ghcr.io",
+                "registry": reg,
                 "tag": img_ref.split(":")[-1] if ":" in img_ref else "latest",
                 "status": "ready",
                 "dockerfile": bool(tmpl.get("dockerfile")),
@@ -380,7 +403,11 @@ async def list_registry_images():
                 "setupScript": tmpl.get("setupScript", ""),
             }
         )
-    return {"registry": "ghcr.io/izzywdev/fuzeagent", "images": images}
+    return {
+        "registry": f"{harbor_host}/{harbor_project}",
+        "upstreamRegistry": "ghcr.io/izzywdev/fuzeagent",
+        "images": images,
+    }
 
 
 @router.get(
@@ -749,9 +776,84 @@ async def resolve_escalation(escalation_id: str, req: EscalationResolutionReques
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Track A & B: Multi-Agent Workspace & Pod Sandbox Relay WebSockets
+# ---------------------------------------------------------------------------
+
+CONNECTED_AGENT_PODS: Dict[str, WebSocket] = {}
+ACTIVE_CHAT_CLIENTS: List[WebSocket] = []
+
+
+@router.websocket("/ws/agent-relay/{agent_id}")
+@router.websocket("/ws/agent-relay")
+@router.websocket("/ws/stream")
+async def agent_relay_websocket(websocket: WebSocket, agent_id: Optional[str] = None):
+    """
+    Bidirectional relay endpoint for container sandbox pods.
+    Accepts connections from session-relay.mjs / session-relay.sh running inside pods.
+    Forwards stdout/stderr tokens and status updates to all active browser chat clients.
+    """
+    await websocket.accept()
+    resolved_id = agent_id or "agent-sandbox"
+    CONNECTED_AGENT_PODS[resolved_id] = websocket
+    logger.info(f"⚡ Sandbox container pod connected to relay: {resolved_id}")
+
+    # Mark corresponding active sandbox as online
+    for sbx in ACTIVE_SANDBOXES:
+        if (
+            sbx.get("id") == resolved_id
+            or resolved_id in sbx.get("templateId", "")
+            or resolved_id in sbx.get("name", "").lower()
+        ):
+            sbx["status"] = "running"
+            sbx["logs"].append(f"[{resolved_id}] ⚡ Container runner connected to relay bus.")
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            pod_agent_id = data.get("agentId", resolved_id)
+            if pod_agent_id != resolved_id:
+                resolved_id = pod_agent_id
+                CONNECTED_AGENT_PODS[resolved_id] = websocket
+
+            msg_type = data.get("type")
+            for sbx in ACTIVE_SANDBOXES:
+                if (
+                    sbx.get("id") == resolved_id
+                    or resolved_id in sbx.get("templateId", "")
+                    or resolved_id in sbx.get("name", "").lower()
+                ):
+                    if msg_type == "agent_status":
+                        sbx["currentTask"] = data.get("currentTask", sbx["currentTask"])
+                    elif msg_type == "agent_message":
+                        sbx["logs"].append(
+                            f"[{resolved_id}] 📤 Output: {data.get('content', '')[:120]}..."
+                        )
+
+            # Broadcast streaming chunks from sandbox container directly to connected browser clients
+            dead_clients = []
+            for client in list(ACTIVE_CHAT_CLIENTS):
+                try:
+                    await client.send_json(data)
+                except Exception:
+                    dead_clients.append(client)
+            for dc in dead_clients:
+                if dc in ACTIVE_CHAT_CLIENTS:
+                    ACTIVE_CHAT_CLIENTS.remove(dc)
+
+    except WebSocketDisconnect:
+        logger.info(f"Sandbox container pod disconnected: {resolved_id}")
+    except Exception as e:
+        logger.warning(f"Agent relay exception for {resolved_id}: {e}")
+    finally:
+        if resolved_id in CONNECTED_AGENT_PODS:
+            del CONNECTED_AGENT_PODS[resolved_id]
+
+
 @router.websocket("/ws/multi-agent")
 async def multi_agent_websocket(websocket: WebSocket):
     await websocket.accept()
+    ACTIVE_CHAT_CLIENTS.append(websocket)
     logger.info("⚡ Multi-agent WebSocket client connected")
     try:
         await websocket.send_json(
@@ -809,7 +911,7 @@ async def multi_agent_websocket(websocket: WebSocket):
                     }
                 )
 
-                await asyncio.sleep(0.25)
+                await asyncio.sleep(0.2)
 
                 # 3. Pull context from brain_store
                 docs = await brain_store.search(brain_id, message, limit=2)
@@ -841,7 +943,78 @@ async def multi_agent_websocket(websocket: WebSocket):
                         f"[{agent_id}] 📥 Inbound command from browser: {message}"
                     )
 
-                # 5. Live LLM streaming (Anthropic Claude or contextual RAG fallback)
+                # 5. Check if a live pod WebSocket relay is connected for this agent
+                pod_ws = CONNECTED_AGENT_PODS.get(agent_id)
+                if not pod_ws and active_sbx:
+                    pod_ws = CONNECTED_AGENT_PODS.get(active_sbx.get("id"))
+
+                if pod_ws:
+                    try:
+                        # Forward prompt directly into the container pod
+                        await pod_ws.send_json(
+                            {
+                                "action": "chat",
+                                "agentId": agent_id,
+                                "prompt": message,
+                            }
+                        )
+                        # Pod streams tokens back to ACTIVE_CHAT_CLIENTS directly
+                        continue
+                    except Exception as e:
+                        logger.warning(
+                            f"Relay to pod {agent_id} failed: {e}; falling back to execution driver"
+                        )
+
+                # 6. If no pod WS, but active sandbox has K8s pod and API is available
+                if (
+                    active_sbx
+                    and active_sbx.get("podName")
+                    and k8s_sandbox_driver.k8s_core_api
+                ):
+                    exec_res = await k8s_sandbox_driver.execute_in_sandbox_pod(
+                        pod_name=active_sbx["podName"],
+                        command=message,
+                    )
+                    pod_output = (
+                        exec_res.get("stdout")
+                        or exec_res.get("stderr")
+                        or "Command completed in sandbox container."
+                    )
+                    words = pod_output.split("\n")
+                    for w in words:
+                        line_chunk = w + "\n"
+                        await websocket.send_json(
+                            {
+                                "type": "agent_chunk",
+                                "agentId": agent_id,
+                                "chunk": line_chunk,
+                                "accumulated": pod_output,
+                                "isFinal": False,
+                            }
+                        )
+                        await asyncio.sleep(0.02)
+
+                    await websocket.send_json(
+                        {
+                            "type": "agent_message",
+                            "agentId": agent_id,
+                            "content": pod_output,
+                            "citations": citations,
+                            "isFinal": True,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
+                    await websocket.send_json(
+                        {
+                            "type": "agent_status",
+                            "agentId": agent_id,
+                            "status": "online",
+                            "currentTask": "Standby for commands",
+                        }
+                    )
+                    continue
+
+                # 7. Live LLM streaming (Anthropic Claude or contextual RAG fallback)
                 streamed_via_llm = False
                 accumulated = ""
                 api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -948,3 +1121,6 @@ async def multi_agent_websocket(websocket: WebSocket):
         logger.info("⚡ Multi-agent WebSocket client disconnected")
     except Exception as e:
         logger.error(f"Multi-agent WebSocket error: {e}")
+    finally:
+        if websocket in ACTIVE_CHAT_CLIENTS:
+            ACTIVE_CHAT_CLIENTS.remove(websocket)

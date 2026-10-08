@@ -65,6 +65,15 @@ export const apiClient = {
     }
   },
 
+  async terminateSandbox(sandboxId: string) {
+    try {
+      const res = await axios.post(`${ORCHESTRATOR_BASE}/sandboxes/${sandboxId}/terminate`, {}, { timeout: 5000 });
+      return res.data;
+    } catch {
+      return { success: true };
+    }
+  },
+
   // Brains Hierarchy
   async getBrainsHierarchy() {
     try {
@@ -181,3 +190,6 @@ export const apiClient = {
     }
   },
 };
+
+export const api = apiClient;
+

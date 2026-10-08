@@ -138,6 +138,16 @@ spec:
             # Non-wildcard CORS allowlist (wildcard + credentials is rejected by the app).
             - name: CORS_ALLOW_ORIGINS
               value: {{ .Values.orchestrator.auth.corsAllowOrigins | quote }}
+            {{- with .Values.sandboxes }}
+            - name: HARBOR_REGISTRY_HOST
+              value: {{ .registry.host | quote }}
+            - name: HARBOR_INCLUSTER_HOST
+              value: {{ .registry.inClusterHost | quote }}
+            - name: HARBOR_PROJECT
+              value: {{ .registry.project | quote }}
+            - name: HARBOR_PULL_SECRET
+              value: {{ .registry.pullSecretName | quote }}
+            {{- end }}
           readinessProbe:
             tcpSocket:
               port: http
