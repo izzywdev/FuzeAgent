@@ -16,7 +16,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 try:
-    import anthropic
     from anthropic import AsyncAnthropic
 
     ANTHROPIC_AVAILABLE = True
@@ -25,11 +24,9 @@ except ImportError:
 
 from fastapi import (
     APIRouter,
-    Depends,
     HTTPException,
     WebSocket,
     WebSocketDisconnect,
-    status,
 )
 from pydantic import BaseModel, Field
 
@@ -353,7 +350,9 @@ async def trigger_kaniko_build(template_id: str):
     tmpl = TEMPLATES_REGISTRY[template_id]
     harbor_host = os.getenv("HARBOR_REGISTRY_HOST", "harbor.prod.fuzefront.com")
     harbor_project = os.getenv("HARBOR_PROJECT", "sandboxes")
-    dest_image = tmpl.get("image") or f"{harbor_host}/{harbor_project}/{template_id}:latest"
+    dest_image = (
+        tmpl.get("image") or f"{harbor_host}/{harbor_project}/{template_id}:latest"
+    )
 
     try:
         from .kaniko_builder import kaniko_builder
@@ -806,7 +805,9 @@ async def agent_relay_websocket(websocket: WebSocket, agent_id: Optional[str] = 
             or resolved_id in sbx.get("name", "").lower()
         ):
             sbx["status"] = "running"
-            sbx["logs"].append(f"[{resolved_id}] ⚡ Container runner connected to relay bus.")
+            sbx["logs"].append(
+                f"[{resolved_id}] ⚡ Container runner connected to relay bus."
+            )
 
     try:
         while True:
@@ -884,7 +885,6 @@ async def multi_agent_websocket(websocket: WebSocket):
             if action == "chat":
                 agent_id = data.get("agentId", "python-dev")
                 message = data.get("message", "")
-                session_id = data.get("sessionId", str(uuid.uuid4()))
 
                 # 1. Emit executing status
                 await websocket.send_json(

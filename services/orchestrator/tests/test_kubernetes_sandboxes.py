@@ -4,7 +4,6 @@ Tests Track #1 (Kubernetes Pod Sandbox Lifecycle), Track #2 (Secret & NetworkPol
 and REST/WebSocket endpoints for agent sandboxes.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -12,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from kubernetes.client.rest import ApiException
 
-from image_registry_router import ACTIVE_SANDBOXES, TEMPLATES_REGISTRY, router
+from image_registry_router import router
 from kubernetes_sandbox_driver import KubernetesSandboxDriver
 
 

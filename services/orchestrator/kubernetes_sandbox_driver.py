@@ -266,7 +266,7 @@ class KubernetesSandboxDriver:
             container_spec["command"] = [
                 "/bin/bash",
                 "-c",
-                'if [ -x /usr/local/bin/session-relay ]; then exec /usr/local/bin/session-relay; else exec sleep infinity; fi',
+                "if [ -x /usr/local/bin/session-relay ]; then exec /usr/local/bin/session-relay; else exec sleep infinity; fi",
             ]
 
         pull_secret_names = list(image_pull_secrets or [])
@@ -504,7 +504,6 @@ class KubernetesSandboxDriver:
         except Exception as e:
             return f"Unable to fetch logs for {pod_name}: {e}"
 
-
     async def execute_in_sandbox_pod(
         self,
         pod_name: str,
@@ -528,9 +527,7 @@ class KubernetesSandboxDriver:
             }
 
         cmd_list = (
-            ["/bin/bash", "-c", command]
-            if isinstance(command, str)
-            else list(command)
+            ["/bin/bash", "-c", command] if isinstance(command, str) else list(command)
         )
 
         try:
