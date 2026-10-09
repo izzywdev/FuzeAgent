@@ -158,6 +158,7 @@ jobs:
           # ANTHROPIC_AUTH_TOKEN, some SDK paths still read ANTHROPIC_API_KEY, so
           # both carry the resolved credential — whichever endpoint won the probe.
           anthropic-api-key: ${{ steps.llm.outputs.auth-token }}
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # allowed_bots: scoped to `claude`, deliberately NOT `*`.
           #
           # The gate exists because claude-code-action hard-fails a Bot actor:

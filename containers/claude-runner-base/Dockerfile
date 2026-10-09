@@ -26,10 +26,10 @@ RUN --mount=type=secret,id=npm_token \
     rm -f /tmp/.npmrc-gh
 
 COPY session-relay.sh /usr/local/bin/session-relay
-RUN chmod +x /usr/local/bin/session-relay
-
+COPY session-relay.mjs /usr/local/bin/session-relay.mjs
+RUN chmod +x /usr/local/bin/session-relay /usr/local/bin/session-relay.mjs
 RUN useradd -m -u 1001 -s /bin/bash agent
-
+RUN mkdir -p /workspace && chown -R agent:agent /workspace
 WORKDIR /workspace
 ENV ANTHROPIC_API_KEY=""
 ENV WS_RELAY_URL=""

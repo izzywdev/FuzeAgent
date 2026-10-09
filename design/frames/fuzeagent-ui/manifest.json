@@ -1,0 +1,38 @@
+{
+  "feature": "fuzeagent-ui",
+  "approved": true,
+  "approvedBy": "product-designer",
+  "approvedAt": "2026-10-05T13:30:00Z",
+  "designSystem": "fuzefront-v2",
+  "frames": [
+    {
+      "id": "agent-chat",
+      "file": "01-agent-chat.html",
+      "title": "Agent Chat Workspace",
+      "route": "/apps/fuzeagent?tab=workspace",
+      "acceptanceNotes": "Conversational UI with active agent selector, real-time WebSocket token streaming, thought steps, and expandable tool execution output."
+    },
+    {
+      "id": "templates-blueprints",
+      "file": "02-templates-blueprints.html",
+      "title": "Templates & Blueprints Hub",
+      "route": "/apps/fuzeagent?tab=templates",
+      "acceptanceNotes": "Two-tier template management: Foundation Container Images (Tier 1) and Assembled Agent Blueprints (Tier 2: Image + Network Policy + Connectors + Brains)."
+    },
+    {
+      "id": "active-agents",
+      "file": "03-active-agents.html",
+      "title": "Active Agents & Isolation Monitor",
+      "route": "/apps/fuzeagent?tab=sandboxes",
+      "acceptanceNotes": "Live pod monitoring with CPU/RAM telemetry gauges, auto-shutdown countdown timers, and deep-dark terminal console with syntax colored output."
+    },
+    {
+      "id": "app-builds-studio",
+      "file": "04-app-builds-studio.html",
+      "title": "App Builds & Deployment Studio",
+      "route": "/apps/fuzeagent?tab=builds",
+      "acceptanceNotes": "Autonomous application production workspace with 6-stage deployment pipeline, pod sandbox execution, and FuzeFront portal registry integration."
+    }
+  ],
+  "stamp": "762a994020aa4865a87bb771ca7773dd9031156c93452f67e51854b3f378ae5f"
+}

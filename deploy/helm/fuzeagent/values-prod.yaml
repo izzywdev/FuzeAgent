@@ -20,9 +20,9 @@ orchestrator:
     tag: ffe6f421445c
   # First-light guardrails (also the chart default; pinned here for clarity).
   execution:
-    autonomous: false
-    multiAgent: false
-    fileOps: false
+    autonomous: true
+    multiAgent: true
+    fileOps: true
     mcp: true
   # CORS allowlist = the same-origin admin host (the UI nginx proxies /api/* to
   # the orchestrator, so the browser Origin is the ingress host).
@@ -91,4 +91,12 @@ redis:
 rabbitmq:
   storageClassName: local-path
   claimName: rabbitmq-data-v2
+
+# In-cluster Harbor Container Registry for runtime user & agent sandboxes
+sandboxes:
+  registry:
+    host: "harbor.prod.fuzefront.com"
+    inClusterHost: "harbor-core.harbor.svc.cluster.local"
+    project: "sandboxes"
+    pullSecretName: "harbor-pull-secret"
 

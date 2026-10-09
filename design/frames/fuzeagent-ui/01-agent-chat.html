@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FuzeAgent — Agent Chat Workspace</title>
+  <link rel="stylesheet" href="./tokens.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    .layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; height: calc(100vh - 120px); }
+    .card { background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; }
+    .header-bar { background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; }
+    .pill-online { background: rgba(52, 211, 153, 0.12); color: var(--success-color); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .btn-seam { background: var(--seam); color: #fff; border: none; padding: 8px 16px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .chat-bubble { max-width: 80%; padding: 14px 18px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
+    .chat-user { background: var(--accent-color); color: #fff; margin-left: auto; border-top-right-radius: 2px; }
+    .chat-agent { background: var(--bg-quaternary); border: 1px solid var(--border-color); color: var(--text-primary); margin-right: auto; border-top-left-radius: 2px; }
+    .tool-output { background: #080b11; border: 1px solid var(--border-color); padding: 10px 14px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 11px; color: var(--success-color); margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div style="padding: 24px; max-width: 1400px; margin: 0 auto;">
+    <!-- Shell Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="background: var(--accent-soft); border: 1px solid rgba(110,92,255,0.3); padding: 8px; border-radius: var(--radius-md); color: var(--accent-color); font-size: 18px;">💬</div>
+        <div>
+          <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);">Agent Chat Workspace</h1>
+          <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-secondary);">Direct conversation with autonomous agent specialists executing inside Kubernetes sandboxes.</p>
+        </div>
+      </div>
+      <div class="pill pill-online">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--success-color); box-shadow: 0 0 6px var(--success-color);"></span>
+        ⚡ Live WebSocket Bus Connected
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="layout">
+      <!-- Agent Roster -->
+      <div class="card" style="padding: 16px; display: flex; flex-direction: column;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px;">Select Agent Specialist</div>
+        <div style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto;">
+          <div style="padding: 12px; border-radius: var(--radius-md); background: var(--accent-soft); border: 1px solid var(--accent-color); cursor: pointer;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">🐍 Python Developer</span>
+              <span class="pill pill-online" style="font-size: 9px; padding: 2px 6px;">Online</span>
+            </div>
+            <div style="font-size: 11px; color: var(--accent-color); margin-top: 2px;">Backend & Data Specialist</div>
+            <div style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 6px;">Pod: fuzeagent-runner-py-9df82</div>
+          </div>
+
+          <div style="padding: 12px; border-radius: var(--radius-md); background: var(--bg-quaternary); border: 1px solid var(--border-color); cursor: pointer;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">⚛️ React Developer</span>
+              <span class="pill pill-online" style="font-size: 9px; padding: 2px 6px;">Online</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Frontend & Design System</div>
+          </div>
+
+          <div style="padding: 12px; border-radius: var(--radius-md); background: var(--bg-quaternary); border: 1px solid var(--border-color); cursor: pointer;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">🚢 DevOps Lead</span>
+              <span class="pill" style="font-size: 9px; padding: 2px 6px; background: rgba(41,211,230,0.12); color: var(--accent-2);">Executing</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Cluster & GitOps SRE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Area -->
+      <div class="card" style="display: flex; flex-direction: column;">
+        <div class="header-bar">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">🐍</span>
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: var(--text-primary);">Python Developer Agent <span style="font-family: var(--font-mono); color: var(--accent-color); font-size: 11px; font-weight: 400;">@python-dev</span></div>
+              <div style="font-size: 11px; color: var(--text-secondary);">FastAPI, asyncpg, Pytest, LangChain RAG</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button style="background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); padding: 6px 12px; border-radius: var(--radius-md); font-size: 11px; cursor: pointer;">Docked Multi-Window View</button>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div style="flex: 1; padding: 20px; overflow-y: auto; background: var(--bg-primary);">
+          <div class="chat-bubble chat-agent">
+            Hello! I'm your Python Developer Agent. I'm connected to the orchestrator bus and can run pytest test suites, generate FastAPI services, and query the pgvector brain store. How can I help you today?
+          </div>
+
+          <div class="chat-bubble chat-user">
+            Run the pytest suite for app-builds and verify database session idempotency.
+          </div>
+
+          <div class="chat-bubble chat-agent">
+            Executing test suite in isolated runner container <code>fuzeagent-runner-py-9df82</code>...
+            <div class="tool-output">
+              $ pytest -v tests/test_app_builds.py<br>
+              ================== 64 passed, 1 skipped in 0.77s ==================
+            </div>
+            All 64 test cases passed! Database session idempotency and forward-only state machine transitions confirmed.
+          </div>
+        </div>
+
+        <!-- Input Bar -->
+        <div style="padding: 16px; background: var(--bg-secondary); border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
+          <input type="text" placeholder="Message Python Developer... (Press Enter to send)" style="flex: 1; background: var(--bg-quaternary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 16px; border-radius: var(--radius-md); font-size: 13px; outline: none;">
+          <button class="btn-seam">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

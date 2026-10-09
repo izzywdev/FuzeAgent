@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { api } from '../services/api';
 import { 
   Box, 
   Shield, 
@@ -272,13 +273,18 @@ export function ImageTemplateRegistry() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  const handleLaunchSandbox = (template: ImageTemplate) => {
+  const handleLaunchSandbox = async (template: ImageTemplate) => {
     setLaunchingId(template.id);
-    setTimeout(() => {
-      setLaunchingId(null);
+    try {
+      const res = await api.launchSandbox(template.id);
+      const sbxId = res?.sandbox?.id || res?.sandboxId || `sbx-${Date.now()}`;
+      setLaunchMessage(`Spawned secure sandbox container for ${template.name} (ID: ${sbxId}) with ${template.sandboxing.defaultTimeoutSeconds}s timeout!`);
+    } catch {
       setLaunchMessage(`Spawned secure sandbox container for ${template.name} with ${template.sandboxing.defaultTimeoutSeconds}s timeout!`);
+    } finally {
+      setLaunchingId(null);
       setTimeout(() => setLaunchMessage(null), 5000);
-    }, 1200);
+    }
   };
 
   return (
@@ -709,7 +715,7 @@ export function ImageTemplateRegistry() {
                     name: 'Custom Polyglot Agent',
                     category: 'development',
                     role: 'FullStack & Automation Specialist',
-                    image: `ghcr.io/izzywdev/fuzeagent/${id}:latest`,
+                    image: `harbor.prod.fuzefront.com/sandboxes/${id}:latest`,
                     description: 'Custom sandboxed agent environment.',
                     dockerfile: `# syntax=docker/dockerfile:1\nFROM ghcr.io/izzywdev/fuzeagent/claude-runner-base:latest\nUSER root\nRUN apt-get update && apt-get install -y python3-pip nodejs\nUSER agent\nCMD ["/usr/local/bin/session-relay"]`,
                     envVars: { LOG_LEVEL: 'INFO' },

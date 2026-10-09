@@ -40,6 +40,11 @@ Core tables are UUID-keyed (`gen_random_uuid()`), `organizations` at the root, w
 - **MCP** — `mcp-servers/fuzeagent-server` (declared in `.mcp.json`). Changes here belong to `mcp-engineer`.
 - **CLI** — `migrate-cli.py` + `dbctl.sh`. Changes here belong to `cli-engineer`.
 
+## App builds (FuzeFront "Build your application")
+- `services/orchestrator/app_builds/` — accepts build requests from FuzeFront's applications-service at `POST /api/v1/app-builds` (also `GET /{buildSessionId}`, `POST /{buildSessionId}/cancel`); bearer auth against `APP_BUILD_API_TOKEN`, **fail-closed** when unset. Release flag `fuzeagent.app-builds.enabled`, default OFF (env-evaluated: `FEATURE_FLAG_FUZEAGENT_APP_BUILDS_ENABLED`; Helm `orchestrator.appBuilds.enabled`).
+- Sessions are idempotent on `buildSessionId`, forward-only (`accepted → building → deploying → deployed | failed`, plus `cancelled`), and persisted in `app_build_sessions`. Status goes back to FuzeFront via a persisted callback outbox (retry/backoff; 409 `ORG_MISMATCH` is terminal). `deployed` is only reported after the app is registered through FuzeFront's registry **in the session's own org**.
+- `AppDeployer` is the seam for the real build+deploy step; the default `NotConfiguredDeployer` fails the session with `deployer_unavailable` — never fake a deploy. Orchestrator is single-replica (two replicas would both resume a session). Contract: `contracts/app-builds.openapi.yaml`, docs: `docs/app-builds.md`.
+
 ## Governance / posture
 FuzeAgent is **class `oss-public`** (public repo, MIT licensed) and **tier `product`**. It runs the standard FuzeSDLC hardening (ruleset, six `gate-*` checks, signed commits, automation + nightly governance) — identical to every Fuze repo; class only changes licensing/contribution posture, never the engineering gates. **Do not deploy on push.** When routing work: data tier/migrations → `database-engineer`, Python service/business logic → `backend-engineer`, React UI → `frontend-engineer`, MCP surface → `mcp-engineer`, CLI → `cli-engineer`, deploy/CI → `devops-engineer`, independent tests → `test-engineer`/`frontend-test-engineer`, the API contract first → `contract-designer`.
 
