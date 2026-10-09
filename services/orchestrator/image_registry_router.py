@@ -198,7 +198,7 @@ TEMPLATES_REGISTRY: Dict[str, Dict[str, Any]] = {
             "streamLlmChunks": True,
             "wsRelayUrl": os.getenv(
                 "INTRA_CLUSTER_WS_RELAY_URL",
-                "ws://fuzeagent-orchestrator.fuzeagent.svc.cluster.local:8000/api/ws/agent-relay",
+                "ws://orchestrator.fuzeagent.svc.cluster.local:8000/api/ws/agent-relay",
             ),
         },
         "escalation": {
@@ -242,7 +242,7 @@ TEMPLATES_REGISTRY: Dict[str, Dict[str, Any]] = {
             "streamLlmChunks": True,
             "wsRelayUrl": os.getenv(
                 "INTRA_CLUSTER_WS_RELAY_URL",
-                "ws://fuzeagent-orchestrator.fuzeagent.svc.cluster.local:8000/api/ws/agent-relay",
+                "ws://orchestrator.fuzeagent.svc.cluster.local:8000/api/ws/agent-relay",
             ),
         },
         "escalation": {
@@ -880,6 +880,42 @@ async def multi_agent_websocket(websocket: WebSocket):
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     }
                 )
+                continue
+
+            if action == "spawn":
+                agent_id = data.get("agentId", "python-dev")
+                template_id = "react-dev-v2" if "react" in agent_id else "python-dev-v2"
+                template = TEMPLATES_REGISTRY.get(template_id)
+                if template:
+                    await websocket.send_json(
+                        {
+                            "type": "agent_status",
+                            "agentId": agent_id,
+                            "status": "booting",
+                            "currentTask": f"Provisioning runtime sandbox pod for {agent_id}...",
+                        }
+                    )
+                    asyncio.create_task(
+                        k8s_sandbox_driver.spawn_sandbox_pod(
+                            template_id=template["id"],
+                            image=template["image"],
+                            env_vars=template.get("envVars", {}),
+                            setup_script=template.get("setupScript"),
+                            network_isolation=template.get("sandboxing", {}).get(
+                                "networkIsolation", "outbound-only"
+                            ),
+                            timeout_seconds=template.get("sandboxing", {}).get(
+                                "defaultTimeoutSeconds", 1800
+                            ),
+                            cpu_limit=template.get("sandboxing", {}).get(
+                                "cpuLimit", "2.0"
+                            ),
+                            memory_limit=template.get("sandboxing", {}).get(
+                                "memoryLimit", "4Gi"
+                            ),
+                            agent_id=agent_id,
+                        )
+                    )
                 continue
 
             if action == "chat":

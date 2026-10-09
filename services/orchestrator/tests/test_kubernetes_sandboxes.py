@@ -439,3 +439,23 @@ class TestMultiAgentWebSocketStreaming:
                 received = chat_ws.receive_json()
                 assert received.get("type") == "agent_chunk"
                 assert received.get("chunk") == "Echo from sandbox pod container"
+
+    def test_multi_agent_websocket_spawn_action(self, client: TestClient):
+        with client.websocket_connect("/api/ws/multi-agent") as chat_ws:
+            init_msg = chat_ws.receive_json()
+            assert init_msg.get("type") == "connection_established"
+
+            chat_ws.send_json(
+                {
+                    "action": "spawn",
+                    "agentId": "python-dev",
+                }
+            )
+
+            status_msg = chat_ws.receive_json()
+            assert status_msg.get("type") == "agent_status"
+            assert status_msg.get("agentId") == "python-dev"
+            assert status_msg.get("status") == "booting"
+            assert "Provisioning runtime sandbox pod" in status_msg.get(
+                "currentTask", ""
+            )

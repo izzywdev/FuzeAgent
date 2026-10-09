@@ -52,6 +52,8 @@ spec:
               value: {{ .Values.orchestrator.execution.fileOps | quote }}
             - name: ENABLE_MCP_INTEGRATION
               value: {{ .Values.orchestrator.execution.mcp | quote }}
+            - name: INTRA_CLUSTER_WS_RELAY_URL
+              value: "ws://orchestrator.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.orchestrator.port }}/api/ws/agent-relay"
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:

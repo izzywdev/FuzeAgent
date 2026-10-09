@@ -97,7 +97,7 @@ class KubernetesSandboxDriver:
         merged_env = dict(env_vars)
         intra_cluster_ws = os.getenv(
             "INTRA_CLUSTER_WS_RELAY_URL",
-            f"ws://fuzeagent-orchestrator.{self.namespace}.svc.cluster.local:8000/api/ws/agent-relay/{agent_id or short_id}",
+            f"ws://orchestrator.{self.namespace}.svc.cluster.local:8000/api/ws/agent-relay/{agent_id or short_id}",
         )
         if not ws_relay_url or "fuzeagent.prod.fuzefront.com/ws/stream" in ws_relay_url:
             merged_env["WS_RELAY_URL"] = intra_cluster_ws
@@ -174,11 +174,22 @@ class KubernetesSandboxDriver:
                             "from": [
                                 {
                                     "podSelector": {
+                                        "matchExpressions": [
+                                            {
+                                                "key": "app.kubernetes.io/part-of",
+                                                "operator": "In",
+                                                "values": ["fuzeagent"],
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "podSelector": {
                                         "matchLabels": {
                                             "app.kubernetes.io/name": "fuzeagent",
                                         }
                                     }
-                                }
+                                },
                             ]
                         }
                     ],
@@ -206,11 +217,22 @@ class KubernetesSandboxDriver:
                             "to": [
                                 {
                                     "podSelector": {
+                                        "matchExpressions": [
+                                            {
+                                                "key": "app.kubernetes.io/part-of",
+                                                "operator": "In",
+                                                "values": ["fuzeagent"],
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "podSelector": {
                                         "matchLabels": {
                                             "app.kubernetes.io/name": "fuzeagent",
                                         }
                                     }
-                                }
+                                },
                             ],
                         },
                     ],

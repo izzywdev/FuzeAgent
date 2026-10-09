@@ -70,11 +70,13 @@ function connect() {
         // 2. Chat / Prompt execution
         if (msg.action === 'chat' || msg.action === 'execute') {
           const prompt = msg.prompt || msg.message || msg.command || '';
-          console.log(`[session-relay] 📥 Received execution request: ${prompt.slice(0, 60)}...`);
+          const sessionId = msg.sessionId || null;
+          console.log(`[session-relay] 📥 Received execution request (${sessionId || 'direct'}): ${prompt.slice(0, 60)}...`);
 
           ws.send(JSON.stringify({
             role: 'agent',
             agentId,
+            sessionId,
             type: 'agent_status',
             status: 'executing',
             currentTask: `Executing: ${prompt.slice(0, 40)}...`,
@@ -83,16 +85,25 @@ function connect() {
           ws.send(JSON.stringify({
             role: 'agent',
             agentId,
+            sessionId,
             type: 'agent_thought',
-            thought: `Container sandbox executing command in /home/agent/workspace...`,
+            thought: `Container sandbox executing command in ${process.env.WORKDIR || '/workspace'}...`,
             timestamp: new Date().toISOString(),
           }));
 
-          // Run Claude Code CLI if available, else bash
-          const hasClaude = process.env.ANTHROPIC_API_KEY && process.env.USE_CLAUDE_CLI === 'true';
-          const cmd = hasClaude
-            ? ['claude', '-p', prompt, '--output-format', 'text']
-            : ['/bin/bash', '-c', prompt.startsWith('/') || prompt.startsWith('ls') || prompt.startsWith('echo') || prompt.startsWith('python') ? prompt : `echo "Processed in container sandbox: ${prompt}"`];
+          // Run Claude Code CLI if API key is present and not explicitly disabled, else execute shell command directly
+          const hasClaude = !!process.env.ANTHROPIC_API_KEY && process.env.USE_CLAUDE_CLI !== 'false';
+          const isExplicitCommand = msg.action === 'execute' || prompt.startsWith('!') || prompt.startsWith('$') || prompt.startsWith('bash ');
+          
+          let cmd;
+          if (isExplicitCommand) {
+            const cleanCmd = prompt.replace(/^(!|\$|bash\s+)/, '');
+            cmd = ['/bin/bash', '-c', cleanCmd];
+          } else if (hasClaude) {
+            cmd = ['claude', '-p', prompt, '--output-format', 'text', '--dangerously-skip-permissions'];
+          } else {
+            cmd = ['/bin/bash', '-c', prompt.startsWith('/') || prompt.startsWith('ls') || prompt.startsWith('echo') || prompt.startsWith('python') || prompt.startsWith('node') || prompt.startsWith('pytest') ? prompt : `echo "Processed in container sandbox: ${prompt}"`];
+          }
 
           const runner = spawn(cmd[0], cmd.slice(1), {
             cwd: process.env.WORKDIR || '/workspace',
@@ -107,6 +118,7 @@ function connect() {
             ws.send(JSON.stringify({
               role: 'agent',
               agentId,
+              sessionId,
               type: 'agent_chunk',
               chunk,
               accumulated,
@@ -120,6 +132,7 @@ function connect() {
             ws.send(JSON.stringify({
               role: 'agent',
               agentId,
+              sessionId,
               type: 'agent_chunk',
               chunk,
               accumulated,
@@ -132,6 +145,7 @@ function connect() {
             ws.send(JSON.stringify({
               role: 'agent',
               agentId,
+              sessionId,
               type: 'agent_message',
               content: finalOutput,
               isFinal: true,
@@ -141,6 +155,7 @@ function connect() {
             ws.send(JSON.stringify({
               role: 'agent',
               agentId,
+              sessionId,
               type: 'agent_status',
               status: 'online',
               currentTask: 'Standby for commands',
@@ -152,6 +167,7 @@ function connect() {
             ws.send(JSON.stringify({
               role: 'agent',
               agentId,
+              sessionId,
               type: 'agent_message',
               content: `Error executing task inside sandbox: ${err.message}`,
               isFinal: true,
@@ -161,6 +177,7 @@ function connect() {
             ws.send(JSON.stringify({
               role: 'agent',
               agentId,
+              sessionId,
               type: 'agent_status',
               status: 'online',
               currentTask: 'Standby for commands',

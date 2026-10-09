@@ -12,7 +12,11 @@ import {
   Terminal,
   Sparkles,
   LayoutGrid,
+  Play,
+  Box,
+  Loader2,
 } from 'lucide-react';
+import { api } from '../services/api';
 
 export interface AgentPersona {
   id: string;
@@ -127,6 +131,9 @@ const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = p
   ]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [agentStatus, setAgentStatus] = useState<string>(agent.status);
+  const [currentTask, setCurrentTask] = useState<string>(agent.currentTask || 'Ready for tasks');
+  const [isLaunching, setIsLaunching] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -138,7 +145,11 @@ const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = p
     const unsub = subscribeAgentWs((evt) => {
       if (evt.agentId !== agent.id) return;
 
-      if (evt.type === 'agent_chunk') {
+      if (evt.type === 'agent_status') {
+        if (evt.status) setAgentStatus(evt.status);
+        if (evt.currentTask) setCurrentTask(evt.currentTask);
+        if (evt.status === 'online' || evt.status === 'executing') setIsLaunching(false);
+      } else if (evt.type === 'agent_chunk') {
         setIsThinking(false);
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -181,6 +192,19 @@ const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = p
       unsub();
     };
   }, [agent.id]);
+
+  const handleLaunchPod = async () => {
+    setIsLaunching(true);
+    setAgentStatus('booting');
+    setCurrentTask('Provisioning container sandbox pod in fuzeagent namespace...');
+    sendToAgentWs({ action: 'spawn', agentId: agent.id });
+    try {
+      const templateId = agent.id.includes('react') ? 'react-dev-v2' : 'python-dev-v2';
+      await api.launchSandbox(templateId);
+    } catch {
+      // fallback handled gracefully
+    }
+  };
 
   const handleSend = () => {
     if (!input.trim() || isThinking) return;
@@ -261,7 +285,7 @@ const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = p
             name={agent.name}
             fallbackEmoji={agent.emoji}
             size="sm"
-            status={agent.status === 'executing' ? 'busy' : agent.status === 'online' ? 'online' : 'offline'}
+            status={agentStatus === 'executing' ? 'busy' : agentStatus === 'online' ? 'online' : 'offline'}
           />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -271,12 +295,45 @@ const AgentChatPanel: React.FC<IDockviewPanelProps<{ agent: AgentPersona }>> = p
               </Badge>
             </div>
             <div style={{ fontSize: '10px', color: 'var(--text-tertiary, #66718a)' }}>
-              {agent.currentTask}
+              {currentTask}
             </div>
           </div>
         </div>
 
-        <StatusPill status={agent.status} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {agentStatus !== 'online' && agentStatus !== 'executing' && (
+            <button
+              onClick={handleLaunchPod}
+              disabled={isLaunching || agentStatus === 'booting'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: '1px solid var(--accent-color, #6e5cff)',
+                backgroundColor: 'rgba(110, 92, 255, 0.15)',
+                color: 'var(--text-primary, #e7ecf5)',
+                cursor: isLaunching || agentStatus === 'booting' ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isLaunching || agentStatus === 'booting' ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  <span>Booting Pod...</span>
+                </>
+              ) : (
+                <>
+                  <Play size={11} fill="currentColor" />
+                  <span>Launch Pod</span>
+                </>
+              )}
+            </button>
+          )}
+          <StatusPill status={(agentStatus === 'booting' ? 'idle' : agentStatus) as any} />
+        </div>
       </div>
 
       {/* Message List */}
