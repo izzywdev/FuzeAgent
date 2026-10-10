@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.fuzefront.com/a2a/ext/delegated-principal/v1/schema/delegation-policy.schema.json",
+  "title": "Per-callee delegation policy",
+  "description": "The callee's delegation policy, stored as its OWN file at `.fuze/a2a-delegation.json`. Deliberately NOT a key inside the manifest's `a2a` block: contracts/a2a/v1's manifest-a2a-extension.schema.json sets additionalProperties:false on that block, so adding `delegation` there would make every adopting repo's manifest fail v1 validation. An extension that requires editing the frozen contract to adopt is a version, not an extension \u2014 a separate file is what keeps this additive. It classifies EVERY published skill; there is no default class and no wildcard that could supply one, so an unclassified skill is denied and a new skill cannot acquire the weakest rule in the system merely by being written.",
+  "type": "object",
+  "required": [
+    "extension",
+    "skills",
+    "brokerable"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "extension": {
+      "const": "https://contracts.fuzefront.com/a2a/ext/delegated-principal/v1",
+      "description": "Pinned URI. A policy that does not name the extension it implements cannot be checked against the right rules."
+    },
+    "authzBaseUrl": {
+      "type": "string",
+      "description": "Base URL of FuzeFront's Security API for the Permit decision (/api/v1/security/authz/check). A product never calls Permit directly. Unreachable is DENY \u2014 there is no fail-open option."
+    },
+    "skills": {
+      "type": "object",
+      "description": "role key -> class. Every published skill MUST appear. Absence is DENY, never `delegable`.",
+      "propertyNames": {
+        "pattern": "^[a-z0-9_-]+$"
+      },
+      "additionalProperties": {
+        "enum": [
+          "delegable",
+          "principal-required",
+          "never-delegable"
+        ],
+        "description": "delegable = v1 behaviour, any allowlisted caller. principal-required = verified `sub` AND a Permit ALLOW for that subject. never-delegable = no principal reaches it via A2A regardless of `sub` (the machine-readable form of authz.md \u00a77's reach_human and _base guardrails)."
+      }
+    },
+    "brokerable": {
+      "type": "object",
+      "description": "actor reference -> the role keys that actor may BROKER. The second half of the intersection in spec.md \u00a74: the subject cannot reach past this, no matter what Permit says about the subject. An actor absent here brokers nothing.",
+      "propertyNames": {
+        "pattern": "^(repo|agent|service):[^\\s:]+$"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+$"
+        },
+        "description": "Role keys. An empty array means this actor brokers nothing \u2014 which is a meaningful, explicit statement, unlike absence."
+      }
+    }
+  }
+}

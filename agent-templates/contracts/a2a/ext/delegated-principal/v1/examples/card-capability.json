@@ -1,0 +1,11 @@
+{
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "https://contracts.fuzefront.com/a2a/ext/delegated-principal/v1",
+        "required": true,
+        "description": "Calls carry the originating principal (RFC 8693 sub/act). Skills classified principal-required or never-delegable are denied without a conforming credential."
+      }
+    ]
+  }
+}

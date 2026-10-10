@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.fuzefront.com/a2a/ext/delegated-principal/v1/schema/delegated-principal-token.schema.json",
+  "title": "Delegated-principal claims (RFC 8693)",
+  "description": "The delegation claims a callee reads AFTER verifying signature and aud. Validating this shape is never a substitute for that verification: an unverified `sub` is worth less than no `sub`, because it looks like authority.",
+  "type": "object",
+  "required": ["sub", "act"],
+  "properties": {
+    "sub": {
+      "type": "string",
+      "pattern": "^(user|service):[^\\s:]+$",
+      "description": "The ORIGINATING principal — whom the work is ultimately for. This is the subject Permit decides on. Typed prefix is mandatory; a bare id cannot be resolved to a principal kind and so cannot be checked."
+    },
+    "act": {
+      "$ref": "#/$defs/Actor",
+      "description": "The actor chain, outermost first: the immediate actor, then its actor. BOUNDS what `sub` may reach and never widens it."
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "Actor": {
+      "type": "object",
+      "required": ["sub"],
+      "properties": {
+        "sub": {
+          "type": "string",
+          "pattern": "^(repo|agent|service):[^\\s:]+$",
+          "description": "A TYPED reference. An untyped actor is rejected: it cannot be matched against the callee's brokerable set, and a rule that cannot be evaluated must not be treated as satisfied."
+        },
+        "act": { "$ref": "#/$defs/Actor" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
