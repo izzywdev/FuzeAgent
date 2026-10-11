@@ -179,11 +179,11 @@ federatedMount:
 resourceGovernance:
   enabled: true
   quota:
-    requestsCpu: "2"
-    requestsMemory: 4Gi
-    limitsCpu: "6"   # was 4; +room for a2a-shared (500m) + its rolling-update surge (go-live #93)
-    limitsMemory: 8Gi
-    pods: "20"
+    requestsCpu: "4"
+    requestsMemory: 8Gi
+    limitsCpu: "12"   # accommodates runtime ephemeral sandboxes + pod rolling updates
+    limitsMemory: 16Gi
+    pods: "40"
   limitRange:
     defaultCpu: 500m
     defaultMemory: 512Mi
