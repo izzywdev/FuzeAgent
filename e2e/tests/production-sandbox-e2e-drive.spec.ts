@@ -1,14 +1,7 @@
 import { test, expect } from '@playwright/test'
+import path from 'path'
 
-/**
- * End-to-End Production Proof Drive:
- * 1. Sign in to FuzeFront portal / authenticate via Cloudflare Access or Session Token.
- * 2. Select/Create Python Developer Agent from template.
- * 3. Setup runtime environment and launch the sandbox pod.
- * 4. Verify pod transitions to Online.
- * 5. Send 'Hello World' command in the chat window.
- * 6. Observe real-time bidirectional streaming tokens and response.
- */
+const RESULTS_DIR = path.resolve(__dirname, '../test-results')
 
 const FUZEFRONT_URL = process.env.FUZEFRONT_URL ?? 'https://app.fuzefront.com'
 const FUZEAGENT_APP_URL = `${FUZEFRONT_URL}/apps/fuzeagent/`
@@ -73,7 +66,7 @@ test.describe('Production Sandbox Proof Drive: Sign-in -> Template -> Launch -> 
       }
     }
 
-    await page.screenshot({ path: 'e2e/test-results/step1-authenticated.png' })
+    await page.screenshot({ path: path.join(RESULTS_DIR, 'step1-authenticated.png') })
 
     // -------------------------------------------------------------------------
     // Step 2: Navigate to Agent Chat Workspace Tab
@@ -90,7 +83,7 @@ test.describe('Production Sandbox Proof Drive: Sign-in -> Template -> Launch -> 
     await workspaceButton.first().click()
     await page.waitForTimeout(2000)
 
-    await page.screenshot({ path: 'e2e/test-results/step2-workspace.png' })
+    await page.screenshot({ path: path.join(RESULTS_DIR, 'step2-workspace.png') })
 
     // -------------------------------------------------------------------------
     // Step 3: Select Python Developer Agent & Setup Env / Launch Pod
@@ -134,7 +127,7 @@ test.describe('Production Sandbox Proof Drive: Sign-in -> Template -> Launch -> 
 
     await expect(onlineIndicator).toBeVisible({ timeout: 30_000 })
     console.log('[Drive] Pod sandbox runner connected to orchestrator WebSocket relay!')
-    await page.screenshot({ path: 'e2e/test-results/step3-pod-online.png' })
+    await page.screenshot({ path: path.join(RESULTS_DIR, 'step3-pod-online.png') })
 
     // -------------------------------------------------------------------------
     // Step 5: Send Hello World Command in Chat Window
@@ -177,6 +170,6 @@ test.describe('Production Sandbox Proof Drive: Sign-in -> Template -> Launch -> 
     await expect(responseStream).toBeVisible({ timeout: 35_000 })
     console.log('[Drive] Received live streaming response in conversation window!')
 
-    await page.screenshot({ path: 'e2e/test-results/step4-stream-success.png' })
+    await page.screenshot({ path: path.join(RESULTS_DIR, 'step4-stream-success.png') })
   })
 })

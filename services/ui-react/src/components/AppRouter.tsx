@@ -16,12 +16,20 @@ import ApiPlayground from './ApiPlayground'
 import { Layout } from './layout/Layout'
 import BillingPage from '../pages/BillingPage'
 import { IdentityOrgPage } from '../pages/IdentityPage'
+import App from '../App'
 
 export default function AppRouter() {
+  const basename =
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/apps/fuzeagent')
+      ? '/apps/fuzeagent'
+      : '/'
+
   return (
-    <Router>
+    <Router basename={basename}>
       <Routes>
-        <Route path="/" element={<FixedDashboard />} />
+        <Route path="/" element={<App />} />
+        <Route path="/workspace" element={<App />} />
+        <Route path="/classic-dashboard" element={<FixedDashboard />} />
         <Route path="/simple" element={<SimpleApp />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/agents" element={<FixedAgentsPage />} />
