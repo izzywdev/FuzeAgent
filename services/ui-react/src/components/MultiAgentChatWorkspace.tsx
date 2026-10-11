@@ -13,7 +13,6 @@ import {
   Sparkles,
   LayoutGrid,
   Play,
-  Box,
   Loader2,
 } from 'lucide-react';
 import { api } from '../services/api';
