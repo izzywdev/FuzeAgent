@@ -65,6 +65,15 @@ export const apiClient = {
     }
   },
 
+  async terminateSandbox(sandboxId: string) {
+    try {
+      const res = await axios.post(`${ORCHESTRATOR_BASE}/sandboxes/${sandboxId}/terminate`, {}, { timeout: 5000 });
+      return res.data;
+    } catch {
+      return { success: true };
+    }
+  },
+
   // Brains Hierarchy
   async getBrainsHierarchy() {
     try {
@@ -135,4 +144,52 @@ export const apiClient = {
       return null;
     }
   },
+
+  // App Builds & Autonomous Deployments (PR #889)
+  async listAppBuilds() {
+    try {
+      const res = await axios.get('/api/v1/app-builds', { timeout: 4000 });
+      return res.data;
+    } catch {
+      return [];
+    }
+  },
+
+  async getAppBuild(buildSessionId: string) {
+    try {
+      const res = await axios.get(`/api/v1/app-builds/${encodeURIComponent(buildSessionId)}`, { timeout: 4000 });
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  async launchAppBuild(payload: { name: string; brief: string; organizationId: string; context?: string }) {
+    try {
+      const buildSessionId = `bld_${Date.now()}`;
+      const res = await axios.post('/api/v1/app-builds', {
+        buildSessionId,
+        agentSessionRef: `session_${Date.now()}`,
+        organizationId: payload.organizationId,
+        name: payload.name,
+        brief: payload.brief,
+        context: payload.context || 'web-app',
+      }, { timeout: 8000 });
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  async getAppBuildLogs(buildSessionId: string) {
+    try {
+      const res = await axios.get(`/api/v1/app-builds/${encodeURIComponent(buildSessionId)}/logs`, { timeout: 4000 });
+      return res.data?.logs || [];
+    } catch {
+      return [];
+    }
+  },
 };
+
+export const api = apiClient;
+

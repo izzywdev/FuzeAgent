@@ -20,6 +20,8 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 EMBEDDING_DIM = 384
+# The brain_documents DDL below hardcodes vector(384) (no SQL string formatting).
+assert EMBEDDING_DIM == 384, "update the brain_documents DDL in _ensure_table"
 _model = None
 _table_ready = False
 

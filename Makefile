@@ -59,3 +59,7 @@ ui: ## Rebuild and restart UI only
 
 api: ## Rebuild and restart API services only
 	@export DOCKER_BUILDKIT=1 && docker-compose build orchestrator hierarchy-api && docker-compose up -d orchestrator hierarchy-api
+
+test-postprod: ## Run Playwright post-production smoke tests against live stack
+	@echo "🎭 Running Playwright post-prod smoke tests..."
+	@cd e2e && npx playwright test

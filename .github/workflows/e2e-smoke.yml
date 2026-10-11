@@ -7,6 +7,11 @@ on:
     paths:
       - 'deploy/helm/fuzeagent/values-prod.yaml'
 
+  # Trigger automatically after release workflow finishes
+  workflow_run:
+    workflows: ['Release (images + GitOps bump)']
+    types: [completed]
+
   # Allow manual trigger from the Actions tab
   workflow_dispatch:
 
@@ -19,6 +24,7 @@ jobs:
     name: Playwright smoke — FuzeAgent in FuzeFront
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - uses: actions/checkout@v4

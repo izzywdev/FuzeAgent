@@ -35,6 +35,13 @@ try:
 except ImportError:
     from image_registry_router import router as image_registry_router
 
+try:
+    from .app_builds import router as app_builds_router
+    from .app_builds import start_app_builds, stop_app_builds
+except ImportError:
+    from app_builds import router as app_builds_router
+    from app_builds import start_app_builds, stop_app_builds
+
 from .agent_manager import AgentManager
 from .container_manager import ContainerConfig, ContainerStatus, container_manager
 from .context_service import ContextService
@@ -510,9 +517,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not create IzzyAI CEO: {e}")
 
+    # FuzeFront "build your application" API (release flag fuzeagent.app-builds.enabled,
+    # default OFF). Resumes unfinished sessions + the status-callback outbox.
+    try:
+        await start_app_builds(get_db_connection)
+    except Exception as e:
+        logger.error(f"Failed to start app-builds runtime: {e}")
+
     yield
 
     # Shutdown
+    try:
+        await stop_app_builds()
+    except Exception as e:
+        logger.error(f"Error stopping app-builds runtime: {e}")
     await app.state.multi_agent_coordinator.stop()
     await app.state.task_execution_engine.stop()
     await app.state.sandbox_manager.stop()
@@ -656,6 +674,8 @@ app.add_middleware(
 app.include_router(hierarchy_router)
 # Include image registry, sandboxes, brains & escalations router
 app.include_router(image_registry_router)
+# FuzeFront build-your-application API (machine bearer auth + release flag, fail-closed)
+app.include_router(app_builds_router)
 
 
 # Health check endpoint

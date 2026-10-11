@@ -18,6 +18,7 @@ spec:
         app.kubernetes.io/part-of: fuzeagent
         app.kubernetes.io/component: orchestrator
     spec:
+      serviceAccountName: {{ include "fuzeagent.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -51,6 +52,8 @@ spec:
               value: {{ .Values.orchestrator.execution.fileOps | quote }}
             - name: ENABLE_MCP_INTEGRATION
               value: {{ .Values.orchestrator.execution.mcp | quote }}
+            - name: INTRA_CLUSTER_WS_RELAY_URL
+              value: "ws://orchestrator.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.orchestrator.port }}/api/ws/agent-relay"
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -108,9 +111,46 @@ spec:
               value: {{ .Values.orchestrator.auth.jwtAudience | quote }}
             - name: JWT_ISSUER
               value: {{ .Values.orchestrator.auth.jwtIssuer | quote }}
+            # FuzeFront "build your application" API (docs/app-builds.md). All optional;
+            # unset => the endpoint answers 503 (fail closed), never unauthenticated.
+            - name: FEATURE_FLAG_FUZEAGENT_APP_BUILDS_ENABLED
+              value: {{ .Values.orchestrator.appBuilds.enabled | quote }}
+            - name: APP_BUILD_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fuzeagent.secretName" . }}
+                  key: APP_BUILD_API_TOKEN
+                  optional: true
+            - name: FUZEFRONT_API_URL
+              value: {{ .Values.fuzefront.apiUrl | quote }}
+            # Same platform service-account credential register.sh uses (apps:register).
+            - name: FUZEFRONT_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: fuzefront-registration
+                  key: token
+                  optional: true
+            {{- with .Values.orchestrator.appBuilds.fuzefrontPublicBaseUrl }}
+            - name: FUZEFRONT_PUBLIC_BASE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.orchestrator.appBuilds.sessionUrlTemplate }}
+            - name: APP_BUILD_SESSION_URL_TEMPLATE
+              value: {{ . | quote }}
+            {{- end }}
             # Non-wildcard CORS allowlist (wildcard + credentials is rejected by the app).
             - name: CORS_ALLOW_ORIGINS
               value: {{ .Values.orchestrator.auth.corsAllowOrigins | quote }}
+            {{- with .Values.sandboxes }}
+            - name: HARBOR_REGISTRY_HOST
+              value: {{ .registry.host | quote }}
+            - name: HARBOR_INCLUSTER_HOST
+              value: {{ .registry.inClusterHost | quote }}
+            - name: HARBOR_PROJECT
+              value: {{ .registry.project | quote }}
+            - name: HARBOR_PULL_SECRET
+              value: {{ .registry.pullSecretName | quote }}
+            {{- end }}
           readinessProbe:
             tcpSocket:
               port: http
