@@ -17,7 +17,7 @@ imageRegistry:
 orchestrator:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-orchestrator
-    tag: a95f2314a5b9
+    tag: 9faec9aaf5ba
   # First-light guardrails (also the chart default; pinned here for clarity).
   execution:
     autonomous: true
@@ -45,17 +45,17 @@ orchestrator:
 hierarchyApi:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-hierarchy-api
-    tag: a95f2314a5b9
+    tag: 9faec9aaf5ba
 
 ui:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-ui
-    tag: a95f2314a5b9
+    tag: 9faec9aaf5ba
 
 mcpServer:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-mcp-server
-    tag: a95f2314a5b9
+    tag: 9faec9aaf5ba
 
 # Admin console — host sits under the *.prod.fuzefront.com wildcard, which is
 # already behind Cloudflare Access email-OTP + routed through the CF tunnel to
