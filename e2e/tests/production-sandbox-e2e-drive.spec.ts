@@ -167,9 +167,32 @@ test.describe('Production Sandbox Proof Drive: Sign-in -> Template -> Launch -> 
       .or(page.locator('text=Processed in container'))
       .first()
 
-    await expect(responseStream).toBeVisible({ timeout: 35_000 })
-    console.log('[Drive] Received live streaming response in conversation window!')
+    // -------------------------------------------------------------------------
+    // Step 7: Send "What is the time now in LA?" & verify real time stream
+    // -------------------------------------------------------------------------
+    const timeQuery = 'What is the time now in LA?'
+    console.log(`[Drive] Sending query: ${timeQuery}`)
+    await chatInput.fill(timeQuery)
+    await sendBtn.click()
 
-    await page.screenshot({ path: path.join(RESULTS_DIR, 'step4-stream-success.png') })
+    const timeMessage = page.locator(`text=${timeQuery}`).first()
+    await expect(timeMessage).toBeVisible({ timeout: 10_000 })
+
+    // Verify response streams real Los Angeles time and NOT fake pytest output
+    const timeResponse = page
+      .locator('text=Los Angeles')
+      .or(page.locator('text=PDT'))
+      .or(page.locator('text=PST'))
+      .or(page.locator('text=California'))
+      .first()
+
+    await expect(timeResponse).toBeVisible({ timeout: 35_000 })
+    console.log('[Drive] Received live streaming Los Angeles time in conversation window!')
+
+    // Assert that the fake mock pytest string is NOT present
+    const fakeMock = page.locator('text=64 passed, 1 skipped in 3.14s')
+    await expect(fakeMock).toHaveCount(0)
+
+    await page.screenshot({ path: path.join(RESULTS_DIR, 'step5-time-query-success.png') })
   })
 })

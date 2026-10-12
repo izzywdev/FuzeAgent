@@ -187,24 +187,8 @@ export const AgentChatWorkspace: React.FC = () => {
     }
 
     if (!sentWs) {
-      // Local simulated response with tool execution
+      // Real connection status notification instead of hardcoded mock
       setTimeout(() => {
-        let reply = '';
-        let toolCall = undefined;
-
-        if (selectedAgent.id === 'python-dev') {
-          reply = `Analyzing "${userText}". I've executed the test harness and validated the database connection pool. All contracts match OpenAPI definitions.`;
-          toolCall = { tool: 'pytest -v tests/test_app_builds.py', output: '64 passed, 1 skipped in 3.14s' };
-        } else if (selectedAgent.id === 'react-dev') {
-          reply = `Configuring the component hierarchy to conform strictly to FuzeFront DS tokens. Applied var(--bg-tertiary) surfaces and balanced flex padding.`;
-          toolCall = { tool: 'vite build', output: 'Built dist/index.html in 1.4s (0 errors)' };
-        } else if (selectedAgent.id === 'devops-lead') {
-          reply = `Verified Helm templates. StorageClass binding 'local-path' on worker node 'fuzeinfra-prod-elastic-v2' is healthy. No restart loops detected.`;
-          toolCall = { tool: 'kubectl get pods -n fuzeagent', output: 'fuzeagent-runner-py-9df82 1/1 Running' };
-        } else {
-          reply = `Received your task: "${userText}". Processing in sandboxed runtime and relaying status over the orchestrator bus.`;
-        }
-
         setMessagesByAgent(prev => ({
           ...prev,
           [selectedAgent.id]: [
@@ -212,14 +196,13 @@ export const AgentChatWorkspace: React.FC = () => {
             {
               id: `agt_${Date.now()}`,
               role: 'agent',
-              content: reply,
+              content: `Connecting to orchestrator event bus for ${selectedAgent.name}... If pod is cold-starting, sandbox provisioning may take 5-10s.`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              toolCall,
             },
           ],
         }));
         setIsThinking(false);
-      }, 700);
+      }, 500);
     }
   };
 

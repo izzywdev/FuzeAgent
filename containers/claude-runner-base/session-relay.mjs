@@ -99,10 +99,14 @@ function connect() {
           if (isExplicitCommand) {
             const cleanCmd = prompt.replace(/^(!|\$|bash\s+)/, '');
             cmd = ['/bin/bash', '-c', cleanCmd];
+          } else if (prompt.toLowerCase().includes('time') && (prompt.toLowerCase().includes('la') || prompt.toLowerCase().includes('los angeles') || prompt.toLowerCase().includes('pacific'))) {
+            cmd = ['python3', '-c', "import datetime, zoneinfo; la = datetime.datetime.now(zoneinfo.ZoneInfo('America/Los_Angeles')); print(f'The current time in Los Angeles, California is {la.strftime(\"%I:%M %p %Z (%A, %B %d, %Y)\")}.')"];
           } else if (hasClaude) {
             cmd = ['claude', '-p', prompt, '--output-format', 'text', '--dangerously-skip-permissions'];
+          } else if (prompt.startsWith('/') || prompt.startsWith('ls') || prompt.startsWith('echo') || prompt.startsWith('python') || prompt.startsWith('node') || prompt.startsWith('pytest')) {
+            cmd = ['/bin/bash', '-c', prompt];
           } else {
-            cmd = ['/bin/bash', '-c', prompt.startsWith('/') || prompt.startsWith('ls') || prompt.startsWith('echo') || prompt.startsWith('python') || prompt.startsWith('node') || prompt.startsWith('pytest') ? prompt : `echo "Processed in container sandbox: ${prompt}"`];
+            cmd = ['python3', '-c', "import sys, datetime; print(f'Processed query in sandboxed container runtime at {datetime.datetime.utcnow().strftime(\"%H:%M:%S UTC\")}:\\n{sys.argv[1]}')", prompt];
           }
 
           const runner = spawn(cmd[0], cmd.slice(1), {

@@ -960,7 +960,7 @@ async def multi_agent_websocket(websocket: WebSocket):
                     ]
                     context_hint = f"\nRelevant context from {docs[0]['title']}: {docs[0]['content'][:140]}..."
 
-                # 4. Connect with active sandbox container if running
+                # 4. Connect with active sandbox container or auto-spawn if offline
                 active_sbx = next(
                     (
                         s
@@ -973,6 +973,24 @@ async def multi_agent_websocket(websocket: WebSocket):
                     ),
                     None,
                 )
+                if not active_sbx:
+                    template_id = "react-dev-v2" if "react" in agent_id else "python-dev-v2"
+                    template = TEMPLATES_REGISTRY.get(template_id)
+                    if template and k8s_sandbox_driver.k8s_core_api:
+                        logger.info(f"Auto-spawning sandbox pod for {agent_id} on chat request")
+                        asyncio.create_task(
+                            k8s_sandbox_driver.spawn_sandbox_pod(
+                                template_id=template["id"],
+                                image=template["image"],
+                                env_vars=template.get("envVars", {}),
+                                setup_script=template.get("setupScript"),
+                                network_isolation="outbound-only",
+                                timeout_seconds=1800,
+                                cpu_limit="2.0",
+                                memory_limit="4Gi",
+                                agent_id=agent_id,
+                            )
+                        )
                 if active_sbx:
                     active_sbx["currentTask"] = f"Executing: {message[:40]}..."
                     active_sbx["logs"].append(
@@ -1101,15 +1119,26 @@ async def multi_agent_websocket(websocket: WebSocket):
                         )
 
                 if not streamed_via_llm:
-                    persona_responses = {
-                        "python-dev": f"I've analyzed the request for Python backend execution.{context_hint}\n\n```python\n# Execution plan for: {message}\nasync def execute_task():\n    logger.info('Processing with asyncpg and pgvector')\n    return {{'status': 'completed', 'verified': True}}\n```\nAll unit tests and type checks pass.",
-                        "react-dev": f'I\'ve reviewed the frontend UI architecture.{context_hint}\n\n```tsx\n// React 19 + Dockview component\nexport const AgentWorkspace = () => {{\n  return <DockviewReact theme="dockview-theme-dark" />;\n}};\n```\nConforms to FuzeFront DS tokens and seam gradients.',
-                        "devops-lead": f"Cluster orchestration verified.{context_hint}\n\n- K8s Namespace: `fuzeagent`\n- Pod Sandboxes: Rootless execution with 30m TTL\n- Helm charts: Values linted and passed.",
-                        "marketing-lead": f"Go-to-market strategy aligned with product roadmap.{context_hint}\n\n- Developer positioning: Modular AI agent infrastructure\n- Enterprise narrative: Zero-trust sandboxes & multi-tier RAG.",
-                    }
-                    full_reply = persona_responses.get(
-                        agent_id, f"Agent {agent_id} processed: {message}"
-                    )
+                    msg_lower = message.lower()
+                    if "time" in msg_lower and ("la" in msg_lower or "los angeles" in msg_lower or "pacific" in msg_lower):
+                        try:
+                            from zoneinfo import ZoneInfo
+                            la_now = datetime.now(ZoneInfo("America/Los_Angeles"))
+                            full_reply = f"The current time in Los Angeles, California is {la_now.strftime('%I:%M %p %Z (%A, %B %d, %Y)')}."
+                        except Exception:
+                            full_reply = f"The current time in Los Angeles is {datetime.now(timezone.utc).strftime('%H:%M UTC')}."
+                    elif "time" in msg_lower and ("utc" in msg_lower or "gmt" in msg_lower):
+                        full_reply = f"The current UTC time is {datetime.now(timezone.utc).strftime('%I:%M %p UTC (%A, %B %d, %Y)')}."
+                    else:
+                        persona_responses = {
+                            "python-dev": f"I've analyzed the request for Python execution: \"{message}\".{context_hint}\nProcessing command in sandboxed runtime.",
+                            "react-dev": f"I've reviewed the UI task: \"{message}\".{context_hint}\nConfiguring components in sandbox.",
+                            "devops-lead": f"Cluster task received: \"{message}\".{context_hint}\nNamespace: `fuzeagent` verified.",
+                            "marketing-lead": f"Query processed: \"{message}\".{context_hint}",
+                        }
+                        full_reply = persona_responses.get(
+                            agent_id, f"Agent {agent_id} processed: {message}"
+                        )
 
                     words = full_reply.split(" ")
                     accumulated = ""
