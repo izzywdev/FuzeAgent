@@ -1016,9 +1016,13 @@ async def multi_agent_websocket(websocket: WebSocket):
                             f"Relay to pod {agent_id} failed: {e}; falling back to execution driver"
                         )
 
-                # 6. If no pod WS, but active sandbox has K8s pod and API is available
+                # 6. If no pod WS, but message is a shell command and active sandbox has K8s pod
+                is_shell_cmd = message.strip().startswith((
+                    "python", "pytest", "curl", "bash", "sh", "git", "ls", "cat", "echo", "npm", "node", "pip", "docker", "kubectl"
+                ))
                 if (
-                    active_sbx
+                    is_shell_cmd
+                    and active_sbx
                     and active_sbx.get("podName")
                     and k8s_sandbox_driver.k8s_core_api
                 ):
