@@ -6,6 +6,7 @@ invoking the 3-channel remediation dispatcher and Loki coordination mechanism.
 
 import logging
 from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -18,7 +19,9 @@ from .loki_incident_coordinator import LokiIncidentCoordinator
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/orchestrator/alerts", tags=["Incident Alerts & Remediation"])
+router = APIRouter(
+    prefix="/api/orchestrator/alerts", tags=["Incident Alerts & Remediation"]
+)
 
 dispatcher = IncidentRemediationDispatcher()
 coordinator = LokiIncidentCoordinator()
@@ -28,8 +31,13 @@ class DirectIncidentTriggerRequest(BaseModel):
     alert_name: str = Field(..., example="PostgresVolumeCorrupted")
     component: str = Field(..., example="fuzeinfra-postgres")
     severity: str = Field(default="critical", example="critical")
-    summary: str = Field(..., example="ext4 filesystem I/O error on /var/lib/postgresql/data/pgdata")
-    diagnostics: str = Field(..., example="could not open configuration file /var/lib/postgresql/data/pgdata/postgresql.conf: Input/output error")
+    summary: str = Field(
+        ..., example="ext4 filesystem I/O error on /var/lib/postgresql/data/pgdata"
+    )
+    diagnostics: str = Field(
+        ...,
+        example="could not open configuration file /var/lib/postgresql/data/pgdata/postgresql.conf: Input/output error",
+    )
     incident_id: Optional[str] = None
     target_repo: Optional[str] = "izzywdev/FuzeAgent"
 
@@ -112,9 +120,18 @@ async def alertmanager_webhook(payload: AlertmanagerWebhookPayload):
             continue
 
         alert_name = labels.get("alertname", "InfrastructureIncident")
-        component = labels.get("container") or labels.get("pod") or labels.get("app") or "infrastructure"
+        component = (
+            labels.get("container")
+            or labels.get("pod")
+            or labels.get("app")
+            or "infrastructure"
+        )
         severity = labels.get("severity", "critical")
-        summary = annotations.get("summary") or annotations.get("message") or f"{alert_name} on {component}"
+        summary = (
+            annotations.get("summary")
+            or annotations.get("message")
+            or f"{alert_name} on {component}"
+        )
         diagnostics = annotations.get("description") or str(alert_data)
 
         alert = IncidentAlert(

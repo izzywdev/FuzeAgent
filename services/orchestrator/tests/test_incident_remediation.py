@@ -11,18 +11,16 @@ import asyncio
 import json
 import os
 import sys
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath("services/orchestrator"))
 
-from services.orchestrator.loki_incident_coordinator import (
-    ClaimResult,
-    IncidentClaim,
-    LokiIncidentCoordinator,
-)
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from services.orchestrator.incident_remediation_dispatcher import (
     IncidentAlert,
     IncidentDispatchReport,
@@ -33,8 +31,11 @@ from services.orchestrator.incident_webhook_router import (
     DirectIncidentTriggerRequest,
     router,
 )
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from services.orchestrator.loki_incident_coordinator import (
+    ClaimResult,
+    IncidentClaim,
+    LokiIncidentCoordinator,
+)
 
 
 class MockLokiCoordinator(LokiIncidentCoordinator):
@@ -152,7 +153,10 @@ async def test_incident_remediation_dispatcher_three_mechanisms():
         # Stand downs must verify the required message format
         for s in stand_downs:
             assert "is already being handled by" in s.message
-            assert s.details.get("link") == "https://github.com/izzywdev/FuzeAgent/issues/999"
+            assert (
+                s.details.get("link")
+                == "https://github.com/izzywdev/FuzeAgent/issues/999"
+            )
 
 
 def test_incident_webhook_router_endpoints():

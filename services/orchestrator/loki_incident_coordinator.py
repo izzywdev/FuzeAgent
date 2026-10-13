@@ -9,11 +9,11 @@ import json
 import logging
 import os
 import time
+import urllib.parse
+import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-import urllib.parse
-import urllib.request
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +244,9 @@ class LokiIncidentCoordinator:
 
         winner = all_claims[0]
         if winner.owner == owner:
-            logger.info(f"🏆 [Winner Elected] {owner} ({channel}) won remediation claim for {incident_id}")
+            logger.info(
+                f"🏆 [Winner Elected] {owner} ({channel}) won remediation claim for {incident_id}"
+            )
             return ClaimResult(
                 won=True,
                 owner=owner,
@@ -287,7 +289,9 @@ class LokiIncidentCoordinator:
                                     "owner": owner,
                                     "pr_link": pr_link,
                                     "notes": notes,
-                                    "resolved_at": datetime.now(timezone.utc).isoformat(),
+                                    "resolved_at": datetime.now(
+                                        timezone.utc
+                                    ).isoformat(),
                                 }
                             ),
                         ]

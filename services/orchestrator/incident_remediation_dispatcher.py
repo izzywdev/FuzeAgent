@@ -11,15 +11,15 @@ ensuring exactly one agent executes remediation while the remaining two stand do
 """
 
 import asyncio
+import json
 import logging
 import os
+import urllib.parse
+import urllib.request
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-import urllib.parse
-import urllib.request
-import json
 
 from .loki_incident_coordinator import ClaimResult, LokiIncidentCoordinator
 
@@ -80,15 +80,11 @@ class IncidentRemediationDispatcher:
     ):
         self.coordinator = coordinator or LokiIncidentCoordinator()
         self.github_token = (
-            github_token
-            or os.getenv("GITHUB_TOKEN")
-            or os.getenv("GH_TOKEN")
+            github_token or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
         )
         self.anthropic_api_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
 
-    async def dispatch_incident(
-        self, alert: IncidentAlert
-    ) -> IncidentDispatchReport:
+    async def dispatch_incident(self, alert: IncidentAlert) -> IncidentDispatchReport:
         """
         Launches all 3 remediation sessions concurrently and arbitrates
         distributed leader election via Loki.
@@ -181,7 +177,9 @@ class IncidentRemediationDispatcher:
         Creates a GitHub Issue with @fuze mention to trigger .github/workflows/fuze.yml.
         Returns the web URL to the issue.
         """
-        title = f"[Incident Remediation] @fuze: Fix {alert.component} {alert.alert_name}"
+        title = (
+            f"[Incident Remediation] @fuze: Fix {alert.component} {alert.alert_name}"
+        )
         body = f"""### Incident Auto-Remediation Trigger
 @fuze — please remediate this production incident:
 
@@ -201,10 +199,14 @@ If another agent has already claimed this incident, stand down with:
 `Issue <link> is already being handled by <owner>`
 """
 
-        fallback_link = f"https://github.com/{target_repo}/issues/simulation-{alert.incident_id}"
+        fallback_link = (
+            f"https://github.com/{target_repo}/issues/simulation-{alert.incident_id}"
+        )
 
         if not self.github_token:
-            logger.warning("No GITHUB_TOKEN configured; using simulated GitHub issue link.")
+            logger.warning(
+                "No GITHUB_TOKEN configured; using simulated GitHub issue link."
+            )
             return fallback_link
 
         url = f"{GITHUB_API_BASE}/repos/{target_repo}/issues"
@@ -226,10 +228,14 @@ If another agent has already claimed this incident, stand down with:
 
             issue_data = await loop.run_in_executor(None, _req)
             html_url = issue_data.get("html_url", fallback_link)
-            logger.info(f"✅ GitHub Issue created successfully with @fuze trigger: {html_url}")
+            logger.info(
+                f"✅ GitHub Issue created successfully with @fuze trigger: {html_url}"
+            )
             return html_url
         except Exception as e:
-            logger.warning(f"⚠️ Failed to create real GitHub issue ({e}); falling back to reference link.")
+            logger.warning(
+                f"⚠️ Failed to create real GitHub issue ({e}); falling back to reference link."
+            )
             return fallback_link
 
     async def _run_anthropic_cloud_channel(
@@ -240,7 +246,9 @@ If another agent has already claimed this incident, stand down with:
         Picks environment: devops.
         """
         channel_name = "anthropic_managed_agents_cloud"
-        logger.info(f"🚀 Initializing Anthropic Cloud Session ({agent_id}) in 'devops' environment...")
+        logger.info(
+            f"🚀 Initializing Anthropic Cloud Session ({agent_id}) in 'devops' environment..."
+        )
 
         claim_result = await self.coordinator.claim_incident(
             incident_id=alert.incident_id,
@@ -260,7 +268,9 @@ If another agent has already claimed this incident, stand down with:
             )
 
         # Agent Won Election -> Executes cloud agent run in devops environment
-        logger.info(f"⚡ [Winner Acting] Anthropic Managed Session {agent_id} executing remediation...")
+        logger.info(
+            f"⚡ [Winner Acting] Anthropic Managed Session {agent_id} executing remediation..."
+        )
         return SessionOutcome(
             channel=channel_name,
             agent_id=agent_id,
@@ -300,7 +310,9 @@ If another agent has already claimed this incident, stand down with:
                 details={"handled_by": claim_result.owner, "link": claim_result.link},
             )
 
-        logger.info(f"⚡ [Winner Acting] GitHub Actions Workflow {agent_id} executing remediation...")
+        logger.info(
+            f"⚡ [Winner Acting] GitHub Actions Workflow {agent_id} executing remediation..."
+        )
         return SessionOutcome(
             channel=channel_name,
             agent_id=agent_id,
@@ -317,7 +329,9 @@ If another agent has already claimed this incident, stand down with:
         Mechanism 3: FuzeAgent in-cluster DevOps Template Pod (agent-sbx-devops-...).
         """
         channel_name = "fuzeagent_devops_pod"
-        logger.info(f"🚀 Initializing FuzeAgent DevOps Template Pod Session ({agent_id})...")
+        logger.info(
+            f"🚀 Initializing FuzeAgent DevOps Template Pod Session ({agent_id})..."
+        )
 
         claim_result = await self.coordinator.claim_incident(
             incident_id=alert.incident_id,
@@ -336,7 +350,9 @@ If another agent has already claimed this incident, stand down with:
                 details={"handled_by": claim_result.owner, "link": claim_result.link},
             )
 
-        logger.info(f"⚡ [Winner Acting] FuzeAgent DevOps Pod {agent_id} executing remediation...")
+        logger.info(
+            f"⚡ [Winner Acting] FuzeAgent DevOps Pod {agent_id} executing remediation..."
+        )
         return SessionOutcome(
             channel=channel_name,
             agent_id=agent_id,
