@@ -130,16 +130,17 @@ test.describe('Production Sandbox Proof Drive: Sign-in -> Template -> Launch -> 
     await page.screenshot({ path: path.join(RESULTS_DIR, 'step3-pod-online.png') })
 
     // -------------------------------------------------------------------------
-    // Step 5: Send Hello World Command in Chat Window
+    // -------------------------------------------------------------------------
+    // Step 5: Send Natural Language Query in Chat Window
     // -------------------------------------------------------------------------
     const chatInput = page
       .locator('input[placeholder*="Message"], input[placeholder*="Ask"], textarea')
       .first()
 
     await expect(chatInput).toBeVisible({ timeout: 10_000 })
-    const testCommand = "python3 -c \"print('Hello World from sandboxed FuzeOne container!')\""
-    console.log(`[Drive] Sending command to container: ${testCommand}`)
-    await chatInput.fill(testCommand)
+    const timeQuery = 'What is the time now in LA?'
+    console.log(`[Drive] Sending natural language query to agent: ${timeQuery}`)
+    await chatInput.fill(timeQuery)
 
     const sendBtn = page
       .getByRole('button', { name: /send/i })
@@ -154,29 +155,9 @@ test.describe('Production Sandbox Proof Drive: Sign-in -> Template -> Launch -> 
     // -------------------------------------------------------------------------
     console.log('[Drive] Monitoring live streaming response...')
 
-    // Wait for the sent message to appear in the message thread
-    const userMessage = page.locator(`text=${testCommand}`).first()
+    // Wait for the user message to appear in the message thread
+    const userMessage = page.locator(`text=${timeQuery}`).first()
     await expect(userMessage).toBeVisible({ timeout: 10_000 })
-
-    // Wait for the agent's bidirectional response to appear
-    const responseStream = page
-      .locator('text=Hello World')
-      .or(page.locator('text=Python services'))
-      .or(page.locator('text=asyncpg'))
-      .or(page.locator('text=sandbox'))
-      .or(page.locator('text=Processed in container'))
-      .first()
-
-    // -------------------------------------------------------------------------
-    // Step 7: Send "What is the time now in LA?" & verify real time stream
-    // -------------------------------------------------------------------------
-    const timeQuery = 'What is the time now in LA?'
-    console.log(`[Drive] Sending query: ${timeQuery}`)
-    await chatInput.fill(timeQuery)
-    await sendBtn.click()
-
-    const timeMessage = page.locator(`text=${timeQuery}`).first()
-    await expect(timeMessage).toBeVisible({ timeout: 10_000 })
 
     // Verify response streams real Los Angeles time and NOT fake pytest output
     const timeResponse = page
@@ -189,7 +170,7 @@ test.describe('Production Sandbox Proof Drive: Sign-in -> Template -> Launch -> 
     await expect(timeResponse).toBeVisible({ timeout: 35_000 })
     console.log('[Drive] Received live streaming Los Angeles time in conversation window!')
 
-    // Assert that the fake mock pytest string is NOT present
+    // Assert that fake mock pytest string is NOT present
     const fakeMock = page.locator('text=64 passed, 1 skipped in 3.14s')
     await expect(fakeMock).toHaveCount(0)
 

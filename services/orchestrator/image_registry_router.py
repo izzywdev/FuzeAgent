@@ -1016,60 +1016,6 @@ async def multi_agent_websocket(websocket: WebSocket):
                             f"Relay to pod {agent_id} failed: {e}; falling back to execution driver"
                         )
 
-                # 6. If no pod WS, but message is a shell command and active sandbox has K8s pod
-                is_shell_cmd = message.strip().startswith((
-                    "python", "pytest", "curl", "bash", "sh", "git", "ls", "cat", "echo", "npm", "node", "pip", "docker", "kubectl"
-                ))
-                if (
-                    is_shell_cmd
-                    and active_sbx
-                    and active_sbx.get("podName")
-                    and k8s_sandbox_driver.k8s_core_api
-                ):
-                    exec_res = await k8s_sandbox_driver.execute_in_sandbox_pod(
-                        pod_name=active_sbx["podName"],
-                        command=message,
-                    )
-                    if exec_res.get("status") == "completed" and exec_res.get("stdout"):
-                        pod_output = exec_res.get("stdout")
-                        words = pod_output.split("\n")
-                        for w in words:
-                            line_chunk = w + "\n"
-                            await websocket.send_json(
-                                {
-                                    "type": "agent_chunk",
-                                    "agentId": agent_id,
-                                    "chunk": line_chunk,
-                                    "accumulated": pod_output,
-                                    "isFinal": False,
-                                }
-                            )
-                            await asyncio.sleep(0.02)
-
-                        await websocket.send_json(
-                            {
-                                "type": "agent_message",
-                                "agentId": agent_id,
-                                "content": pod_output,
-                                "citations": citations,
-                                "isFinal": True,
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
-                            }
-                        )
-                        await websocket.send_json(
-                            {
-                                "type": "agent_status",
-                                "agentId": agent_id,
-                                "status": "online",
-                                "currentTask": "Standby for commands",
-                            }
-                        )
-                        continue
-                    else:
-                        logger.warning(
-                            f"Exec in pod {active_sbx.get('podName')} did not succeed ({exec_res.get('status')}: {exec_res.get('stderr')}); falling back to stream handler"
-                        )
-
                 # 7. Live LLM streaming (Anthropic Claude or contextual RAG fallback)
                 streamed_via_llm = False
                 accumulated = ""
