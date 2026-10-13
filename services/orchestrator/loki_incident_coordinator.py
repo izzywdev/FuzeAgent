@@ -57,7 +57,9 @@ class LokiIncidentCoordinator:
     async def query_incident_claims(self, incident_id: str) -> List[IncidentClaim]:
         """Query Loki for all claims associated with this incident."""
         query = f'{{job="incident-remediation", incident_id="{incident_id}"}}'
-        url = f"{self.loki_url}/loki/api/v1/query?query={urllib.parse.quote(query)}"
+        url = (
+            f"{self.loki_url}/loki/api/v1/query_range?query={urllib.parse.quote(query)}"
+        )
 
         try:
             loop = asyncio.get_running_loop()

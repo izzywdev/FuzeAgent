@@ -21,7 +21,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from .loki_incident_coordinator import ClaimResult, LokiIncidentCoordinator
+try:
+    from .loki_incident_coordinator import ClaimResult, LokiIncidentCoordinator
+except ImportError:
+    from loki_incident_coordinator import ClaimResult, LokiIncidentCoordinator
 
 logger = logging.getLogger(__name__)
 
