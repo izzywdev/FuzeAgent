@@ -250,6 +250,14 @@ mcp:
 # ---------------------------------------------------------------------------
 fuzefront:
   apiUrl: "http://fuzefront-applications.fuzefront.svc.cluster.local:3003"
+  # Self-registration via init container is disabled because:
+  # 1. FuzeAgent micro-frontend routing is handled via ingress / federatedMount
+  #    and static built-in registration in FuzeFront portal.
+  # 2. In/out data and control streams are routed strictly through the Orchestrator
+  #    and Kafka topics, never directly to FuzeFront.
+  # 3. Disabling prevents pod crashlooping if fuzefront-applications is unavailable.
+  registration:
+    enabled: false
 
 # In-cluster Harbor Container Registry for runtime user & agent sandboxes
 sandboxes:

@@ -22,6 +22,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if and .Values.fuzefront.registration .Values.fuzefront.registration.enabled }}
       initContainers:
         # Runs BEFORE the app container, so an unregistered app never serves traffic.
         - name: fuzefront-register
@@ -38,6 +39,7 @@ spec:
           volumeMounts:
             - name: registration
               mountPath: /registration
+      {{- end }}
       containers:
         - name: ui
           image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
@@ -63,12 +65,14 @@ spec:
             periodSeconds: 15
           resources:
             {{- toYaml .Values.ui.resources | nindent 12 }}
+      {{- if and .Values.fuzefront.registration .Values.fuzefront.registration.enabled }}
       volumes:
         - name: registration
           configMap:
             name: {{ include "fuzeagent.fullname" . }}-registration
             # 0755 so register.sh is executable inside the init container.
             defaultMode: 0755
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

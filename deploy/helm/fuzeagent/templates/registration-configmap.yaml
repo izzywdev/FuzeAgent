@@ -12,6 +12,7 @@ with nothing reporting it.
 This is also the shape check-registration.mjs understands — it follows
 `.Files.Get` references.
 */}}
+{{- if and .Values.fuzefront.registration .Values.fuzefront.registration.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -25,3 +26,4 @@ data:
 {{ .Files.Get "files/registration/policy.json" | indent 4 }}
   register.sh: |-
 {{ .Files.Get "files/registration/register.sh" | indent 4 }}
+{{- end }}
