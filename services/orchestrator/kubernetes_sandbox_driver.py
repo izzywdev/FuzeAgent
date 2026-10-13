@@ -594,9 +594,30 @@ class KubernetesSandboxDriver:
         )
 
         try:
+            loop = asyncio.get_event_loop()
+            pod_obj = await loop.run_in_executor(
+                None,
+                lambda: self.k8s_core_api.read_namespaced_pod(
+                    name=pod_name, namespace=self.namespace
+                ),
+            )
+            if not pod_obj or pod_obj.status.phase != "Running":
+                phase = (
+                    pod_obj.status.phase if pod_obj and pod_obj.status else "Unknown"
+                )
+                logger.warning(
+                    f"Pod {pod_name} is not in Running state (phase={phase})"
+                )
+                return {
+                    "status": "not_running",
+                    "podName": pod_name,
+                    "stdout": "",
+                    "stderr": f"Pod {pod_name} is in phase {phase}",
+                    "exitCode": 1,
+                }
+
             from kubernetes.stream import stream
 
-            loop = asyncio.get_event_loop()
             resp = await loop.run_in_executor(
                 None,
                 lambda: stream(
@@ -611,15 +632,18 @@ class KubernetesSandboxDriver:
                     tty=False,
                 ),
             )
+            stdout_str = (
+                resp.decode("utf-8") if isinstance(resp, bytes) else str(resp or "")
+            )
             return {
                 "status": "completed",
                 "podName": pod_name,
-                "stdout": resp,
+                "stdout": stdout_str,
                 "stderr": "",
                 "exitCode": 0,
             }
         except Exception as e:
-            logger.error(f"Exec in pod {pod_name} failed: {e}")
+            logger.warning(f"Exec in pod {pod_name} failed or pod inaccessible: {e}")
             return {
                 "status": "error",
                 "podName": pod_name,

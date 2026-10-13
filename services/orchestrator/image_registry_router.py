@@ -259,19 +259,16 @@ ACTIVE_SANDBOXES: List[Dict[str, Any]] = [
         "id": "sbx-py-7721",
         "name": "Python Dev (FastAPI Migration)",
         "templateId": "python-dev-v2",
-        "status": "running",
-        "podName": "agent-sbx-python-dev-7721",
+        "status": "stopped",
+        "podName": "",
         "startedAt": datetime.now(timezone.utc).isoformat(),
         "timeoutSeconds": 1800,
         "secondsRemaining": 1420,
-        "cpuUsage": "0.35 / 2.0",
-        "memUsage": "1.1Gi / 4Gi",
-        "currentTask": "Refactoring PostgreSQL connection pool for asyncpg",
+        "cpuUsage": "0.0 / 2.0",
+        "memUsage": "0Mi / 4Gi",
+        "currentTask": "Standby for commands",
         "logs": [
-            "[INIT] Kubernetes Pod spawned from ghcr.io/izzywdev/fuzeagent/claude-runner-python-dev:latest",
-            "[FUZEKEYS] Injected 2 secrets via zero-trust API (ANTHROPIC_API_KEY, DATABASE_URL)",
-            "[STREAM] Linked session to agent.stream.python-dev-v2",
-            "[EXEC] Analyzing models/database.py syntax...",
+            "[INIT] Python Dev sandbox template ready",
         ],
     }
 ]
@@ -1029,44 +1026,45 @@ async def multi_agent_websocket(websocket: WebSocket):
                         pod_name=active_sbx["podName"],
                         command=message,
                     )
-                    pod_output = (
-                        exec_res.get("stdout")
-                        or exec_res.get("stderr")
-                        or "Command completed in sandbox container."
-                    )
-                    words = pod_output.split("\n")
-                    for w in words:
-                        line_chunk = w + "\n"
+                    if exec_res.get("status") == "completed" and exec_res.get("stdout"):
+                        pod_output = exec_res.get("stdout")
+                        words = pod_output.split("\n")
+                        for w in words:
+                            line_chunk = w + "\n"
+                            await websocket.send_json(
+                                {
+                                    "type": "agent_chunk",
+                                    "agentId": agent_id,
+                                    "chunk": line_chunk,
+                                    "accumulated": pod_output,
+                                    "isFinal": False,
+                                }
+                            )
+                            await asyncio.sleep(0.02)
+
                         await websocket.send_json(
                             {
-                                "type": "agent_chunk",
+                                "type": "agent_message",
                                 "agentId": agent_id,
-                                "chunk": line_chunk,
-                                "accumulated": pod_output,
-                                "isFinal": False,
+                                "content": pod_output,
+                                "citations": citations,
+                                "isFinal": True,
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
                             }
                         )
-                        await asyncio.sleep(0.02)
-
-                    await websocket.send_json(
-                        {
-                            "type": "agent_message",
-                            "agentId": agent_id,
-                            "content": pod_output,
-                            "citations": citations,
-                            "isFinal": True,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                        }
-                    )
-                    await websocket.send_json(
-                        {
-                            "type": "agent_status",
-                            "agentId": agent_id,
-                            "status": "online",
-                            "currentTask": "Standby for commands",
-                        }
-                    )
-                    continue
+                        await websocket.send_json(
+                            {
+                                "type": "agent_status",
+                                "agentId": agent_id,
+                                "status": "online",
+                                "currentTask": "Standby for commands",
+                            }
+                        )
+                        continue
+                    else:
+                        logger.warning(
+                            f"Exec in pod {active_sbx.get('podName')} did not succeed ({exec_res.get('status')}: {exec_res.get('stderr')}); falling back to stream handler"
+                        )
 
                 # 7. Live LLM streaming (Anthropic Claude or contextual RAG fallback)
                 streamed_via_llm = False
