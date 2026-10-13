@@ -42,6 +42,11 @@ except ImportError:
     from app_builds import router as app_builds_router
     from app_builds import start_app_builds, stop_app_builds
 
+try:
+    from .incident_webhook_router import router as incident_webhook_router
+except ImportError:
+    from incident_webhook_router import router as incident_webhook_router
+
 from .agent_manager import AgentManager
 from .container_manager import ContainerConfig, ContainerStatus, container_manager
 from .context_service import ContextService
@@ -676,6 +681,8 @@ app.include_router(hierarchy_router)
 app.include_router(image_registry_router)
 # FuzeFront build-your-application API (machine bearer auth + release flag, fail-closed)
 app.include_router(app_builds_router)
+# Automated incident remediation & Alertmanager webhook router with Loki consensus
+app.include_router(incident_webhook_router)
 
 
 # Health check endpoint
