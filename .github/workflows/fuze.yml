@@ -169,8 +169,75 @@ jobs:
           git checkout "$HEAD_SHA"
           echo "Checked out PR branch: $HEAD_REF @ $HEAD_SHA"
 
+      # -------------------------------------------------------------------------
+      # LOKI DEDUPLICATION & CONSENSUS GATE:
+      # If this issue was opened for an automated incident remediation (contains
+      # `inc-...`), check Loki for an existing active claim lease. If another
+      # agent (Anthropic Managed Cloud Session or FuzeAgent DevOps Pod) won the
+      # claim, stand down immediately with:
+      # "Issue <link> is already being handled by <owner>"
+      # -------------------------------------------------------------------------
+      - name: Loki Incident Consensus Pre-Check
+        id: loki-consensus
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_BODY: ${{ github.event.issue.body || github.event.comment.body || '' }}
+          ISSUE_TITLE: ${{ github.event.issue.title || '' }}
+          ISSUE_URL: ${{ github.event.issue.html_url || '' }}
+          CF_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          TEXT="${ISSUE_TITLE} ${ISSUE_BODY}"
+
+          # Match incident id (e.g. inc-postgresvolume-20261014-1200 or inc-*)
+          INCIDENT_ID=$(echo "$TEXT" | grep -oE '\binc-[a-zA-Z0-9_-]+\b' | head -n1 || true)
+
+          if [ -z "$INCIDENT_ID" ]; then
+            echo "No incident remediation token found. Proceeding with standard @fuze execution."
+            echo "skip_execution=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Identified Incident ID: $INCIDENT_ID"
+
+          # Query active claims from the Orchestrator Claims API
+          CLAIMS_URL="https://fuzeagent.prod.fuzefront.com/api/orchestrator/alerts/claims/${INCIDENT_ID}"
+          if [ -n "$CF_CLIENT_ID" ] && [ -n "$CF_CLIENT_SECRET" ]; then
+            RESP=$(curl -s -m 8 -H "CF-Access-Client-Id: $CF_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_CLIENT_SECRET" "$CLAIMS_URL" || true)
+          else
+            RESP=$(curl -s -m 8 "$CLAIMS_URL" || true)
+          fi
+
+          # Check if an active claim is already held by another agent
+          ACTIVE_OWNER=$(echo "$RESP" | jq -r '.active_claim.owner // empty' 2>/dev/null || true)
+          ACTIVE_LINK=$(echo "$RESP" | jq -r '.active_claim.link // empty' 2>/dev/null || true)
+          [ -z "$ACTIVE_LINK" ] && ACTIVE_LINK="$ISSUE_URL"
+
+          MY_AGENT_ID="gh-action-run-${GITHUB_RUN_ID}"
+
+          if [ -n "$ACTIVE_OWNER" ] && [ "$ACTIVE_OWNER" != "$MY_AGENT_ID" ]; then
+            STAND_DOWN_MSG="Issue ${ACTIVE_LINK} is already being handled by ${ACTIVE_OWNER}"
+            echo "🛑 STAND-DOWN: $STAND_DOWN_MSG"
+
+            # Post the exact required message to the thread
+            if [ -n "$ISSUE_NUM" ]; then
+              gh issue comment "$ISSUE_NUM" --repo "$REPO" --body "$STAND_DOWN_MSG" || true
+            fi
+
+            echo "skip_execution=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "✅ Loki lease available or no conflicting claim. Proceeding as winning runner ($MY_AGENT_ID)."
+          echo "skip_execution=false" >> "$GITHUB_OUTPUT"
+
       - name: Run Fuze
         id: fuze
+        if: steps.loki-consensus.outputs.skip_execution != 'true'
         # continue-on-error so the detect + alert steps below run and OWN the job's final
         # status. Without it the action fails the job outright and the requester is never
         # told on their own thread — the failure is only visible to whoever opens the run
@@ -271,7 +338,7 @@ jobs:
       # is_error WITHOUT failing the step, which is how a dead responder reported green).
       - name: Detect Fuze failure
         id: detect
-        if: always()
+        if: always() && steps.loki-consensus.outputs.skip_execution != 'true'
         env:
           STEP_OUTCOME: ${{ steps.fuze.outcome }}
           MODE: ${{ steps.fuze.outputs.mode }}
