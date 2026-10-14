@@ -5,6 +5,9 @@
 #
 # Runtime inputs:
 #   Secret  handoff-mcp-secret   -> ANTHROPIC_API_KEY   (SealedSecret; scripts/seal-secret.sh)
+#   Secret  a2a-client-oidc      -> client-id, client-secret   (SealedSecret; the OIDC
+#                                   client-credentials client FuzeFront provisions per
+#                                   FuzeInfra#981 — see "A2A outbound identity" below)
 #   ConfigMap handoff-state      -> agent-ids.json, vault-ids.json, memory-ids.json,
 #                                   environment-ids.json
 # The ConfigMap is produced in CI: check out the repo, run the sync scripts against
@@ -61,6 +64,29 @@ spec:
               valueFrom: { secretKeyRef: { name: handoff-mcp-secret, key: ANTHROPIC_API_KEY } }
             - name: FUZE_STATE_DIR
               value: /state
+            # --- A2A outbound identity (FuzeInfra#981 runtime half) ---------------------
+            # This server is the CALLER carrier (imports a2a_transport). To call a peer it
+            # must present an `aud=a2a` OIDC bearer (authz.md §2). With no static A2A_TOKEN
+            # set, a2a_transport builds a client-credentials token provider from these vars
+            # (fuze_a2a_client.auth.token_provider_from_env) and mints/caches/refreshes the
+            # token itself. client-id/secret come from the SealedSecret FuzeFront provisions
+            # (repo-claim scope mapping); the secret value never leaves this pod's env.
+            #
+            # IDENTITY NOTE: one client_id => one `repo` claim on the wire, so this shared
+            # carrier presents a single caller identity (the FuzeAgent-first rollout). True
+            # per-caller identity would need per-tenant client credentials — out of scope here.
+            #
+            # NETWORKPOLICY: discovery/token are fetched in-cluster from authentik-server in
+            # the `fuzefront` ns; fuzeinfra -> authentik-server:9000 egress must be admitted
+            # (mirror of FuzeFront#373's fuzeagent allowance) or the mint fails closed.
+            - name: A2A_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: a2a-client-oidc, key: client-id } }
+            - name: A2A_CLIENT_SECRET
+              valueFrom: { secretKeyRef: { name: a2a-client-oidc, key: client-secret } }
+            - name: A2A_OIDC_DISCOVERY_URL
+              value: http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/fuzefront/.well-known/openid-configuration
+            - name: A2A_TOKEN_AUDIENCE
+              value: "a2a"
           volumeMounts:
             - name: state
               mountPath: /state
