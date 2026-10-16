@@ -14,6 +14,7 @@ import EscalationsView from './components/EscalationsView'
 import { AgentChatWorkspace } from './components/AgentChatWorkspace'
 import { AppBuildsStudio } from './components/AppBuildsStudio'
 import { OrgProvider, useOrgContext } from './context/OrgContext'
+import { usePortalTheme } from './design-system'
 import { api, createWebSocket } from './config/api'
 import type { 
   Agent, Task, AgentTemplate, 
@@ -40,12 +41,7 @@ function FuzeAgentDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'workspace' | 'builds' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
   const [showEventsDropdown, setShowEventsDropdown] = useState(false)
   const { activeOrg, isPersonal, user: orgUser, organizations: platformOrgs, switchOrg, recentEvents, allowInAppOrgManagement } = useOrgContext()
-
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.add('dark')
-    }
-  }, [])
+  const { theme, isDark, toggleTheme } = usePortalTheme()
 
   // FuzeFront Platform Bridge: Register app-specific menu items into host shell
   useEffect(() => {
@@ -363,7 +359,7 @@ function FuzeAgentDashboard() {
   }
 
   return (
-    <div className="dark min-h-screen text-[var(--text-primary)]" style={{ backgroundColor: 'var(--bg-primary, #0f131c)' }}>
+    <div className={`min-h-screen text-[var(--text-primary)] transition-colors duration-200 ${isDark ? 'dark' : 'light'}`} style={{ backgroundColor: 'var(--bg-primary, #0f131c)' }}>
       {/* Header */}
       <nav className="border-b shadow-sm" style={{ backgroundColor: 'var(--bg-secondary, #0b0e15)', borderColor: 'var(--border-color, #232c3d)' }}>
         <div className="max-w-7xl mx-auto px-4">
@@ -527,6 +523,21 @@ function FuzeAgentDashboard() {
                   </div>
                 )}
               </div>
+
+              {/* Contextual Theme Switcher (Syncs with FuzeFront Host) */}
+              <button
+                onClick={toggleTheme}
+                title={isDark ? "Switch to Portal Light Mode" : "Switch to Portal Dark Mode"}
+                className="px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors border shadow-sm cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--bg-tertiary, #141a26)',
+                  borderColor: 'var(--border-color, #232c3d)',
+                  color: 'var(--text-primary, #e7ecf5)'
+                }}
+              >
+                <span>{isDark ? '🌙' : '☀️'}</span>
+                <span className="capitalize font-mono hidden sm:inline text-[11px]">{theme}</span>
+              </button>
 
               <button
                 onClick={handleRefresh}

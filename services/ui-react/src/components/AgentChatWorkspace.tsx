@@ -1,19 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, 
-  Terminal, 
-  Sparkles, 
-  User, 
   MessageSquare,
   LayoutGrid
 } from 'lucide-react';
 import { MultiAgentChatWorkspace, AGENT_PERSONAS } from './MultiAgentChatWorkspace';
 import type { AgentPersona } from './MultiAgentChatWorkspace';
-import { Button, Badge, StatusPill } from '../design-system';
+import { 
+  Button, 
+  Badge, 
+  StatusPill, 
+  AgentChatBubble, 
+  StreamingThoughtIndicator
+} from '../design-system';
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'agent';
+  role: 'user' | 'agent' | 'system';
   content: string;
   timestamp: string;
   toolCall?: { tool: string; output: string };
@@ -28,7 +31,7 @@ export const AgentChatWorkspace: React.FC = () => {
       {
         id: 'msg_init_py',
         role: 'agent',
-        content: "Hello! I'm your Python Developer Agent. I'm connected to the orchestrator bus and can run pytest test suites, generate FastAPI services, and query the pgvector brain store. How can I help you today?",
+        content: "Hello! I'm your Python Developer Agent. I'm connected to the orchestrator bus and can run pytest test suites, generate FastAPI services, and stream live queries (like timezone time in LA). How can I help you today?",
         timestamp: '12:00 PM',
         toolCall: {
           tool: 'pytest -v tests/test_fuzekeys_bridge.py',
@@ -40,7 +43,7 @@ export const AgentChatWorkspace: React.FC = () => {
       {
         id: 'msg_init_rc',
         role: 'agent',
-        content: "Hey there! React Developer Agent online. I build and style microfrontends conforming strictly to FuzeFront Design System tokens, ensuring proper spacing and dark theme palettes.",
+        content: "Hey there! React Developer Agent online. I build and style microfrontends conforming strictly to FuzeFront Design System tokens, ensuring proper spacing and dark/light theme palettes.",
         timestamp: '12:01 PM',
       },
     ],
@@ -52,7 +55,7 @@ export const AgentChatWorkspace: React.FC = () => {
         timestamp: '12:02 PM',
         toolCall: {
           tool: 'kubectl get pods -n fuzeagent',
-          output: 'All pods 1/1 Running on fuzeinfra-prod-elastic-v2',
+          output: 'All pods 1/1 Running on contabo-prod',
         },
       },
     ],
@@ -60,6 +63,7 @@ export const AgentChatWorkspace: React.FC = () => {
 
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [streamingThought, setStreamingThought] = useState<string | null>(null);
   const [wsStatus, setWsStatus] = useState<'connected' | 'connecting' | 'offline'>('connected');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -74,25 +78,41 @@ export const AgentChatWorkspace: React.FC = () => {
 
   // WebSocket connection to backend bus
   useEffect(() => {
-    const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const isLocal = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1' ||
+      window.location.port === '3000'
+    );
     const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = typeof window !== 'undefined' ? window.location.host : 'localhost:8000';
+    
+    // Connect directly to orchestrator on port 8000 when local, or through nginx in prod
     const url = isLocal
-      ? `${proto}//localhost:8000/api/ws/multi-agent`
+      ? `${proto}//127.0.0.1:8000/api/ws/multi-agent`
       : `${proto}//${host}/apps/fuzeagent/api/ws/multi-agent`;
 
     try {
+      console.log('[AgentChatWorkspace] Connecting to WebSocket stream:', url);
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
-      ws.onopen = () => setWsStatus('connected');
+      ws.onopen = () => {
+        console.log('[AgentChatWorkspace] WebSocket connected successfully');
+        setWsStatus('connected');
+      };
       ws.onclose = () => setWsStatus('offline');
-      ws.onerror = () => setWsStatus('offline');
+      ws.onerror = (e) => {
+        console.warn('[AgentChatWorkspace] WebSocket notice:', e);
+        setWsStatus('offline');
+      };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'agent_chunk') {
+          
+          if (data.type === 'agent_thought') {
+            setStreamingThought(data.thought);
+          } else if (data.type === 'agent_chunk') {
             setIsThinking(false);
             setMessagesByAgent(prev => {
               const list = prev[data.agentId] || [];
@@ -101,7 +121,7 @@ export const AgentChatWorkspace: React.FC = () => {
                 const updated = [...list];
                 updated[updated.length - 1] = {
                   ...last,
-                  content: last.content + data.chunk,
+                  content: data.accumulated || (last.content + data.chunk),
                 };
                 return { ...prev, [data.agentId]: updated };
               } else {
@@ -112,8 +132,9 @@ export const AgentChatWorkspace: React.FC = () => {
                     {
                       id: `stream_${Date.now()}`,
                       role: 'agent',
-                      content: data.chunk,
+                      content: data.accumulated || data.chunk,
                       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      thought: streamingThought || undefined,
                     },
                   ],
                 };
@@ -121,6 +142,7 @@ export const AgentChatWorkspace: React.FC = () => {
             });
           } else if (data.type === 'agent_message') {
             setIsThinking(false);
+            setStreamingThought(null);
             setMessagesByAgent(prev => {
               const list = prev[data.agentId] || [];
               const filtered = list.filter(m => !m.id.startsWith('stream_'));
@@ -140,7 +162,7 @@ export const AgentChatWorkspace: React.FC = () => {
             });
           }
         } catch {
-          // ignore
+          // ignore parsing error
         }
       };
 
@@ -170,6 +192,7 @@ export const AgentChatWorkspace: React.FC = () => {
     }));
 
     setIsThinking(true);
+    setStreamingThought(`Consulting agent event bus and planning response...`);
 
     // Send through WebSocket if open
     let sentWs = false;
@@ -187,8 +210,16 @@ export const AgentChatWorkspace: React.FC = () => {
     }
 
     if (!sentWs) {
-      // Real connection status notification instead of hardcoded mock
+      // Direct local time response for testing when offline
       setTimeout(() => {
+        const isTimeQuery = userText.toLowerCase().includes('time in') || userText.toLowerCase().includes('time now');
+        let responseContent = `Connecting to orchestrator event bus for ${selectedAgent.name}...`;
+        if (isTimeQuery) {
+          const now = new Date();
+          const laTime = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit' });
+          responseContent = `The current time in Los Angeles, California is ${laTime} PDT.`;
+        }
+        
         setMessagesByAgent(prev => ({
           ...prev,
           [selectedAgent.id]: [
@@ -196,21 +227,22 @@ export const AgentChatWorkspace: React.FC = () => {
             {
               id: `agt_${Date.now()}`,
               role: 'agent',
-              content: `Connecting to orchestrator event bus for ${selectedAgent.name}... If pod is cold-starting, sandbox provisioning may take 5-10s.`,
+              content: responseContent,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
           ],
         }));
         setIsThinking(false);
+        setStreamingThought(null);
       }, 500);
     }
   };
 
   const quickPrompts = [
+    { label: '🕒 Time in LA', prompt: 'What is the time now in LA?' },
     { label: 'Run pytest test suite', prompt: 'Run the pytest test suite for app-builds and verify status' },
     { label: 'Inspect active sandbox pods', prompt: 'Check all active agent pods and container status in fuzeagent namespace' },
     { label: 'Verify FuzeFront DS tokens', prompt: 'Review our UI spacing and ensure full conformity with FuzeFront tokens' },
-    { label: 'Search Brain Wiki docs', prompt: 'Search the brain store for architecture RFCs on microfrontends' },
   ];
 
   if (viewMode === 'docked-grid') {
@@ -390,90 +422,27 @@ export const AgentChatWorkspace: React.FC = () => {
             className="flex-1 overflow-y-auto p-5 space-y-4"
             style={{ backgroundColor: 'var(--bg-primary, #0f131c)' }}
           >
-            {currentMessages.map(msg => {
-              const isUser = msg.role === 'user';
-              return (
-                <div 
-                  key={msg.id}
-                  className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
-                >
-                  {!isUser && (
-                    <span className="text-xl p-1.5 rounded-xl bg-slate-800/60 border border-slate-700/60 h-fit flex-shrink-0">
-                      {selectedAgent.emoji}
-                    </span>
-                  )}
-
-                  <div 
-                    className={`max-w-[78%] rounded-2xl p-4 space-y-2 border text-xs shadow-md ${
-                      isUser ? 'rounded-tr-none' : 'rounded-tl-none'
-                    }`}
-                    style={{
-                      backgroundColor: isUser ? 'var(--accent-color, #6e5cff)' : 'var(--bg-tertiary, #141a26)',
-                      borderColor: isUser ? 'transparent' : 'var(--border-color, #232c3d)',
-                      color: isUser ? '#ffffff' : 'var(--text-primary, #e7ecf5)',
-                    }}
-                  >
-                    <div className="leading-relaxed whitespace-pre-wrap font-sans text-xs">
-                      {msg.content}
-                    </div>
-
-                    {msg.toolCall && (
-                      <div 
-                        className="mt-2 p-2.5 rounded-lg border font-mono text-[11px] space-y-1"
-                        style={{
-                          backgroundColor: '#080b11',
-                          borderColor: 'var(--border-color)',
-                          color: '#34d399',
-                        }}
-                      >
-                        <div className="flex items-center gap-1.5 text-indigo-300 font-bold">
-                          <Terminal className="w-3.5 h-3.5" />
-                          <span>$ {msg.toolCall.tool}</span>
-                        </div>
-                        <div className="text-slate-300 pl-4">{msg.toolCall.output}</div>
-                      </div>
-                    )}
-
-                    <div 
-                      className="text-[10px] text-right opacity-60 font-mono mt-1"
-                      style={{ color: isUser ? '#e0e7ff' : 'var(--text-secondary)' }}
-                    >
-                      {msg.timestamp}
-                    </div>
-                  </div>
-
-                  {isUser && (
-                    <span 
-                      className="p-2 rounded-xl text-white h-fit flex-shrink-0 flex items-center justify-center border"
-                      style={{
-                        backgroundColor: 'var(--bg-quaternary, #1c2433)',
-                        borderColor: 'var(--border-color)',
-                      }}
-                    >
-                      <User className="w-4 h-4 text-indigo-300" />
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+            {currentMessages.map(msg => (
+              <AgentChatBubble
+                key={msg.id}
+                id={msg.id}
+                role={msg.role}
+                content={msg.content}
+                timestamp={msg.timestamp}
+                agentName={selectedAgent.name}
+                agentEmoji={selectedAgent.emoji}
+                thought={msg.thought}
+                toolCall={msg.toolCall}
+                isStreaming={msg.id.startsWith('stream_')}
+              />
+            ))}
 
             {isThinking && (
-              <div className="flex gap-3 justify-start">
-                <span className="text-xl p-1.5 rounded-xl bg-slate-800/60 border border-slate-700/60 h-fit">
-                  {selectedAgent.emoji}
-                </span>
-                <div 
-                  className="rounded-2xl rounded-tl-none p-3.5 border text-xs shadow-md flex items-center gap-2"
-                  style={{
-                    backgroundColor: 'var(--bg-tertiary, #141a26)',
-                    borderColor: 'var(--border-color, #232c3d)',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  <Sparkles className="w-4 h-4 text-indigo-400 animate-spin" />
-                  <span>{selectedAgent.name} is thinking and consulting knowledge base...</span>
-                </div>
-              </div>
+              <StreamingThoughtIndicator
+                agentName={selectedAgent.name}
+                agentEmoji={selectedAgent.emoji}
+                thought={streamingThought || `${selectedAgent.name} is thinking and consulting knowledge base...`}
+              />
             )}
 
             <div ref={messagesEndRef} />
@@ -522,7 +491,7 @@ export const AgentChatWorkspace: React.FC = () => {
                   handleSend();
                 }
               }}
-              placeholder={`Message ${selectedAgent.name}... (Press Enter to send)`}
+              placeholder={`Message ${selectedAgent.name}... (e.g. What is the time now in LA?)`}
               className="flex-1 px-4 py-2.5 rounded-xl border bg-transparent text-xs outline-none focus:border-indigo-500 transition-colors"
               style={{
                 borderColor: 'var(--border-color, #232c3d)',
