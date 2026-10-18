@@ -35,6 +35,7 @@ tiktoken>=0.7.0,<0.14.0
 # CrewAI for agent orchestration
 crewai>=0.65.0,<2.0.0
 json-repair>=0.60.1
+litellm>=1.96.2,<2.0.0
 
 # Autonomous execution dependencies
 cryptography>=50.0.0,<51.0.0
