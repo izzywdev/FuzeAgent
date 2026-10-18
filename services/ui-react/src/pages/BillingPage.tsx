@@ -32,11 +32,16 @@ interface Subscription {
 let billing: BillingComponents | null = null
 
 try {
-  billing = require('@fuzefront/billing-ui')
-  // Styles — import via require so the try/catch covers the CSS too.
-  require('@fuzefront/billing-ui/styles.css')
+  // Packages on GitHub Packages are published under @izzywdev/
+  billing = require('@izzywdev/fuzefront-billing-ui')
+  require('@izzywdev/fuzefront-billing-ui/styles.css')
 } catch {
-  billing = null
+  try {
+    billing = require('@fuzefront/billing-ui')
+    require('@fuzefront/billing-ui/styles.css')
+  } catch {
+    billing = null
+  }
 }
 
 // ---------------------------------------------------------------------------
