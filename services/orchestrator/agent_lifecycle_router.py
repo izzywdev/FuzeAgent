@@ -745,7 +745,7 @@ async def _dispatch_session_prompt(session_id: str, agent_id: str, message: str)
     words = full_reply.split(" ")
     accumulated = ""
     for i in range(0, len(words), 3):
-        chunk = " ".join(words[i:i + 3]) + " "
+        chunk = " ".join(words[i : i + 3]) + " "
         accumulated += chunk
         await _broadcast_to_session(
             session_id,
