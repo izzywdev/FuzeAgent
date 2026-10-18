@@ -37,6 +37,17 @@ jobs:
       
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
+      with:
+        output: results
+
+    - name: Preserve CodeQL findings for remediation
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      with:
+        name: codeql-findings-${{ matrix.language }}
+        path: results/*.sarif
+        retention-days: 7
+        if-no-files-found: warn
 
   secrets-scan:
     name: Secrets Scanning

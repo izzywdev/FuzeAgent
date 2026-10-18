@@ -29,6 +29,7 @@ try {
 
 function inPlatform(): boolean {
   if (typeof window === 'undefined') return false
+  if (window.parent === window) return false
   if ((window as unknown as Record<string, unknown>).__FUZEFRONT__) return true
   if (sdkIsInPlatform) {
     try { return sdkIsInPlatform() } catch { return false }

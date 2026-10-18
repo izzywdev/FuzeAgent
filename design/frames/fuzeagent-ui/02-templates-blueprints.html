@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FuzeAgent — Templates & Blueprints Hub</title>
+  <link rel="stylesheet" href="./tokens.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
+    .card { background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 20px; transition: transform 0.15s ease, border-color 0.15s ease; position: relative; }
+    .card:hover { border-color: var(--accent-color); transform: translateY(-2px); }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; }
+    .pill-accent { background: var(--accent-soft); color: var(--accent-color); border: 1px solid rgba(110,92,255,0.3); }
+    .btn-seam { background: var(--seam); color: #fff; border: none; padding: 8px 16px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .tag-row { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; border-top: 1px solid var(--border-color); padding-top: 12px; font-size: 11px; color: var(--text-secondary); }
+    .tag-item { display: flex; align-items: center; gap: 6px; }
+  </style>
+</head>
+<body>
+  <div style="padding: 24px; max-width: 1400px; margin: 0 auto;">
+    <!-- Shell Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+      <div>
+        <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);">Templates & Blueprints Hub</h1>
+        <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-secondary);">Tier 1: Foundation container runtimes &bull; Tier 2: Assembled blueprints with network policies, connectors, and brains.</p>
+      </div>
+
+      <!-- Two-tier Tab Switcher -->
+      <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 4px; border-radius: var(--radius-md); display: flex; gap: 4px;">
+        <button style="background: var(--accent-color); color: #fff; border: none; padding: 6px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer;">Agent Blueprints (4)</button>
+        <button style="background: transparent; color: var(--text-secondary); border: none; padding: 6px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer;">Foundation Images (3)</button>
+      </div>
+    </div>
+
+    <!-- Blueprints Cards Grid -->
+    <div class="grid-3">
+      <!-- Blueprint 1 -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h3 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary);">Full-Stack Feature Engineer</h3>
+            <div style="font-size: 12px; font-weight: 500; color: var(--accent-color); margin-top: 2px;">Senior Software Engineer</div>
+          </div>
+          <span class="pill pill-accent">Development</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-secondary); margin: 12px 0; line-height: 1.5;">Autonomous builder that writes Python backend services, wires React 19 UI with FuzeFront DS tokens, and validates integration tests.</p>
+        <div class="tag-row">
+          <div class="tag-item">📦 <strong>Runtime:</strong> <span style="font-family: var(--font-mono); color: #a5b4fc;">Python Developer Runtime</span></div>
+          <div class="tag-item">🛡️ <strong>Policy:</strong> <span style="font-family: var(--font-mono); color: var(--success-color);">FuzeFront Internal Only</span></div>
+          <div class="tag-item">🧠 <strong>Brains:</strong> Engineering Wiki, FuzeFront DS Standards</div>
+          <div class="tag-item">🔌 <strong>Connectors:</strong> GitHub Enterprise, PostgreSQL</div>
+        </div>
+        <button class="btn-seam" style="width: 100%; justify-content: center;">Use Blueprint to Create Agent</button>
+      </div>
+
+      <!-- Blueprint 2 -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h3 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary);">Kubernetes Platform & SRE Lead</h3>
+            <div style="font-size: 12px; font-weight: 500; color: var(--accent-color); margin-top: 2px;">Site Reliability Engineer</div>
+          </div>
+          <span class="pill pill-accent">DevOps</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-secondary); margin: 12px 0; line-height: 1.5;">Monitors pod health, validates Helm charts, detects container restart loops, and safeguards cluster stability.</p>
+        <div class="tag-row">
+          <div class="tag-item">📦 <strong>Runtime:</strong> <span style="font-family: var(--font-mono); color: #a5b4fc;">DevOps & Kubernetes Runtime</span></div>
+          <div class="tag-item">🛡️ <strong>Policy:</strong> <span style="font-family: var(--font-mono); color: var(--success-color);">Strict Isolated</span></div>
+          <div class="tag-item">🧠 <strong>Brains:</strong> Infrastructure Runbooks & Alerts</div>
+          <div class="tag-item">🔌 <strong>Connectors:</strong> GitHub Helm Repo, Slack Alerts</div>
+        </div>
+        <button class="btn-seam" style="width: 100%; justify-content: center;">Use Blueprint to Create Agent</button>
+      </div>
+
+      <!-- Blueprint 3 -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h3 style="margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary);">QA & Test Automation Specialist</h3>
+            <div style="font-size: 12px; font-weight: 500; color: var(--accent-color); margin-top: 2px;">Quality Assurance Engineer</div>
+          </div>
+          <span class="pill pill-accent">QA</span>
+        </div>
+        <p style="font-size: 12px; color: var(--text-secondary); margin: 12px 0; line-height: 1.5;">Executes automated regression suites, generates integration tests, and audits API contracts against OpenAPI schemas.</p>
+        <div class="tag-row">
+          <div class="tag-item">📦 <strong>Runtime:</strong> <span style="font-family: var(--font-mono); color: #a5b4fc;">Python Developer Runtime</span></div>
+          <div class="tag-item">🛡️ <strong>Policy:</strong> <span style="font-family: var(--font-mono); color: var(--success-color);">FuzeFront Internal Only</span></div>
+          <div class="tag-item">🧠 <strong>Brains:</strong> Engineering Wiki & API Specs</div>
+          <div class="tag-item">🔌 <strong>Connectors:</strong> GitHub CI Pipeline, Jira Tracker</div>
+        </div>
+        <button class="btn-seam" style="width: 100%; justify-content: center;">Use Blueprint to Create Agent</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

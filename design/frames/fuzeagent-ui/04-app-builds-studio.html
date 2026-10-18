@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FuzeAgent — App Builds & Deployment Studio</title>
+  <link rel="stylesheet" href="./tokens.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    .layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; height: calc(100vh - 120px); }
+    .card { background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; }
+    .header-bar { background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .pipeline-step { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-md); background: var(--bg-quaternary); border: 1px solid var(--border-color); font-size: 12px; margin-bottom: 8px; }
+    .pipeline-step.active { border-color: var(--accent-color); background: var(--accent-soft); }
+    .pipeline-step.done { border-color: rgba(52, 211, 153, 0.4); color: var(--success-color); }
+    .btn-seam { background: var(--seam); color: #fff; border: none; padding: 8px 16px; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .terminal-body { background: #080b11; color: #e2e8f0; font-family: var(--font-mono); font-size: 12px; padding: 20px; flex: 1; overflow-y: auto; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div style="padding: 24px; max-width: 1400px; margin: 0 auto;">
+    <!-- Shell Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="background: var(--accent-soft); border: 1px solid rgba(110,92,255,0.3); padding: 8px; border-radius: var(--radius-md); color: var(--accent-color); font-size: 18px;">🚀</div>
+        <div>
+          <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);">App Builds & Autonomous Deployment Studio</h1>
+          <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-secondary);">Transforms high-level user briefs into production microfrontends isolated in Kubernetes and registered with FuzeFront.</p>
+        </div>
+      </div>
+      <button class="btn-seam">+ Build New Application</button>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="layout">
+      <!-- Build Sessions Roster & Pipeline -->
+      <div class="card" style="padding: 16px; display: flex; flex-direction: column;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px;">Deployment Pipeline (6 Steps)</div>
+        <div class="pipeline-step done"><span>✅</span> 1. Ingest Brief & Validate Organization</div>
+        <div class="pipeline-step done"><span>✅</span> 2. Spawn Kubernetes Build Sandbox Pod</div>
+        <div class="pipeline-step active"><span>⚡</span> 3. Scaffold Vite + React 19 MFE Template</div>
+        <div class="pipeline-step"><span>⚪</span> 4. Compile, Lint & Run Vitest Test Suite</div>
+        <div class="pipeline-step"><span>⚪</span> 5. Emit Module Federation remoteEntry.js</div>
+        <div class="pipeline-step"><span>⚪</span> 6. Register with FuzeFront Portal Registry</div>
+      </div>
+
+      <!-- Live Build Console -->
+      <div class="card" style="display: flex; flex-direction: column;">
+        <div class="header-bar">
+          <div>
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-primary);">Session: bld_1791195915866 <span style="font-family: var(--font-mono); color: var(--accent-2); font-size: 11px;">(customer-analytics-dashboard)</span></div>
+            <div style="font-size: 11px; color: var(--text-secondary);">Target: React 19 + Tailwind v4 + Vite Federation</div>
+          </div>
+          <span style="font-size: 11px; font-family: var(--font-mono); background: rgba(110,92,255,0.15); color: var(--accent-color); padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid rgba(110,92,255,0.3);">Stage: Scaffolding</span>
+        </div>
+
+        <div class="terminal-body">
+          <div style="color: var(--accent-2); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 12px;">
+            [FuzeAgent Autonomous App Deployer — KubernetesSandboxDeployer Engine]
+          </div>
+          <div>[1/6] 🚀 Initiating autonomous app build for 'Customer Analytics Dashboard'</div>
+          <div>[2/6] 📋 Brief: Interactive churn predictor with real-time metrics and export capabilities...</div>
+          <div>[3/6] 🔒 Tenant isolation: Organization ID org_enterprise_prod_01</div>
+          <div>[4/6] 📦 Scaffolding Vite + React 19 MFE template with FuzeFront DS tokens</div>
+          <div>[5/6] 🛡️ Spawning ephemeral build runner pod in 'fuzeagent' namespace</div>
+          <div style="color: var(--success-color);">   ✓ Pod spawned: fuzeagent-runner-bld-884a1 (status: Running)</div>
+          <div style="color: #a5b4fc;">   ℹ️ Injecting FuzeFront design system tokens and StatusPill components...</div>
+        </div>
+
+        <div style="background: var(--bg-secondary); border-top: 1px solid var(--border-color); padding: 10px 20px; display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary);">
+          <span>Live pod stdout/stderr stream</span>
+          <span style="font-family: var(--font-mono); color: var(--success-color);">Status: Compiling (elapsed: 14s)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

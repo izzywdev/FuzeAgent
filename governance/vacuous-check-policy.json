@@ -51,12 +51,6 @@
       "match": "Run Trivy on Docker images",
       "reason": "Not independently reverifiable in a CI-wiring pass: needs a docker daemon and a private-registry GITHUB_TOKEN secret to build fuzeagent-ui. Needs whoever can actually run it to confirm current findings are clean or add a justified per-CVE ignore list.",
       "owner": "backend-engineer / security owner (tracked by izzywdev)"
-    },
-    {
-      "file": ".github/workflows/ci.yml",
-      "match": "npm audit --audit-level=high",
-      "reason": "Verified 2026-08-23: 23 current advisories (16 high, 3 critical) in services/ui-react devDependencies (vite/vitest/ws transitive chain). `npm audit fix` covers most, but bumping vite/vitest majors is a real dependency-upgrade decision with build-breakage risk, not a mechanical CI-wiring change.",
-      "owner": "frontend-engineer (tracked by izzywdev)"
     }
   ]
 }
