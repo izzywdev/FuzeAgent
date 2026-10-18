@@ -42,7 +42,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
     let cancelled = false
     getAuthMethods()
       .then((methods) => {
-        if (!cancelled) setProbe({ state: 'present', methods })
+        if (!methods || typeof methods !== 'object' || (!Array.isArray((methods as any).social) && !(methods as any).password)) {
+          if (!cancelled) setProbe({ state: 'absent' })
+        } else {
+          if (!cancelled) setProbe({ state: 'present', methods })
+        }
       })
       .catch(() => {
         // No security surface on this origin — standalone/offline deployment.

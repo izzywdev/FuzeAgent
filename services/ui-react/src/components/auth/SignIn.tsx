@@ -57,7 +57,7 @@ export function SignIn({ methods, error }: SignInProps) {
         )}
 
         <div className="space-y-3">
-          {methods.social.map((provider) => (
+          {(methods?.social || []).map((provider) => (
             <a
               key={provider}
               href={socialStartUrl(provider, returnTo)}
@@ -67,14 +67,14 @@ export function SignIn({ methods, error }: SignInProps) {
             </a>
           ))}
 
-          {methods.password && (
+          {methods?.password && (
             <p className="text-sm text-muted-foreground">
               Password sign-in is handled by FuzeFront. Sign in there, then return here.
             </p>
           )}
 
           {/* Empty state — auth is configured but no method is switched on. */}
-          {methods.social.length === 0 && !methods.password && (
+          {(methods?.social || []).length === 0 && !methods?.password && (
             <p className="text-sm text-muted-foreground">
               No sign-in method is enabled for this deployment. Contact your
               administrator.

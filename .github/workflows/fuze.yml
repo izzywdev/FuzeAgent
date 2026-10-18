@@ -1,4 +1,4 @@
-# fuze:managed template=fuze.yml baseline=v1 digest=sha256:e9a5b6234d2b2341e1bb38ec4a68f4c4ceccac7338046f0393457dace68bca61
+# fuze:managed template=fuze.yml baseline=v1 digest=sha256:824d7e89b18797cfe837ede929b9ee9bf300a0da4d4cea61c5aac3e81aa2566a
 name: Fuze
 
 # THE CANONICAL `@fuze` ENTRYPOINT. Every onboarded repo gets this file, and this is the
@@ -169,8 +169,75 @@ jobs:
           git checkout "$HEAD_SHA"
           echo "Checked out PR branch: $HEAD_REF @ $HEAD_SHA"
 
+      # -------------------------------------------------------------------------
+      # LOKI DEDUPLICATION & CONSENSUS GATE:
+      # If this issue was opened for an automated incident remediation (contains
+      # `inc-...`), check Loki for an existing active claim lease. If another
+      # agent (Anthropic Managed Cloud Session or FuzeAgent DevOps Pod) won the
+      # claim, stand down immediately with:
+      # "Issue <link> is already being handled by <owner>"
+      # -------------------------------------------------------------------------
+      - name: Loki Incident Consensus Pre-Check
+        id: loki-consensus
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_BODY: ${{ github.event.issue.body || github.event.comment.body || '' }}
+          ISSUE_TITLE: ${{ github.event.issue.title || '' }}
+          ISSUE_URL: ${{ github.event.issue.html_url || '' }}
+          CF_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          TEXT="${ISSUE_TITLE} ${ISSUE_BODY}"
+
+          # Match incident id (e.g. inc-postgresvolume-20261014-1200 or inc-*)
+          INCIDENT_ID=$(echo "$TEXT" | grep -oE '\binc-[a-zA-Z0-9_-]+\b' | head -n1 || true)
+
+          if [ -z "$INCIDENT_ID" ]; then
+            echo "No incident remediation token found. Proceeding with standard @fuze execution."
+            echo "skip_execution=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Identified Incident ID: $INCIDENT_ID"
+
+          # Query active claims from the Orchestrator Claims API
+          CLAIMS_URL="https://fuzeagent.prod.fuzefront.com/api/orchestrator/alerts/claims/${INCIDENT_ID}"
+          if [ -n "$CF_CLIENT_ID" ] && [ -n "$CF_CLIENT_SECRET" ]; then
+            RESP=$(curl -s -m 8 -H "CF-Access-Client-Id: $CF_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_CLIENT_SECRET" "$CLAIMS_URL" || true)
+          else
+            RESP=$(curl -s -m 8 "$CLAIMS_URL" || true)
+          fi
+
+          # Check if an active claim is already held by another agent
+          ACTIVE_OWNER=$(echo "$RESP" | jq -r '.active_claim.owner // empty' 2>/dev/null || true)
+          ACTIVE_LINK=$(echo "$RESP" | jq -r '.active_claim.link // empty' 2>/dev/null || true)
+          [ -z "$ACTIVE_LINK" ] && ACTIVE_LINK="$ISSUE_URL"
+
+          MY_AGENT_ID="gh-action-run-${GITHUB_RUN_ID}"
+
+          if [ -n "$ACTIVE_OWNER" ] && [ "$ACTIVE_OWNER" != "$MY_AGENT_ID" ]; then
+            STAND_DOWN_MSG="Issue ${ACTIVE_LINK} is already being handled by ${ACTIVE_OWNER}"
+            echo "🛑 STAND-DOWN: $STAND_DOWN_MSG"
+
+            # Post the exact required message to the thread
+            if [ -n "$ISSUE_NUM" ]; then
+              gh issue comment "$ISSUE_NUM" --repo "$REPO" --body "$STAND_DOWN_MSG" || true
+            fi
+
+            echo "skip_execution=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "✅ Loki lease available or no conflicting claim. Proceeding as winning runner ($MY_AGENT_ID)."
+          echo "skip_execution=false" >> "$GITHUB_OUTPUT"
+
       - name: Run Fuze
         id: fuze
+        if: steps.loki-consensus.outputs.skip_execution != 'true'
         # continue-on-error so the detect + alert steps below run and OWN the job's final
         # status. Without it the action fails the job outright and the requester is never
         # told on their own thread — the failure is only visible to whoever opens the run
@@ -186,24 +253,44 @@ jobs:
           # llm-endpoint falls back to the direct vendor key — degraded but working, and the
           # reason this template does not hardcode the base URL the way FuzeInfra's did.
           #
-          # THE GATEWAY *IS* PUBLICLY REACHABLE, and pointing at it is the intended fix rather
-          # than a hypothetical: helm/litellm/values-contabo.yaml enables an ingress on
-          # `litellm.prod.fuzefront.com`. What blocks it today is Cloudflare Access, verified
-          # rather than assumed — `GET https://litellm.prod.fuzefront.com/v1/models` returns
-          # 302 to fuzefront.cloudflareaccess.com with `"service_token_status": false` and
-          # `"auth_status": "NONE"`. A hosted runner therefore gets a login page, not the API.
-          #
-          # Making the public host work needs TWO things this template cannot supply:
-          #   1. a Cloudflare Access SERVICE TOKEN — none exists (no `cloudflare_access_service_token`
-          #      declared in FuzeInfra's IaC). Minting it is a human step;
-          #   2. `CF-Access-Client-Id` / `CF-Access-Client-Secret` support in
-          #      ./.github/actions/llm-endpoint, which has no such inputs today.
-          # Until both land, setting this variable to the public host makes things WORSE, not
-          # better: the probe would get a 302 instead of a connection error and still fall
-          # back, with a configuration that looks deliberate. Leave it unset until then.
+          # THE GATEWAY *IS* PUBLICLY REACHABLE at `litellm.prod.fuzefront.com`
+          # (helm/litellm/values-contabo.yaml enables the ingress), behind Cloudflare Access.
+          # Routing a hosted runner through it now works end to end, because BOTH prerequisites
+          # that used to block it have landed:
+          #   1. a Cloudflare Access SERVICE TOKEN exists — FuzeInfra terraform
+          #      `cloudflare_zero_trust_access_service_token.litellm_ci`, bound to the
+          #      `litellm_service` Access app by the `litellm_service_ci_token` policy, whose
+          #      `non_identity` decision (FuzeInfra #1039) makes the service-token path return
+          #      200 non-interactively from CI;
+          #   2. ./.github/actions/llm-endpoint accepts `cf-access-client-id` /
+          #      `cf-access-client-secret`, masks the secret (`::add-mask::`) on entry, uses
+          #      them on its readiness probe, and returns them ONLY through its pre-masked
+          #      `custom-headers` output — the SAME masked-output channel as `auth-token`,
+          #      never printed, logged, or written to a file. fuze-code-action sets that
+          #      output as ANTHROPIC_CUSTOM_HEADERS on the claude rung so the model requests
+          #      carry the same CF-Access headers and clear Access too (the probe passing is
+          #      not enough on its own).
+          # TO TURN IT ON, provision THREE secrets and change nothing else:
+          # `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (from `terraform output`, a
+          # local-terminal step — never a PR/chat/log) and `LITELLM_CI_KEY` (the capped virtual
+          # key). You DO NOT repoint `FUZE_LITELLM_BASE_URL` at the public host: ./llm-endpoint
+          # keeps the in-cluster DNS name as its Tier-1 probe (which a hosted runner misses) and
+          # then probes the public gateway as Tier-2 automatically, using those three secrets,
+          # BEFORE the runner-local fallback. With any of the three UNSET the Tier-2 probe is
+          # skipped entirely, so leaving them unset keeps the exact prior behaviour (in-cluster
+          # probe → runner-local/vendor fallback) — there is no "looks deliberate but 302s"
+          # foot-gun anymore, because the public URL is not activated by a base-URL flip.
           litellm-base-url: ${{ vars.FUZE_LITELLM_BASE_URL || 'http://litellm.fuzeinfra.svc.cluster.local:4000' }}
           litellm-key: ${{ secrets.LITELLM_FUZE_KEY }}
+          cf-access-client-id: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          cf-access-client-secret: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          # Tier-2 public-gateway key. Its presence in this file is also what makes
+          # provision-secrets.yml source LITELLM_CI_KEY onto the repo (the survey keys off the
+          # `secrets.` reference intersected with FLEET_SOURCED). ./llm-endpoint uses it ONLY
+          # against the public host and only alongside the CF-Access creds above.
+          litellm-ci-key: ${{ secrets.LITELLM_CI_KEY }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Inert on this path — see MENTION MODE in the header. Passed for shape-parity
           # with the fleet's other fuze-code-action call sites, NOT as a claimed fallback.
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
@@ -251,7 +338,7 @@ jobs:
       # is_error WITHOUT failing the step, which is how a dead responder reported green).
       - name: Detect Fuze failure
         id: detect
-        if: always()
+        if: always() && steps.loki-consensus.outputs.skip_execution != 'true'
         env:
           STEP_OUTCOME: ${{ steps.fuze.outcome }}
           MODE: ${{ steps.fuze.outputs.mode }}

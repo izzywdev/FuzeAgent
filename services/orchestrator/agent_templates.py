@@ -664,6 +664,43 @@ class AgentTemplateManager:
 
         return errors
 
+    def register_template(self, template: AgentTemplate) -> AgentTemplate:
+        """Register a new template or overwrite an existing one"""
+        self.templates[template.template_id] = template
+        return template
+
+    def create_custom_template(
+        self,
+        template_id: str,
+        name: str,
+        category: AgentCategory,
+        description: str,
+        system_prompt: str,
+        default_goal: str,
+        default_backstory: str,
+        tools: List[str],
+        skills: List[str],
+        default_model: str = "claude-sonnet-4-20250514",
+        default_temperature: float = 0.7,
+        customizable_fields: List[str] = None,
+    ) -> AgentTemplate:
+        """Create and register a new custom agent template"""
+        template = AgentTemplate(
+            template_id=template_id,
+            name=name,
+            category=category,
+            description=description,
+            system_prompt=system_prompt,
+            default_goal=default_goal,
+            default_backstory=default_backstory,
+            tools=tools,
+            skills=skills,
+            default_model=default_model,
+            default_temperature=default_temperature,
+            customizable_fields=customizable_fields,
+        )
+        return self.register_template(template)
+
 
 # Global template manager instance
 template_manager = AgentTemplateManager()

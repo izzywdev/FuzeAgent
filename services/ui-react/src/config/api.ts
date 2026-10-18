@@ -35,9 +35,9 @@ const getAPIEndpoints = () => {
   } else {
     // Production endpoints (through nginx proxy) with optional overrides
     return {
-      ORCHESTRATOR_API_BASE: envOrchestrator || `${protocol}//${hostname}/api`,
-      HIERARCHY_API_BASE: envHierarchy || `${protocol}//${hostname}/api`,
-      WEBSOCKET_BASE: envWebSocket || `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}/api`
+      ORCHESTRATOR_API_BASE: envOrchestrator || `${protocol}//${window.location.host}/apps/fuzeagent/api`,
+      HIERARCHY_API_BASE: envHierarchy || `${protocol}//${window.location.host}/apps/fuzeagent/api/hierarchy`,
+      WEBSOCKET_BASE: envWebSocket || `${protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/apps/fuzeagent/api`
     }
   }
 }

@@ -167,6 +167,10 @@ case "$CODE" in
   401|403)
     die "auth rejected (HTTP ${CODE}) — check FUZEFRONT_REGISTRATION_TOKEN has the apps:register scope"
     ;;
+  000*)
+    log "WARNING: registry service at ${API} is unreachable (HTTP ${CODE}) — continuing without blocking pod startup"
+    exit 0
+    ;;
   *)
     die "unexpected response looking up ${SLUG}: HTTP ${CODE} $(cat "$BODY")"
     ;;
