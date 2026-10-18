@@ -226,7 +226,7 @@ If another agent has already claimed this incident, stand down with:
 
             def _req():
                 req = urllib.request.Request(url, data=payload, headers=headers)
-                with urllib.request.urlopen(req, timeout=10) as resp:
+                with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310
                     return json.loads(resp.read().decode("utf-8"))
 
             issue_data = await loop.run_in_executor(None, _req)

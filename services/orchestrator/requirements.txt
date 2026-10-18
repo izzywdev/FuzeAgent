@@ -26,6 +26,7 @@ langchain>=0.3.0,<2.0.0
 langchain-anthropic>=0.3.0,<2.0.0
 langchain-community>=0.3.0,<0.5.0
 chromadb>=0.5.0,<2.0.0
+mcp>=1.30.0,<3.0.0
 
 # RAG and conversation management
 sentence-transformers>=3.0.0,<6.0.0
