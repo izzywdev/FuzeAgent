@@ -57,10 +57,53 @@
   --dockview-theme-header-color: var(--bg-secondary);
 }
 
+[data-theme='light'],
+.light {
+  /* Light surface hierarchy */
+  --bg-primary:    #f6f8fb;  /* Main canvas */
+  --bg-secondary:  #ffffff;  /* Top bar / navbar */
+  --bg-tertiary:   #edf1f7;  /* Cards, panels, sidebars */
+  --bg-quaternary: #e2e8f0;  /* Hover states, inputs */
+
+  /* Light borders */
+  --border-color:  #d8e0eb;
+  --border-strong: #c2cddb;
+
+  /* Light typography */
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary:  #64748b;
+
+  /* Accent remains electric indigo & fuse seam */
+  --accent-color: #6e5cff;
+  --accent-hover: #5847e6;
+  --accent-soft:  rgba(110, 92, 255, 0.08);
+  --accent-2:     #0284c7;
+  --seam:         linear-gradient(90deg, #6e5cff 0%, #0284c7 100%);
+
+  /* Status Colors */
+  --success-color: #059669;
+  --success-soft:  rgba(5, 150, 105, 0.1);
+  --warning-color: #d97706;
+  --warning-soft:  rgba(217, 119, 6, 0.1);
+  --error-color:   #dc2626;
+  --error-soft:    rgba(220, 38, 38, 0.1);
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
+
+  --dockview-theme-background-color: var(--bg-primary);
+  --dockview-theme-border-color: var(--border-color);
+  --dockview-theme-header-color: var(--bg-secondary);
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
   margin: 0;
   padding: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }

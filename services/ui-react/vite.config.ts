@@ -28,6 +28,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@fuzefront/design-system": path.resolve(__dirname, "../../../FuzeFront/design-system"),
     },
   },
   base: '/apps/fuzeagent/',
@@ -35,7 +36,7 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
-    assetsDir: '',
+    assetsDir: 'assets',
   },
   server: {
     host: '0.0.0.0',
