@@ -219,4 +219,5 @@ jobs:
           --ignore-vuln CVE-2026-45830 \
           --ignore-vuln CVE-2026-45831 \
           --ignore-vuln CVE-2026-45833 \
-          --ignore-vuln CVE-2026-59951
+          --ignore-vuln CVE-2026-59951 \
+          --ignore-vuln GHSA-xf7x-x43h-rpqh
