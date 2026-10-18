@@ -2,12 +2,15 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-data
+  name: {{ .Values.postgres.claimName | default "postgres-data" }}
   labels:
     {{- include "fuzeagent.labels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
 spec:
   accessModes: ["ReadWriteOnce"]
+  {{- if .Values.postgres.storageClassName }}
+  storageClassName: {{ .Values.postgres.storageClassName | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.postgres.storage }}
@@ -71,7 +74,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: postgres-data
+            claimName: {{ .Values.postgres.claimName | default "postgres-data" }}
 ---
 apiVersion: v1
 kind: Service

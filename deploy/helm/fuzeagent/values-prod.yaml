@@ -11,15 +11,18 @@
 imagePullSecrets:
   - name: ghcr-pull
 
+imageRegistry:
+  secretName: harbor-registry-creds
+
 orchestrator:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-orchestrator
-    tag: d8e8b889283b
+    tag: 8728d3a7d821
   # First-light guardrails (also the chart default; pinned here for clarity).
   execution:
-    autonomous: false
-    multiAgent: false
-    fileOps: false
+    autonomous: true
+    multiAgent: true
+    fileOps: true
     mcp: true
   # CORS allowlist = the same-origin admin host (the UI nginx proxies /api/* to
   # the orchestrator, so the browser Origin is the ingress host).
@@ -42,17 +45,17 @@ orchestrator:
 hierarchyApi:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-hierarchy-api
-    tag: d8e8b889283b
+    tag: 8728d3a7d821
 
 ui:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-ui
-    tag: d8e8b889283b
+    tag: 8728d3a7d821
 
 mcpServer:
   image:
     repository: ghcr.io/izzywdev/fuzeagent-mcp-server
-    tag: d8e8b889283b
+    tag: 8728d3a7d821
 
 # Admin console — host sits under the *.prod.fuzefront.com wildcard, which is
 # already behind Cloudflare Access email-OTP + routed through the CF tunnel to
@@ -76,3 +79,24 @@ ingress:
 federatedMount:
   enabled: true
   host: app.fuzefront.com
+
+postgres:
+  storageClassName: local-path
+  claimName: postgres-data-v2
+
+redis:
+  storageClassName: local-path
+  claimName: redis-data-v2
+
+rabbitmq:
+  storageClassName: local-path
+  claimName: rabbitmq-data-v2
+
+# In-cluster Harbor Container Registry for runtime user & agent sandboxes
+sandboxes:
+  registry:
+    host: "harbor.prod.fuzefront.com"
+    inClusterHost: "harbor-core.harbor.svc.cluster.local"
+    project: "sandboxes"
+    pullSecretName: "harbor-pull-secret"
+

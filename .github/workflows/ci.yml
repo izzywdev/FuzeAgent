@@ -48,9 +48,9 @@ jobs:
       run: npm run test:coverage
       
     - name: Upload frontend coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: ./.github/actions/upload-coverage
       with:
-        file: ./services/ui-react/coverage/coverage-summary.json
+        files: ./services/ui-react/coverage/coverage-summary.json
         flags: frontend
         name: fuzeagent-frontend
         fail_ci_if_error: false
@@ -184,16 +184,9 @@ jobs:
         node-version: '24.x'
         
     - name: Frontend dependency audit
-      # Report-only: verified 23 current advisories at --audit-level=high (16 high, 3
-      # critical) as of 2026-08-23, in devDependencies (vite/vitest/ws transitive
-      # chain). Most have `npm audit fix` available, but bumping is a real dependency
-      # upgrade with build-breakage risk (vite/vitest majors), not a mechanical
-      # CI-wiring change — owner frontend-engineer. Tracked in
-      # governance/vacuous-check-policy.json.
       run: |
         cd services/ui-react
         npm audit --audit-level=high
-      continue-on-error: true
       
     - name: Setup Python for backend dependency check
       uses: actions/setup-python@v5

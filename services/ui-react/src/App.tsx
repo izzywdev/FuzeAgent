@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link } from 'react-router-dom'
-import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle, FiUsers, FiBook, FiCode, FiHelpCircle } from 'react-icons/fi'
+import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle, FiUsers } from 'react-icons/fi'
 import AgentDashboard from './components/AgentDashboard'
 import CreateAgentModal from './components/CreateAgentModal'
 import TasksView from './components/TasksView'
@@ -8,6 +7,14 @@ import StatsCards from './components/StatsCards'
 import OrganizationSelector from './components/OrganizationSelector'
 import TeamSelector from './components/TeamSelector'
 import HierarchyView from './components/HierarchyView'
+import { TemplatesHub } from './components/TemplatesHub'
+import BrainsMemoryHierarchy from './components/BrainsMemoryHierarchy'
+import SandboxesView from './components/SandboxesView'
+import EscalationsView from './components/EscalationsView'
+import { AgentChatWorkspace } from './components/AgentChatWorkspace'
+import { AppBuildsStudio } from './components/AppBuildsStudio'
+import { OrgProvider, useOrgContext } from './context/OrgContext'
+import { usePortalTheme } from './design-system'
 import { api, createWebSocket } from './config/api'
 import type { 
   Agent, Task, AgentTemplate, 
@@ -15,7 +22,8 @@ import type {
   OrganizationCreate, TeamCreate 
 } from './types'
 
-function App() {
+
+function FuzeAgentDashboard() {
   // Hierarchy state
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -30,7 +38,60 @@ function App() {
   // UI state
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showHierarchy, setShowHierarchy] = useState(false)
+  const [activeTab, setActiveTab] = useState<'overview' | 'workspace' | 'builds' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
+  const [showEventsDropdown, setShowEventsDropdown] = useState(false)
+  const { activeOrg, isPersonal, user: orgUser, organizations: platformOrgs, switchOrg, recentEvents, allowInAppOrgManagement } = useOrgContext()
+  const { theme, isDark, toggleTheme } = usePortalTheme()
+
+  // FuzeFront Platform Bridge: Register app-specific menu items into host shell
+  useEffect(() => {
+    const bridge = typeof window !== 'undefined' ? (window as any).__FUZEFRONT__ : null
+    if (bridge?.menu) {
+      bridge.menu.add('fuzeagent', [
+        { id: 'overview', label: 'Agents Overview', icon: '🤖', order: 1 },
+        { id: 'workspace', label: 'Agent Chat', icon: '💬', order: 2 },
+        { id: 'builds', label: 'App Builds & Deploy', icon: '🚀', order: 3 },
+        { id: 'templates', label: 'Templates & Blueprints', icon: '📦', order: 4 },
+        { id: 'brains', label: 'Brains & Memory Wiki', icon: '🧠', order: 5 },
+        { id: 'sandboxes', label: 'Active Agents', icon: '🛡️', order: 6 },
+        { id: 'teams', label: 'Teams & Hierarchy', icon: '👥', order: 7 },
+        { id: 'escalations', label: 'Escalations & Approvals', icon: '⚡', order: 8 },
+      ])
+    }
+
+    const handleHostNav = (e: any) => {
+      const target = e.detail?.section || e.detail?.id || e.detail
+      if (typeof target === 'string') {
+        const clean = target.replace(/^\/?(app\/)?fuzeagent\/?/, '').replace(/^\//, '')
+        if (['overview', 'workspace', 'builds', 'templates', 'brains', 'sandboxes', 'teams', 'escalations'].includes(clean)) {
+          setActiveTab(clean as any)
+        } else if (clean === '' || clean === 'agents') {
+          setActiveTab('overview')
+        }
+      }
+    }
+
+    const handleOrgSwitch = (e: any) => {
+      const org = e.detail?.organization
+      if (org?.id && organizations.length > 0) {
+        const found = organizations.find((o) => o.id === org.id || o.name === org.name)
+        if (found) setCurrentOrganization(found)
+      }
+    }
+
+    window.addEventListener('fuzefront:navigate', handleHostNav)
+    window.addEventListener('fuzefront:org-switched', handleOrgSwitch)
+    window.addEventListener('fuzefront:organization-switched', handleOrgSwitch)
+    return () => {
+      window.removeEventListener('fuzefront:navigate', handleHostNav)
+      window.removeEventListener('fuzefront:org-switched', handleOrgSwitch)
+      window.removeEventListener('fuzefront:organization-switched', handleOrgSwitch)
+      if (bridge?.menu) {
+        bridge.menu.remove('fuzeagent')
+      }
+    }
+  }, [organizations])
+
 
   // Helper function to deep compare arrays
   const arraysEqual = (a: any[], b: any[]): boolean => {
@@ -45,7 +106,7 @@ function App() {
       // Load organizations from hierarchy API and templates from orchestrator API (optional)
       const results = await Promise.allSettled([
         api.hierarchy.get('/organizations'),
-        api.orchestrator.get('/templates').then((res) => res.templates)
+        api.orchestrator.get('/templates').then((res) => (Array.isArray(res) ? res : res.templates))
       ])
 
       const newOrganizations = results[0].status === 'fulfilled' ? results[0].value : []
@@ -285,108 +346,218 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div 
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: 'var(--bg-primary, #0f131c)', color: 'var(--text-primary, #e7ecf5)' }}
+      >
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading FuzeAgent...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: 'var(--accent-color, #6e5cff)' }}></div>
+          <p className="mt-4 text-xs font-mono" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>Loading FuzeAgent Workspace...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className={`min-h-screen text-[var(--text-primary)] transition-colors duration-200 ${isDark ? 'dark' : 'light'}`} style={{ backgroundColor: 'var(--bg-primary, #0f131c)' }}>
       {/* Header */}
-      <nav className="bg-white shadow-lg border-b">
+      <nav className="border-b shadow-sm" style={{ backgroundColor: 'var(--bg-secondary, #0b0e15)', borderColor: 'var(--border-color, #232c3d)' }}>
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
-                <FiUser className="text-3xl" />
-                FuzeAgent
-              </h1>
-              <span className="ml-2 text-sm text-gray-500">AI Team Manager</span>
-            </div>
-            <div className="flex space-x-4 items-center">
-              {/* Help Menu */}
-              <div className="relative group">
-                <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center gap-2 transition-colors">
-                  <FiHelpCircle />
-                  Help
-                </button>
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="py-2">
-                    <Link
-                      to="/docs"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiBook className="w-4 h-4" />
-                      Documentation
-                    </Link>
-                    <Link
-                      to="/docs/getting-started"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiActivity className="w-4 h-4" />
-                      Getting Started
-                    </Link>
-                    <Link
-                      to="/docs/api-reference"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiCode className="w-4 h-4" />
-                      API Reference
-                    </Link>
-                    <Link
-                      to="/playground"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiCode className="w-4 h-4" />
-                      API Playground
-                    </Link>
-                    <Link
-                      to="/organization-chart"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiUsers className="w-4 h-4" />
-                      Organization Chart
-                    </Link>
-                    <div className="border-t border-gray-100 my-2"></div>
-                    <a
-                      href="https://github.com/yourusername/fuzeagent"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      <FiBook className="w-4 h-4" />
-                      GitHub Repository
-                    </a>
-                  </div>
-                </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('overview')}>
+                <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
+                  <span className="p-1.5 rounded-lg border text-indigo-400" style={{ backgroundColor: 'rgba(110, 92, 255, 0.15)', borderColor: 'rgba(110, 92, 255, 0.3)' }}>
+                    <FiUser className="text-xl" />
+                  </span>
+                  <span>FuzeAgent</span>
+                </h1>
+                <span className="ml-2 text-xs font-mono opacity-50 text-[var(--text-secondary)]">v2.0</span>
               </div>
 
-              <button
-                onClick={() => setShowHierarchy(!showHierarchy)}
-                className={`px-4 py-2 rounded-md flex items-center gap-2 transition-colors ${
-                  showHierarchy 
-                    ? 'bg-purple-600 text-white hover:bg-purple-700' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+              {/* In-App Tab Switcher (mirrors FuzeFront Left-Side Menu) */}
+              <div className="hidden md:flex items-center space-x-1">
+                {[
+                  { id: 'overview', label: 'Overview', icon: '🤖' },
+                  { id: 'workspace', label: 'Agent Chat', icon: '💬' },
+                  { id: 'builds', label: 'App Builds', icon: '🚀' },
+                  { id: 'templates', label: 'Templates', icon: '📦' },
+                  { id: 'brains', label: 'Brains & Memory', icon: '🧠' },
+                  { id: 'sandboxes', label: 'Active Agents', icon: '🛡️' },
+                  { id: 'teams', label: 'Teams', icon: '👥' },
+                  { id: 'escalations', label: 'Escalations', icon: '⚡' },
+                ].map(tab => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                        isActive
+                          ? 'font-bold shadow-sm'
+                          : 'hover:opacity-100 opacity-70'
+                      }`}
+                      style={{
+                        backgroundColor: isActive ? 'var(--bg-quaternary, #1c2433)' : 'transparent',
+                        color: isActive ? 'var(--text-primary, #e7ecf5)' : 'var(--text-secondary, #9fa9bc)',
+                        border: isActive ? '1px solid var(--accent-color, #6e5cff)' : '1px solid transparent',
+                      }}
+                    >
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Organization & Context Indicator */}
+              <div 
+                className="flex items-center gap-3 px-3.5 py-1.5 rounded-xl border text-xs shadow-sm"
+                style={{
+                  backgroundColor: 'var(--bg-tertiary, #141a26)',
+                  borderColor: 'var(--border-color, #232c3d)'
+                }}
               >
-                <FiUsers />
-                {showHierarchy ? 'Hide Hierarchy' : 'Show Hierarchy'}
+                {isPersonal || !activeOrg ? (
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-cyan-400 font-semibold flex items-center gap-1.5">
+                      👤 Personal Context
+                    </span>
+                    {orgUser && (
+                      <span className="text-[11px] opacity-75 font-mono text-[var(--text-secondary)] pl-2 border-l" style={{ borderColor: 'var(--border-color)' }}>
+                        {orgUser.email || orgUser.name}
+                      </span>
+                    )}
+                    <span className="text-[9px] uppercase px-2 py-0.5 rounded font-bold tracking-wide" style={{ backgroundColor: 'rgba(41, 211, 230, 0.15)', color: '#29d3e6' }}>
+                      Portal Context
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-indigo-400 font-semibold flex items-center gap-1.5">
+                      🏢 {activeOrg.name}
+                    </span>
+                    {activeOrg.tier && (
+                      <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md" style={{ backgroundColor: 'rgba(110, 92, 255, 0.2)', color: '#a78bfa', border: '1px solid rgba(110, 92, 255, 0.35)' }}>
+                        {activeOrg.tier}
+                      </span>
+                    )}
+                    {orgUser && (
+                      <span className="text-[11px] text-[var(--text-secondary)] pl-2 border-l flex items-center gap-1" style={{ borderColor: 'var(--border-color)' }}>
+                        <span>👤</span>
+                        <span>{orgUser.name || orgUser.email}</span>
+                      </span>
+                    )}
+                    <span className="text-[9px] uppercase px-2 py-0.5 rounded-md font-bold tracking-wide" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
+                      Platform Managed
+                    </span>
+                  </div>
+                )}
+
+                {/* Fallback selector only active when Unleash flag 'fuzeagent.in-app-org-management' is explicitly enabled */}
+                {allowInAppOrgManagement && (
+                  <select
+                    value={activeOrg?.id || ''}
+                    onChange={(e) => switchOrg(e.target.value)}
+                    className="text-xs font-semibold bg-transparent outline-none cursor-pointer ml-1"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {platformOrgs.map((org) => (
+                      <option key={org.id} value={org.id} style={{ background: '#141a26', color: '#e7ecf5' }}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Real-time Global Event Notifications */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowEventsDropdown(!showEventsDropdown)}
+                  className="px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors border"
+                  style={{
+                    backgroundColor: 'var(--bg-tertiary, #141a26)',
+                    borderColor: 'var(--border-color, #232c3d)',
+                    color: 'var(--text-primary, #e7ecf5)'
+                  }}
+                  title="Global Platform Events"
+                >
+                  <span className="text-amber-400">⚡</span>
+                  <span className="font-semibold">{recentEvents.length}</span>
+                </button>
+                {showEventsDropdown && (
+                  <div 
+                    className="absolute right-0 mt-2 w-80 rounded-xl shadow-2xl border p-3 z-50 animate-in fade-in"
+                    style={{
+                      backgroundColor: 'var(--bg-secondary, #0b0e15)',
+                      borderColor: 'var(--border-color, #232c3d)',
+                      color: 'var(--text-primary, #e7ecf5)'
+                    }}
+                  >
+                    <div className="flex items-center justify-between border-b pb-2 mb-2" style={{ borderColor: 'var(--border-color)' }}>
+                      <span className="text-xs font-bold text-white">Global Events Feed</span>
+                      <span className="text-[10px] text-[var(--text-secondary)]">Live platform bus</span>
+                    </div>
+                    {recentEvents.length === 0 ? (
+                      <div className="text-xs text-[var(--text-secondary)] py-3 text-center">No recent events</div>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto space-y-1.5">
+                        {recentEvents.map((evt) => (
+                          <div 
+                            key={evt.id} 
+                            className="text-xs p-2 rounded border"
+                            style={{
+                              backgroundColor: 'var(--bg-tertiary, #141a26)',
+                              borderColor: 'var(--border-color, #232c3d)'
+                            }}
+                          >
+                            <div className="font-mono text-[10px] text-indigo-400 font-bold uppercase">{evt.type}</div>
+                            <div className="text-slate-300 text-[11px] mt-0.5">{evt.message}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Contextual Theme Switcher (Syncs with FuzeFront Host) */}
+              <button
+                onClick={toggleTheme}
+                title={isDark ? "Switch to Portal Light Mode" : "Switch to Portal Dark Mode"}
+                className="px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors border shadow-sm cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--bg-tertiary, #141a26)',
+                  borderColor: 'var(--border-color, #232c3d)',
+                  color: 'var(--text-primary, #e7ecf5)'
+                }}
+              >
+                <span>{isDark ? '🌙' : '☀️'}</span>
+                <span className="capitalize font-mono hidden sm:inline text-[11px]">{theme}</span>
               </button>
+
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors disabled:opacity-50 border"
+                style={{
+                  backgroundColor: 'var(--bg-tertiary, #141a26)',
+                  borderColor: 'var(--border-color, #232c3d)',
+                  color: 'var(--text-primary, #e7ecf5)'
+                }}
               >
                 <FiRefreshCw className={loading ? 'animate-spin' : ''} />
                 Refresh
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 transition-colors"
+                className="px-3 py-1.5 text-white rounded-lg flex items-center gap-1.5 text-xs font-medium transition-colors shadow-md active:scale-95"
+                style={{
+                  backgroundColor: 'var(--accent-color, #6e5cff)'
+                }}
               >
                 <FiPlus />
                 Create Agent
@@ -396,11 +567,24 @@ function App() {
         </div>
       </nav>
 
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 px-4">
-        {/* Hierarchy View */}
-        {showHierarchy && (
-          <div className="mb-6">
+        {activeTab === 'workspace' && <AgentChatWorkspace />}
+        {activeTab === 'builds' && (
+          <div className="h-[800px] rounded-xl overflow-hidden border border-slate-800 shadow-xl mb-6">
+            <AppBuildsStudio />
+          </div>
+        )}
+        {activeTab === 'templates' && (
+          <TemplatesHub onUseTemplateToCreateAgent={() => setShowCreateModal(true)} />
+        )}
+        {activeTab === 'brains' && <BrainsMemoryHierarchy />}
+        {activeTab === 'sandboxes' && <SandboxesView />}
+        {activeTab === 'escalations' && <EscalationsView />}
+
+        {activeTab === 'teams' && (
+          <div className="space-y-6">
             <HierarchyView
               organizations={organizations}
               teams={teams}
@@ -409,97 +593,148 @@ function App() {
               onSelectOrganization={handleSelectOrganization}
               onSelectTeam={handleSelectTeam}
             />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <OrganizationSelector
+                organizations={organizations}
+                currentOrganization={currentOrganization}
+                loading={loading}
+                onSelectOrganization={handleSelectOrganization}
+                onCreateOrganization={handleCreateOrganization}
+              />
+              <TeamSelector
+                teams={teams}
+                currentTeam={currentTeam}
+                currentOrganization={currentOrganization}
+                loading={loading}
+                onSelectTeam={handleSelectTeam}
+                onCreateTeam={handleCreateTeam}
+              />
+            </div>
           </div>
         )}
 
-        {/* Organization and Team Selection */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <OrganizationSelector
-            organizations={organizations}
-            currentOrganization={currentOrganization}
-            loading={loading}
-            onSelectOrganization={handleSelectOrganization}
-            onCreateOrganization={handleCreateOrganization}
-          />
-          <TeamSelector
-            teams={teams}
-            currentTeam={currentTeam}
-            currentOrganization={currentOrganization}
-            loading={loading}
-            onSelectTeam={handleSelectTeam}
-            onCreateTeam={handleCreateTeam}
-          />
-        </div>
+        {activeTab === 'overview' && (
+          <>
+            {/* Organization and Team Selection */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <OrganizationSelector
+                organizations={organizations}
+                currentOrganization={currentOrganization}
+                loading={loading}
+                onSelectOrganization={handleSelectOrganization}
+                onCreateOrganization={handleCreateOrganization}
+              />
+              <TeamSelector
+                teams={teams}
+                currentTeam={currentTeam}
+                currentOrganization={currentOrganization}
+                loading={loading}
+                onSelectTeam={handleSelectTeam}
+                onCreateTeam={handleCreateTeam}
+              />
+            </div>
 
-        {/* Context Information */}
-        {currentOrganization && currentTeam && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600">
-                  Current Context: <span className="font-medium">{currentOrganization.name}</span> → <span className="font-medium">{currentTeam.name}</span>
+            {/* Context Information */}
+            {currentOrganization && currentTeam && (
+              <div 
+                className="rounded-xl border p-4 mb-6 shadow-sm flex items-center justify-between"
+                style={{
+                  backgroundColor: 'var(--bg-tertiary, #141a26)',
+                  borderColor: 'var(--border-color, #232c3d)',
+                  color: 'var(--text-primary, #e7ecf5)'
+                }}
+              >
+                <div>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
+                    Current Scope: <strong className="text-indigo-400 font-semibold">{currentOrganization.name}</strong> → <strong className="text-emerald-400 font-semibold">{currentTeam.name}</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  disabled={!currentTeam}
+                  className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-medium text-white shadow transition-all disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent-color, #6e5cff)' }}
+                >
+                  <FiPlus />
+                  Add Agent to Squad
+                </button>
+              </div>
+            )}
+
+            {/* Show message if no team selected */}
+            {!currentTeam ? (
+              <div 
+                className="rounded-xl border p-8 text-center shadow-sm"
+                style={{
+                  backgroundColor: 'var(--bg-tertiary, #141a26)',
+                  borderColor: 'var(--border-color, #232c3d)',
+                  color: 'var(--text-primary, #e7ecf5)'
+                }}
+              >
+                <FiUsers className="mx-auto h-10 w-10 mb-3 opacity-40 text-emerald-400" />
+                <h3 className="text-sm font-semibold mb-1 text-white">Select a Squad</h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
+                  {!currentOrganization 
+                    ? "Operating in Personal context. Select an organization or squad to view provisioned agents." 
+                    : "Please select or create a squad in this organization to view agent activity."}
                 </p>
               </div>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                disabled={!currentTeam}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FiPlus />
-                Add Agent to Team
-              </button>
-            </div>
-          </div>
-        )}
+            ) : (
+              <>
+                {/* Statistics */}
+                <StatsCards agents={memoizedAgents} tasks={memoizedTasks} />
 
-        {/* Show message if no team selected */}
-        {!currentTeam ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <FiUsers className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Team</h3>
-            <p className="text-gray-600">
-              {!currentOrganization 
-                ? "Please select an organization and team to view agents" 
-                : "Please select or create a team to view agents"}
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Statistics */}
-            <StatsCards agents={memoizedAgents} tasks={memoizedTasks} />
+                {/* Agents Grid */}
+                <div 
+                  className="rounded-xl border shadow-sm mb-6"
+                  style={{
+                    backgroundColor: 'var(--bg-tertiary, #141a26)',
+                    borderColor: 'var(--border-color, #232c3d)'
+                  }}
+                >
+                  <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-color, #232c3d)' }}>
+                    <div>
+                      <h2 className="text-base font-bold flex items-center gap-2 text-white">
+                        <FiActivity className="text-indigo-400" />
+                        AI Agents
+                        <span className="text-xs font-mono px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(52, 211, 153, 0.15)', color: '#34d399' }}>
+                          {currentTeam.name}
+                        </span>
+                      </h2>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>Autonomous agent workforce & assigned tools</p>
+                    </div>
+                  </div>
+                  <div className="p-5">
+                    <AgentDashboard 
+                      agents={memoizedAgents} 
+                      tasks={memoizedTasks}
+                      onAssignTask={handleAssignTask}
+                    />
+                  </div>
+                </div>
 
-            {/* Agents Grid */}
-            <div className="bg-white rounded-lg shadow mb-6">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <FiActivity />
-                  AI Agents
-                  <span className="text-sm font-normal text-blue-600">({currentTeam.name})</span>
-                </h2>
-                <p className="text-gray-600 mt-1">Manage your AI team members</p>
-              </div>
-              <div className="p-6">
-                <AgentDashboard 
-                  agents={memoizedAgents} 
-                  tasks={memoizedTasks}
-                  onAssignTask={handleAssignTask}
-                />
-              </div>
-            </div>
-
-            {/* Tasks Section */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <FiCheckCircle />
-                  Recent Tasks
-                </h2>
-                <p className="text-gray-600 mt-1">Track task assignments and progress</p>
-              </div>
-              <div className="p-6">
-                <TasksView tasks={memoizedTasks} agents={memoizedAgents} />
-              </div>
-            </div>
+                {/* Tasks Section */}
+                <div 
+                  className="rounded-xl border shadow-sm"
+                  style={{
+                    backgroundColor: 'var(--bg-tertiary, #141a26)',
+                    borderColor: 'var(--border-color, #232c3d)'
+                  }}
+                >
+                  <div className="p-5 border-b" style={{ borderColor: 'var(--border-color, #232c3d)' }}>
+                    <h2 className="text-base font-bold flex items-center gap-2 text-white">
+                      <FiCheckCircle className="text-emerald-400" />
+                      Recent Tasks
+                    </h2>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>Track autonomous execution progress and outputs</p>
+                  </div>
+                  <div className="p-5">
+                    <TasksView tasks={memoizedTasks} agents={memoizedAgents} />
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
       </main>
@@ -511,10 +746,18 @@ function App() {
           currentTeam={currentTeam}
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleCreateAgent}
+          onOpenTemplatesHub={() => setActiveTab('templates')}
         />
       )}
     </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <OrgProvider>
+      <FuzeAgentDashboard />
+    </OrgProvider>
+  )
+}
+

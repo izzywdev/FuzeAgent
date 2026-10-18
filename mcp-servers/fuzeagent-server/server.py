@@ -37,7 +37,11 @@ class FuzeAgentClient:
 
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
-        self.client = httpx.AsyncClient(timeout=30.0)
+        headers = {}
+        token = os.getenv("FUZEAGENT_API_TOKEN") or os.getenv("FUZEFRONT_SECURITY_SERVICE_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        self.client = httpx.AsyncClient(timeout=30.0, headers=headers)
 
     async def get(self, endpoint: str, params: Optional[Dict] = None) -> Dict[str, Any]:
         """Make GET request to FuzeAgent API"""
@@ -1831,8 +1835,12 @@ class FuzeAgentMCPServer:
             """Health check endpoint"""
             try:
                 # Test connection to FuzeAgent API
-                response = await self.api_client.get("/organizations")
-                org_count = len(response) if isinstance(response, list) else 0
+                try:
+                    await self.api_client.get("/health")
+                    org_count = 0
+                except Exception:
+                    response = await self.api_client.get("/organizations")
+                    org_count = len(response) if isinstance(response, list) else 0
                 return web.json_response(
                     {
                         "status": "healthy",

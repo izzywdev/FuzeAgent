@@ -1,17 +1,26 @@
-# fuze:managed template=gate-workflow-drift.yml baseline=v1 digest=sha256:85362f869dc924f4d4e842f8399a708dcdb8b3cd51be2b048d369e30f8664925
+# fuze:managed template=gate-workflow-drift.yml baseline=v1 digest=sha256:46e78baf535330d51f05e8f3f44b2345a50dd2e1076ab4ea865db6797b4edb2b
 name: gate-workflow-drift
 
 # REQUIRED-check ratchet on `fuze:managed` workflow-file drift (governance/file-ownership.md).
 #
-# governance-sync.yml already DETECTS this (scripts/governance_sync.py's `workflows` bucket)
-# but only ever WARNS: the default GITHUB_TOKEN cannot push `.github/workflows/**` at all, and
-# the workflows-scoped fuze-agent App token that would let it self-heal has never been granted
-# the Workflows permission (governance/file-ownership.md) — so an unconditional hard-fail here
-# would redden every onboarded repo on the very next canonical release, for a condition this
-# job cannot fix itself. Instead it fails only once a marked file's drift has survived
-# `governance/workflow-drift-policy.json`'s `max_versions_behind` baseline releases without
-# being caught by a human bootstrap re-run or the nightly sweep — see that policy file and
-# `governance/workflow-template-containment.md` for the full ramp rationale.
+# governance-sync.yml DETECTS this and -- since the workflows-scoped fuze-agent App token was
+# wired into it -- also RECONCILES the files that still carry their `fuze:managed` marker.
+#
+# So this gate does not exist because nothing can fix the drift. It exists because the
+# reconciler deliberately does NOT touch three categories: files carrying no marker, files
+# whose marker was removed on purpose (`detached` -- the supported way to fork a managed
+# workflow), and files absent from the repo entirely (installing those is sdlc-bootstrap's
+# job, not a per-PR reconciler's). Drift there is real, invisible to the reconciler by
+# design, and needs a human. The ramp below gives it a bounded grace window before it blocks.
+#
+# HISTORICAL NOTE, because this comment asserted the opposite for months and misled readers
+# (including into briefing others with the false constraint): the default GITHUB_TOKEN
+# genuinely cannot push `.github/workflows/**` under GitHub's `workflows` OAuth scope, and
+# for a long time the App had not been granted the Workflows permission -- so the reconciler
+# really was detect-only. Both halves are resolved now. If you are reading this while asking
+# "why can't the bot fix its own drift", the answer for a MARKED file is that it now can, and
+# a repo where it still does not is one where the scoped token mint FAILED. Check
+# governance-sync's own run log: it emits a notice naming which branch it took.
 #
 # NEVER blocks on: a repo with no `.fuze/manifest.json` yet (not onboarded), a repo with no
 # `fuze:managed` marker anywhere yet (the re-stamp fan-out has not reached it), `detached`
@@ -23,6 +32,20 @@ name: gate-workflow-drift
 # (governance/required-checks.json) — a required check that is path-filtered can produce zero
 # check runs on a PR that misses the filter and block that PR forever
 # (gate-policy-integrity.yml documents the exact incident this avoids repeating).
+#
+# RUNNER: routed through the same hosted-default `pick-runner` budget-fallback chooser as
+# harden-gate.yml / fuze-code-review.yml, for the reason those two document at length
+# (governance/required-checks.json `no_self_hosted_required`). The plain `runs-on: ubuntu-latest`
+# this job used to carry LOOKS hosted-only in this file, but scripts/bootstrap/lib/render.py
+# rewrites every literal `ubuntu-latest` job to the consuming repo's declared `ci.runner` —
+# so on a per-product repo (fuzecall, fuzeplan, ...) this job actually ran HARDCODED
+# self-hosted on that repo's own pool, which is exactly the pattern this policy's own
+# invariant forbids for a required context: no hosted default, so it queues forever with no
+# error if that pool is ever down. The chooser expression form
+# (`${{ needs.pick-runner.outputs.runner }}`) is immune to that rewrite (render.py's scalar
+# substitution only matches a literal `ubuntu-latest` string), which is the same reason
+# fuze-code-review.yml's two jobs are left untouched by the installer — see that file's own
+# RUNNER comment.
 
 on:
   pull_request:
@@ -37,8 +60,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Mirrors fuze-code-review.yml's pick-runner verbatim — see that file for the full
+  # rationale. Not itself a required status context; only gate-workflow-drift below is.
+  pick-runner:
+    runs-on: ${{ github.event.repository.private && 'fuze-runner' || 'ubuntu-latest' }}
+    outputs:
+      runner: ${{ steps.pick.outputs.runner }}
+    steps:
+      - id: pick
+        shell: bash
+        env:
+          IS_PRIVATE: ${{ github.event.repository.private }}
+          OWNER: ${{ github.repository_owner }}
+          # fuze:secret-sourcing CI_BUDGET_TOKEN=fleet — OPTIONAL org-wide Actions-billing read token; the chooser degrades to the self-hosted pool by name when unset (no repo needs to provision it)
+          BUDGET_TOKEN: ${{ secrets.CI_BUDGET_TOKEN }}
+          FORCE_RUNNER: ${{ vars.HARDEN_GATE_RUNNER }}
+        run: |
+          set -euo pipefail
+          emit() { echo "runner=$1" >> "$GITHUB_OUTPUT"; echo "selected runner: $1"; }
+
+          if [ -n "${FORCE_RUNNER:-}" ]; then
+            emit "${FORCE_RUNNER}"; exit 0
+          fi
+          if [ "${IS_PRIVATE:-}" != "true" ]; then
+            emit ubuntu-latest; exit 0
+          fi
+          if [ -z "${BUDGET_TOKEN:-}" ]; then
+            echo "::notice title=pick-runner::no CI_BUDGET_TOKEN; using the self-hosted pool (free, not budget-gated)"
+            emit fuze-runner; exit 0
+          fi
+          resp="$(curl -sS -H "Authorization: Bearer ${BUDGET_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/orgs/${OWNER}/settings/billing/actions" || true)"
+          used="$(printf '%s' "${resp}" | jq -r '.total_minutes_used // empty' 2>/dev/null || true)"
+          incl="$(printf '%s' "${resp}" | jq -r '.included_minutes // empty' 2>/dev/null || true)"
+          if printf '%s' "${used}" | grep -qE '^[0-9]+$' && printf '%s' "${incl}" | grep -qE '^[0-9]+$' && [ "${used}" -lt "${incl}" ]; then
+            emit ubuntu-latest
+          else
+            echo "::notice title=pick-runner::Actions budget exhausted or unreadable (used=${used:-?} incl=${incl:-?}) — using the self-hosted pool"
+            emit fuze-runner
+          fi
+
   gate-workflow-drift:
-    runs-on: ubuntu-latest
+    needs: [pick-runner]
+    runs-on: ${{ needs.pick-runner.outputs.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

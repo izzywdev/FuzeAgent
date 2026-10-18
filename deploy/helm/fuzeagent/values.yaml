@@ -24,6 +24,10 @@ imagePullSecrets: []
 secret:
   existingSecret: fuzeagent-secrets
 
+# Image registry configuration (e.g. Harbor or private registry for dynamic agent builds)
+imageRegistry:
+  secretName: harbor-registry-creds
+
 # --- Application services -----------------------------------------------------
 orchestrator:
   enabled: true
@@ -56,6 +60,21 @@ orchestrator:
     jwtAudience: ""
     jwtIssuer: ""
     corsAllowOrigins: "http://localhost:3000,http://localhost:3031"
+  # FuzeFront "build your application" API (docs/app-builds.md). Every key is optional and
+  # the defaults FAIL CLOSED: `enabled: false` is the release flag
+  # fuzeagent.app-builds.enabled (default OFF -> 503), and with no APP_BUILD_API_TOKEN the
+  # endpoint refuses every request (503) rather than accepting unauthenticated callers.
+  appBuilds:
+    enabled: false
+    # Public FuzeFront base used to resolve a relative callbackUrl and to allow-list the
+    # callback origin. Empty -> falls back to fuzefront.apiUrl (cluster-internal).
+    fuzefrontPublicBaseUrl: ""
+    # Optional UI deep link; "{agentSessionRef}" is substituted. Empty -> no agentSessionUrl.
+    sessionUrlTemplate: ""
+    # Secrets (never inline): APP_BUILD_API_TOKEN lives in the SealedSecret
+    # `fuzeagent-secrets` (inbound bearer; FuzeFront's FUZEAGENT_BUILD_API_TOKEN must equal
+    # it). FUZEFRONT_REGISTRATION_TOKEN is REUSED from the `fuzefront-registration` secret
+    # the UI init container already consumes (key: token).
   resources:
     requests: { cpu: 150m, memory: 384Mi }
     limits: { cpu: "1", memory: 1Gi }
@@ -101,6 +120,8 @@ postgres:
   database: ai_context
   user: postgres
   storage: 5Gi
+  storageClassName: local-path
+  claimName: postgres-data-v2
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits: { cpu: "1", memory: 1Gi }
@@ -110,6 +131,8 @@ redis:
   image: redis:7-alpine
   port: 6379
   storage: 1Gi
+  storageClassName: local-path
+  claimName: redis-data-v2
   resources:
     requests: { cpu: 25m, memory: 64Mi }
     limits: { cpu: 250m, memory: 256Mi }
@@ -121,6 +144,8 @@ rabbitmq:
   managementPort: 15672
   user: admin
   storage: 2Gi
+  storageClassName: local-path
+  claimName: rabbitmq-data-v2
   resources:
     requests: { cpu: 50m, memory: 256Mi }
     limits: { cpu: 500m, memory: 512Mi }
@@ -149,15 +174,16 @@ federatedMount:
   annotations: {}
   path: /apps/fuzeagent
 
+
 # --- Namespace guardrails on the shared node ----------------------------------
 resourceGovernance:
   enabled: true
   quota:
-    requestsCpu: "2"
-    requestsMemory: 4Gi
-    limitsCpu: "6"   # was 4; +room for a2a-shared (500m) + its rolling-update surge (go-live #93)
-    limitsMemory: 8Gi
-    pods: "20"
+    requestsCpu: "4"
+    requestsMemory: 8Gi
+    limitsCpu: "12"   # accommodates runtime ephemeral sandboxes + pod rolling updates
+    limitsMemory: 16Gi
+    pods: "40"
   limitRange:
     defaultCpu: 500m
     defaultMemory: 512Mi
@@ -224,3 +250,19 @@ mcp:
 # ---------------------------------------------------------------------------
 fuzefront:
   apiUrl: "http://fuzefront-applications.fuzefront.svc.cluster.local:3003"
+  # Self-registration via init container is disabled because:
+  # 1. FuzeAgent micro-frontend routing is handled via ingress / federatedMount
+  #    and static built-in registration in FuzeFront portal.
+  # 2. In/out data and control streams are routed strictly through the Orchestrator
+  #    and Kafka topics, never directly to FuzeFront.
+  # 3. Disabling prevents pod crashlooping if fuzefront-applications is unavailable.
+  registration:
+    enabled: false
+
+# In-cluster Harbor Container Registry for runtime user & agent sandboxes
+sandboxes:
+  registry:
+    host: "harbor.prod.fuzefront.com"
+    inClusterHost: "harbor-core.harbor.svc.cluster.local"
+    project: "sandboxes"
+    pullSecretName: "harbor-pull-secret"

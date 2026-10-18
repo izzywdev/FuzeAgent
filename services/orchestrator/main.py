@@ -31,6 +31,28 @@ from pydantic import BaseModel, Field
 from a2a_tenant_registration import router as a2a_tenant_registration_router
 from hierarchy_endpoints import router as hierarchy_router
 
+try:
+    from .image_registry_router import router as image_registry_router
+except ImportError:
+    from image_registry_router import router as image_registry_router
+
+try:
+    from .app_builds import router as app_builds_router
+    from .app_builds import start_app_builds, stop_app_builds
+except ImportError:
+    from app_builds import router as app_builds_router
+    from app_builds import start_app_builds, stop_app_builds
+
+try:
+    from .incident_webhook_router import router as incident_webhook_router
+except ImportError:
+    from incident_webhook_router import router as incident_webhook_router
+
+try:
+    from .agent_lifecycle_router import router as agent_lifecycle_router
+except ImportError:
+    from agent_lifecycle_router import router as agent_lifecycle_router
+
 from .agent_manager import AgentManager
 from .container_manager import ContainerConfig, ContainerStatus, container_manager
 from .context_service import ContextService
@@ -422,7 +444,9 @@ async def lifespan(app: FastAPI):
         app.state.org_rag_manager = OrganizationRAGManager(database_url)
         await app.state.org_rag_manager.initialize()
 
-        app.state.team_knowledge_manager = TeamKnowledgeManager(database_url)
+        app.state.team_knowledge_manager = TeamKnowledgeManager(
+            database_url, app.state.org_rag_manager
+        )
         await app.state.team_knowledge_manager.initialize()
 
         app.state.knowledge_propagation_engine = KnowledgePropagationEngine(
@@ -504,9 +528,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not create IzzyAI CEO: {e}")
 
+    # FuzeFront "build your application" API (release flag fuzeagent.app-builds.enabled,
+    # default OFF). Resumes unfinished sessions + the status-callback outbox.
+    try:
+        await start_app_builds(get_db_connection)
+    except Exception as e:
+        logger.error(f"Failed to start app-builds runtime: {e}")
+
     yield
 
     # Shutdown
+    try:
+        await stop_app_builds()
+    except Exception as e:
+        logger.error(f"Error stopping app-builds runtime: {e}")
     await app.state.multi_agent_coordinator.stop()
     await app.state.task_execution_engine.stop()
     await app.state.sandbox_manager.stop()
@@ -638,7 +673,9 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:3031",
         "http://localhost",
+        "https://app.fuzefront.com",
     ],
+    allow_origin_regex=r"https://.*\.fuzefront\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -646,6 +683,14 @@ app.add_middleware(
 
 # Include hierarchy router for organizational visualization
 app.include_router(hierarchy_router)
+# Include image registry, sandboxes, brains & escalations router
+app.include_router(image_registry_router)
+# FuzeFront build-your-application API (machine bearer auth + release flag, fail-closed)
+app.include_router(app_builds_router)
+# Automated incident remediation & Alertmanager webhook router with Loki consensus
+app.include_router(incident_webhook_router)
+# Agent Lifecycle REST API & Streaming Session Management (A-F)
+app.include_router(agent_lifecycle_router)
 
 # A2A runtime tenant registration (izzywdev/FuzeAgent#203 slice 2)
 app.include_router(a2a_tenant_registration_router)
@@ -1114,85 +1159,6 @@ async def list_teams():
         raise HTTPException(status_code=500, detail=f"Failed to list teams: {str(e)}")
 
 
-@app.get("/agent-templates")
-async def list_agent_templates():
-    """List available agent templates"""
-    try:
-        return [
-            {
-                "id": "react_developer",
-                "name": "React Developer",
-                "description": "Frontend developer specialized in React and TypeScript",
-                "type": "developer",
-                "defaultConfig": {
-                    "model": "claude-sonnet-4-20250514",
-                    "temperature": 0.7,
-                    "tools": ["code_generation", "code_review", "debugging", "testing"],
-                    "goal": "Build responsive and performant React applications",
-                    "backstory": "Experienced frontend developer with deep knowledge of React ecosystem",
-                },
-            },
-            {
-                "id": "python_developer",
-                "name": "Python Developer",
-                "description": "Backend developer specialized in Python and FastAPI",
-                "type": "developer",
-                "defaultConfig": {
-                    "model": "claude-sonnet-4-20250514",
-                    "temperature": 0.7,
-                    "tools": [
-                        "code_generation",
-                        "api_development",
-                        "database_design",
-                        "testing",
-                    ],
-                    "goal": "Develop robust and scalable backend systems",
-                    "backstory": "Senior Python developer with expertise in FastAPI and databases",
-                },
-            },
-            {
-                "id": "qa_engineer",
-                "name": "QA Engineer",
-                "description": "Quality assurance engineer focused on testing and automation",
-                "type": "qa",
-                "defaultConfig": {
-                    "model": "claude-sonnet-4-20250514",
-                    "temperature": 0.6,
-                    "tools": [
-                        "test_automation",
-                        "bug_reporting",
-                        "quality_analysis",
-                        "performance_testing",
-                    ],
-                    "goal": "Ensure high quality and reliability of software products",
-                    "backstory": "Experienced QA engineer with expertise in automated testing frameworks",
-                },
-            },
-            {
-                "id": "devops_engineer",
-                "name": "DevOps Engineer",
-                "description": "Infrastructure and deployment specialist",
-                "type": "devops",
-                "defaultConfig": {
-                    "model": "claude-sonnet-4-20250514",
-                    "temperature": 0.5,
-                    "tools": [
-                        "infrastructure_management",
-                        "deployment",
-                        "monitoring",
-                        "security",
-                    ],
-                    "goal": "Maintain reliable and scalable infrastructure",
-                    "backstory": "DevOps engineer with expertise in cloud platforms and CI/CD",
-                },
-            },
-        ]
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list agent templates: {str(e)}"
-        )
-
-
 @app.get("/tasks")
 async def list_tasks():
     """List all tasks"""
@@ -1203,64 +1169,6 @@ async def list_tasks():
 async def get_task(task_id: str):
     """Get task details"""
     return await app.state.task_queue.get_task(task_id)
-
-
-# Autonomous Execution Endpoints
-@app.post("/agents/from-template")
-async def create_agent_from_template(request: dict):
-    """Create agent from template with repository settings"""
-    try:
-        # Extract template data
-        template_id = request.get("template_id")
-        name = request.get("name")
-        team_id = request.get("team_id")
-        overrides = request.get("overrides", {})
-
-        # Get template configuration
-        template_config = await app.state.agent_manager.get_template_config(template_id)
-        if not template_config:
-            raise HTTPException(
-                status_code=404, detail=f"Template {template_id} not found"
-            )
-
-        # Build agent configuration
-        agent_config = {
-            "name": name,
-            "role": template_config.get("role", template_id.replace("_", " ").title()),
-            "type": template_config.get("type", "specialized"),
-            "template_id": template_id,
-            "team_id": team_id,
-            "config": {**template_config.get("config", {}), **overrides},
-            "repository_settings": request.get("repository_settings", {}),
-            "sandbox_settings": {
-                "base_image": f"fuzeagent/dev-{template_id.split('_')[0]}:latest",
-                "resource_limits": template_config.get(
-                    "resource_limits", {"memory": "2Gi", "cpu": "1.0", "disk": "10Gi"}
-                ),
-                "auto_cleanup": "24h",
-            },
-        }
-
-        # Create agent
-        agent = await app.state.agent_manager.create_agent(**agent_config)
-
-        return {
-            "agent_id": agent.id,
-            "status": "created",
-            "agent": agent_config,
-            "template_id": template_id,
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create agent from template: {str(e)}"
-        )
-
-
-@app.get("/templates")
-async def get_agent_templates():
-    """Get available agent templates"""
-    return await app.state.agent_manager.get_available_templates()
 
 
 @app.post(

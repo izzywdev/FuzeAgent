@@ -40,6 +40,7 @@ jobs:
         uses: ./.github/actions/fuze-code-action
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           litellm-key: ${{ secrets.LITELLM_FUZE_KEY }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
