@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from a2a_protocol import A2AProtocolManager, MessageType, TaskStatus
+from a2a_tenant_registration import router as a2a_tenant_registration_router
 from agent_templates import AgentCategory, template_manager
 from database import DatabaseManager
 from hierarchy_endpoints import router as hierarchy_router
@@ -183,6 +184,9 @@ app.add_middleware(
 
 # Include hierarchy router for organizational visualization
 app.include_router(hierarchy_router)
+
+# A2A runtime tenant registration (izzywdev/FuzeAgent#203 slice 2)
+app.include_router(a2a_tenant_registration_router)
 
 # ============================================================================
 # ORGANIZATION ENDPOINTS

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/izzywdev/FuzeAgent/agent-templates/contracts/a2a/v1/schema/fuze-profile.schema.json",
+  "title": "Fuze A2A profile (v1) — constraints layered on the open A2A AgentCard",
+  "description": "A card MUST validate against BOTH agent-card.schema.json and this profile. The profile narrows the open standard to the subset the Fuze family freezes for v1. Narrowing only — it never contradicts A2A, so a Fuze card remains consumable by any conformant third-party A2A client.",
+  "allOf": [
+    { "$ref": "agent-card.schema.json" },
+    {
+      "type": "object",
+      "required": ["securitySchemes", "securityRequirements", "signatures"],
+      "properties": {
+        "supportedInterfaces": {
+          "description": "v1 freezes a SINGLE interface: JSON-RPC 2.0 over HTTP with SSE streaming, A2A 1.0. gRPC and HTTP+JSON are OUT of v1 (see binding.md).",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "properties": {
+              "protocolBinding": { "const": "JSONRPC" },
+              "protocolVersion": { "const": "1.0" }
+            },
+            "required": ["tenant"]
+          }
+        },
+        "capabilities": {
+          "description": "v1 baseline: streaming REQUIRED true (the Managed-Agents driver already holds an SSE stream, so this is free); pushNotifications REQUIRED false in v1 (no webhook egress path is frozen yet); extendedAgentCard REQUIRED true (skill visibility is caller-dependent — see authz.md).",
+          "required": ["streaming", "pushNotifications", "extendedAgentCard"],
+          "properties": {
+            "streaming": { "const": true },
+            "pushNotifications": { "const": false },
+            "extendedAgentCard": { "const": true }
+          }
+        },
+        "provider": {
+          "properties": {
+            "organization": { "const": "FuzeOne" }
+          }
+        },
+        "signatures": {
+          "description": "REQUIRED and non-empty in the Fuze profile. A2A leaves signing optional, but the callee-enforced authZ model (authz.md) treats the card as the published capability boundary — an unsigned card cannot be trusted to state which skills a caller may reach.",
+          "minItems": 1
+        },
+        "securityRequirements": { "minItems": 1 }
+      }
+    }
+  ]
+}

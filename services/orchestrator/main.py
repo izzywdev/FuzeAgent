@@ -28,6 +28,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
+from a2a_tenant_registration import router as a2a_tenant_registration_router
 from hierarchy_endpoints import router as hierarchy_router
 
 try:
@@ -690,6 +691,9 @@ app.include_router(app_builds_router)
 app.include_router(incident_webhook_router)
 # Agent Lifecycle REST API & Streaming Session Management (A-F)
 app.include_router(agent_lifecycle_router)
+
+# A2A runtime tenant registration (izzywdev/FuzeAgent#203 slice 2)
+app.include_router(a2a_tenant_registration_router)
 
 
 # Health check endpoint
