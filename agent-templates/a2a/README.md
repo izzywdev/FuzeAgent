@@ -34,7 +34,8 @@ Two deployment topologies, **one codebase and one values document**:
 | `session_store.py` | caller-ownership index + reflected `Task` snapshot (NOT an engine) | `state-mapping.md §7` |
 | `adapter.py` | wire methods → `AgentProvider` seam (the translation) | `state-mapping.md` |
 | `server.py` | JSON-RPC 2.0 over HTTP + SSE (`POST /rpc`, well-known card) | `binding.md` |
-| `config.py` | parse the `values-interface.schema.json` document | `values-interface` |
+| `config.py` | parse the `values-interface.schema.json` document; union static + registry tenants | `values-interface` |
+| `registry.py` | fetch the orchestrator's runtime tenant registry over HTTP (`httpx`, no DB) | `tenant-registration.md` |
 | `runtime.py` | compose config → adapter → server with a real provider + OIDC | — |
 
 ## Key invariants enforced here
@@ -46,6 +47,13 @@ Two deployment topologies, **one codebase and one values document**:
   credential identity, never the request body. Absent `providesTo` → **DENY**.
 - **No new task engine.** `Task.id` IS the provider `session_id`. Continuations use
   `confirm_tool` / `resume_session`, never transcript replay. `FAILED` is not retried.
+- **Stateless, DB-free tenant resolution (contract v1.3.0, `#203`).** The runtime
+  tenant set is the UNION of the static `A2A_VALUES_FILE` ConfigMap and, when
+  `A2A_REGISTRY_URL` is set, the orchestrator's HTTP tenant registry
+  (`GET {url}/a2a/tenants?enabled=true`, fetched with `httpx` — never a DB client). A
+  registry-sourced tenant carries its already-projected Agent Card as data, so it is
+  served with no repo clone. An unreachable registry logs a warning and falls back to
+  the static source alone — never a crash, never a served-tenant outage window.
 - **Interrupted ≠ terminal.** An `always_ask` pause is `INPUT_REQUIRED`; a missing
   credential/grant is `AUTH_REQUIRED`; both may be resolved out-of-band by `reach_human`
   with no caller message, and the adapter never downgrades them on timeout.
@@ -66,7 +74,8 @@ editable install is required.
 
 ```bash
 export A2A_VALUES_FILE=/path/to/values.json   # the a2a.* block
-export A2A_REPOS_DIR=/repos                    # tenant repo checkouts
+export A2A_REPOS_DIR=/repos                    # tenant repo checkouts (static tenants)
 export AGENT_PROVIDER=anthropic
+export A2A_REGISTRY_URL=https://orchestrator.internal   # optional; contract v1.3.0
 python -m a2a.runtime
 ```

@@ -28,69 +28,6 @@ spec:
         runAsNonRoot: true
         runAsUser: 10001
         fsGroup: 10001
-      {{- if .Values.a2a.tenants }}
-      # Repo checkout: runtime.py's LocalRepoResolver reads each tenant's projection
-      # inputs (.fuze/manifest.json + agent-templates/roles/) from A2A_REPOS_DIR/<name>.
-      # The server comment states the chart provides this checkout out of band, so an
-      # init container shallow-clones each enabled tenant's repo at its GitOps `ref`.
-      # GitOps: the ref is the source of truth, never live-mutated in /repos.
-      initContainers:
-        - name: repo-sync
-          image: {{ .Values.deploy.gitImage }}
-          command:
-            - sh
-            - -c
-            - |
-              # NOTE: intentionally NOT `set -e` at the top level. A single tenant's clone
-              # failing must never abort the whole init container -- see the per-tenant
-              # guard below for why.
-              set -u
-              {{- if .Values.deploy.reposGitTokenSecretRef }}
-              AUTH="${A2A_REPOS_GIT_TOKEN}@"
-              {{- else }}
-              AUTH=""
-              {{- end }}
-              sync_failed=0
-              {{- range .Values.a2a.tenants }}
-              {{- if .enabled }}
-              name="{{ .tenant }}"   # server resolves /repos/<tenant> (case-preserved), NOT the repo slug
-              echo "cloning {{ .repo }}@{{ .ref | default "main" }} -> /repos/${name}"
-              if ( set -e
-                   rm -rf "/repos/${name}"
-                   git clone --depth 1 --branch "{{ .ref | default "main" }}" \
-                     "https://${AUTH}github.com/{{ .repo }}.git" "/repos/${name}" ); then
-                echo "synced {{ .tenant }}"
-              else
-                echo "WARNING: failed to sync tenant {{ .tenant }} ({{ .repo }}@{{ .ref | default "main" }}) -- server will start WITHOUT this tenant; its A2A requests will fail until the clone is fixed (bad ref, missing repo access, or an invalid a2a-repos-git token). This must never crash-loop the whole shared pod for every other tenant." >&2
-                sync_failed=1
-              fi
-              {{- end }}
-              {{- end }}
-              # A per-tenant clone failure is logged and skipped, never fatal: one
-              # misconfigured/inaccessible tenant repo must not block every other
-              # already-working tenant from serving. Root cause of the fleet's observed
-              # "two a2a-shared deployments" (one Running, one Init:CrashLoopBackOff,
-              # 38+ restarts): the old `set -eu` aborted this whole script on the FIRST
-              # failing clone, so the new ReplicaSet's pod could never pass its
-              # startupProbe/become Ready, and the old ReplicaSet's pod was kept alive by
-              # the default RollingUpdate strategy forever -- a permanently stuck rollout,
-              # not two independent Deployments/releases.
-              if [ "$sync_failed" = "1" ]; then
-                echo "repo-sync finished with at least one tenant sync failure (see WARNINGs above); continuing startup" >&2
-              fi
-              exit 0
-          {{- if .Values.deploy.reposGitTokenSecretRef }}
-          env:
-            - name: A2A_REPOS_GIT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.deploy.reposGitTokenSecretRef.name }}
-                  key: {{ .Values.deploy.reposGitTokenSecretRef.key }}
-          {{- end }}
-          volumeMounts:
-            - name: repos
-              mountPath: /repos
-      {{- end }}
       containers:
         - name: {{ include "a2a.name" . }}
           image: "{{ .Values.a2a.image.repository }}:{{ .Values.a2a.image.tag }}"
@@ -113,6 +50,12 @@ spec:
               value: "0.0.0.0"
             - name: A2A_VALUES_FILE
               value: /config/values.json
+            # NOTE (#203 slice 3): the `repo-sync` init container that used to populate
+            # this path was removed — cards for a registry-sourced tenant now arrive as
+            # data (tenant-registration.md), no server-side clone. `A2A_REPOS_DIR` /
+            # the `repos` volume below are left wired ONLY for the static `a2a.tenants[]`
+            # topology (LocalRepoResolver), which Slice 5 retires; until then a static
+            # tenant with no matching registry entry finds `/repos/<tenant>` empty.
             - name: A2A_REPOS_DIR
               value: /repos
             - name: AGENT_PROVIDER
@@ -179,16 +122,20 @@ spec:
           # composed Starlette routes: /rpc, /.well-known/agent-card.json,
           # /extendedAgentCard, /healthz).
           # Tuned for a slow-start server under load. A startupProbe gives it time to
-          # clone tenants + boot before liveness/readiness apply; liveness is tolerant
-          # (5s timeout, 6 failures × 30s) so a briefly-slow /healthz doesn't restart it
-          # (was killing the pod on the default 1s timeout under cluster strain).
+          # boot (registry fetch + provider init) before liveness/readiness apply;
+          # liveness is tolerant (5s timeout, 6 failures × 30s) so a briefly-slow
+          # /healthz doesn't restart it (was killing the pod on the default 1s timeout
+          # under cluster strain). Kept generous post-#203 even though server-side repo
+          # cloning is gone (the old dominant cost) — a slow/unreachable
+          # A2A_REGISTRY_URL fetch, though it fails closed to the static source rather
+          # than blocking boot, still shares this budget with provider init.
           startupProbe:
             httpGet:
               path: /healthz
               port: http
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 30        # up to ~5min to become healthy (repo clones + boot)
+            failureThreshold: 30        # up to ~5min to become healthy
           readinessProbe:
             httpGet:
               path: /healthz

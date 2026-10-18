@@ -411,6 +411,70 @@ def test_extended_card_requires_authorization(fuzeplan_cfg, resolver):
         a.extended_card("FuzePlan", _ctx(caller="FuzeMalory"))
 
 
+# --- registry-sourced tenant (tenant-registration.md, contract v1.3.0, #203) -------
+def _exploding_resolver(tenant):
+    raise AssertionError(
+        f"resolve_repo must not be called for a registry-sourced tenant ({tenant.tenant}); "
+        "its card arrives as data, no clone/projection needed"
+    )
+
+
+@pytest.fixture
+def registry_only_cfg():
+    """A ServerConfig whose ONLY tenant came from the HTTP registry (config.merge_tenant_sources
+    with an empty static source) -- exercises `adapter._tenant_or_none` resolving a tenant that
+    exists in neither the static values file nor a local repo checkout."""
+    return ServerConfig(
+        enabled=True,
+        tenants=(
+            TenantConfig(
+                tenant="FuzePlan",
+                repo="izzywdev/FuzePlan",
+                enabled=True,
+                entry_role="product-manager",
+                card={
+                    "name": "FuzePlan agent",
+                    "supportedInterfaces": [{"tenant": "FuzePlan"}],
+                    "skills": [{"id": "product-manager"}],
+                },
+            ),
+        ),
+    )
+
+
+def test_tenant_or_none_resolves_a_registry_only_tenant(registry_only_cfg):
+    a = _adapter(registry_only_cfg, FakeProvider(), _exploding_resolver)
+    tenant = a._tenant_or_none("FuzePlan")
+    assert tenant is not None
+    assert tenant.repo == "izzywdev/FuzePlan"
+    assert tenant.card is not None
+
+
+def test_tenant_or_none_unknown_name_still_returns_none(registry_only_cfg):
+    a = _adapter(registry_only_cfg, FakeProvider(), _exploding_resolver)
+    assert a._tenant_or_none("NoSuchTenant") is None
+    assert a._tenant_or_none(None) is None
+
+
+def test_well_known_card_serves_registry_card_verbatim_without_cloning(registry_only_cfg):
+    # resolve_repo is `_exploding_resolver` -- if the adapter tried to clone/project
+    # instead of serving `tenant.card` directly, this raises.
+    a = _adapter(registry_only_cfg, FakeProvider(), _exploding_resolver)
+    card = a.well_known_card("FuzePlan")
+    assert card == registry_only_cfg.tenants[0].card
+
+
+def test_extended_card_fails_closed_for_registry_only_tenant_with_no_manifest(registry_only_cfg):
+    # RegisteredTenant carries a card, not a manifest -- there is nothing to run
+    # authorize() against, so this must fail closed (non-disclosure), never crash on
+    # the missing checkout `_exploding_resolver` would otherwise be asked to read.
+    from a2a.wire_errors import TaskNotFoundError
+
+    a = _adapter(registry_only_cfg, FakeProvider(), _exploding_resolver)
+    with pytest.raises(TaskNotFoundError):
+        a.extended_card("FuzePlan", _ctx(caller="FuzeSales"))
+
+
 # --- FA-1 safety additions ---------------------------------------------------
 from a2a.adapter import _parse_decision  # noqa: E402
 
