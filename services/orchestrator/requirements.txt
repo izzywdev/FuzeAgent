@@ -106,3 +106,8 @@ structlog>=23.2.0,<27.0.0
 # Design System tokens & styling (internal package; installed from local monorepo / wheel)
 # fuzefront-design-system>=1.0.0
 
+
+# Security floor: force the patched Model Context Protocol SDK.
+# mcp is pulled transitively; <1.30.0 carries CVE-2026-59951 (fixed in 1.30.0).
+# Pinned direct so pip-audit resolves the fixed version; kept within 1.x to avoid the 2.x major.
+mcp>=1.30.0,<2.0.0

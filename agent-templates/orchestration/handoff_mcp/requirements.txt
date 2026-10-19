@@ -1,4 +1,4 @@
-mcp>=1.2.0
+mcp>=1.30.0  # CVE-2026-59951 fixed in 1.30.0
 uvicorn>=0.30
 starlette>=0.37
 # A2A transport: the FROZEN generated client (contracts/a2a/v1/client) speaks
