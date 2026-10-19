@@ -1,717 +1,670 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Send,
-  Plus,
-  Maximize2,
-  Sliders,
-  Sparkles,
-  Bot,
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Send, 
+  MessageSquare, 
+  Plus, 
+  Search, 
+  ExternalLink, 
+  Sparkles, 
+  ChevronRight, 
+  PanelRightClose, 
+  PanelRightOpen,
   Terminal,
   Activity,
-  Trash2,
+  Cpu,
   Clock,
-  Compass,
-  Cpu
+  Layers
 } from 'lucide-react';
-import {
-  TimeInZoneCard,
-  TerminalLogWindow,
-  SandboxStatusBadge,
+import { 
+  Button, 
+  Badge, 
+  SandboxStatusBadge, 
+  AgentChatBubble, 
   StreamingThoughtIndicator,
+  TerminalLogWindow
 } from '../design-system';
+import { AGENT_PERSONAS } from '../components/MultiAgentChatWorkspace';
+import type { AgentPersona } from '../components/MultiAgentChatWorkspace';
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'agent' | 'system';
+  content: string;
+  timestamp: string;
+  thought?: string;
+  toolCall?: { tool: string; output: string };
+  customCard?: {
+    type: string;
+    payload: Record<string, unknown>;
+  };
+}
 
 interface ChatThread {
   id: string;
   title: string;
+  agentId: string;
+  lastMessage: string;
   updatedAt: string;
-  model: string;
+  pinned?: boolean;
 }
 
-interface MessageItem {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  thought?: { title: string; duration: string; details: string };
-  cards?: Array<
-    | { type: 'time_in_zone'; data: { timeString: string; zone: string } }
-    | { type: 'terminal_log'; data: { title: string; logs: string[] } }
-    | { type: 'sandbox_badge'; data: { status: 'running' | 'idle' | 'failed'; pod: string } }
-  >;
-}
+const INITIAL_THREADS: ChatThread[] = [
+  {
+    id: 'thread_la_time',
+    title: 'LA Timezone Verification',
+    agentId: 'python-dev',
+    lastMessage: 'Verified Los Angeles time is 03:30 AM PDT.',
+    updatedAt: 'Just now',
+    pinned: true,
+  },
+  {
+    id: 'thread_frontend_crossbrain',
+    title: 'Frontend Cross-Brain & UI Components',
+    agentId: 'react-dev',
+    lastMessage: 'Shared chat-ui components promoted to izzywdev registry.',
+    updatedAt: '10m ago',
+    pinned: true,
+  },
+  {
+    id: 'thread_devops_helm',
+    title: 'ArgoCD Post-Sync & K8s Pods',
+    agentId: 'devops-lead',
+    lastMessage: 'Cluster healthy on contabo-prod node.',
+    updatedAt: '1h ago',
+  },
+];
 
-export const StandaloneChatPage: React.FC = () => {
-  const [threads, setThreads] = useState<ChatThread[]>([
-    {
-      id: 'thread-today-1',
-      title: 'Current Time & World Clock Stream',
-      updatedAt: 'Just now',
-      model: 'FuzeAgent Multi-Agent',
-    },
-    {
-      id: 'thread-today-2',
-      title: 'Argocd PostSync & Pod Rollouts',
-      updatedAt: '2 hours ago',
-      model: 'Claude 3.5 Sonnet',
-    },
-    {
-      id: 'thread-prev-1',
-      title: 'PostgreSQL DB Migration & RAG Schema',
-      updatedAt: '3 days ago',
-      model: 'GPT-4o',
-    },
-  ]);
-
-  const [activeThreadId, setActiveThreadId] = useState<string>('thread-today-1');
-  const [selectedModel, setSelectedModel] = useState<string>('fuzeagent-multi-agent');
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
-  const [telemetryOpen, setTelemetryOpen] = useState<boolean>(false);
-  const [input, setInput] = useState<string>('');
-  const [isStreaming, setIsStreaming] = useState<boolean>(false);
-  const [thoughtExpanded, setThoughtExpanded] = useState<boolean>(true);
-
-  // Time in LA live clock
-  const [laTime, setLaTime] = useState<string>(() => {
-    return new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Los_Angeles',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-      timeZoneName: 'short',
-    }).format(new Date());
-  });
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setLaTime(
-        new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Los_Angeles',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: true,
-          timeZoneName: 'short',
-        }).format(new Date())
-      );
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const [messages, setMessages] = useState<MessageItem[]>([
+const INITIAL_MESSAGES_BY_THREAD: Record<string, ChatMessage[]> = {
+  thread_la_time: [
     {
       id: 'm1',
       role: 'user',
-      content: 'What is the current local time in Los Angeles, California right now?',
-      timestamp: '12:04 PM',
+      content: 'What is the current time in Los Angeles?',
+      timestamp: '12:30 PM',
     },
     {
       id: 'm2',
-      role: 'assistant',
-      content:
-        'I queried the system time broker with timezone `America/Los_Angeles` (Pacific Daylight Time). Here is the verified real-time stream:',
-      timestamp: '12:04 PM',
-      thought: {
-        title: 'Querying world time relay & verifying timezone offset',
-        duration: '1.2s',
-        details:
-          '1. Identified target timezone: America/Los_Angeles\n2. Resolved UTC offset: UTC-7 (PDT daylight saving observed)\n3. Invoked live time provider and bound streaming card.\n4. Sandbox container sandbox-agent-7f92 confirmed heartbeat.',
+      role: 'agent',
+      content: 'The current time in Los Angeles, California is 03:30 AM PDT.',
+      timestamp: '12:30 PM',
+      thought: 'Querying world time engine for America/Los_Angeles timezone and formatting via TimeInZoneCard.',
+      toolCall: {
+        tool: 'world_clock.get_time(timezone="America/Los_Angeles")',
+        output: '{"status": "ok", "timezone": "America/Los_Angeles", "time": "03:30 AM PDT"}',
       },
-      cards: [
-        {
-          type: 'time_in_zone',
-          data: {
-            timeString: `Los Angeles: ${laTime}`,
-            zone: 'America/Los_Angeles (PDT)',
-          },
-        },
-        {
-          type: 'sandbox_badge',
-          data: {
-            status: 'running',
-            pod: 'pod/sandbox-agent-7f92-la',
-          },
-        },
-      ],
     },
+  ],
+  thread_frontend_crossbrain: [
+    {
+      id: 'm3',
+      role: 'user',
+      content: 'Verify cross-functional frontend brain architecture and chat workspace exports.',
+      timestamp: '12:20 PM',
+    },
+    {
+      id: 'm4',
+      role: 'agent',
+      content: 'I have verified that all frontend agents share the cross-functional brain `brain_cross_frontend` for design tokens and chat UI components, alongside their product-specific agent memory.',
+      timestamp: '12:21 PM',
+      thought: 'Evaluating multi-tier brain hierarchy: Org Global -> Cross-Functional Frontend -> Team Platform -> Agent React Dev.',
+      toolCall: {
+        tool: 'fuzeagent.get_agent_brains(agent_id="react-dev")',
+        output: 'Resolved 4 tiers: [brain_agent_react_dev, brain_team_platform, brain_cross_frontend, brain_org_global]',
+      },
+    },
+  ],
+  thread_devops_helm: [
+    {
+      id: 'm5',
+      role: 'user',
+      content: 'Check active agent sandbox pods in fuzeagent namespace.',
+      timestamp: '11:45 AM',
+    },
+    {
+      id: 'm6',
+      role: 'agent',
+      content: 'All Kubernetes sandbox pods and containers in the fuzeagent namespace are 1/1 Running with healthy liveness probes.',
+      timestamp: '11:46 AM',
+      toolCall: {
+        tool: 'kubectl get pods -n fuzeagent',
+        output: 'fuzeagent-orchestrator-7d84f 1/1 Running\nfuzeagent-sandbox-runner-9c22b 1/1 Running',
+      },
+    },
+  ],
+};
+
+const AVAILABLE_MODELS = [
+  { id: 'claude-3-7-sonnet', name: 'Claude 3.7 Sonnet (Hybrid Reasoning)' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Multimodal Agentic)' },
+  { id: 'deepseek-r1-qwen', name: 'DeepSeek R1 Distill (Fast Reasoning)' },
+  { id: 'gpt-4o', name: 'GPT-4o (Omni Realtime)' },
+];
+
+export const StandaloneChatPage: React.FC = () => {
+  const [threads, setThreads] = useState<ChatThread[]>(INITIAL_THREADS);
+  const [activeThreadId, setActiveThreadId] = useState<string>('thread_la_time');
+  const [messagesByThread, setMessagesByThread] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES_BY_THREAD);
+  const [selectedAgent, setSelectedAgent] = useState<AgentPersona>(AGENT_PERSONAS[0]);
+  const [selectedModel, setSelectedModel] = useState<string>('claude-3-7-sonnet');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [input, setInput] = useState<string>('');
+  const [isThinking, setIsThinking] = useState<boolean>(false);
+  const [streamingThought, setStreamingThought] = useState<string | null>(null);
+  const [showRightDrawer, setShowRightDrawer] = useState<boolean>(true);
+  const [sandboxLogs, setSandboxLogs] = useState<string[]>([
+    '[sandbox-init] Container runtime gVisor v2.1 sandbox attached',
+    '[brain-store] Ingested org_global context (1,420 tokens)',
+    '[brain-store] Ingested cross_functional context for domain (frontend/devops)',
+    '[bus] Listening on /ws/agents/stream',
   ]);
 
-  const handleSend = () => {
-    if (!input.trim() || isStreaming) return;
-    const userText = input.trim();
-    setInput('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const newMsg: MessageItem = {
-      id: `usr_${Date.now()}`,
-      role: 'user',
-      content: userText,
-      timestamp: 'Just now',
-    };
+  const currentThread = threads.find(t => t.id === activeThreadId) || threads[0];
+  const currentMessages = messagesByThread[activeThreadId] || [];
 
-    setMessages((prev) => [...prev, newMsg]);
-    setIsStreaming(true);
+  // Synchronize persona with thread
+  useEffect(() => {
+    if (currentThread) {
+      const found = AGENT_PERSONAS.find(a => a.id === currentThread.agentId);
+      if (found) setSelectedAgent(found);
+    }
+  }, [currentThread]);
 
-    setTimeout(() => {
-      const isTimeQuery =
-        userText.toLowerCase().includes('time') ||
-        userText.toLowerCase().includes('la') ||
-        userText.toLowerCase().includes('los angeles');
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [currentMessages, isThinking, streamingThought]);
 
-      const assistantMsg: MessageItem = {
-        id: `ast_${Date.now()}`,
-        role: 'assistant',
-        content: isTimeQuery
-          ? `Here is the current updated live time in Los Angeles:`
-          : `I have processed your request for "${userText}". Here is the verified sandbox output:`,
-        timestamp: 'Just now',
-        thought: {
-          title: 'Orchestrating agent sub-routine',
-          duration: '0.8s',
-          details: `Processed instruction via model ${selectedModel}. Executed isolated container commands.`,
-        },
-        cards: isTimeQuery
-          ? [
-              {
-                type: 'time_in_zone',
-                data: {
-                  timeString: `Los Angeles: ${laTime}`,
-                  zone: 'America/Los_Angeles (PDT)',
-                },
-              },
-            ]
-          : [
-              {
-                type: 'terminal_log',
-                data: {
-                  title: 'Task Execution Logs',
-                  logs: [
-                    'Initialized sandbox worker pod...',
-                    `Executed instruction: ${userText}`,
-                    'Exit code: 0 (Success)',
-                  ],
-                },
-              },
-            ],
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-      setIsStreaming(false);
-    }, 1200);
-  };
-
-  const handlePopOut = () => {
-    const popoutUrl = `${window.location.origin}/chat/window`;
-    window.open(popoutUrl, '_blank', 'width=1280,height=860,menubar=no,toolbar=no,status=no');
-  };
-
-  const handleNewChat = () => {
+  const handleCreateNewThread = () => {
     const newId = `thread_${Date.now()}`;
     const newThread: ChatThread = {
       id: newId,
       title: 'New Conversation',
+      agentId: selectedAgent.id,
+      lastMessage: 'Ready to assist',
       updatedAt: 'Just now',
-      model: selectedModel,
     };
-    setThreads([newThread, ...threads]);
+    setThreads(prev => [newThread, ...prev]);
     setActiveThreadId(newId);
-    setMessages([
-      {
-        id: `welcome_${Date.now()}`,
-        role: 'assistant',
-        content:
-          "Welcome to your standalone FuzeAgent workspace! I'm ready to orchestrate Kubernetes clusters, check live timezones, or analyze code.",
-        timestamp: 'Just now',
-      },
-    ]);
+    setMessagesByThread(prev => ({
+      ...prev,
+      [newId]: [
+        {
+          id: `init_${newId}`,
+          role: 'agent',
+          content: `Hello! I am your ${selectedAgent.name}. Connected to the multi-tier Brain memory bus. How can I assist you in this workspace?`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ],
+    }));
   };
 
+  const handlePopoutWindow = () => {
+    const popoutUrl = window.location.pathname.includes('/chat/window')
+      ? window.location.href
+      : `${window.location.origin}/chat/window`;
+    window.open(popoutUrl, 'FuzeAgentChatWindow', 'width=1240,height=880,menubar=no,toolbar=no');
+  };
+
+  const handleSend = () => {
+    if (!input.trim() || isThinking) return;
+    const userText = input.trim();
+    setInput('');
+
+    const newMsg: ChatMessage = {
+      id: `usr_${Date.now()}`,
+      role: 'user',
+      content: userText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setMessagesByThread(prev => ({
+      ...prev,
+      [activeThreadId]: [...(prev[activeThreadId] || []), newMsg],
+    }));
+
+    setIsThinking(true);
+    setStreamingThought(`Formulating reasoning trace across ${selectedAgent.name} and resolving brain hierarchy...`);
+
+    // Simulate smart response with custom card / tool call
+    setTimeout(() => {
+      const lower = userText.toLowerCase();
+      let responseText = `I have received your request: "${userText}". Executing operations within the Kubernetes sandbox.`;
+      let thoughtTrace = `Resolved agent persona ${selectedAgent.id} with associated memory tiers.`;
+      let toolCall: { tool: string; output: string } | undefined = undefined;
+
+      if (lower.includes('time in') || lower.includes('time now') || lower.includes('la time')) {
+        const now = new Date();
+        const laTime = now.toLocaleTimeString('en-US', { 
+          timeZone: 'America/Los_Angeles', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+        responseText = `The current time in Los Angeles, California is ${laTime} PDT.`;
+        thoughtTrace = 'Querying world time engine for America/Los_Angeles timezone and rendering interactive TimeInZoneCard.';
+        toolCall = {
+          tool: 'world_clock.get_time(timezone="America/Los_Angeles")',
+          output: JSON.stringify({ status: 'ok', timezone: 'America/Los_Angeles', time: `${laTime} PDT` }),
+        };
+        setSandboxLogs(prev => [...prev, `[tool] world_clock executed -> ${laTime} PDT`]);
+      } else if (lower.includes('pytest') || lower.includes('test')) {
+        responseText = 'Ran complete test suite across 9 test cases in `services/orchestrator/tests/test_brain_crud_and_mcp.py`. All tests passed (100% pass rate).';
+        thoughtTrace = 'Invoking pytest with in-memory SQLite resilient fallback; verifying CRUD lifecycle & cross-functional domains.';
+        toolCall = {
+          tool: 'pytest -v services/orchestrator/tests/test_brain_crud_and_mcp.py',
+          output: '9 passed, 0 failed in 0.85s (100% pass rate)',
+        };
+        setSandboxLogs(prev => [...prev, '[tool] pytest executed -> 9 passed in 0.85s']);
+      } else if (lower.includes('brain') || lower.includes('cross-functional') || lower.includes('mcp')) {
+        responseText = 'Multi-tier Brain architecture active:\n- 🏢 Org Global Brain: `brain_org_global`\n- 🔀 Cross-Functional Brain: `brain_cross_frontend` & `brain_cross_devops`\n- 👥 Team Brain: `brain_team_platform`\n- 👤 Agent Persona Brain: `brain_agent_${selectedAgent.id}`\n\nAll CRUD REST endpoints (`/brains`, `/brains/{id}/associate`) and dual MCP servers are operational.';
+        thoughtTrace = 'Querying orchestrator brain_store and verifying dual MCP tool exposition.';
+        toolCall = {
+          tool: 'fuzeagent.get_agent_brains(agent_id="' + selectedAgent.id + '")',
+          output: 'Returned 4 tiers with cross-functional domain fallback.',
+        };
+      } else if (lower.includes('pod') || lower.includes('k8s') || lower.includes('kubectl')) {
+        responseText = 'Active sandbox container pods verified in `fuzeagent` namespace. Zero evictions, zero OOMKills.';
+        toolCall = {
+          tool: 'kubectl get pods -n fuzeagent',
+          output: 'orchestrator-7d84f 1/1 Running\nsandbox-runner-9c22b 1/1 Running\nmcp-bridge-2a11c 1/1 Running',
+        };
+      }
+
+      setMessagesByThread(prev => ({
+        ...prev,
+        [activeThreadId]: [
+          ...(prev[activeThreadId] || []),
+          {
+            id: `agt_${Date.now()}`,
+            role: 'agent',
+            content: responseText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            thought: thoughtTrace,
+            toolCall,
+          },
+        ],
+      }));
+
+      // Update thread last message
+      setThreads(prev =>
+        prev.map(t =>
+          t.id === activeThreadId
+            ? { ...t, lastMessage: responseText.slice(0, 60) + '...', updatedAt: 'Just now' }
+            : t
+        )
+      );
+
+      setIsThinking(false);
+      setStreamingThought(null);
+    }, 700);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const filteredThreads = threads.filter(t =>
+    t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const actionChips = [
+    { label: '🕒 Time in LA', prompt: 'What is the current time in Los Angeles?' },
+    { label: '🧪 Run pytest', prompt: 'Run the pytest test suite for brain CRUD and MCP endpoints' },
+    { label: '🧠 Query Brains', prompt: 'Inspect our multi-tier brain hierarchy and cross-functional domains' },
+    { label: '☸️ kubectl pods', prompt: 'Check all active agent sandbox pods in fuzeagent namespace' },
+  ];
+
   return (
-    <div
-      className="flex w-screen h-screen overflow-hidden text-[var(--text-primary)] font-sans select-none"
-      style={{
-        backgroundColor: 'var(--bg-primary, #0b0e15)',
-        color: 'var(--text-primary, #f0f4f8)',
-      }}
-    >
-      {/* 1. Left Sidebar: Threads History & Models */}
-      <aside
-        className={`flex flex-col border-r transition-all duration-300 relative z-20 ${
-          sidebarOpen ? 'w-64 min-w-[16rem]' : 'w-0 min-w-0 -translate-x-full overflow-hidden'
-        }`}
-        style={{
-          backgroundColor: 'var(--bg-secondary, #0f131c)',
-          borderColor: 'var(--border-color, #232c3d)',
-        }}
-      >
-        {/* Brand & New Chat */}
-        <div
-          className="p-3 border-b flex items-center justify-between"
-          style={{ borderColor: 'var(--border-color, #232c3d)' }}
-        >
-          <div className="flex items-center gap-2 font-bold text-sm tracking-wide">
-            <span
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white"
-              style={{ background: 'var(--seam, linear-gradient(135deg, #6e5cff, #29d3e6))' }}
-            >
-              <Bot className="w-4 h-4" />
-            </span>
-            <span className="font-display">FuzeAgent</span>
-          </div>
-
-          <button
-            onClick={handleNewChat}
-            className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors hover:border-cyan-400"
-            style={{
-              backgroundColor: 'var(--bg-tertiary, #141a26)',
-              borderColor: 'var(--border-color, #232c3d)',
-            }}
-            title="Start new chat (⌘K)"
-          >
-            <Plus className="w-3.5 h-3.5 text-cyan-400" />
-            <span>New Chat</span>
-          </button>
-        </div>
-
-        {/* Model Selector */}
-        <div
-          className="p-3 border-b flex flex-col gap-1.5"
-          style={{ borderColor: 'var(--border-color, #232c3d)' }}
-        >
-          <label className="text-[10px] font-mono uppercase text-[var(--text-tertiary)] flex items-center gap-1">
-            <Sliders className="w-3 h-3 text-cyan-400" />
-            <span>Active Model</span>
-          </label>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full text-xs py-1.5 px-2 rounded-lg border bg-[var(--bg-tertiary)] border-[var(--border-color)] text-[var(--text-primary)] outline-none focus:border-cyan-400 cursor-pointer"
-          >
-            <option value="fuzeagent-multi-agent">🤖 FuzeAgent Multi-Agent</option>
-            <option value="claude-3-5-sonnet">⚡ Claude 3.5 Sonnet</option>
-            <option value="gpt-4o">🧠 OpenAI GPT-4o</option>
-          </select>
-        </div>
-
-        {/* Threads List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          <div className="text-[10px] font-mono uppercase text-[var(--text-tertiary)] px-2 py-1">
-            Recent Conversations
-          </div>
-          {threads.map((thread) => {
-            const isActive = thread.id === activeThreadId;
-            return (
-              <div
-                key={thread.id}
-                onClick={() => setActiveThreadId(thread.id)}
-                className={`group flex items-center justify-between p-2.5 rounded-xl text-xs cursor-pointer transition-colors ${
-                  isActive
-                    ? 'border border-cyan-500/40 bg-[var(--bg-tertiary)] text-cyan-300 font-semibold'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-white'
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400/80" />
-                  <span className="truncate">{thread.title}</span>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setThreads(threads.filter((t) => t.id !== thread.id));
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-rose-400 transition-opacity p-0.5"
-                  title="Delete chat"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+    <div className="flex h-screen w-screen bg-[#07090e] text-slate-100 overflow-hidden font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+      {/* --------------------------------------------------------------------- */}
+      {/* LEFT SIDEBAR: Threads & Personas                                       */}
+      {/* --------------------------------------------------------------------- */}
+      <aside className="w-72 flex-shrink-0 border-r border-[#1a2233] bg-[#0b0f19] flex flex-col justify-between">
+        <div className="flex flex-col h-full overflow-hidden">
+          {/* Header */}
+          <div className="p-4 border-b border-[#1a2233] flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 font-bold text-sm">
+                ⚡
               </div>
-            );
-          })}
-        </div>
+              <div>
+                <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+                  FuzeAgent <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">Chat</span>
+                </h1>
+                <p className="text-[10px] text-slate-400">Standalone Window</p>
+              </div>
+            </div>
 
-        {/* User / Pod Info Footer */}
-        <div
-          className="p-3 border-t text-[11px] flex items-center justify-between text-[var(--text-tertiary)]"
-          style={{ borderColor: 'var(--border-color, #232c3d)' }}
-        >
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-mono">Cluster: contabo-prod</span>
-          </div>
-          <span className="font-mono">v1.2.3</span>
-        </div>
-      </aside>
-
-      {/* 2. Main Center Canvas: OpenWebUI/Claude-style Standalone Window */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Top Navigation Bar */}
-        <header
-          className="h-12 border-b px-4 flex items-center justify-between z-10"
-          style={{
-            backgroundColor: 'var(--bg-secondary, #0f131c)',
-            borderColor: 'var(--border-color, #232c3d)',
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1.5 rounded-lg border text-[var(--text-secondary)] hover:text-white transition-colors"
-              style={{
-                backgroundColor: 'var(--bg-tertiary, #141a26)',
-                borderColor: 'var(--border-color, #232c3d)',
-              }}
-              title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleCreateNewThread}
+              className="h-8 w-8 p-0 rounded-lg flex items-center justify-center text-slate-300 hover:text-white"
+              title="New Chat"
             >
-              ☰
-            </button>
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
 
-            <div>
-              <h1 className="text-sm font-bold flex items-center gap-2">
-                <span>Standalone Chat Window</span>
-                <span
-                  className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-cyan-500/30 text-cyan-300"
-                  style={{ backgroundColor: 'rgba(41, 211, 230, 0.1)' }}
-                >
-                  {selectedModel}
-                </span>
-              </h1>
+          {/* Search */}
+          <div className="p-3 border-b border-[#1a2233]/70">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-[#131a29] border border-[#232d42] rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/60 transition-all"
+              />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Pop-out standalone window button */}
-            <button
-              onClick={handlePopOut}
-              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border text-[var(--text-secondary)] hover:text-cyan-300 transition-colors"
-              style={{
-                backgroundColor: 'var(--bg-tertiary, #141a26)',
-                borderColor: 'var(--border-color, #232c3d)',
-              }}
-              title="Open standalone window"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Pop Out</span>
-            </button>
+          {/* Thread list */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2 py-1">
+              Conversations
+            </div>
+            {filteredThreads.map(thread => {
+              const isActive = thread.id === activeThreadId;
+              const persona = AGENT_PERSONAS.find(a => a.id === thread.agentId);
 
-            {/* Telemetry drawer toggle */}
-            <button
-              onClick={() => setTelemetryOpen(!telemetryOpen)}
-              className={`p-1.5 rounded-lg border transition-colors ${
-                telemetryOpen
-                  ? 'border-cyan-400 text-cyan-300 bg-cyan-950/40'
-                  : 'text-[var(--text-secondary)] hover:text-white'
-              }`}
-              style={{
-                backgroundColor: telemetryOpen ? undefined : 'var(--bg-tertiary, #141a26)',
-                borderColor: telemetryOpen ? undefined : 'var(--border-color, #232c3d)',
-              }}
-              title="Toggle Telemetry Drawer"
+              return (
+                <button
+                  key={thread.id}
+                  onClick={() => setActiveThreadId(thread.id)}
+                  className={`w-full text-left p-2.5 rounded-xl transition-all flex items-start gap-2.5 border ${
+                    isActive
+                      ? 'bg-gradient-to-r from-indigo-950/60 to-slate-900 border-indigo-500/40 text-white shadow-md'
+                      : 'border-transparent text-slate-400 hover:bg-[#131b2b] hover:text-slate-200'
+                  }`}
+                >
+                  <div className="text-base mt-0.5">{persona?.emoji || '💬'}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <span className="text-xs font-semibold truncate text-slate-200">
+                        {thread.title}
+                      </span>
+                      <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                        {thread.updatedAt}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      {thread.lastMessage}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Persona selector in footer */}
+          <div className="p-3 border-t border-[#1a2233] bg-[#0c111e]">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+              Active Persona
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {AGENT_PERSONAS.map(persona => {
+                const isSelected = persona.id === selectedAgent.id;
+                return (
+                  <button
+                    key={persona.id}
+                    onClick={() => {
+                      setSelectedAgent(persona);
+                      setThreads(prev =>
+                        prev.map(t =>
+                          t.id === activeThreadId ? { ...t, agentId: persona.id } : t
+                        )
+                      );
+                    }}
+                    className={`p-2 rounded-lg text-center border transition-all flex flex-col items-center gap-1 ${
+                      isSelected
+                        ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300'
+                        : 'bg-[#141b2a] border-[#222c3f] text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="text-base">{persona.emoji}</span>
+                    <span className="text-[10px] font-medium truncate w-full">{persona.name.split(' ')[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* --------------------------------------------------------------------- */}
+      {/* MAIN CHAT WORKSPACE AREA                                              */}
+      {/* --------------------------------------------------------------------- */}
+      <main className="flex-1 flex flex-col min-w-0 bg-[#07090e]">
+        {/* Workspace Top Bar */}
+        <header className="h-14 border-b border-[#1a2233] bg-[#0b0f19]/90 backdrop-blur px-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">{selectedAgent.emoji}</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-white">{selectedAgent.name}</h2>
+                <Badge variant="outline" className="text-[10px] border-indigo-500/30 text-indigo-300">
+                  {selectedAgent.role}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Connected to multi-tier Brain memory & Orchestrator Event Bus</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Model Selector */}
+            <select
+              value={selectedModel}
+              onChange={e => setSelectedModel(e.target.value)}
+              className="bg-[#131a29] border border-[#232d42] text-xs text-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500"
             >
-              <Activity className="w-4 h-4" />
+              {AVAILABLE_MODELS.map(model => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Sandbox Status Badge */}
+            <SandboxStatusBadge status="running" label="Cluster: Healthy (1/1)" />
+
+            {/* Popout Window Button */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handlePopoutWindow}
+              className="h-8 px-2.5 text-xs flex items-center gap-1.5 text-slate-300 hover:text-white"
+              title="Popout into standalone window"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Popout</span>
+            </Button>
+
+            {/* Right Drawer Toggle */}
+            <button
+              onClick={() => setShowRightDrawer(prev => !prev)}
+              className="p-1.5 rounded-lg border border-[#232d42] bg-[#131a29] text-slate-400 hover:text-white transition-colors"
+              title={showRightDrawer ? 'Hide Telemetry' : 'Show Telemetry'}
+            >
+              {showRightDrawer ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
             </button>
           </div>
         </header>
 
         {/* Message Feed Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-          <div className="max-w-3xl mx-auto space-y-6">
-            {messages.map((msg) => {
-              const isAssistant = msg.role === 'assistant';
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}
-                >
-                  {/* Meta tag */}
-                  <div className="flex items-center gap-2 mb-1.5 px-1 text-[11px] text-[var(--text-tertiary)]">
-                    <span className="font-semibold text-[var(--text-secondary)]">
-                      {isAssistant ? 'FuzeAgent' : 'You'}
-                    </span>
-                    <span>·</span>
-                    <span>{msg.timestamp}</span>
-                  </div>
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          {currentMessages.map(msg => (
+            <AgentChatBubble
+              key={msg.id}
+              id={msg.id}
+              role={msg.role}
+              content={msg.content}
+              timestamp={msg.timestamp}
+              agentName={selectedAgent.name}
+              agentEmoji={selectedAgent.emoji}
+              thought={msg.thought}
+              toolCall={msg.toolCall}
+            />
+          ))}
 
-                  {/* Thought accordion if present */}
-                  {msg.thought && (
-                    <div
-                      className="w-full mb-3 rounded-xl border overflow-hidden transition-all text-xs"
-                      style={{
-                        backgroundColor: 'var(--bg-secondary, #0f131c)',
-                        borderColor: 'var(--border-color, #232c3d)',
-                      }}
-                    >
-                      <button
-                        onClick={() => setThoughtExpanded(!thoughtExpanded)}
-                        className="w-full px-3 py-2 flex items-center justify-between text-cyan-300 font-medium hover:bg-slate-800/40 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-3.5 h-3.5 animate-pulse text-cyan-400" />
-                          <span>
-                            Thought process ({msg.thought.duration})
-                          </span>
-                        </div>
-                        <span className="text-gray-400 text-xs">
-                          {thoughtExpanded ? 'Hide ▲' : 'Show ▼'}
-                        </span>
-                      </button>
+          {isThinking && (
+            <div className="my-3">
+              <StreamingThoughtIndicator thought={streamingThought || 'Thinking...'} />
+            </div>
+          )}
 
-                      {thoughtExpanded && (
-                        <div
-                          className="px-3 py-2.5 font-mono text-[11px] border-t leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap"
-                          style={{
-                            backgroundColor: 'var(--bg-primary, #0b0e15)',
-                            borderColor: 'var(--border-color, #232c3d)',
-                          }}
-                        >
-                          {msg.thought.details}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Bubble Content */}
-                  <div
-                    className={`rounded-2xl p-4 text-sm leading-relaxed max-w-2xl relative ${
-                      isAssistant
-                        ? 'border shadow-lg text-[var(--text-primary)]'
-                        : 'bg-cyan-600 text-white font-medium shadow-md'
-                    }`}
-                    style={
-                      isAssistant
-                        ? {
-                            backgroundColor: 'var(--bg-secondary, #0f131c)',
-                            borderColor: 'var(--border-color, #232c3d)',
-                          }
-                        : undefined
-                    }
-                  >
-                    {/* Assistant fuse seam */}
-                    {isAssistant && (
-                      <div
-                        className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
-                        style={{
-                          background: 'var(--seam, linear-gradient(90deg, #6e5cff, #29d3e6))',
-                        }}
-                      />
-                    )}
-                    <p>{msg.content}</p>
-                  </div>
-
-                  {/* Custom Tool Cards */}
-                  {msg.cards && msg.cards.length > 0 && (
-                    <div className="w-full max-w-2xl mt-3 space-y-3">
-                      {msg.cards.map((card, idx) => {
-                        if (card.type === 'time_in_zone') {
-                          return (
-                            <TimeInZoneCard
-                              key={idx}
-                              timeString={laTime}
-                              zone={card.data.zone}
-                            />
-                          );
-                        }
-                        if (card.type === 'terminal_log') {
-                          return (
-                            <TerminalLogWindow
-                              key={idx}
-                              title={card.data.title}
-                              logs={card.data.logs}
-                            />
-                          );
-                        }
-                        if (card.type === 'sandbox_badge') {
-                          return (
-                            <div key={idx} className="flex items-center gap-2">
-                              <SandboxStatusBadge
-                                status={card.data.status}
-                                label={card.data.pod}
-                              />
-                            </div>
-                          );
-                        }
-                        return null;
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Streaming indicator */}
-            {isStreaming && (
-              <div className="flex flex-col items-start space-y-2">
-                <StreamingThoughtIndicator
-                  agentName="FuzeAgent"
-                  thought="Thinking and executing tool calls..."
-                />
-              </div>
-            )}
-          </div>
+          <div ref={messagesEndRef} />
         </div>
 
-        {/* Floating Composer */}
-        <div
-          className="p-4 border-t z-10"
-          style={{
-            backgroundColor: 'var(--bg-secondary, #0f131c)',
-            borderColor: 'var(--border-color, #232c3d)',
-          }}
-        >
-          <div className="max-w-3xl mx-auto space-y-2.5">
-            {/* Quick Action Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto text-[11px] font-medium text-[var(--text-secondary)]">
+        {/* Floating Action Chips & Composer */}
+        <div className="p-4 border-t border-[#1a2233] bg-[#0b0f19]/80 backdrop-blur">
+          {/* Action Chips */}
+          <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1 scrollbar-none">
+            {actionChips.map((chip, idx) => (
               <button
-                onClick={() => setInput('@agent ')}
-                className="px-2.5 py-1 rounded-full border border-cyan-500/30 text-cyan-300 hover:border-cyan-400 transition-colors flex items-center gap-1"
-                style={{ backgroundColor: 'rgba(41, 211, 230, 0.08)' }}
-              >
-                <span>@ Agent Mention</span>
-              </button>
-              <button
-                onClick={() => setInput('What is the current time in Los Angeles, CA?')}
-                className="px-2.5 py-1 rounded-full border border-slate-700 hover:border-slate-500 transition-colors flex items-center gap-1"
-                style={{ backgroundColor: 'var(--bg-tertiary, #141a26)' }}
-              >
-                <Clock className="w-3 h-3 text-cyan-400" />
-                <span>Time in LA</span>
-              </button>
-              <button
-                onClick={() => setInput('Run kubectl get pods in namespace fuzeagent')}
-                className="px-2.5 py-1 rounded-full border border-slate-700 hover:border-slate-500 transition-colors flex items-center gap-1"
-                style={{ backgroundColor: 'var(--bg-tertiary, #141a26)' }}
-              >
-                <Terminal className="w-3 h-3 text-emerald-400" />
-                <span>K8s Pod Status</span>
-              </button>
-            </div>
-
-            {/* Input Row */}
-            <div
-              className="flex items-center gap-2 p-2 rounded-2xl border shadow-inner transition-colors focus-within:border-cyan-400"
-              style={{
-                backgroundColor: 'var(--bg-primary, #0b0e15)',
-                borderColor: 'var(--border-color, #232c3d)',
-              }}
-            >
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask FuzeAgent anything, or trigger actions with @agent or /cmd..."
-                className="flex-1 bg-transparent border-none outline-none text-sm px-2 text-[var(--text-primary)] placeholder-[var(--text-tertiary)]"
-              />
-
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isStreaming}
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-opacity disabled:opacity-40"
-                style={{
-                  background: 'var(--seam, linear-gradient(135deg, #6e5cff, #29d3e6))',
+                key={idx}
+                onClick={() => {
+                  setInput(chip.prompt);
+                  textareaRef.current?.focus();
                 }}
-                aria-label="Send message"
+                className="text-xs px-3 py-1.5 rounded-full border border-[#232d42] bg-[#121927] hover:border-indigo-500/50 hover:bg-indigo-950/30 text-slate-300 hover:text-white transition-all whitespace-nowrap flex items-center gap-1.5"
               >
-                <Send className="w-4 h-4" />
+                <span>{chip.label}</span>
               </button>
-            </div>
+            ))}
+          </div>
 
-            <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)] px-1">
-              <span>Enter to send · Shift+Enter for new line</span>
-              <span className="font-mono">Pod sandbox: secure & isolated</span>
+          {/* Composer Input Box */}
+          <div className="relative rounded-2xl border border-[#232d42] bg-[#101624] focus-within:border-indigo-500/60 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all p-3 shadow-xl">
+            <textarea
+              ref={textareaRef}
+              rows={2}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={`Message ${selectedAgent.name}... (Press Enter to send, Shift+Enter for new line)`}
+              className="w-full bg-transparent text-sm text-slate-100 placeholder-slate-500 resize-none focus:outline-none pr-12 leading-relaxed"
+            />
+
+            <div className="flex items-center justify-between pt-2 border-t border-[#1c2436] text-[11px] text-slate-500">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 text-slate-400">
+                  <Sparkles className="w-3 h-3 text-indigo-400" />
+                  <span>Dual MCP & Cross-Brain Active</span>
+                </span>
+                <span>•</span>
+                <span>Model: {selectedModel}</span>
+              </div>
+
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSend}
+                disabled={!input.trim() || isThinking}
+                className="h-8 px-3 rounded-xl flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-medium shadow-md shadow-indigo-500/20 disabled:opacity-50"
+              >
+                <span>Send</span>
+                <Send className="w-3.5 h-3.5" />
+              </Button>
             </div>
           </div>
         </div>
       </main>
 
-      {/* 3. Optional Right Inspector Drawer: Diagnostics & Sandbox Pod Telemetry */}
-      {telemetryOpen && (
-        <aside
-          className="w-80 min-w-[20rem] border-l flex flex-col h-full overflow-y-auto"
-          style={{
-            backgroundColor: 'var(--bg-secondary, #0f131c)',
-            borderColor: 'var(--border-color, #232c3d)',
-          }}
-        >
-          <div
-            className="p-3 border-b flex items-center justify-between"
-            style={{ borderColor: 'var(--border-color, #232c3d)' }}
-          >
-            <div className="flex items-center gap-2 text-xs font-bold font-display">
-              <Cpu className="w-4 h-4 text-cyan-400" />
-              <span>Telemetry & Cluster Sandbox</span>
-            </div>
-            <button
-              onClick={() => setTelemetryOpen(false)}
-              className="text-gray-400 hover:text-white text-sm p-1"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="p-4 space-y-4 text-xs">
-            {/* Live Timezone Monitor */}
-            <div
-              className="p-3 rounded-xl border space-y-2"
-              style={{
-                backgroundColor: 'var(--bg-tertiary, #141a26)',
-                borderColor: 'var(--border-color, #232c3d)',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold flex items-center gap-1.5 text-cyan-300">
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>Timezone Stream</span>
-                </span>
-                <span className="text-[10px] font-mono text-emerald-400">ACTIVE</span>
-              </div>
-              <div className="font-mono text-sm font-semibold">{laTime}</div>
-              <div className="text-[10px] text-[var(--text-tertiary)]">
-                Offset: UTC-7 · America/Los_Angeles (Pacific Time)
-              </div>
+      {/* --------------------------------------------------------------------- */}
+      {/* RIGHT DRAWER: Multi-Tier Brain Hierarchy & Sandbox Telemetry          */}
+      {/* --------------------------------------------------------------------- */}
+      {showRightDrawer && (
+        <aside className="w-80 flex-shrink-0 border-l border-[#1a2233] bg-[#0b0f19] flex flex-col justify-between overflow-hidden">
+          <div className="flex flex-col h-full overflow-y-auto p-4 space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-indigo-400" />
+                <span>Brain Architecture</span>
+              </h3>
+              <Badge variant="outline" className="text-[10px] text-cyan-400 border-cyan-500/30">
+                4 Tiers Resolved
+              </Badge>
             </div>
 
-            {/* Sandbox Metrics */}
-            <div
-              className="p-3 rounded-xl border space-y-2"
-              style={{
-                backgroundColor: 'var(--bg-tertiary, #141a26)',
-                borderColor: 'var(--border-color, #232c3d)',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Sandbox Pod Metrics</span>
-                </span>
-                <span className="text-[10px] font-mono text-emerald-400">1/1 RUNNING</span>
+            {/* Multi-Tier Brain Hierarchy Cards */}
+            <div className="space-y-2">
+              <div className="p-3 rounded-xl border border-indigo-500/30 bg-indigo-950/20">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-bold text-indigo-300">1. Persona Memory</span>
+                  <span className="text-[10px] font-mono text-slate-400">scope: agent</span>
+                </div>
+                <p className="text-xs text-slate-200 font-semibold">{selectedAgent.name} Memory</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Session history, persona directives, workspace keys</p>
               </div>
-              <div className="space-y-1 font-mono text-[11px] text-[var(--text-secondary)]">
-                <div className="flex justify-between">
-                  <span>CPU Usage:</span>
-                  <span className="text-cyan-300">14m (2.8%)</span>
+
+              <div className="p-3 rounded-xl border border-cyan-500/30 bg-cyan-950/20">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-bold text-cyan-300">2. Cross-Functional Brain</span>
+                  <span className="text-[10px] font-mono text-slate-400">scope: cross_functional</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Memory RSS:</span>
-                  <span className="text-cyan-300">128 MiB</span>
+                <p className="text-xs text-slate-200 font-semibold">
+                  {selectedAgent.id === 'react-dev' ? 'Frontend Cross-Brain (chat-ui, DS)' : 'DevOps/Backend Cross-Brain'}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Shared across all UI / Infra agents globally</p>
+              </div>
+
+              <div className="p-3 rounded-xl border border-slate-700/60 bg-slate-900/40">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-bold text-slate-300">3. Team Brain</span>
+                  <span className="text-[10px] font-mono text-slate-400">scope: team</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Token Stream:</span>
-                  <span className="text-cyan-300">42 tokens/sec</span>
+                <p className="text-xs text-slate-200 font-semibold">Platform & Core Team</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Microfrontend shell & orchestration rules</p>
+              </div>
+
+              <div className="p-3 rounded-xl border border-slate-700/60 bg-slate-900/40">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-bold text-slate-300">4. Organization Global</span>
+                  <span className="text-[10px] font-mono text-slate-400">scope: org</span>
                 </div>
+                <p className="text-xs text-slate-200 font-semibold">FuzeGlobal Architecture Wiki</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Master system topology & compliance policies</p>
               </div>
             </div>
 
-            {/* Security Isolation Notice */}
-            <div
-              className="p-3 rounded-xl border text-[11px] text-[var(--text-secondary)] leading-relaxed"
-              style={{
-                backgroundColor: 'rgba(110, 92, 255, 0.08)',
-                borderColor: 'rgba(110, 92, 255, 0.25)',
-              }}
-            >
-              <span className="font-bold text-violet-300 block mb-1">
-                Security Sandbox Active
-              </span>
-              Container runs unprivileged with gVisor / AppArmor confinement. Mutating tools require confirmation.
+            {/* Sandbox Telemetry */}
+            <div className="pt-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2.5">
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <span>Sandbox Telemetry</span>
+              </h4>
+
+              <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                <div className="p-2.5 rounded-lg border border-[#1f283d] bg-[#121927]">
+                  <span className="text-[10px] text-slate-400 flex items-center gap-1 mb-1">
+                    <Cpu className="w-3 h-3 text-cyan-400" /> CPU Allocation
+                  </span>
+                  <span className="font-mono font-bold text-slate-200">1.8 / 4.0 Cores</span>
+                </div>
+                <div className="p-2.5 rounded-lg border border-[#1f283d] bg-[#121927]">
+                  <span className="text-[10px] text-slate-400 flex items-center gap-1 mb-1">
+                    <Clock className="w-3 h-3 text-emerald-400" /> Latency
+                  </span>
+                  <span className="font-mono font-bold text-slate-200">14ms relay</span>
+                </div>
+              </div>
+
+              <TerminalLogWindow
+                title="Container Sandbox Logs"
+                logs={sandboxLogs}
+                height="180px"
+              />
             </div>
           </div>
         </aside>

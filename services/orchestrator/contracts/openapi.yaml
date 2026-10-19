@@ -79,6 +79,10 @@ tags:
       which exposes THIS API as MCP tools.
   - name: Organizations
     description: Organization-scoped model, provider and dashboard configuration.
+  - name: Brains
+    description: >-
+      Multi-tier brain hierarchy, knowledge stores, and cross-functional memory (organization,
+      team, agent persona, and domain-level brains such as frontend and devops).
 paths:
   "/health":
     get:
@@ -5629,6 +5633,211 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+  "/brains":
+    get:
+      operationId: listBrains
+      tags: ["Brains"]
+      summary: "List brains for the company or organization"
+      description: "List brains with optional filtering by organization_id, scope, functional_domain, team_id, or agent_id."
+      parameters:
+        - name: organization_id
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by organization ID
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [organization, team, agent, cross_functional]
+          description: Filter by scope tier
+        - name: functional_domain
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by cross-functional domain (e.g. frontend, devops, backend)
+        - name: team_id
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by team ID
+        - name: agent_id
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by agent persona ID
+      responses:
+        "200":
+          description: List of brain configurations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Brain" }
+    post:
+      operationId: createBrain
+      tags: ["Brains"]
+      summary: "Create a new brain"
+      description: "Create a brain scoped to organization, team, agent persona, or cross-functional domain (e.g. frontend, devops)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BrainCreateRequest" }
+      responses:
+        "200":
+          description: Brain successfully created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Brain" }
+        "400":
+          description: Validation error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  "/brains/{brain_id}":
+    get:
+      operationId: getBrain
+      tags: ["Brains"]
+      summary: "Get brain details"
+      description: "Retrieve configuration, metadata, and document/vector counts for a specific brain."
+      parameters:
+        - name: brain_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Brain details.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Brain" }
+        "404":
+          description: Brain not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      operationId: updateBrain
+      tags: ["Brains"]
+      summary: "Update brain configuration"
+      description: "Update brain name, description, tags, metadata, or active status."
+      parameters:
+        - name: brain_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BrainUpdateRequest" }
+      responses:
+        "200":
+          description: Brain successfully updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Brain" }
+        "404":
+          description: Brain not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      operationId: deleteBrain
+      tags: ["Brains"]
+      summary: "Delete a brain"
+      description: "Delete a brain and its associated wiki documents."
+      parameters:
+        - name: brain_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Brain successfully deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "deleted" }
+                  brain_id: { type: string }
+        "404":
+          description: Brain not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  "/brains/{brain_id}/associate":
+    post:
+      operationId: associateBrain
+      tags: ["Brains"]
+      summary: "Associate brain with org, team, agent, or domain"
+      description: "Dynamically associates a brain with an organization, team, agent persona, or cross-functional domain."
+      parameters:
+        - name: brain_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BrainAssociateRequest" }
+      responses:
+        "200":
+          description: Brain association successfully updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Brain" }
+        "400":
+          description: Invalid association scope or parameters.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Brain not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  "/agents/{agent_id}/brains":
+    get:
+      operationId: getAgentBrains
+      tags: ["Brains"]
+      summary: "Resolve multi-tier brain hierarchy for an agent"
+      description: "Resolves all applicable brains for an agent persona: agent persona brain, team brain, cross-functional domain brain (e.g. frontend, devops), and organization global brain."
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema: { type: string }
+          description: Agent persona ID (e.g. react-dev, python-dev)
+        - name: team_id
+          in: query
+          required: false
+          schema: { type: string }
+          description: Optional team ID
+        - name: functional_domain
+          in: query
+          required: false
+          schema: { type: string }
+          description: Optional functional domain override (e.g. frontend, devops, backend)
+        - name: organization_id
+          in: query
+          required: false
+          schema: { type: string, default: "org_default" }
+          description: Organization ID
+      responses:
+        "200":
+          description: Resolved brain hierarchy layers.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentBrainsHierarchy" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -5645,5 +5854,100 @@ components:
       properties:
         detail:
           description: Human-readable error, or a validation-error array.
+    Brain:
+      type: object
+      description: A knowledge brain entity with multi-tier scoping.
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        organization_id: { type: string }
+        scope:
+          type: string
+          enum: [organization, team, agent, cross_functional]
+        functional_domain:
+          type: string
+          nullable: true
+          description: Functional domain for cross-functional brains (e.g. frontend, devops)
+        team_id: { type: string, nullable: true }
+        agent_id: { type: string, nullable: true }
+        is_active: { type: boolean }
+        tags:
+          type: array
+          items: { type: string }
+        metadata: { type: object }
+        document_count: { type: integer }
+        vector_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    BrainCreateRequest:
+      type: object
+      required: [name, scope]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        organization_id: { type: string, default: "org_default" }
+        scope:
+          type: string
+          enum: [organization, team, agent, cross_functional]
+        functional_domain: { type: string }
+        team_id: { type: string }
+        agent_id: { type: string }
+        is_active: { type: boolean, default: true }
+        tags:
+          type: array
+          items: { type: string }
+        metadata: { type: object }
+    BrainUpdateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        organization_id: { type: string }
+        scope:
+          type: string
+          enum: [organization, team, agent, cross_functional]
+        functional_domain: { type: string }
+        team_id: { type: string }
+        agent_id: { type: string }
+        is_active: { type: boolean }
+        tags:
+          type: array
+          items: { type: string }
+        metadata: { type: object }
+    BrainAssociateRequest:
+      type: object
+      required: [scope]
+      properties:
+        scope:
+          type: string
+          enum: [organization, team, agent, cross_functional]
+        organization_id: { type: string }
+        team_id: { type: string }
+        agent_id: { type: string }
+        functional_domain: { type: string }
+        metadata: { type: object }
+    AgentBrainsHierarchy:
+      type: object
+      properties:
+        agent_id: { type: string }
+        team_id: { type: string, nullable: true }
+        functional_domain: { type: string, nullable: true }
+        organization_id: { type: string }
+        total_brains: { type: integer }
+        brains:
+          type: array
+          items: { $ref: "#/components/schemas/Brain" }
+        hierarchy:
+          type: array
+          items:
+            type: object
+            properties:
+              tier: { type: integer }
+              scope: { type: string }
+              functional_domain: { type: string }
+              brain_id: { type: string }
+              name: { type: string }
 security:
   - bearerAuth: []

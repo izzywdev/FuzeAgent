@@ -30,8 +30,8 @@ export default function AppRouter() {
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/workspace" element={<App />} />
-        <Route path="/chat" element={<StandaloneChatPage />} />
         <Route path="/chat/window" element={<StandaloneChatPage />} />
+        <Route path="/chat" element={<StandaloneChatPage />} />
         <Route path="/classic-dashboard" element={<FixedDashboard />} />
         <Route path="/simple" element={<SimpleApp />} />
         <Route path="/dashboard" element={<DashboardPage />} />
