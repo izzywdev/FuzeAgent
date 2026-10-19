@@ -66,7 +66,7 @@
       }
     ],
     "entryServer": "fuzeagent",
-    "note": "REAL, not a scaffold — mcp-servers/fuzeagent-server/ already serves 15+ tools over the hierarchy API. Outstanding: a tools.json declaring `mutates` per tool. Several tools mutate (assign_task, deploy_agent, create_custom_agent, update_task_status, create_organizational_goal, update_goal_progress) and MUST be classified mutates:true; the read tools (list_*, get_*) are mutates:false. Classification is mcp-maintainer's to reconcile."
+    "note": "REAL, not a scaffold — mcp-servers/fuzeagent-server/ serves 20 tools over the hierarchy API. mcp/tools.json provides mutates classification for all 20 tools: 9 mutates:true (assign_task, deploy_agent, create_custom_agent, update_task_status, create_organizational_goal, update_goal_progress, generate_goal_execution_plan, create_goal_conversation, track_goal_progress) and 11 mutates:false (list_*, get_*, assess_goal_deadline_risk). Surface in sync as of PR #2088."
   },
   "providesTo": [
     "Exec-ceo",
