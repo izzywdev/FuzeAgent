@@ -214,9 +214,16 @@ jobs:
         cd services/orchestrator
         pip install --upgrade pip
         pip install pip-audit
+        # GHSA-xf7x-x43h-rpqh (json-repair, transitive via crewai): the fixed
+        # version (0.60.1) is not resolvable without backtracking the dependency
+        # tree onto litellm 1.72.0, which carries ~18 CVEs — a net regression.
+        # json-repair only repairs LLM-emitted JSON strings (no network/file
+        # surface), so the advisory is accepted rather than "fixed" into a worse
+        # tree. (mcp's CVE-2026-59951, by contrast, IS pinned out — see requirements.txt.)
         pip-audit -r requirements.txt \
           --ignore-vuln PYSEC-2026-311 \
           --ignore-vuln PYSEC-2026-1325 \
           --ignore-vuln CVE-2026-45830 \
           --ignore-vuln CVE-2026-45831 \
-          --ignore-vuln CVE-2026-45833
+          --ignore-vuln CVE-2026-45833 \
+          --ignore-vuln GHSA-xf7x-x43h-rpqh
