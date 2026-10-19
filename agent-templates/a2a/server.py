@@ -16,6 +16,8 @@ behaviour lives in ``adapter`` (and below it, the provider seam).
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import Any, Iterator
 
 from starlette.applications import Starlette
@@ -161,6 +163,17 @@ class A2AServer:
         return StreamingResponse(sse(), media_type="text/event-stream")
 
     async def well_known_card(self, request: Request) -> Response:
+        # Per-product static card: when AGENT_CARD_FILE is set the card is baked into
+        # the product image (FROM ghcr.io/izzywdev/fuze-a2a + COPY). Serve it directly
+        # — no repo clone, no GitHub access, no tenant lookup needed. Falls through to
+        # dynamic projection only when the file is absent or malformed.
+        static_file = os.environ.get("AGENT_CARD_FILE")
+        if static_file:
+            try:
+                card = json.loads(Path(static_file).read_text(encoding="utf-8"))
+                return JSONResponse(card, headers={"Cache-Control": "public, max-age=60"})
+            except (OSError, json.JSONDecodeError):
+                pass  # fall through to dynamic generation below
         tenant = self._card_tenant(request)
         if tenant is None:
             return JSONResponse({"error": "tenant not found"}, status_code=404)
