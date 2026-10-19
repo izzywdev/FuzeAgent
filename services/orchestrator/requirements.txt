@@ -33,6 +33,8 @@ tiktoken>=0.7.0,<0.14.0
 
 # CrewAI for agent orchestration
 crewai>=0.65.0,<2.0.0
+# crewai pulls in mcp as a transitive dep; pin past CVE-2026-59951 (mcp<1.30.0)
+mcp>=1.30.0,<2.0.0
 
 # Autonomous execution dependencies
 cryptography>=50.0.0,<51.0.0
