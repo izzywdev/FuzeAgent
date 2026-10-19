@@ -37,6 +37,8 @@ crewai>=0.65.0,<2.0.0
 mcp>=1.30.0,<2.0.0
 # crewai pulls in json-repair as a transitive dep; pin past GHSA-xf7x-x43h-rpqh (json-repair<0.60.1)
 json-repair>=0.60.1
+# crewai pulls in litellm as a transitive dep; pin past 30 CVEs (highest recorded fix: PYSEC-2026-4066 @ 1.96.2)
+litellm>=1.96.2,<2.0.0
 
 # Autonomous execution dependencies
 cryptography>=50.0.0,<51.0.0

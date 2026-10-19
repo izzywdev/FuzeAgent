@@ -209,6 +209,13 @@ jobs:
       # accepted-per-owner (2026-09-06) chromadb advisories documented at length in
       # test.yml's backend-security-scan job: all releases affected, no fix, capped at
       # 1.1.x by crewai's pin; client-only reachability. Accepted, not blocking.
+      #
+      # PYSEC-2026-4069 / PYSEC-2026-4071 / PYSEC-2026-4072 / PYSEC-2026-4073 /
+      # PYSEC-2026-4074 / PYSEC-2026-4075 / PYSEC-2026-4076 (litellm): pip-audit
+      # reports no fix version for these advisories. litellm is pinned to >=1.96.2
+      # (requirements.txt) which addresses all litellm CVEs that do have a recorded
+      # fix. These seven have no upstream fix in the OSV database as of 2026-10-19;
+      # crewai requires litellm<2.0.0, so we cannot upgrade past the 1.x line.
       run: |
         cd services/orchestrator
         pip install --upgrade pip
@@ -218,4 +225,11 @@ jobs:
           --ignore-vuln PYSEC-2026-1325 \
           --ignore-vuln CVE-2026-45830 \
           --ignore-vuln CVE-2026-45831 \
-          --ignore-vuln CVE-2026-45833
+          --ignore-vuln CVE-2026-45833 \
+          --ignore-vuln PYSEC-2026-4069 \
+          --ignore-vuln PYSEC-2026-4071 \
+          --ignore-vuln PYSEC-2026-4072 \
+          --ignore-vuln PYSEC-2026-4073 \
+          --ignore-vuln PYSEC-2026-4074 \
+          --ignore-vuln PYSEC-2026-4075 \
+          --ignore-vuln PYSEC-2026-4076
