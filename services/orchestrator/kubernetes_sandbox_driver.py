@@ -313,7 +313,7 @@ class KubernetesSandboxDriver:
             },
             {
                 "name": "tmp-storage",
-                "mountPath": "/tmp",
+                "mountPath": "/tmp",  # nosec B108 -- container-internal mount path of an emptyDir volume, not a host temp file
             },
         ]
 

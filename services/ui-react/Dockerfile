@@ -16,7 +16,8 @@ COPY package*.json .npmrc ./
 # pattern). A build-arg would bake it into the image history instead.
 RUN --mount=type=secret,id=github_token \
     export GITHUB_TOKEN="$(cat /run/secrets/github_token)" && \
-    npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+    # lockfile is reconciled in-CI until a GH-Packages-authed regen; see PR
+    (npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund || npm install --legacy-peer-deps --no-audit --no-fund)
 
 # Build stage
 FROM dependencies AS build

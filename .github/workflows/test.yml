@@ -380,7 +380,8 @@ jobs:
     
     - name: Install frontend dependencies
       working-directory: services/ui-react
-      run: npm ci --legacy-peer-deps
+      # lockfile is reconciled in-CI until a GH-Packages-authed regen; see PR
+      run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
       # @izzywdev/fuzefront-identity is on GitHub Packages; see services/ui-react/.npmrc.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

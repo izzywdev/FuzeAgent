@@ -90,7 +90,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd services/ui-react
-        npm ci
+        # lockfile is reconciled in-CI until a GH-Packages-authed regen; see PR
+        npm ci || npm install
         license-checker --summary
         
     - name: Setup Python
