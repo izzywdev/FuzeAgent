@@ -119,7 +119,7 @@ async def test_incident_remediation_dispatcher_three_mechanisms():
     mock_coord = MockLokiCoordinator()
     dispatcher = IncidentRemediationDispatcher(
         coordinator=mock_coord,
-        github_token="fake-token-test",
+        github_token="fake-token-test",  # nosec B106 -- test fixture dummy value
         anthropic_api_key="fake-key-test",
     )
 

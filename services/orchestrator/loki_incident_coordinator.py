@@ -75,7 +75,9 @@ class LokiIncidentCoordinator:
         req = urllib.request.Request(
             url, headers={"User-Agent": "FuzeAgent-IncidentCoordinator/1.0"}
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(
+            req, timeout=5
+        ) as resp:  # nosec B310 -- operator-configured loki_url (http/https), not user input
             return json.loads(resp.read().decode("utf-8"))
 
     def _http_post_json(self, url: str, payload: Dict[str, Any]) -> None:
@@ -88,7 +90,9 @@ class LokiIncidentCoordinator:
                 "User-Agent": "FuzeAgent-IncidentCoordinator/1.0",
             },
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(
+            req, timeout=5
+        ) as resp:  # nosec B310 -- operator-configured loki_url (http/https), not user input
             _ = resp.read()
 
     def _parse_loki_claims(

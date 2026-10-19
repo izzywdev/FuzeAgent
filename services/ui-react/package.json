@@ -16,7 +16,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fuzefront/design-system": "^1.0.0",
+    "@fuzefront/design-system": "npm:@izzywdev/fuzefront-design-system@^1.0.0",
     "@izzywdev/fuzefront-identity": "^1.0.0",
     "@mdx-js/react": "^3.1.0",
     "@mdx-js/rollup": "^3.1.0",
