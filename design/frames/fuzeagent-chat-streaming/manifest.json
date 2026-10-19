@@ -42,6 +42,12 @@
         "orchestrator": "SandboxesView",
         "route": "/sandboxes",
         "approved": true
+      },
+      {
+        "id": "04-standalone-chat-window",
+        "orchestrator": "StandaloneChatWindow",
+        "route": "/chat/window",
+        "approved": true
       }
     ],
     "components": [
@@ -50,7 +56,8 @@
       "TimeInZoneCard",
       "StreamingThoughtIndicator",
       "SandboxStatusBadge",
-      "TerminalLogWindow"
+      "TerminalLogWindow",
+      "StandaloneChatWindow"
     ],
     "packages": [
       "@fuzefront/design-system",
@@ -103,7 +110,22 @@
         "[data-sandboxes-panel]",
         "[data-action='terminate-sandbox']"
       ]
+    },
+    {
+      "id": "04-standalone-chat-window",
+      "file": "04-standalone-chat-window.html",
+      "label": "(d) Standalone Chat Window — OpenWebUI / Claude Style",
+      "route": "/chat/window",
+      "flow": "04-standalone-chat-window",
+      "summary": "Demonstrates full-window standalone conversational UI with thread history sidebar, model picker, live token stream, and telemetry drawer.",
+      "acceptanceNotes": "Provides dedicated separate window experience for multi-agent chat, compatible with pop-out and full viewport displays.",
+      "testHooks": [
+        "[data-frame='04-standalone-chat-window']",
+        "[data-chat-window]",
+        "[data-session-list]",
+        "[data-composer-input]"
+      ]
     }
   ],
-  "stamp": "49a785a9cebccfed86d5aa529cb7de48346001e3c9eb7013c90dcebeffa9f9be"
+  "stamp": "717b1e7826af1bc7c944d47c9176ee9bcadae1634ea5c178b47aaa12def6d137"
 }
