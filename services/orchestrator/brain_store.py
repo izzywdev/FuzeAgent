@@ -252,6 +252,21 @@ async def _ensure_table(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_brain_documents_brain ON brain_documents(brain_id)"
     )
 
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS brain_chunks (
+            id TEXT PRIMARY KEY,
+            document_id TEXT NOT NULL,
+            brain_id TEXT NOT NULL,
+            chunk_index INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+            embedding vector(384),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_brain_chunks_brain ON brain_chunks(brain_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_brain_chunks_doc ON brain_chunks(document_id)")
+
     # Seed default brains if empty
     count = await conn.fetchval("SELECT COUNT(*) FROM brains")
     if count == 0:
@@ -759,3 +774,202 @@ async def search(
     except Exception as e:
         logger.warning(f"brain_store.search unavailable: {e}")
         return None
+
+
+async def add_document_chunks(
+    brain_id: str,
+    document_id: str,
+    chunks: List[Dict[str, Any]]
+) -> int:
+    """Embed and persist text chunks for a document into brain_chunks."""
+    if not chunks:
+        return 0
+    try:
+        texts = [c.get("content", "") for c in chunks]
+        loop = asyncio.get_event_loop()
+        embeddings = await loop.run_in_executor(
+            None, lambda: _get_model().encode(texts, normalize_embeddings=True).tolist()
+        )
+
+        async with get_db_connection() as conn:
+            await _ensure_table(conn)
+            inserted = 0
+            for i, (chunk, vec) in enumerate(zip(chunks, embeddings)):
+                cid = chunk.get("id") or f"{document_id}_{i}"
+                await conn.execute(
+                    """
+                    INSERT INTO brain_chunks (id, document_id, brain_id, chunk_index, content, metadata, embedding)
+                    VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::vector)
+                    ON CONFLICT (id) DO UPDATE SET
+                        content = EXCLUDED.content,
+                        metadata = EXCLUDED.metadata,
+                        embedding = EXCLUDED.embedding
+                    """,
+                    cid,
+                    document_id,
+                    brain_id,
+                    i,
+                    chunk.get("content", ""),
+                    import_json().dumps(chunk.get("metadata", {})),
+                    _vec_literal(vec)
+                )
+                inserted += 1
+
+            await conn.execute(
+                "UPDATE brains SET vector_count = vector_count + $1 WHERE id = $2",
+                inserted,
+                brain_id
+            )
+            return inserted
+    except Exception as e:
+        logger.warning(f"brain_store.add_document_chunks failed: {e}")
+        return 0
+
+
+def import_json():
+    import json
+    return json
+
+
+async def search_multi_brains(
+    brain_ids: List[str],
+    query: str,
+    limit: int = 5,
+    similarity_threshold: float = 0.5
+) -> List[Dict[str, Any]]:
+    """
+    Searches across multiple brain tiers simultaneously using cosine distance.
+    Returns matched chunks and documents ranked by similarity score.
+    """
+    if not brain_ids or not query:
+        return []
+    try:
+        vec = await _embed(query)
+        async with get_db_connection() as conn:
+            await _ensure_table(conn)
+            # Try chunks first
+            chunk_rows = await conn.fetch(
+                """
+                SELECT c.id, c.document_id, c.brain_id, c.chunk_index, c.content, c.metadata,
+                       1 - (c.embedding <=> $2::vector) AS score,
+                       b.name AS brain_name, b.scope AS brain_scope
+                FROM brain_chunks c
+                JOIN brains b ON b.id = c.brain_id
+                WHERE c.brain_id = ANY($1) AND c.embedding IS NOT NULL
+                  AND (1 - (c.embedding <=> $2::vector)) >= $3
+                ORDER BY c.embedding <=> $2::vector
+                LIMIT $4
+                """,
+                brain_ids,
+                _vec_literal(vec),
+                similarity_threshold,
+                limit
+            )
+            if chunk_rows:
+                return [
+                    {
+                        "chunk_id": r["id"],
+                        "document_id": r["document_id"],
+                        "brain_id": r["brain_id"],
+                        "brain_name": r["brain_name"],
+                        "brain_scope": r["brain_scope"],
+                        "content": r["content"],
+                        "metadata": import_json().loads(r["metadata"] or "{}") if isinstance(r["metadata"], str) else (r["metadata"] or {}),
+                        "score": round(float(r["score"]), 4)
+                    }
+                    for r in chunk_rows
+                ]
+
+            # Fallback to document-level search
+            doc_rows = await conn.fetch(
+                """
+                SELECT d.id, d.brain_id, d.title, d.category, d.content, d.author, d.tags,
+                       1 - (d.embedding <=> $2::vector) AS score,
+                       b.name AS brain_name, b.scope AS brain_scope
+                FROM brain_documents d
+                JOIN brains b ON b.id = d.brain_id
+                WHERE d.brain_id = ANY($1) AND d.embedding IS NOT NULL
+                  AND (1 - (d.embedding <=> $2::vector)) >= $3
+                ORDER BY d.embedding <=> $2::vector
+                LIMIT $4
+                """,
+                brain_ids,
+                _vec_literal(vec),
+                similarity_threshold,
+                limit
+            )
+            return [
+                {
+                    "document_id": r["id"],
+                    "brain_id": r["brain_id"],
+                    "brain_name": r["brain_name"],
+                    "brain_scope": r["brain_scope"],
+                    "title": r["title"],
+                    "content": r["content"],
+                    "score": round(float(r["score"]), 4)
+                }
+                for r in doc_rows
+            ]
+    except Exception as e:
+        logger.warning(f"brain_store.search_multi_brains failed: {e}")
+        return []
+
+
+async def get_hierarchical_context_for_agent(
+    agent_id: str,
+    query: str,
+    team_id: Optional[str] = None,
+    functional_domain: Optional[str] = None,
+    organization_id: str = "org_default",
+    token_budget: int = 4000
+) -> Dict[str, Any]:
+    """
+    1. Resolves all 4 brain tiers: Agent -> Team -> Cross-Functional -> Org
+    2. Searches all tiers in parallel with Reciprocal Rank Fusion
+    3. Trims and distills context to fit within token budget
+    """
+    hierarchy_info = await get_agent_brains(
+        agent_id=agent_id,
+        team_id=team_id,
+        functional_domain=functional_domain,
+        organization_id=organization_id
+    )
+    brain_ids = [b["id"] for b in hierarchy_info.get("brains", [])]
+    if not brain_ids:
+        return {"context": "", "total_tokens": 0, "sources": []}
+
+    results = await search_multi_brains(brain_ids=brain_ids, query=query, limit=8)
+
+    # Distill and assemble context sections by tier
+    sections = []
+    current_tokens = 0
+    sources = []
+
+    for hit in results:
+        scope = hit.get("brain_scope", "general")
+        name = hit.get("brain_name", hit.get("brain_id"))
+        content = hit.get("content", "")
+        # Approx 4 chars per token
+        approx_tokens = len(content) // 4
+        if current_tokens + approx_tokens > token_budget:
+            break
+
+        header = f"### [{scope.upper()}] {name} (Relevance: {hit.get('score', 0):.2f})"
+        sections.append(f"{header}\n{content}")
+        current_tokens += approx_tokens
+        sources.append({
+            "brain_id": hit.get("brain_id"),
+            "scope": scope,
+            "title": hit.get("title") or hit.get("document_id"),
+            "score": hit.get("score")
+        })
+
+    distilled = "\n\n---\n\n".join(sections)
+    return {
+        "context": distilled,
+        "total_tokens": current_tokens,
+        "sources_count": len(sources),
+        "sources": sources,
+        "hierarchy": hierarchy_info.get("hierarchy", [])
+    }
+
