@@ -513,6 +513,235 @@
         "required": ["organization_id"]
       },
       "mutates": false
+    },
+    {
+      "name": "list_brains",
+      "description": "List brains for company/organization with optional scope, domain, team, or agent filtering",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "description": "Optional organization ID filter"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["organization", "team", "agent", "cross_functional"],
+            "description": "Filter by scope level"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Filter by cross-functional domain (frontend, devops, backend, etc.)"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Filter by team ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Filter by agent persona ID"
+          }
+        },
+        "required": []
+      },
+      "mutates": false
+    },
+    {
+      "name": "get_brain",
+      "description": "Get detailed metadata, configuration, and document/vector counts for a specific brain",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brain_id": {
+            "type": "string",
+            "description": "ID of the brain to retrieve"
+          }
+        },
+        "required": ["brain_id"]
+      },
+      "mutates": false
+    },
+    {
+      "name": "create_brain",
+      "description": "Create a new brain scoped to org, team, agent persona, or cross-functional domain",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the brain"
+          },
+          "description": {
+            "type": "string",
+            "description": "Brain description and guidelines"
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "Organization ID (default: org_default)"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["organization", "team", "agent", "cross_functional"],
+            "description": "Scope level of the brain"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Functional domain for cross-functional brains (e.g. frontend, devops)"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Associated team ID (for team scope)"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Associated agent persona ID (for agent scope)"
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Tags for search and classification"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Arbitrary metadata key-value pairs"
+          }
+        },
+        "required": ["name", "scope"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "update_brain",
+      "description": "Update brain metadata, scope, functional domain, tags, or active status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brain_id": {
+            "type": "string",
+            "description": "ID of the brain to update"
+          },
+          "name": {
+            "type": "string",
+            "description": "Updated brain name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated description"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["organization", "team", "agent", "cross_functional"],
+            "description": "Updated scope"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Updated domain"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Updated team ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Updated agent ID"
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Active status"
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": ["brain_id"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "delete_brain",
+      "description": "Delete a brain and its associated wiki documents",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brain_id": {
+            "type": "string",
+            "description": "ID of the brain to delete"
+          }
+        },
+        "required": ["brain_id"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "associate_brain",
+      "description": "Associate a brain with an organization, team, agent persona, or cross-functional domain",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brain_id": {
+            "type": "string",
+            "description": "ID of the brain to associate"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["organization", "team", "agent", "cross_functional"],
+            "description": "Target association scope"
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "Target organization ID"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Target team ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Target agent ID"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Target functional domain (e.g. frontend, devops)"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Association metadata"
+          }
+        },
+        "required": ["brain_id", "scope"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "get_agent_brains",
+      "description": "Resolve the multi-tier brain hierarchy for an agent (agent persona, team, cross-functional e.g. frontend/devops, and org global)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "Agent persona ID (e.g. react-dev, python-dev)"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Optional team ID"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Optional functional domain (frontend, devops, backend)"
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "Organization ID (default: org_default)"
+          }
+        },
+        "required": ["agent_id"]
+      },
+      "mutates": false
     }
   ]
 }
