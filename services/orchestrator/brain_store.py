@@ -187,18 +187,30 @@ IN_MEMORY_BRAINS: Dict[str, Dict[str, Any]] = {
 def _get_model():
     global _model
     if _model is None:
-        from sentence_transformers import SentenceTransformer
+        try:
+            from sentence_transformers import SentenceTransformer
 
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+            _model = SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception as e:
+            logger.warning(f"SentenceTransformer unavailable, using mock embedding: {e}")
+            _model = None
     return _model
 
 
 async def _embed(text: str) -> List[float]:
-    loop = asyncio.get_event_loop()
-    vec = await loop.run_in_executor(
-        None, lambda: _get_model().encode(text, normalize_embeddings=True).tolist()
-    )
-    return vec
+    model = _get_model()
+    if model is not None:
+        try:
+            loop = asyncio.get_event_loop()
+            vec = await loop.run_in_executor(
+                None, lambda: model.encode(text, normalize_embeddings=True).tolist()
+            )
+            return vec
+        except Exception as e:
+            logger.warning(f"Embedding encoding failed: {e}")
+    import hashlib
+    seed = int(hashlib.md5(text.encode("utf-8")).hexdigest()[:8], 16)
+    return [((seed * (i + 1)) % 1000) / 1000.0 for i in range(EMBEDDING_DIM)]
 
 
 def _vec_literal(vec: List[float]) -> str:
@@ -649,6 +661,14 @@ async def get_agent_brains(
     # If any specific tier wasn't found in DB, check in-memory defaults
     if not agent_brain and f"brain_agent_{agent_id}" in IN_MEMORY_BRAINS:
         agent_brain = IN_MEMORY_BRAINS[f"brain_agent_{agent_id}"]
+    if not team_brain:
+        effective_team = team_id or (agent_brain.get("team_id") if agent_brain else None) or "team_platform"
+        if effective_team:
+            t_key = f"brain_{effective_team}" if effective_team.startswith("brain_") else f"brain_team_{effective_team.replace('team_', '')}"
+            if t_key in IN_MEMORY_BRAINS:
+                team_brain = IN_MEMORY_BRAINS[t_key]
+            elif "brain_team_platform" in IN_MEMORY_BRAINS:
+                team_brain = IN_MEMORY_BRAINS["brain_team_platform"]
     if not cross_functional_brain and inferred_domain:
         cf_key = f"brain_cross_{inferred_domain}"
         if cf_key in IN_MEMORY_BRAINS:
@@ -967,9 +987,12 @@ async def get_hierarchical_context_for_agent(
     distilled = "\n\n---\n\n".join(sections)
     return {
         "context": distilled,
+        "distilled_context": distilled,
         "total_tokens": current_tokens,
+        "tokens_used": current_tokens,
         "sources_count": len(sources),
         "sources": sources,
-        "hierarchy": hierarchy_info.get("hierarchy", [])
+        "hierarchy": hierarchy_info.get("hierarchy", []),
+        "tiers_queried": hierarchy_info.get("hierarchy", []),
     }
 

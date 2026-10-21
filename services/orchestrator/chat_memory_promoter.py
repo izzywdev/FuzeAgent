@@ -134,7 +134,7 @@ class ChatMemoryPromoter:
 
         logger.info(f"✅ [MemoryPromoter] Promoted {len(promoted_records)} insights from session {session_id}.")
         return {
-            "status": "completed",
+            "status": "promoted",
             "session_id": session_id,
             "promoted_count": len(promoted_records),
             "promotions": promoted_records

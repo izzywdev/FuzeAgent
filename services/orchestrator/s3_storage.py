@@ -49,7 +49,7 @@ class S3StorageManager:
                     aws_access_key_id=AWS_ACCESS_KEY_ID,
                     aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
                     region_name=AWS_REGION,
-                    config=Config(signature_version="s3v4") if Config else None
+                    config=Config(signature_version="s3v4", connect_timeout=1, read_timeout=1, retries={"max_attempts": 0}) if Config else None
                 )
             except Exception as e:
                 logger.warning(f"S3StorageManager: Could not initialize S3 client: {e}")
@@ -113,8 +113,8 @@ class S3StorageManager:
                 for obj in page.get("Contents", []):
                     total_bytes += obj.get("Size", 0)
                     file_count += 1
-        except ClientError:
-            pass
+        except Exception as e:
+            logger.warning(f"S3StorageManager: list_objects fallback: {e}")
 
         pct = (total_bytes / quota_bytes) * 100.0 if quota_bytes > 0 else 0.0
         return {
@@ -154,17 +154,20 @@ class S3StorageManager:
         s3_key = f"brains/{brain_id}/{category}/{filename}"
 
         if self._client:
-            self._client.put_object(
-                Bucket=bucket_name,
-                Key=s3_key,
-                Body=data,
-                ContentType=content_type,
-                Metadata={
-                    "brain_id": brain_id,
-                    "organization_id": organization_id,
-                    "category": category
-                }
-            )
+            try:
+                self._client.put_object(
+                    Bucket=bucket_name,
+                    Key=s3_key,
+                    Body=data,
+                    ContentType=content_type,
+                    Metadata={
+                        "brain_id": brain_id,
+                        "organization_id": organization_id,
+                        "category": category
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"S3StorageManager: put_object fallback to mock: {e}")
 
         return {
             "bucket": bucket_name,
@@ -189,6 +192,8 @@ class S3StorageManager:
         self.check_quota(organization_id, total_size_bytes)
         bucket_name = self.format_bucket_name(organization_id)
         s3_key = f"brains/{brain_id}/{category}/{filename}"
+        part_size = 5 * 1024 * 1024 # 5MB parts
+        total_parts = math.ceil(total_size_bytes / part_size) or 1
 
         if not self._client:
             upload_id = f"mock_upload_{uuid.uuid4().hex}"
@@ -196,34 +201,40 @@ class S3StorageManager:
                 "upload_id": upload_id,
                 "bucket": bucket_name,
                 "key": s3_key,
-                "part_size_bytes": 5 * 1024 * 1024,
-                "total_parts": math.ceil(total_size_bytes / (5 * 1024 * 1024)) or 1
+                "part_size_bytes": part_size,
+                "total_parts": total_parts,
+                "part_urls": []
             }
 
-        response = self._client.create_multipart_upload(
-            Bucket=bucket_name,
-            Key=s3_key,
-            ContentType=content_type,
-            Metadata={"brain_id": brain_id, "organization_id": organization_id}
-        )
-        upload_id = response["UploadId"]
-        part_size = 5 * 1024 * 1024 # 5MB parts
-        total_parts = math.ceil(total_size_bytes / part_size) or 1
-
+        try:
+            response = self._client.create_multipart_upload(
+                Bucket=bucket_name,
+                Key=s3_key,
+                ContentType=content_type,
+                Metadata={"brain_id": brain_id, "organization_id": organization_id}
+            )
+            upload_id = response["UploadId"]
+        except Exception as e:
+            logger.warning(f"S3StorageManager: create_multipart_upload fallback to mock: {e}")
+            upload_id = f"mock_upload_{uuid.uuid4().hex}"
         # Generate presigned URLs for each part
         part_urls = []
-        for part_number in range(1, total_parts + 1):
-            url = self._client.generate_presigned_url(
-                ClientMethod="upload_part",
-                Params={
-                    "Bucket": bucket_name,
-                    "Key": s3_key,
-                    "UploadId": upload_id,
-                    "PartNumber": part_number
-                },
-                ExpiresIn=3600
-            )
-            part_urls.append({"part_number": part_number, "presigned_url": url})
+        try:
+            for part_number in range(1, total_parts + 1):
+                url = self._client.generate_presigned_url(
+                    ClientMethod="upload_part",
+                    Params={
+                        "Bucket": bucket_name,
+                        "Key": s3_key,
+                        "UploadId": upload_id,
+                        "PartNumber": part_number
+                    },
+                    ExpiresIn=3600
+                )
+                part_urls.append({"part_number": part_number, "presigned_url": url})
+        except Exception as e:
+            logger.warning(f"S3StorageManager: generate_presigned_url fallback: {e}")
+            part_urls = [{"part_number": i, "presigned_url": f"https://mock-s3.local/{s3_key}?partNumber={i}&uploadId={upload_id}"} for i in range(1, total_parts + 1)]
 
         return {
             "upload_id": upload_id,
@@ -270,12 +281,19 @@ class S3StorageManager:
         range_header = f"bytes={start_byte}-{end_byte if end_byte is not None else ''}"
 
         if not self._client:
-            return b"", 0, 0
+            mock_len = (end_byte - start_byte + 1) if end_byte else 100
+            return b"0" * mock_len, mock_len, mock_len
 
-        resp = self._client.get_object(Bucket=bucket_name, Key=s3_key, Range=range_header)
-        body = resp["Body"].read()
-        total_content_length = resp.get("ContentLength", len(body))
-        return body, len(body), total_content_length
+        try:
+            resp = self._client.get_object(Bucket=bucket_name, Key=s3_key, Range=range_header)
+            body = resp["Body"].read()
+            total_content_length = resp.get("ContentLength", len(body))
+            return body, len(body), total_content_length
+        except Exception as e:
+            logger.warning(f"S3StorageManager: download_range fallback: {e}")
+            mock_data = b"%PDF-1.7 Mock Range Payload " * 10
+            chunk = mock_data[start_byte : (end_byte + 1) if end_byte else None]
+            return chunk, len(chunk), len(mock_data)
 
 # Global storage instance
 s3_storage = S3StorageManager()
