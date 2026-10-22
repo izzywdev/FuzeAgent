@@ -48,9 +48,18 @@ type IdentityComponents = {
 let identityPkg: IdentityComponents | null = null
 
 try {
-  identityPkg = require('@fuzefront/identity-ui')
+  // Packages on GitHub Packages are published under @izzywdev/
+  identityPkg = require('@izzywdev/fuzefront-identity-ui')
 } catch {
-  identityPkg = null
+  try {
+    identityPkg = require('@izzywdev/fuzefront-identity')
+  } catch {
+    try {
+      identityPkg = require('@fuzefront/identity-ui')
+    } catch {
+      identityPkg = null
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

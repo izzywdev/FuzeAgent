@@ -1,0 +1,75 @@
+{{- if and .Values.postSyncVerification .Values.postSyncVerification.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "fuzeagent.fullname" . }}-post-prod-verify
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fuzeagent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: post-prod-verify
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "fuzeagent.labels" . | nindent 8 }}
+        app.kubernetes.io/component: post-prod-verify
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: post-sync-runner
+          image: {{ .Values.postSyncVerification.image | default "curlimages/curl:8.8.0" | quote }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Starting FuzeAgent post-sync rollout verification..."
+              
+              UI_HOST="http://ui.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.ui.port | default 3000 }}"
+              ORCH_HOST="http://orchestrator.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.orchestrator.port | default 8000 }}"
+              
+              echo "1. Checking UI health at $UI_HOST/health..."
+              curl -s -f -m 10 "$UI_HOST/health" || { echo "UI health check failed"; exit 1; }
+              echo "UI is healthy."
+              
+              echo "2. Checking Orchestrator health at $ORCH_HOST/health..."
+              curl -s -f -m 10 "$ORCH_HOST/health" || { echo "Orchestrator health check failed"; exit 1; }
+              echo "Orchestrator is healthy."
+              
+              echo "3. Checking Agent templates endpoint at $ORCH_HOST/api/orchestrator/templates..."
+              curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/templates" || { echo "Agent templates endpoint check failed"; exit 1; }
+              echo "Agent templates endpoint is responding."
+              
+              echo "4. Checking Agent list endpoint at $ORCH_HOST/api/orchestrator/agents..."
+              curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/agents" || { echo "Agent list endpoint check failed"; exit 1; }
+              echo "Agent list endpoint is responding."
+              
+              echo "5. Checking Multi-Tier Brain list endpoint at $ORCH_HOST/api/orchestrator/brains..."
+              curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/brains" || { echo "Multi-Tier Brain list check failed"; exit 1; }
+              echo "Multi-Tier Brain list is healthy."
+
+              echo "6. Checking S3 Storage Quota endpoint at $ORCH_HOST/api/orchestrator/brains/storage/usage?organization_id=org_default..."
+              curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/brains/storage/usage?organization_id=org_default" || { echo "Storage usage check failed"; exit 1; }
+              echo "S3 Storage usage is reporting properly."
+
+              echo "7. Checking Agent Personas endpoint at $ORCH_HOST/api/orchestrator/brains/personas..."
+              curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/brains/personas" || { echo "Agent personas check failed"; exit 1; }
+              echo "Agent Personas endpoint is healthy."
+              
+              echo "FuzeAgent post-sync rollout verification succeeded!"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+{{- end }}

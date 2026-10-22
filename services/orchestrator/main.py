@@ -31,9 +31,9 @@ from pydantic import BaseModel, Field
 from hierarchy_endpoints import router as hierarchy_router
 
 try:
-    from .image_registry_router import router as image_registry_router
+    from .image_registry_router import brain_router, router as image_registry_router
 except ImportError:
-    from image_registry_router import router as image_registry_router
+    from image_registry_router import brain_router, router as image_registry_router
 
 try:
     from .app_builds import router as app_builds_router
@@ -684,6 +684,8 @@ app.add_middleware(
 app.include_router(hierarchy_router)
 # Include image registry, sandboxes, brains & escalations router
 app.include_router(image_registry_router)
+# Include direct /brains root endpoints
+app.include_router(brain_router)
 # FuzeFront build-your-application API (machine bearer auth + release flag, fail-closed)
 app.include_router(app_builds_router)
 # Automated incident remediation & Alertmanager webhook router with Loki consensus

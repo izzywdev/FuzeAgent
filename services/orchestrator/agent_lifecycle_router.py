@@ -492,8 +492,10 @@ async def list_agents():
                     if isinstance(item.get("config"), str):
                         try:
                             item["config"] = json.loads(item["config"])
-                        except Exception:
-                            pass
+                        except Exception:  # nosec B110
+                            logger.debug(
+                                "Config JSON parse failed for agent %s", item.get("id")
+                            )
                     if isinstance(item.get("created_at"), datetime):
                         item["created_at"] = item["created_at"].isoformat()
                     if isinstance(item.get("updated_at"), datetime):
@@ -745,7 +747,7 @@ async def _dispatch_session_prompt(session_id: str, agent_id: str, message: str)
     words = full_reply.split(" ")
     accumulated = ""
     for i in range(0, len(words), 3):
-        chunk = " ".join(words[i:i + 3]) + " "
+        chunk = " ".join(words[i : i + 3]) + " "
         accumulated += chunk
         await _broadcast_to_session(
             session_id,
@@ -975,8 +977,10 @@ async def terminate_agent_session(session_id: str, agent_id: Optional[str] = Non
     for ws in list(subs):
         try:
             await ws.close(code=1000, reason="Session terminated")
-        except Exception:
-            pass
+        except Exception:  # nosec B110
+            logger.debug(
+                "Failed closing websocket for session %s on termination", session_id
+            )
     SESSION_SUBSCRIBERS.pop(session_id, None)
 
     # Update database if connected
