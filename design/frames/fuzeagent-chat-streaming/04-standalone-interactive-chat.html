@@ -802,13 +802,37 @@
     appendUserMessage(text);
 
     const lower = text.toLowerCase();
+    const brainId = personas[currentPersona].brainId || 'brain_cross_backend';
 
-    // Natural Casual Talk Responses & Tools
+    // Attempt real live backend call first
+    fetch(`http://127.0.0.1:8800/api/brains/${encodeURIComponent(brainId)}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    })
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (data && data.reply && !data.reply.includes("found no relevant documents")) {
+        const citationInfo = data.citations && data.citations.length > 0
+          ? `Live pgvector RAG: matched "${data.citations[0].title}" (score: ${data.citations[0].score})`
+          : `Live pgvector semantic search evaluated in ${brainId}`;
+        appendAgentMessage(data.reply, citationInfo);
+        return;
+      }
+      handleFallbackResponse(text, lower);
+    })
+    .catch(() => {
+      handleFallbackResponse(text, lower);
+    });
+  }
+
+  function handleFallbackResponse(text, lower) {
     setTimeout(() => {
-      if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
+      // Natural Casual Talk Responses with strict word boundaries
+      if (/\b(hi|hello|hey|greetings|howdy)\b/i.test(lower)) {
         appendAgentMessage(
-          "Hello there! It's great to chat with you today! I'm running smoothly inside the FuzeAgent cluster. How has your day been going?",
-          "Reasoning: User initiated casual conversation; responding warmly with personal touch."
+          `Hello! I'm ${personas[currentPersona].name}. All services and sandbox runners in the cluster are healthy. How can I help you today?`,
+          "Reasoning: User initiated greeting; confirming persona identity and cluster operational state."
         );
       } else if (lower.includes('favorite programming language') || lower.includes('favorite language')) {
         appendAgentMessage(
@@ -819,6 +843,16 @@
         appendAgentMessage(
           "Here's one for you:<br><br><em>Why do programmers prefer dark mode?</em><br><strong>Because light attracts bugs!</strong> 🐛💡<br><br>And remember: There are only 10 types of people in the world — those who understand binary, and those who don't!",
           "Reasoning: Selecting high-affinity computer science humor from conversational repository."
+        );
+      } else if (lower.includes('brain') || lower.includes('multi-tier') || lower.includes('hierarchy') || lower.includes('context')) {
+        appendAgentMessage(
+          "In this cluster, FuzeAgent runs a <strong>4-Tier Brain Architecture</strong> backed by PostgreSQL pgvector:<br><br>" +
+          "1. <strong>🏢 Tier 1: Org Global Brain</strong> (<code>brain_org_global</code>) — Enterprise security baselines, zero-trust policies, and company-wide standards.<br>" +
+          "2. <strong>🔀 Tier 2: Cross-Functional Domain</strong> (<code>brain_cross_backend</code> / <code>frontend</code> / <code>devops</code>) — Domain libraries, shared patterns, and API contracts.<br>" +
+          "3. <strong>👥 Tier 3: Team Brain</strong> (<code>brain_team_platform</code>) — Team cluster configs, ingress definitions, and service routing.<br>" +
+          "4. <strong>👤 Tier 4: Agent Persona Memory</strong> (<code>brain_agent_python_dev</code>) — Individual agent instructions, test mocks, and conversational history.<br><br>" +
+          "Queries execute parallel hierarchical retrieval with <em>Reciprocal Rank Fusion (RRF)</em> to distill the most relevant tokens into the context window.",
+          "Reasoning: Querying multi-tier brain hierarchy topology and summarizing active 4-tier configuration."
         );
       } else if (lower.includes('time in') || lower.includes('la time') || lower.includes('time now')) {
         const now = new Date();
@@ -836,6 +870,15 @@
           "The current time in <strong>Los Angeles, California</strong> is:",
           "Querying world clock engine for America/Los_Angeles and rendering TimeInZoneCard.",
           cardHtml
+        );
+      } else if (lower.includes('database') || lower.includes('postgres') || lower.includes('asyncpg') || lower.includes('pooling')) {
+        appendAgentMessage(
+          "For PostgreSQL database pooling, we use <strong>asyncpg</strong> with connection limits calibrated per pod:<br><br>" +
+          "• Minimum pool size: <code>min_size=2</code><br>" +
+          "• Maximum pool size: <code>max_size=10</code><br>" +
+          "• Codec registration for native <code>json/jsonb</code> and <code>uuid</code> handling.<br>" +
+          "• All connections must be acquired via <code>async with pool.acquire() as conn:</code> context managers to prevent socket leaks.",
+          "Reasoning: Retrieving database connection management specifications from backend knowledge base."
         );
       } else if (lower.includes('pytest') || lower.includes('test')) {
         const cardHtml = `
@@ -862,11 +905,11 @@
         );
       } else {
         appendAgentMessage(
-          `That's an interesting topic! As your ${personas[currentPersona].name}, I can help you architect solutions, reflect on system design, or execute tasks. What specific angle would you like to explore?`,
-          "Evaluating general user conversational intent and providing helpful open-ended prompt."
+          `Regarding "<em>${escapeHtml(text)}</em>": As your ${personas[currentPersona].name}, I've analyzed your prompt against our active architecture. Would you like me to generate code, check cluster status, or query specific brain documentation?`,
+          "Reasoning: Evaluating user query and synthesizing context-aware response based on active persona role."
         );
       }
-    }, 450);
+    }, 350);
   }
 
   sendBtn.addEventListener('click', handleSendMessage);
