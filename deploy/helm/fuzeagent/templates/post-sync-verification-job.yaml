@@ -52,6 +52,18 @@ spec:
               curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/agents" || { echo "Agent list endpoint check failed"; exit 1; }
               echo "Agent list endpoint is responding."
               
+              echo "5. Checking Multi-Tier Brain list endpoint at $ORCH_HOST/api/orchestrator/brains..."
+              curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/brains" || { echo "Multi-Tier Brain list check failed"; exit 1; }
+              echo "Multi-Tier Brain list is healthy."
+
+              echo "6. Checking S3 Storage Quota endpoint at $ORCH_HOST/api/orchestrator/brains/storage/usage?organization_id=org_default..."
+              curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/brains/storage/usage?organization_id=org_default" || { echo "Storage usage check failed"; exit 1; }
+              echo "S3 Storage usage is reporting properly."
+
+              echo "7. Checking Agent Personas endpoint at $ORCH_HOST/api/orchestrator/brains/personas..."
+              curl -s -f -m 10 "$ORCH_HOST/api/orchestrator/brains/personas" || { echo "Agent personas check failed"; exit 1; }
+              echo "Agent Personas endpoint is healthy."
+              
               echo "FuzeAgent post-sync rollout verification succeeded!"
           resources:
             requests:
