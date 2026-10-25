@@ -1,8 +1,8 @@
 // FuzeAgent Inherited Design System
-// Inherits core tokens and primitives from @fuzefront/design-system
+// Inherits core tokens and primitives from @izzywdev/fuzefront-design-system
 // and layers FuzeAgent product-specific primitives on top.
 
-// Core Primitives (from @fuzefront/design-system or local fallback)
+// Core Primitives (from @izzywdev/fuzefront-design-system or local fallback)
 export { Button } from './Button';
 export { Badge } from './Badge';
 export { Card } from './Card';

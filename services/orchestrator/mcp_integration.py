@@ -20,7 +20,15 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-from .database import DatabaseManager
+try:
+    from .database import DatabaseManager
+except ImportError:
+    from database import DatabaseManager
+
+try:
+    from . import brain_store
+except ImportError:
+    import brain_store
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +225,246 @@ class FuzeAgentMCPServer:
                     "required": ["task_description"],
                 },
             ),
+            # Brains & Cross-Functional Memory Tools
+            MCPTool(
+                name="list_brains",
+                description="List brains for company/organization with optional scope, domain, team, or agent filtering",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "organization_id": {
+                            "type": "string",
+                            "description": "Optional organization ID filter",
+                        },
+                        "scope": {
+                            "type": "string",
+                            "enum": [
+                                "organization",
+                                "team",
+                                "agent",
+                                "cross_functional",
+                            ],
+                            "description": "Filter by scope level",
+                        },
+                        "functional_domain": {
+                            "type": "string",
+                            "description": "Filter by cross-functional domain (frontend, devops, backend, etc.)",
+                        },
+                        "team_id": {
+                            "type": "string",
+                            "description": "Filter by team ID",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Filter by agent persona ID",
+                        },
+                    },
+                },
+            ),
+            MCPTool(
+                name="get_brain",
+                description="Get detailed metadata, configuration, and document/vector counts for a specific brain",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "brain_id": {
+                            "type": "string",
+                            "description": "ID of the brain to retrieve",
+                        }
+                    },
+                    "required": ["brain_id"],
+                },
+            ),
+            MCPTool(
+                name="create_brain",
+                description="Create a new brain scoped to org, team, agent persona, or cross-functional domain",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the brain",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Brain description and guidelines",
+                        },
+                        "organization_id": {
+                            "type": "string",
+                            "description": "Organization ID (default: org_default)",
+                        },
+                        "scope": {
+                            "type": "string",
+                            "enum": [
+                                "organization",
+                                "team",
+                                "agent",
+                                "cross_functional",
+                            ],
+                            "description": "Scope level of the brain",
+                        },
+                        "functional_domain": {
+                            "type": "string",
+                            "description": "Functional domain for cross-functional brains (e.g. frontend, devops)",
+                        },
+                        "team_id": {
+                            "type": "string",
+                            "description": "Associated team ID (for team scope)",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Associated agent persona ID (for agent scope)",
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Tags for search and classification",
+                        },
+                        "metadata": {
+                            "type": "object",
+                            "description": "Arbitrary metadata key-value pairs",
+                        },
+                    },
+                    "required": ["name", "scope"],
+                },
+            ),
+            MCPTool(
+                name="update_brain",
+                description="Update brain metadata, scope, functional domain, tags, or active status",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "brain_id": {
+                            "type": "string",
+                            "description": "ID of the brain to update",
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Updated brain name",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Updated description",
+                        },
+                        "scope": {
+                            "type": "string",
+                            "enum": [
+                                "organization",
+                                "team",
+                                "agent",
+                                "cross_functional",
+                            ],
+                            "description": "Updated scope",
+                        },
+                        "functional_domain": {
+                            "type": "string",
+                            "description": "Updated domain",
+                        },
+                        "team_id": {
+                            "type": "string",
+                            "description": "Updated team ID",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Updated agent ID",
+                        },
+                        "is_active": {
+                            "type": "boolean",
+                            "description": "Active status",
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "metadata": {"type": "object"},
+                    },
+                    "required": ["brain_id"],
+                },
+            ),
+            MCPTool(
+                name="delete_brain",
+                description="Delete a brain and its associated wiki documents",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "brain_id": {
+                            "type": "string",
+                            "description": "ID of the brain to delete",
+                        }
+                    },
+                    "required": ["brain_id"],
+                },
+            ),
+            MCPTool(
+                name="associate_brain",
+                description="Associate a brain with an organization, team, agent persona, or cross-functional domain",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "brain_id": {
+                            "type": "string",
+                            "description": "ID of the brain to associate",
+                        },
+                        "scope": {
+                            "type": "string",
+                            "enum": [
+                                "organization",
+                                "team",
+                                "agent",
+                                "cross_functional",
+                            ],
+                            "description": "Target association scope",
+                        },
+                        "organization_id": {
+                            "type": "string",
+                            "description": "Target organization ID",
+                        },
+                        "team_id": {
+                            "type": "string",
+                            "description": "Target team ID",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Target agent ID",
+                        },
+                        "functional_domain": {
+                            "type": "string",
+                            "description": "Target functional domain (e.g. frontend, devops)",
+                        },
+                        "metadata": {
+                            "type": "object",
+                            "description": "Association metadata",
+                        },
+                    },
+                    "required": ["brain_id", "scope"],
+                },
+            ),
+            MCPTool(
+                name="get_agent_brains",
+                description="Resolve the multi-tier brain hierarchy for an agent (agent persona, team, cross-functional e.g. frontend/devops, and org global)",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Agent persona ID (e.g. react-dev, python-dev)",
+                        },
+                        "team_id": {
+                            "type": "string",
+                            "description": "Optional team ID",
+                        },
+                        "functional_domain": {
+                            "type": "string",
+                            "description": "Optional functional domain (frontend, devops, backend)",
+                        },
+                        "organization_id": {
+                            "type": "string",
+                            "description": "Organization ID (default: org_default)",
+                        },
+                    },
+                    "required": ["agent_id"],
+                },
+            ),
         ]
 
     def _define_resources(self) -> List[MCPResource]:
@@ -226,6 +474,12 @@ class FuzeAgentMCPServer:
                 uri="fuzeagent://organizations",
                 name="Organizations",
                 description="Complete organizational structure and hierarchy",
+                mime_type="application/json",
+            ),
+            MCPResource(
+                uri="fuzeagent://brains",
+                name="Company Brains",
+                description="All organizational, team, persona, and cross-functional brains",
                 mime_type="application/json",
             ),
             MCPResource(
@@ -263,6 +517,59 @@ class FuzeAgentMCPServer:
                 return await self._get_repository_context(arguments)
             elif tool_name == "get_agent_recommendations":
                 return await self._get_agent_recommendations(arguments)
+            # Brain Tools
+            elif tool_name == "list_brains":
+                return {
+                    "brains": await brain_store.list_brains(
+                        organization_id=arguments.get("organization_id"),
+                        scope=arguments.get("scope"),
+                        functional_domain=arguments.get("functional_domain"),
+                        team_id=arguments.get("team_id"),
+                        agent_id=arguments.get("agent_id"),
+                    )
+                }
+            elif tool_name == "get_brain":
+                brain = await brain_store.get_brain(arguments["brain_id"])
+                if not brain:
+                    return {"error": f"Brain '{arguments['brain_id']}' not found"}
+                return {"brain": brain}
+            elif tool_name == "create_brain":
+                return {"brain": await brain_store.create_brain(arguments)}
+            elif tool_name == "update_brain":
+                brain_id = arguments["brain_id"]
+                data = {
+                    k: v
+                    for k, v in arguments.items()
+                    if k != "brain_id" and v is not None
+                }
+                updated = await brain_store.update_brain(brain_id, data)
+                if not updated:
+                    return {"error": f"Brain '{brain_id}' not found"}
+                return {"brain": updated}
+            elif tool_name == "delete_brain":
+                deleted = await brain_store.delete_brain(arguments["brain_id"])
+                return {
+                    "status": "deleted" if deleted else "not_found",
+                    "brain_id": arguments["brain_id"],
+                }
+            elif tool_name == "associate_brain":
+                brain_id = arguments["brain_id"]
+                assoc = {
+                    k: v
+                    for k, v in arguments.items()
+                    if k != "brain_id" and v is not None
+                }
+                res = await brain_store.associate_brain(brain_id, assoc)
+                if not res:
+                    return {"error": f"Brain '{brain_id}' not found"}
+                return {"brain": res}
+            elif tool_name == "get_agent_brains":
+                return await brain_store.get_agent_brains(
+                    agent_id=arguments["agent_id"],
+                    team_id=arguments.get("team_id"),
+                    functional_domain=arguments.get("functional_domain"),
+                    organization_id=arguments.get("organization_id", "org_default"),
+                )
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
 
@@ -275,6 +582,14 @@ class FuzeAgentMCPServer:
         try:
             if uri == "fuzeagent://organizations":
                 return await self._get_organizations_resource()
+            elif uri == "fuzeagent://brains":
+                return {"brains": await brain_store.list_brains()}
+            elif uri.startswith("fuzeagent://brains/"):
+                brain_id = uri.replace("fuzeagent://brains/", "")
+                b = await brain_store.get_brain(brain_id)
+                if not b:
+                    return {"error": f"Brain '{brain_id}' not found"}
+                return {"brain": b}
             elif uri == "fuzeagent://agent-templates":
                 return await self._get_agent_templates_resource()
             elif uri == "fuzeagent://system-status":

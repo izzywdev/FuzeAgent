@@ -1,0 +1,747 @@
+{
+  "tools": [
+    {
+      "name": "list_organizations",
+      "description": "List all organizations in the FuzeAgent system",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "mutates": false
+    },
+    {
+      "name": "list_teams",
+      "description": "List teams, optionally filtered by organization",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "description": "Optional organization ID to filter teams"
+          }
+        },
+        "required": []
+      },
+      "mutates": false
+    },
+    {
+      "name": "list_agents",
+      "description": "List agents, optionally filtered by team or skills",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "Optional team ID to filter agents"
+          },
+          "skills": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Optional list of required skills"
+          }
+        },
+        "required": []
+      },
+      "mutates": false
+    },
+    {
+      "name": "get_agent_details",
+      "description": "Get detailed information about a specific agent",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "ID of the agent to get details for"
+          }
+        },
+        "required": ["agent_id"]
+      },
+      "mutates": false
+    },
+    {
+      "name": "assign_task",
+      "description": "Assign a task to a specific agent",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "ID of the agent to assign the task to"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the task"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the task"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Task priority (1-10, default: 5)",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 5
+          },
+          "created_by": {
+            "type": "string",
+            "description": "ID or name of task creator",
+            "default": "claude-mcp-client"
+          }
+        },
+        "required": ["agent_id", "title", "description"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "get_agent_templates",
+      "description": "List available agent templates with their capabilities",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Optional category filter (development, qa, devops, business, management, hybrid)"
+          }
+        },
+        "required": []
+      },
+      "mutates": false
+    },
+    {
+      "name": "get_team_hierarchy",
+      "description": "Get hierarchical view of organization → teams → agents",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "description": "Optional organization ID to filter hierarchy"
+          }
+        },
+        "required": []
+      },
+      "mutates": false
+    },
+    {
+      "name": "deploy_agent",
+      "description": "Deploy a new agent from a template to a specific team",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "ID of the team to deploy the agent to"
+          },
+          "template_id": {
+            "type": "string",
+            "description": "ID of the agent template to use (e.g., 'python_developer', 'react_developer')"
+          },
+          "name": {
+            "type": "string",
+            "description": "Custom name for the agent instance"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional description for the agent instance"
+          },
+          "overrides": {
+            "type": "object",
+            "description": "Optional configuration overrides for the agent",
+            "properties": {
+              "model": {"type": "string"},
+              "temperature": {"type": "number", "minimum": 0, "maximum": 2},
+              "max_tokens": {"type": "integer"},
+              "skills": {"type": "array", "items": {"type": "string"}},
+              "tools": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "required": ["team_id", "template_id", "name"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "create_custom_agent",
+      "description": "Create a custom agent with specific configuration",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "description": "ID of the team to create the agent in"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name for the custom agent"
+          },
+          "role": {
+            "type": "string",
+            "description": "Role description for the agent"
+          },
+          "type": {
+            "type": "string",
+            "description": "Agent type identifier"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the agent's capabilities"
+          },
+          "config": {
+            "type": "object",
+            "description": "Agent configuration including model, skills, tools",
+            "properties": {
+              "model": {"type": "string", "default": "claude-3-sonnet-20241022"},
+              "temperature": {"type": "number", "minimum": 0, "maximum": 2, "default": 0.7},
+              "max_tokens": {"type": "integer", "default": 4096},
+              "skills": {"type": "array", "items": {"type": "string"}},
+              "tools": {"type": "array", "items": {"type": "string"}},
+              "system_prompt": {"type": "string"}
+            }
+          }
+        },
+        "required": ["team_id", "name", "role", "type"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "get_agent_tasks",
+      "description": "Get list of tasks assigned to a specific agent",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "ID of the agent to get tasks for"
+          },
+          "status": {
+            "type": "string",
+            "description": "Optional filter by task status",
+            "enum": ["pending", "running", "completed", "failed", "cancelled"]
+          }
+        },
+        "required": ["agent_id"]
+      },
+      "mutates": false
+    },
+    {
+      "name": "update_task_status",
+      "description": "Update the status of a specific task",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "ID of the task to update"
+          },
+          "status": {
+            "type": "string",
+            "description": "New status for the task",
+            "enum": ["pending", "running", "completed", "failed", "cancelled"]
+          },
+          "result": {
+            "type": "string",
+            "description": "Optional task result or notes"
+          }
+        },
+        "required": ["task_id", "status"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "create_organizational_goal",
+      "description": "Create a new strategic goal for an organization",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "description": "ID of the organization"
+          },
+          "title": {"type": "string", "description": "Goal title"},
+          "description": {
+            "type": "string",
+            "description": "Detailed goal description"
+          },
+          "goal_type": {
+            "type": "string",
+            "enum": ["business", "technical", "operational", "strategic"],
+            "description": "Type of goal"
+          },
+          "target_value": {
+            "type": "number",
+            "description": "Target numeric value (e.g., revenue, users)"
+          },
+          "target_unit": {
+            "type": "string",
+            "description": "Unit for target value (e.g., USD, users, percent)"
+          },
+          "target_deadline": {
+            "type": "string",
+            "description": "Deadline in YYYY-MM-DD format"
+          },
+          "priority_level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Priority level (1-10, higher is more important)"
+          },
+          "assigned_teams": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of team IDs assigned to this goal"
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Tags for categorization"
+          }
+        },
+        "required": ["organization_id", "title", "description", "goal_type", "target_deadline"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "list_organization_goals",
+      "description": "List all goals for an organization",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "description": "ID of the organization"
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["active", "paused", "completed", "cancelled"]
+            },
+            "description": "Filter by goal status"
+          },
+          "goal_type": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["business", "technical", "operational", "strategic"]
+            },
+            "description": "Filter by goal type"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 25,
+            "description": "Maximum number of goals to return"
+          }
+        },
+        "required": ["organization_id"]
+      },
+      "mutates": false
+    },
+    {
+      "name": "get_goal_details",
+      "description": "Get detailed information about a specific goal",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "ID of the goal"
+          }
+        },
+        "required": ["goal_id"]
+      },
+      "mutates": false
+    },
+    {
+      "name": "update_goal_progress",
+      "description": "Update progress on a goal",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "ID of the goal"
+          },
+          "progress_percentage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Progress percentage (0-100)"
+          },
+          "current_value": {
+            "type": "number",
+            "description": "Current value achieved"
+          },
+          "completion_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence in completion (0-1)"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Progress notes"
+          }
+        },
+        "required": ["goal_id"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "generate_goal_execution_plan",
+      "description": "Generate comprehensive execution plan with AI-powered milestones and tasks",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "ID of the goal"
+          },
+          "planning_context": {
+            "type": "object",
+            "description": "Optional context for AI planning",
+            "properties": {
+              "focus": {"type": "string"},
+              "resources": {"type": "string"},
+              "constraints": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        },
+        "required": ["goal_id"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "create_goal_conversation",
+      "description": "Create an AI-powered planning conversation for a goal",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "ID of the goal"
+          },
+          "conversation_type": {
+            "type": "string",
+            "enum": ["planning", "review", "problem_solving"],
+            "description": "Type of conversation"
+          },
+          "conversation_title": {
+            "type": "string",
+            "description": "Title for the conversation"
+          },
+          "initial_context": {
+            "type": "object",
+            "description": "Initial context for the conversation"
+          }
+        },
+        "required": ["goal_id", "conversation_type", "conversation_title"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "track_goal_progress",
+      "description": "Record detailed progress tracking with risk assessment",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "ID of the goal"
+          },
+          "progress_percentage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Progress percentage (0-100)"
+          },
+          "current_value": {
+            "type": "number",
+            "description": "Current value achieved"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Progress notes"
+          },
+          "confidence_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence score (0-1)"
+          },
+          "trigger_alerts": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether to trigger risk assessment alerts"
+          }
+        },
+        "required": ["goal_id", "progress_percentage"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "assess_goal_deadline_risk",
+      "description": "Get comprehensive risk assessment for goal completion",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "goal_id": {
+            "type": "string",
+            "description": "ID of the goal"
+          }
+        },
+        "required": ["goal_id"]
+      },
+      "mutates": false
+    },
+    {
+      "name": "get_organization_goals_dashboard",
+      "description": "Get comprehensive dashboard view for all organizational goals",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "description": "ID of the organization"
+          }
+        },
+        "required": ["organization_id"]
+      },
+      "mutates": false
+    },
+    {
+      "name": "list_brains",
+      "description": "List brains for company/organization with optional scope, domain, team, or agent filtering",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "description": "Optional organization ID filter"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["organization", "team", "agent", "cross_functional"],
+            "description": "Filter by scope level"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Filter by cross-functional domain (frontend, devops, backend, etc.)"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Filter by team ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Filter by agent persona ID"
+          }
+        },
+        "required": []
+      },
+      "mutates": false
+    },
+    {
+      "name": "get_brain",
+      "description": "Get detailed metadata, configuration, and document/vector counts for a specific brain",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brain_id": {
+            "type": "string",
+            "description": "ID of the brain to retrieve"
+          }
+        },
+        "required": ["brain_id"]
+      },
+      "mutates": false
+    },
+    {
+      "name": "create_brain",
+      "description": "Create a new brain scoped to org, team, agent persona, or cross-functional domain",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the brain"
+          },
+          "description": {
+            "type": "string",
+            "description": "Brain description and guidelines"
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "Organization ID (default: org_default)"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["organization", "team", "agent", "cross_functional"],
+            "description": "Scope level of the brain"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Functional domain for cross-functional brains (e.g. frontend, devops)"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Associated team ID (for team scope)"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Associated agent persona ID (for agent scope)"
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Tags for search and classification"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Arbitrary metadata key-value pairs"
+          }
+        },
+        "required": ["name", "scope"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "update_brain",
+      "description": "Update brain metadata, scope, functional domain, tags, or active status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brain_id": {
+            "type": "string",
+            "description": "ID of the brain to update"
+          },
+          "name": {
+            "type": "string",
+            "description": "Updated brain name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Updated description"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["organization", "team", "agent", "cross_functional"],
+            "description": "Updated scope"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Updated domain"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Updated team ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Updated agent ID"
+          },
+          "is_active": {
+            "type": "boolean",
+            "description": "Active status"
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": ["brain_id"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "delete_brain",
+      "description": "Delete a brain and its associated wiki documents",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brain_id": {
+            "type": "string",
+            "description": "ID of the brain to delete"
+          }
+        },
+        "required": ["brain_id"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "associate_brain",
+      "description": "Associate a brain with an organization, team, agent persona, or cross-functional domain",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "brain_id": {
+            "type": "string",
+            "description": "ID of the brain to associate"
+          },
+          "scope": {
+            "type": "string",
+            "enum": ["organization", "team", "agent", "cross_functional"],
+            "description": "Target association scope"
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "Target organization ID"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Target team ID"
+          },
+          "agent_id": {
+            "type": "string",
+            "description": "Target agent ID"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Target functional domain (e.g. frontend, devops)"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Association metadata"
+          }
+        },
+        "required": ["brain_id", "scope"]
+      },
+      "mutates": true
+    },
+    {
+      "name": "get_agent_brains",
+      "description": "Resolve the multi-tier brain hierarchy for an agent (agent persona, team, cross-functional e.g. frontend/devops, and org global)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "Agent persona ID (e.g. react-dev, python-dev)"
+          },
+          "team_id": {
+            "type": "string",
+            "description": "Optional team ID"
+          },
+          "functional_domain": {
+            "type": "string",
+            "description": "Optional functional domain (frontend, devops, backend)"
+          },
+          "organization_id": {
+            "type": "string",
+            "description": "Organization ID (default: org_default)"
+          }
+        },
+        "required": ["agent_id"]
+      },
+      "mutates": false
+    }
+  ]
+}

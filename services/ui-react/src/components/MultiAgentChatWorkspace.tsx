@@ -27,6 +27,8 @@ export interface AgentPersona {
   skills: string[];
   status: 'online' | 'executing' | 'idle';
   currentTask?: string;
+  brainId?: string;
+  functionalDomain?: string;
 }
 
 export const AGENT_PERSONAS: AgentPersona[] = [
