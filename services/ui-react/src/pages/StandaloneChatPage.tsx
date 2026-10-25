@@ -1,15 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, 
-  MessageSquare, 
   Plus, 
   Search, 
   ExternalLink, 
   Sparkles, 
-  ChevronRight, 
   PanelRightClose, 
   PanelRightOpen,
-  Terminal,
   Activity,
   Cpu,
   Clock,
@@ -552,7 +549,11 @@ export const StandaloneChatPage: React.FC = () => {
 
           {isThinking && (
             <div className="my-3">
-              <StreamingThoughtIndicator thought={streamingThought || 'Thinking...'} />
+              <StreamingThoughtIndicator 
+                agentName={selectedAgent.name}
+                agentEmoji={selectedAgent.emoji}
+                thought={streamingThought || 'Thinking...'} 
+              />
             </div>
           )}
 
