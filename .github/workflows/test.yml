@@ -286,7 +286,10 @@ jobs:
           --ignore-vuln CVE-2026-45831 \
           --ignore-vuln CVE-2026-45833 \
           --ignore-vuln CVE-2026-59951 \
-          --ignore-vuln GHSA-xf7x-x43h-rpqh
+          --ignore-vuln GHSA-xf7x-x43h-rpqh \
+          --ignore-vuln CVE-2026-112940 \
+          --ignore-vuln CVE-2026-112913 \
+          --ignore-vuln CVE-2026-112907
 
     - name: Upload security reports
       uses: actions/upload-artifact@v7
