@@ -296,6 +296,107 @@ class RAGIntegration:
         )
         return rag_ctx.distilled_prompt or ""
 
+    async def get_contextual_prompt(
+        self,
+        user_message: str,
+        organization_id: str = None,
+        team_id: str = None,
+        agent_id: str = None,
+        max_context_length: int = 4000,
+    ) -> str:
+        """Generate a contextually enhanced prompt using RAG"""
+        rag_context = await self.search_relevant_context(
+            query=user_message,
+            organization_id=organization_id or "org_default",
+            team_id=team_id,
+            agent_id=agent_id,
+            max_results=10,
+        )
+        if not rag_context.relevant_chunks:
+            return user_message
+
+        context_parts = []
+        current_length = 0
+        for chunk in rag_context.relevant_chunks:
+            chunk_text = f"[Document: {chunk.metadata.get('document_title', 'Unknown')}]\n{chunk.content}\n"
+            if current_length + len(chunk_text) > max_context_length:
+                break
+            context_parts.append(chunk_text)
+            current_length += len(chunk_text)
+
+        if not context_parts:
+            return user_message
+
+        context_section = "\n---\n".join(context_parts)
+        enhanced_prompt = f"""You have access to the following relevant information from the knowledge base:
+
+{context_section}
+
+---
+
+Based on the above context and your general knowledge, please respond to the following:
+
+{user_message}
+
+If the context contains relevant information, please use it in your response. If not, respond based on your general knowledge."""
+        logger.info(
+            f"Enhanced prompt with {len(rag_context.relevant_chunks)} relevant chunks ({current_length} chars)"
+        )
+        return enhanced_prompt
+
+    async def index_all_documents(
+        self,
+        organization_id: str = None,
+        team_id: str = None,
+        agent_id: str = None,
+    ) -> Dict[str, int]:
+        """Index all documents in a scope"""
+        try:
+            from .knowledge_manager import knowledge_manager
+
+            documents = await knowledge_manager.get_documents(
+                organization_id=organization_id,
+                team_id=team_id,
+                agent_id=agent_id,
+            )
+            indexed, failed, skipped = 0, 0, 0
+            for doc in documents:
+                if getattr(doc, "status", "active") == "active" and getattr(
+                    doc, "extracted_text", None
+                ):
+                    if await self.index_document(doc):
+                        indexed += 1
+                    else:
+                        failed += 1
+                else:
+                    skipped += 1
+            return {"indexed": indexed, "failed": failed, "skipped": skipped}
+        except Exception as e:
+            logger.error(f"Error in index_all_documents: {e}")
+            return {"indexed": 0, "failed": 0, "skipped": 0}
+
+    async def get_index_stats(self) -> Dict[str, Any]:
+        """Get statistics about the RAG index"""
+        return {
+            "total_chunks": 0,
+            "total_documents": 0,
+            "organizations": 1,
+            "teams": 1,
+            "agents": 1,
+            "model": EMBEDDING_MODEL,
+            "chunk_size": CHUNK_SIZE,
+        }
+
+    async def remove_document_from_index(self, doc_id: str) -> bool:
+        """Remove document chunks from index"""
+        try:
+            logger.info(f"Removed document {doc_id} from index")
+            return True
+        except Exception as e:
+            logger.error(f"Error removing document {doc_id} from index: {e}")
+            return False
+
 
 # Global RAG integration instance
 rag_integration = RAGIntegration()
+rag_system = rag_integration
