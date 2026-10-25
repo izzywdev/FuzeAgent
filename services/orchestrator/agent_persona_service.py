@@ -71,7 +71,7 @@ def generate_svg_avatar(
     geometric avatar silhouette, and stylized initials badge.
     """
     initials = "".join(part[0].upper() for part in human_name.split()[:2]) or "AG"
-    h = hashlib.md5((seed or f"{human_name}_{role_title}").encode()).hexdigest()
+    h = hashlib.sha256((seed or f"{human_name}_{role_title}").encode()).hexdigest()
 
     # Deterministic palette selection
     palettes = [
