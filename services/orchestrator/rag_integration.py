@@ -17,18 +17,18 @@ import numpy as np
 from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
 
-from knowledge_manager import DocumentMetadata, knowledge_manager
 from brain_store import (
-    add_document_chunks,
     add_document,
-    search_multi_brains,
-    search,
+    add_document_chunks,
     get_agent_brains,
     get_hierarchical_context_for_agent,
+    search,
+    search_multi_brains,
 )
 from graph_client import brain_graph
-from s3_storage import s3_storage
 from kafka_pipeline import brain_pipeline
+from knowledge_manager import DocumentMetadata, knowledge_manager
+from s3_storage import s3_storage
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,7 @@ CHUNK_OVERLAP = 50  # Character overlap between chunks
 
 class DocumentChunk(BaseModel):
     """Document chunk for vector storage"""
+
     id: str
     document_id: str
     chunk_index: int
@@ -49,6 +50,7 @@ class DocumentChunk(BaseModel):
 
 class RAGContext(BaseModel):
     """Context retrieved for RAG"""
+
     query: str
     relevant_chunks: List[DocumentChunk]
     similarity_scores: List[float]
@@ -69,7 +71,9 @@ class RAGIntegration:
         try:
             logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
             self.embedding_model = SentenceTransformer(EMBEDDING_MODEL)
-            logger.info("SentenceTransformer loaded. Vector store consolidated on PostgreSQL pgvector(384).")
+            logger.info(
+                "SentenceTransformer loaded. Vector store consolidated on PostgreSQL pgvector(384)."
+            )
         except Exception as e:
             logger.error(f"Failed to initialize embedding model: {e}")
             self.embedding_model = None
@@ -104,14 +108,20 @@ class RAGIntegration:
 
         return chunks
 
-    async def index_document(self, document: DocumentMetadata, brain_id: Optional[str] = None) -> bool:
+    async def index_document(
+        self, document: DocumentMetadata, brain_id: Optional[str] = None
+    ) -> bool:
         """
         Splits document into chunks, embeds via sentence-transformers,
         and saves into PostgreSQL brain_chunks & brain_documents.
         Also publishes Kafka events for background graph sync.
         """
         try:
-            target_brain_id = brain_id or f"brain_agent_{document.agent_id}" if document.agent_id else "brain_org_global"
+            target_brain_id = (
+                brain_id or f"brain_agent_{document.agent_id}"
+                if document.agent_id
+                else "brain_org_global"
+            )
             content = document.extracted_text
             if not content:
                 logger.warning(f"No content to index for document {document.id}")
@@ -124,22 +134,25 @@ class RAGIntegration:
 
             chunk_records = []
             for i, chunk_txt in enumerate(text_chunks):
-                chunk_records.append({
-                    "id": f"{document.id}_{i}",
-                    "document_id": document.id,
-                    "brain_id": target_brain_id,
-                    "chunk_index": i,
-                    "content": chunk_txt,
-                    "metadata": {
+                chunk_records.append(
+                    {
+                        "id": f"{document.id}_{i}",
                         "document_id": document.id,
-                        "document_title": document.title,
-                        "document_type": document.type,
-                        "organization_id": document.organization_id or "org_default",
-                        "team_id": document.team_id or "",
-                        "agent_id": document.agent_id or "",
-                        "tags": document.tags
+                        "brain_id": target_brain_id,
+                        "chunk_index": i,
+                        "content": chunk_txt,
+                        "metadata": {
+                            "document_id": document.id,
+                            "document_title": document.title,
+                            "document_type": document.type,
+                            "organization_id": document.organization_id
+                            or "org_default",
+                            "team_id": document.team_id or "",
+                            "agent_id": document.agent_id or "",
+                            "tags": document.tags,
+                        },
                     }
-                })
+                )
 
             # 1. Persist chunks and parent doc into pgvector
             await add_document(
@@ -148,22 +161,20 @@ class RAGIntegration:
                 content=content[:2000],
                 category=document.type,
                 author=document.agent_id or "system",
-                tags=document.tags
+                tags=document.tags,
             )
             inserted_chunks = await add_document_chunks(
-                brain_id=target_brain_id,
-                document_id=document.id,
-                chunks=chunk_records
+                brain_id=target_brain_id, document_id=document.id, chunks=chunk_records
             )
 
             # 2. Emit Kafka pipeline event for async processing
             await brain_pipeline.emit_chunks_ready(
-                brain_id=target_brain_id,
-                doc_id=document.id,
-                chunks=chunk_records
+                brain_id=target_brain_id, doc_id=document.id, chunks=chunk_records
             )
 
-            logger.info(f"Indexed document {document.id} in Brain [{target_brain_id}] with {inserted_chunks} chunks via pgvector.")
+            logger.info(
+                f"Indexed document {document.id} in Brain [{target_brain_id}] with {inserted_chunks} chunks via pgvector."
+            )
             return True
 
         except Exception as e:
@@ -188,7 +199,7 @@ class RAGIntegration:
             hierarchy = await get_agent_brains(
                 agent_id=agent_id or "general",
                 team_id=team_id,
-                organization_id=organization_id
+                organization_id=organization_id,
             )
             brain_ids = [b["id"] for b in hierarchy.get("brains", [])]
 
@@ -196,7 +207,7 @@ class RAGIntegration:
                 brain_ids=brain_ids,
                 query=query,
                 limit=max_results,
-                similarity_threshold=similarity_threshold
+                similarity_threshold=similarity_threshold,
             )
 
             relevant_chunks = []
@@ -227,13 +238,19 @@ class RAGIntegration:
             graph_snippets = []
             if brain_graph.is_available and seed_entities and brain_ids:
                 primary_brain = brain_ids[0]
-                graph_paths = brain_graph.traverse_2hop_neighborhood(primary_brain, list(seed_entities))
+                graph_paths = brain_graph.traverse_2hop_neighborhood(
+                    primary_brain, list(seed_entities)
+                )
                 graph_snippets = [p["path"] for p in graph_paths[:10]]
 
             # Distilled prompt assembly
-            distilled_parts = [f"--- Retrieved Knowledge ({len(relevant_chunks)} sources) ---"]
+            distilled_parts = [
+                f"--- Retrieved Knowledge ({len(relevant_chunks)} sources) ---"
+            ]
             for c, s in zip(relevant_chunks, similarity_scores):
-                distilled_parts.append(f"[{c.metadata.get('brain_scope', 'KNOWLEDGE')}] {c.content} (score={s:.2f})")
+                distilled_parts.append(
+                    f"[{c.metadata.get('brain_scope', 'KNOWLEDGE')}] {c.content} (score={s:.2f})"
+                )
             if graph_snippets:
                 distilled_parts.append("\n--- Knowledge Graph Relationships ---")
                 distilled_parts.extend(graph_snippets)
@@ -248,7 +265,7 @@ class RAGIntegration:
                 total_documents=len(relevant_chunks),
                 context_length=context_length,
                 graph_context=graph_snippets,
-                distilled_prompt=distilled_prompt
+                distilled_prompt=distilled_prompt,
             )
 
         except Exception as e:
@@ -275,9 +292,10 @@ class RAGIntegration:
             organization_id=organization_id,
             team_id=team_id,
             agent_id=agent_id,
-            max_results=8
+            max_results=8,
         )
         return rag_ctx.distilled_prompt or ""
+
 
 # Global RAG integration instance
 rag_integration = RAGIntegration()

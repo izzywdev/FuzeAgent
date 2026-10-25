@@ -238,7 +238,12 @@ class FuzeAgentMCPServer:
                         },
                         "scope": {
                             "type": "string",
-                            "enum": ["organization", "team", "agent", "cross_functional"],
+                            "enum": [
+                                "organization",
+                                "team",
+                                "agent",
+                                "cross_functional",
+                            ],
                             "description": "Filter by scope level",
                         },
                         "functional_domain": {
@@ -290,7 +295,12 @@ class FuzeAgentMCPServer:
                         },
                         "scope": {
                             "type": "string",
-                            "enum": ["organization", "team", "agent", "cross_functional"],
+                            "enum": [
+                                "organization",
+                                "team",
+                                "agent",
+                                "cross_functional",
+                            ],
                             "description": "Scope level of the brain",
                         },
                         "functional_domain": {
@@ -338,7 +348,12 @@ class FuzeAgentMCPServer:
                         },
                         "scope": {
                             "type": "string",
-                            "enum": ["organization", "team", "agent", "cross_functional"],
+                            "enum": [
+                                "organization",
+                                "team",
+                                "agent",
+                                "cross_functional",
+                            ],
                             "description": "Updated scope",
                         },
                         "functional_domain": {
@@ -392,7 +407,12 @@ class FuzeAgentMCPServer:
                         },
                         "scope": {
                             "type": "string",
-                            "enum": ["organization", "team", "agent", "cross_functional"],
+                            "enum": [
+                                "organization",
+                                "team",
+                                "agent",
+                                "cross_functional",
+                            ],
                             "description": "Target association scope",
                         },
                         "organization_id": {
@@ -499,13 +519,15 @@ class FuzeAgentMCPServer:
                 return await self._get_agent_recommendations(arguments)
             # Brain Tools
             elif tool_name == "list_brains":
-                return {"brains": await brain_store.list_brains(
-                    organization_id=arguments.get("organization_id"),
-                    scope=arguments.get("scope"),
-                    functional_domain=arguments.get("functional_domain"),
-                    team_id=arguments.get("team_id"),
-                    agent_id=arguments.get("agent_id"),
-                )}
+                return {
+                    "brains": await brain_store.list_brains(
+                        organization_id=arguments.get("organization_id"),
+                        scope=arguments.get("scope"),
+                        functional_domain=arguments.get("functional_domain"),
+                        team_id=arguments.get("team_id"),
+                        agent_id=arguments.get("agent_id"),
+                    )
+                }
             elif tool_name == "get_brain":
                 brain = await brain_store.get_brain(arguments["brain_id"])
                 if not brain:
@@ -515,17 +537,28 @@ class FuzeAgentMCPServer:
                 return {"brain": await brain_store.create_brain(arguments)}
             elif tool_name == "update_brain":
                 brain_id = arguments["brain_id"]
-                data = {k: v for k, v in arguments.items() if k != "brain_id" and v is not None}
+                data = {
+                    k: v
+                    for k, v in arguments.items()
+                    if k != "brain_id" and v is not None
+                }
                 updated = await brain_store.update_brain(brain_id, data)
                 if not updated:
                     return {"error": f"Brain '{brain_id}' not found"}
                 return {"brain": updated}
             elif tool_name == "delete_brain":
                 deleted = await brain_store.delete_brain(arguments["brain_id"])
-                return {"status": "deleted" if deleted else "not_found", "brain_id": arguments["brain_id"]}
+                return {
+                    "status": "deleted" if deleted else "not_found",
+                    "brain_id": arguments["brain_id"],
+                }
             elif tool_name == "associate_brain":
                 brain_id = arguments["brain_id"]
-                assoc = {k: v for k, v in arguments.items() if k != "brain_id" and v is not None}
+                assoc = {
+                    k: v
+                    for k, v in arguments.items()
+                    if k != "brain_id" and v is not None
+                }
                 res = await brain_store.associate_brain(brain_id, assoc)
                 if not res:
                     return {"error": f"Brain '{brain_id}' not found"}

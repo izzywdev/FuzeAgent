@@ -1,19 +1,26 @@
+import os
+import sys
+
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
-import sys
-import os
-
 # Ensure paths
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../mcp-servers/fuzeagent-server")))
+sys.path.insert(
+    0,
+    os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../../mcp-servers/fuzeagent-server")
+    ),
+)
+
+from fastapi import FastAPI
+from server import FuzeAgentMCPServer as StandaloneMCPServer
 
 import brain_store
-from image_registry_router import router as image_registry_router, brain_router
+from image_registry_router import brain_router
+from image_registry_router import router as image_registry_router
 from mcp_integration import FuzeAgentMCPServer as InOrchestratorMCPServer
-from server import FuzeAgentMCPServer as StandaloneMCPServer
-from fastapi import FastAPI
 
 
 @pytest.fixture
@@ -32,6 +39,7 @@ def client(test_app):
 # ---------------------------------------------------------------------------
 # 1. Brain Store Unit Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_brain_store_seeded_brains():
@@ -65,14 +73,16 @@ async def test_brain_store_filtering():
 @pytest.mark.asyncio
 async def test_brain_store_crud():
     # Create
-    new_brain = await brain_store.create_brain({
-        "id": "brain_test_qa",
-        "name": "QA Testing Brain",
-        "description": "Quality assurance strategies and Playwright tests",
-        "scope": "cross_functional",
-        "functional_domain": "qa",
-        "tags": ["qa", "testing", "automation"],
-    })
+    new_brain = await brain_store.create_brain(
+        {
+            "id": "brain_test_qa",
+            "name": "QA Testing Brain",
+            "description": "Quality assurance strategies and Playwright tests",
+            "scope": "cross_functional",
+            "functional_domain": "qa",
+            "tags": ["qa", "testing", "automation"],
+        }
+    )
     assert new_brain["id"] == "brain_test_qa"
     assert new_brain["functional_domain"] == "qa"
 
@@ -82,18 +92,24 @@ async def test_brain_store_crud():
     assert fetched["name"] == "QA Testing Brain"
 
     # Update
-    updated = await brain_store.update_brain("brain_test_qa", {
-        "description": "Updated QA strategies with AI vision checks",
-        "tags": ["qa", "testing", "ai-vision"],
-    })
+    updated = await brain_store.update_brain(
+        "brain_test_qa",
+        {
+            "description": "Updated QA strategies with AI vision checks",
+            "tags": ["qa", "testing", "ai-vision"],
+        },
+    )
     assert "ai-vision" in updated["tags"]
     assert "Updated QA strategies" in updated["description"]
 
     # Associate
-    assoc = await brain_store.associate_brain("brain_test_qa", {
-        "scope": "team",
-        "team_id": "team_qa_core",
-    })
+    assoc = await brain_store.associate_brain(
+        "brain_test_qa",
+        {
+            "scope": "team",
+            "team_id": "team_qa_core",
+        },
+    )
     assert assoc["scope"] == "team"
     assert assoc["team_id"] == "team_qa_core"
 
@@ -125,6 +141,7 @@ async def test_brain_store_agent_hierarchy_resolution():
 # ---------------------------------------------------------------------------
 # 2. REST API Endpoint Tests
 # ---------------------------------------------------------------------------
+
 
 def test_rest_list_brains(client):
     # Test /brains
@@ -164,18 +181,24 @@ def test_rest_brain_crud_lifecycle(client):
     assert get_res.json()["name"] == "AppSec & Vulnerability Management Brain"
 
     # PUT /brains/{id}
-    put_res = client.put("/brains/brain_rest_security", json={
-        "description": "Hardened container CVE scanning and FuzeKeys rotation",
-        "tags": ["security", "cve", "fuzekeys"],
-    })
+    put_res = client.put(
+        "/brains/brain_rest_security",
+        json={
+            "description": "Hardened container CVE scanning and FuzeKeys rotation",
+            "tags": ["security", "cve", "fuzekeys"],
+        },
+    )
     assert put_res.status_code == 200
     assert "fuzekeys" in put_res.json()["tags"]
 
     # POST /brains/{id}/associate
-    assoc_res = client.post("/brains/brain_rest_security/associate", json={
-        "scope": "team",
-        "team_id": "team_security_secops",
-    })
+    assoc_res = client.post(
+        "/brains/brain_rest_security/associate",
+        json={
+            "scope": "team",
+            "team_id": "team_security_secops",
+        },
+    )
     assert assoc_res.status_code == 200
     assert assoc_res.json()["scope"] == "team"
     assert assoc_res.json()["team_id"] == "team_security_secops"
@@ -208,6 +231,7 @@ def test_rest_agent_brains_resolution(client):
 # 3. MCP Server Integration Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_standalone_mcp_server_brain_tools():
     mcp_server = StandaloneMCPServer("http://localhost:8000")
@@ -230,7 +254,7 @@ async def test_standalone_mcp_server_brain_tools():
 @pytest.mark.asyncio
 async def test_in_orchestrator_mcp_server():
     in_mcp = InOrchestratorMCPServer()
-    
+
     # Verify tools defined
     tool_names = [t.name for t in in_mcp.tools]
     assert "list_brains" in tool_names
@@ -246,12 +270,16 @@ async def test_in_orchestrator_mcp_server():
     assert "fuzeagent://brains" in resource_uris
 
     # Test tool call
-    res = await in_mcp.handle_tool_call("list_brains", {"functional_domain": "frontend"})
+    res = await in_mcp.handle_tool_call(
+        "list_brains", {"functional_domain": "frontend"}
+    )
     assert "brains" in res
     assert any(b["id"] == "brain_cross_frontend" for b in res["brains"])
 
     # Test agent brains resolution tool call
-    agent_res = await in_mcp.handle_tool_call("get_agent_brains", {"agent_id": "react-dev"})
+    agent_res = await in_mcp.handle_tool_call(
+        "get_agent_brains", {"agent_id": "react-dev"}
+    )
     assert agent_res["agent_id"] == "react-dev"
     assert len(agent_res["brains"]) >= 3
 
@@ -260,6 +288,8 @@ async def test_in_orchestrator_mcp_server():
     assert "brains" in resource_data
     assert len(resource_data["brains"]) >= 7
 
-    brain_res = await in_mcp.handle_resource_request("fuzeagent://brains/brain_cross_devops")
+    brain_res = await in_mcp.handle_resource_request(
+        "fuzeagent://brains/brain_cross_devops"
+    )
     assert "brain" in brain_res
     assert brain_res["brain"]["functional_domain"] == "devops"

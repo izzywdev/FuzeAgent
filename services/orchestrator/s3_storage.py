@@ -10,12 +10,12 @@ Features:
 - Resumable multipart upload coordination & HTTP Range downloads
 """
 
-import os
 import io
-import math
-import uuid
 import logging
-from typing import Dict, Any, List, Optional, Tuple, BinaryIO
+import math
+import os
+import uuid
+from typing import Any, BinaryIO, Dict, List, Optional, Tuple
 
 try:
     import boto3
@@ -28,14 +28,22 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_QUOTA_BYTES = int(os.environ.get("DEFAULT_ORG_STORAGE_QUOTA_BYTES", str(5 * 1024 * 1024 * 1024))) # 5GB default
-S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", os.environ.get("MINIO_ENDPOINT", "http://localhost:9000"))
+DEFAULT_QUOTA_BYTES = int(
+    os.environ.get("DEFAULT_ORG_STORAGE_QUOTA_BYTES", str(5 * 1024 * 1024 * 1024))
+)  # 5GB default
+S3_ENDPOINT_URL = os.environ.get(
+    "S3_ENDPOINT_URL", os.environ.get("MINIO_ENDPOINT", "http://localhost:9000")
+)
 AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin_secure_pass")
+AWS_SECRET_ACCESS_KEY = os.environ.get(
+    "AWS_SECRET_ACCESS_KEY", "minioadmin_secure_pass"
+)
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+
 
 class QuotaExceededError(ValueError):
     """Raised when an upload exceeds the organization's storage quota."""
+
 
 class S3StorageManager:
     def __init__(self, endpoint_url: str = S3_ENDPOINT_URL):
@@ -49,7 +57,16 @@ class S3StorageManager:
                     aws_access_key_id=AWS_ACCESS_KEY_ID,
                     aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
                     region_name=AWS_REGION,
-                    config=Config(signature_version="s3v4", connect_timeout=1, read_timeout=1, retries={"max_attempts": 0}) if Config else None
+                    config=(
+                        Config(
+                            signature_version="s3v4",
+                            connect_timeout=1,
+                            read_timeout=1,
+                            retries={"max_attempts": 0},
+                        )
+                        if Config
+                        else None
+                    ),
                 )
             except Exception as e:
                 logger.warning(f"S3StorageManager: Could not initialize S3 client: {e}")
@@ -62,11 +79,17 @@ class S3StorageManager:
         clean = (organization_id or "org_default").lower().replace("_", "-")
         return f"fuzeagent-org-{clean}"
 
-    def ensure_org_bucket(self, organization_id: str, quota_bytes: int = DEFAULT_QUOTA_BYTES) -> Dict[str, Any]:
+    def ensure_org_bucket(
+        self, organization_id: str, quota_bytes: int = DEFAULT_QUOTA_BYTES
+    ) -> Dict[str, Any]:
         """Verify org bucket exists or initialize it with quota tags."""
         bucket_name = self.format_bucket_name(organization_id)
         if not self._client:
-            return {"bucket_name": bucket_name, "status": "mock", "quota_bytes": quota_bytes}
+            return {
+                "bucket_name": bucket_name,
+                "status": "mock",
+                "quota_bytes": quota_bytes,
+            }
 
         try:
             self._client.head_bucket(Bucket=bucket_name)
@@ -80,15 +103,19 @@ class S3StorageManager:
                         "TagSet": [
                             {"Key": "OrganizationId", "Value": organization_id},
                             {"Key": "StorageQuotaBytes", "Value": str(quota_bytes)},
-                            {"Key": "ManagedBy", "Value": "FuzeInfra"}
+                            {"Key": "ManagedBy", "Value": "FuzeInfra"},
                         ]
-                    }
+                    },
                 )
             except Exception as e:
                 logger.error(f"Failed to create bucket {bucket_name}: {e}")
                 raise
 
-        return {"bucket_name": bucket_name, "status": "ready", "quota_bytes": quota_bytes}
+        return {
+            "bucket_name": bucket_name,
+            "status": "ready",
+            "quota_bytes": quota_bytes,
+        }
 
     def get_storage_usage(self, organization_id: str) -> Dict[str, Any]:
         """Compute used bytes and available quota for the organization."""
@@ -102,7 +129,7 @@ class S3StorageManager:
                 "used_bytes": 0,
                 "quota_bytes": quota_bytes,
                 "percentage_used": 0.0,
-                "file_count": 0
+                "file_count": 0,
             }
 
         total_bytes = 0
@@ -126,7 +153,7 @@ class S3StorageManager:
             "quota_mb": round(quota_bytes / (1024 * 1024), 2),
             "percentage_used": round(pct, 2),
             "file_count": file_count,
-            "remaining_bytes": max(0, quota_bytes - total_bytes)
+            "remaining_bytes": max(0, quota_bytes - total_bytes),
         }
 
     def check_quota(self, organization_id: str, incoming_bytes: int):
@@ -144,7 +171,7 @@ class S3StorageManager:
         data: bytes,
         filename: str,
         category: str = "documents",
-        content_type: str = "application/octet-stream"
+        content_type: str = "application/octet-stream",
     ) -> Dict[str, Any]:
         """
         Uploads an asset to s3://fuzeagent-org-{org_id}/brains/{brain_id}/{category}/{filename}
@@ -163,8 +190,8 @@ class S3StorageManager:
                     Metadata={
                         "brain_id": brain_id,
                         "organization_id": organization_id,
-                        "category": category
-                    }
+                        "category": category,
+                    },
                 )
             except Exception as e:
                 logger.warning(f"S3StorageManager: put_object fallback to mock: {e}")
@@ -174,7 +201,7 @@ class S3StorageManager:
             "key": s3_key,
             "s3_uri": f"s3://{bucket_name}/{s3_key}",
             "size_bytes": len(data),
-            "content_type": content_type
+            "content_type": content_type,
         }
 
     def initiate_resumable_upload(
@@ -184,7 +211,7 @@ class S3StorageManager:
         filename: str,
         total_size_bytes: int,
         content_type: str = "application/octet-stream",
-        category: str = "media"
+        category: str = "media",
     ) -> Dict[str, Any]:
         """
         Initializes an S3 Multipart Upload for resumable large files/media.
@@ -192,7 +219,7 @@ class S3StorageManager:
         self.check_quota(organization_id, total_size_bytes)
         bucket_name = self.format_bucket_name(organization_id)
         s3_key = f"brains/{brain_id}/{category}/{filename}"
-        part_size = 5 * 1024 * 1024 # 5MB parts
+        part_size = 5 * 1024 * 1024  # 5MB parts
         total_parts = math.ceil(total_size_bytes / part_size) or 1
 
         if not self._client:
@@ -203,7 +230,7 @@ class S3StorageManager:
                 "key": s3_key,
                 "part_size_bytes": part_size,
                 "total_parts": total_parts,
-                "part_urls": []
+                "part_urls": [],
             }
 
         try:
@@ -211,11 +238,13 @@ class S3StorageManager:
                 Bucket=bucket_name,
                 Key=s3_key,
                 ContentType=content_type,
-                Metadata={"brain_id": brain_id, "organization_id": organization_id}
+                Metadata={"brain_id": brain_id, "organization_id": organization_id},
             )
             upload_id = response["UploadId"]
         except Exception as e:
-            logger.warning(f"S3StorageManager: create_multipart_upload fallback to mock: {e}")
+            logger.warning(
+                f"S3StorageManager: create_multipart_upload fallback to mock: {e}"
+            )
             upload_id = f"mock_upload_{uuid.uuid4().hex}"
         # Generate presigned URLs for each part
         part_urls = []
@@ -227,14 +256,20 @@ class S3StorageManager:
                         "Bucket": bucket_name,
                         "Key": s3_key,
                         "UploadId": upload_id,
-                        "PartNumber": part_number
+                        "PartNumber": part_number,
                     },
-                    ExpiresIn=3600
+                    ExpiresIn=3600,
                 )
                 part_urls.append({"part_number": part_number, "presigned_url": url})
         except Exception as e:
             logger.warning(f"S3StorageManager: generate_presigned_url fallback: {e}")
-            part_urls = [{"part_number": i, "presigned_url": f"https://mock-s3.local/{s3_key}?partNumber={i}&uploadId={upload_id}"} for i in range(1, total_parts + 1)]
+            part_urls = [
+                {
+                    "part_number": i,
+                    "presigned_url": f"https://mock-s3.local/{s3_key}?partNumber={i}&uploadId={upload_id}",
+                }
+                for i in range(1, total_parts + 1)
+            ]
 
         return {
             "upload_id": upload_id,
@@ -242,7 +277,7 @@ class S3StorageManager:
             "key": s3_key,
             "part_size_bytes": part_size,
             "total_parts": total_parts,
-            "part_urls": part_urls
+            "part_urls": part_urls,
         }
 
     def complete_resumable_upload(
@@ -250,7 +285,7 @@ class S3StorageManager:
         organization_id: str,
         s3_key: str,
         upload_id: str,
-        parts: List[Dict[str, Any]]
+        parts: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Finalize multipart upload with list of uploaded parts [{PartNumber, ETag}]."""
         bucket_name = self.format_bucket_name(organization_id)
@@ -259,14 +294,14 @@ class S3StorageManager:
                 Bucket=bucket_name,
                 Key=s3_key,
                 UploadId=upload_id,
-                MultipartUpload={"Parts": parts}
+                MultipartUpload={"Parts": parts},
             )
 
         return {
             "status": "completed",
             "bucket": bucket_name,
             "key": s3_key,
-            "s3_uri": f"s3://{bucket_name}/{s3_key}"
+            "s3_uri": f"s3://{bucket_name}/{s3_key}",
         }
 
     def download_range(
@@ -274,7 +309,7 @@ class S3StorageManager:
         organization_id: str,
         s3_key: str,
         start_byte: int,
-        end_byte: Optional[int] = None
+        end_byte: Optional[int] = None,
     ) -> Tuple[bytes, int, int]:
         """Download range of bytes from object for resumable streaming."""
         bucket_name = self.format_bucket_name(organization_id)
@@ -285,7 +320,9 @@ class S3StorageManager:
             return b"0" * mock_len, mock_len, mock_len
 
         try:
-            resp = self._client.get_object(Bucket=bucket_name, Key=s3_key, Range=range_header)
+            resp = self._client.get_object(
+                Bucket=bucket_name, Key=s3_key, Range=range_header
+            )
             body = resp["Body"].read()
             total_content_length = resp.get("ContentLength", len(body))
             return body, len(body), total_content_length
@@ -294,6 +331,7 @@ class S3StorageManager:
             mock_data = b"%PDF-1.7 Mock Range Payload " * 10
             chunk = mock_data[start_byte : (end_byte + 1) if end_byte else None]
             return chunk, len(chunk), len(mock_data)
+
 
 # Global storage instance
 s3_storage = S3StorageManager()

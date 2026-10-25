@@ -169,7 +169,9 @@ class BrainCreateRequest(BaseModel):
     team_id: Optional[str] = Field(None, description="Team ID if scope is team")
     agent_id: Optional[str] = Field(None, description="Agent ID if scope is agent")
     is_active: Optional[bool] = Field(True, description="Whether brain is active")
-    tags: Optional[List[str]] = Field(default_factory=list, description="Categorization tags")
+    tags: Optional[List[str]] = Field(
+        default_factory=list, description="Categorization tags"
+    )
     metadata: Optional[Dict[str, Any]] = Field(
         default_factory=dict, description="Metadata key-value pairs"
     )
@@ -698,7 +700,11 @@ async def get_brain(brain_id: str):
 @router.put("/brains/{brain_id}", summary="Update Brain Configuration")
 async def update_brain(brain_id: str, req: BrainUpdateRequest):
     """Update brain metadata, scope, tags, or active status."""
-    data = req.model_dump(exclude_unset=True) if hasattr(req, "model_dump") else req.dict(exclude_unset=True)
+    data = (
+        req.model_dump(exclude_unset=True)
+        if hasattr(req, "model_dump")
+        else req.dict(exclude_unset=True)
+    )
     brain = await brain_store.update_brain(brain_id, data)
     if not brain:
         raise HTTPException(status_code=404, detail=f"Brain '{brain_id}' not found")
@@ -721,7 +727,11 @@ async def delete_brain(brain_id: str):
 async def associate_brain(brain_id: str, req: BrainAssociateRequest):
     """Dynamically associate or re-assign a brain to an org, team, agent, or functional domain."""
     try:
-        data = req.model_dump(exclude_unset=True) if hasattr(req, "model_dump") else req.dict(exclude_unset=True)
+        data = (
+            req.model_dump(exclude_unset=True)
+            if hasattr(req, "model_dump")
+            else req.dict(exclude_unset=True)
+        )
         updated = await brain_store.associate_brain(brain_id, data)
         if not updated:
             raise HTTPException(status_code=404, detail=f"Brain '{brain_id}' not found")

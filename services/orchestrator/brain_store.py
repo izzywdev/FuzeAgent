@@ -89,11 +89,24 @@ IN_MEMORY_BRAINS: Dict[str, Dict[str, Any]] = {
         "team_id": None,
         "agent_id": None,
         "is_active": True,
-        "tags": ["devops", "sre", "kubernetes", "argocd", "gitops", "prometheus", "loki"],
+        "tags": [
+            "devops",
+            "sre",
+            "kubernetes",
+            "argocd",
+            "gitops",
+            "prometheus",
+            "loki",
+        ],
         "metadata": {
             "tier": 2,
             "domain": "devops",
-            "shared_with": ["devops-agent", "sre-agent", "platform-engineer", "security-agent"],
+            "shared_with": [
+                "devops-agent",
+                "sre-agent",
+                "platform-engineer",
+                "security-agent",
+            ],
         },
         "document_count": 34,
         "vector_count": 6200,
@@ -192,7 +205,9 @@ def _get_model():
 
             _model = SentenceTransformer("all-MiniLM-L6-v2")
         except Exception as e:
-            logger.warning(f"SentenceTransformer unavailable, using mock embedding: {e}")
+            logger.warning(
+                f"SentenceTransformer unavailable, using mock embedding: {e}"
+            )
             _model = None
     return _model
 
@@ -209,7 +224,8 @@ async def _embed(text: str) -> List[float]:
         except Exception as e:
             logger.warning(f"Embedding encoding failed: {e}")
     import hashlib
-    seed = int(hashlib.md5(text.encode("utf-8")).hexdigest()[:8], 16)
+
+    seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], 16)
     return [((seed * (i + 1)) % 1000) / 1000.0 for i in range(EMBEDDING_DIM)]
 
 
@@ -241,11 +257,17 @@ async def _ensure_table(conn) -> None:
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_brains_org ON brains(organization_id)")
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_brains_org ON brains(organization_id)"
+    )
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_brains_scope ON brains(scope)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_brains_domain ON brains(functional_domain)")
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_brains_domain ON brains(functional_domain)"
+    )
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_brains_team ON brains(team_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_brains_agent ON brains(agent_id)")
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_brains_agent ON brains(agent_id)"
+    )
 
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS brain_documents (
@@ -276,8 +298,12 @@ async def _ensure_table(conn) -> None:
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_brain_chunks_brain ON brain_chunks(brain_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_brain_chunks_doc ON brain_chunks(document_id)")
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_brain_chunks_brain ON brain_chunks(brain_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_brain_chunks_doc ON brain_chunks(document_id)"
+    )
 
     # Seed default brains if empty
     count = await conn.fetchval("SELECT COUNT(*) FROM brains")
@@ -559,7 +585,9 @@ async def delete_brain(brain_id: str) -> bool:
         async with get_db_connection() as conn:
             await _ensure_table(conn)
             res = await conn.execute("DELETE FROM brains WHERE id = $1", brain_id)
-            await conn.execute("DELETE FROM brain_documents WHERE brain_id = $1", brain_id)
+            await conn.execute(
+                "DELETE FROM brain_documents WHERE brain_id = $1", brain_id
+            )
             if "DELETE 1" in res:
                 found = True
     except Exception as e:
@@ -572,7 +600,9 @@ async def delete_brain(brain_id: str) -> bool:
     return found
 
 
-async def associate_brain(brain_id: str, association: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def associate_brain(
+    brain_id: str, association: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
     """
     Associate a brain with an org, team, agent persona, or cross-functional domain.
     """
@@ -629,11 +659,19 @@ async def get_agent_brains(
     inferred_domain = functional_domain
     if not inferred_domain:
         aid = agent_id.lower()
-        if any(term in aid for term in ["react", "frontend", "ui", "front", "mobile", "css", "web"]):
+        if any(
+            term in aid
+            for term in ["react", "frontend", "ui", "front", "mobile", "css", "web"]
+        ):
             inferred_domain = "frontend"
-        elif any(term in aid for term in ["devops", "sre", "infra", "k8s", "argocd", "ops", "cloud"]):
+        elif any(
+            term in aid
+            for term in ["devops", "sre", "infra", "k8s", "argocd", "ops", "cloud"]
+        ):
             inferred_domain = "devops"
-        elif any(term in aid for term in ["python", "backend", "api", "db", "server", "sql"]):
+        elif any(
+            term in aid for term in ["python", "backend", "api", "db", "server", "sql"]
+        ):
             inferred_domain = "backend"
 
     all_brains = await list_brains(organization_id=organization_id)
@@ -662,9 +700,17 @@ async def get_agent_brains(
     if not agent_brain and f"brain_agent_{agent_id}" in IN_MEMORY_BRAINS:
         agent_brain = IN_MEMORY_BRAINS[f"brain_agent_{agent_id}"]
     if not team_brain:
-        effective_team = team_id or (agent_brain.get("team_id") if agent_brain else None) or "team_platform"
+        effective_team = (
+            team_id
+            or (agent_brain.get("team_id") if agent_brain else None)
+            or "team_platform"
+        )
         if effective_team:
-            t_key = f"brain_{effective_team}" if effective_team.startswith("brain_") else f"brain_team_{effective_team.replace('team_', '')}"
+            t_key = (
+                f"brain_{effective_team}"
+                if effective_team.startswith("brain_")
+                else f"brain_team_{effective_team.replace('team_', '')}"
+            )
             if t_key in IN_MEMORY_BRAINS:
                 team_brain = IN_MEMORY_BRAINS[t_key]
             elif "brain_team_platform" in IN_MEMORY_BRAINS:
@@ -681,22 +727,45 @@ async def get_agent_brains(
 
     if agent_brain:
         resolved_list.append(agent_brain)
-        hierarchy_layers.append({"tier": 1, "scope": "agent", "brain_id": agent_brain["id"], "name": agent_brain["name"]})
+        hierarchy_layers.append(
+            {
+                "tier": 1,
+                "scope": "agent",
+                "brain_id": agent_brain["id"],
+                "name": agent_brain["name"],
+            }
+        )
     if team_brain:
         resolved_list.append(team_brain)
-        hierarchy_layers.append({"tier": 2, "scope": "team", "brain_id": team_brain["id"], "name": team_brain["name"]})
+        hierarchy_layers.append(
+            {
+                "tier": 2,
+                "scope": "team",
+                "brain_id": team_brain["id"],
+                "name": team_brain["name"],
+            }
+        )
     if cross_functional_brain:
         resolved_list.append(cross_functional_brain)
-        hierarchy_layers.append({
-            "tier": 3,
-            "scope": "cross_functional",
-            "functional_domain": inferred_domain,
-            "brain_id": cross_functional_brain["id"],
-            "name": cross_functional_brain["name"],
-        })
+        hierarchy_layers.append(
+            {
+                "tier": 3,
+                "scope": "cross_functional",
+                "functional_domain": inferred_domain,
+                "brain_id": cross_functional_brain["id"],
+                "name": cross_functional_brain["name"],
+            }
+        )
     if org_brain:
         resolved_list.append(org_brain)
-        hierarchy_layers.append({"tier": 4, "scope": "organization", "brain_id": org_brain["id"], "name": org_brain["name"]})
+        hierarchy_layers.append(
+            {
+                "tier": 4,
+                "scope": "organization",
+                "brain_id": org_brain["id"],
+                "name": org_brain["name"],
+            }
+        )
 
     return {
         "agent_id": agent_id,
@@ -797,9 +866,7 @@ async def search(
 
 
 async def add_document_chunks(
-    brain_id: str,
-    document_id: str,
-    chunks: List[Dict[str, Any]]
+    brain_id: str, document_id: str, chunks: List[Dict[str, Any]]
 ) -> int:
     """Embed and persist text chunks for a document into brain_chunks."""
     if not chunks:
@@ -831,14 +898,14 @@ async def add_document_chunks(
                     i,
                     chunk.get("content", ""),
                     import_json().dumps(chunk.get("metadata", {})),
-                    _vec_literal(vec)
+                    _vec_literal(vec),
                 )
                 inserted += 1
 
             await conn.execute(
                 "UPDATE brains SET vector_count = vector_count + $1 WHERE id = $2",
                 inserted,
-                brain_id
+                brain_id,
             )
             return inserted
     except Exception as e:
@@ -848,14 +915,12 @@ async def add_document_chunks(
 
 def import_json():
     import json
+
     return json
 
 
 async def search_multi_brains(
-    brain_ids: List[str],
-    query: str,
-    limit: int = 5,
-    similarity_threshold: float = 0.5
+    brain_ids: List[str], query: str, limit: int = 5, similarity_threshold: float = 0.5
 ) -> List[Dict[str, Any]]:
     """
     Searches across multiple brain tiers simultaneously using cosine distance.
@@ -883,7 +948,7 @@ async def search_multi_brains(
                 brain_ids,
                 _vec_literal(vec),
                 similarity_threshold,
-                limit
+                limit,
             )
             if chunk_rows:
                 return [
@@ -894,8 +959,12 @@ async def search_multi_brains(
                         "brain_name": r["brain_name"],
                         "brain_scope": r["brain_scope"],
                         "content": r["content"],
-                        "metadata": import_json().loads(r["metadata"] or "{}") if isinstance(r["metadata"], str) else (r["metadata"] or {}),
-                        "score": round(float(r["score"]), 4)
+                        "metadata": (
+                            import_json().loads(r["metadata"] or "{}")
+                            if isinstance(r["metadata"], str)
+                            else (r["metadata"] or {})
+                        ),
+                        "score": round(float(r["score"]), 4),
                     }
                     for r in chunk_rows
                 ]
@@ -916,7 +985,7 @@ async def search_multi_brains(
                 brain_ids,
                 _vec_literal(vec),
                 similarity_threshold,
-                limit
+                limit,
             )
             return [
                 {
@@ -926,7 +995,7 @@ async def search_multi_brains(
                     "brain_scope": r["brain_scope"],
                     "title": r["title"],
                     "content": r["content"],
-                    "score": round(float(r["score"]), 4)
+                    "score": round(float(r["score"]), 4),
                 }
                 for r in doc_rows
             ]
@@ -941,7 +1010,7 @@ async def get_hierarchical_context_for_agent(
     team_id: Optional[str] = None,
     functional_domain: Optional[str] = None,
     organization_id: str = "org_default",
-    token_budget: int = 4000
+    token_budget: int = 4000,
 ) -> Dict[str, Any]:
     """
     1. Resolves all 4 brain tiers: Agent -> Team -> Cross-Functional -> Org
@@ -952,7 +1021,7 @@ async def get_hierarchical_context_for_agent(
         agent_id=agent_id,
         team_id=team_id,
         functional_domain=functional_domain,
-        organization_id=organization_id
+        organization_id=organization_id,
     )
     brain_ids = [b["id"] for b in hierarchy_info.get("brains", [])]
     if not brain_ids:
@@ -977,12 +1046,14 @@ async def get_hierarchical_context_for_agent(
         header = f"### [{scope.upper()}] {name} (Relevance: {hit.get('score', 0):.2f})"
         sections.append(f"{header}\n{content}")
         current_tokens += approx_tokens
-        sources.append({
-            "brain_id": hit.get("brain_id"),
-            "scope": scope,
-            "title": hit.get("title") or hit.get("document_id"),
-            "score": hit.get("score")
-        })
+        sources.append(
+            {
+                "brain_id": hit.get("brain_id"),
+                "scope": scope,
+                "title": hit.get("title") or hit.get("document_id"),
+                "score": hit.get("score"),
+            }
+        )
 
     distilled = "\n\n---\n\n".join(sections)
     return {
@@ -995,4 +1066,3 @@ async def get_hierarchical_context_for_agent(
         "hierarchy": hierarchy_info.get("hierarchy", []),
         "tiers_queried": hierarchy_info.get("hierarchy", []),
     }
-

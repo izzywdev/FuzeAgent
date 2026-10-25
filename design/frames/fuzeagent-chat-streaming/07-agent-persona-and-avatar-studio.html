@@ -250,11 +250,15 @@
     function randomizeAvatar(agentId) {
       const idx = Math.floor(Math.random() * gradients.length);
       const [c1, c2] = gradients[idx];
-      const name = document.getElementById('name-' + agentId).value;
-      const initial = (name.trim()[0] || 'A').toUpperCase();
+      const nameEl = document.getElementById('name-' + agentId);
+      const rawInitial = (nameEl ? nameEl.value.trim()[0] : '') || 'A';
+      const cleanChar = /^[a-zA-Z0-9]$/.test(rawInitial) ? rawInitial.toUpperCase() : 'A';
       const box = document.getElementById('avatar-' + agentId);
-      box.innerHTML = `
-        <svg viewBox="0 0 128 128">
+      if (!box) return;
+
+      const parser = new DOMParser();
+      const svgDoc = parser.parseFromString(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
           <defs>
             <linearGradient id="grad_dyn_${agentId}" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="${c1}"/>
@@ -265,9 +269,14 @@
           <circle cx="64" cy="50" r="22" fill="#FFFFFF" fill-opacity="0.9"/>
           <path d="M28 116 C28 88, 100 88, 100 116 Z" fill="#FFFFFF" fill-opacity="0.9"/>
           <rect x="76" y="76" width="44" height="44" rx="22" fill="#0F172A" stroke="#FFFFFF" stroke-width="2"/>
-          <text x="98" y="103" font-family="sans-serif" font-size="14" font-weight="700" fill="${c1}" text-anchor="middle">${initial}</text>
+          <text id="initial-text" x="98" y="103" font-family="sans-serif" font-size="14" font-weight="700" fill="${c1}" text-anchor="middle"></text>
         </svg>
-      `;
+      `, "image/svg+xml");
+      const textNode = svgDoc.getElementById('initial-text');
+      if (textNode) {
+        textNode.textContent = cleanChar;
+      }
+      box.replaceChildren(svgDoc.documentElement);
     }
   </script>
 </body>

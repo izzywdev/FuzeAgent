@@ -31,9 +31,11 @@ from pydantic import BaseModel, Field
 from hierarchy_endpoints import router as hierarchy_router
 
 try:
-    from .image_registry_router import brain_router, router as image_registry_router
+    from .image_registry_router import brain_router
+    from .image_registry_router import router as image_registry_router
 except ImportError:
-    from image_registry_router import brain_router, router as image_registry_router
+    from image_registry_router import brain_router
+    from image_registry_router import router as image_registry_router
 
 try:
     from .app_builds import router as app_builds_router

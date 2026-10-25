@@ -8,10 +8,11 @@ Provides:
 - Picture placeholder fallback
 """
 
-import os
 import hashlib
 import logging
-from typing import Dict, Any, List, Optional
+import os
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from s3_storage import s3_storage
@@ -24,31 +25,32 @@ DEFAULT_AGENT_PERSONAS: Dict[str, Dict[str, str]] = {
         "human_name": "John",
         "role_title": "Senior Backend Engineer",
         "functional_domain": "backend",
-        "color_theme": "#3B82F6", # Electric Blue
-        "bio": "Specializes in Python, FastAPI, asyncpg, and high-performance microservices."
+        "color_theme": "#3B82F6",  # Electric Blue
+        "bio": "Specializes in Python, FastAPI, asyncpg, and high-performance microservices.",
     },
     "react-dev": {
         "human_name": "Sarah",
         "role_title": "Frontend Architect",
         "functional_domain": "frontend",
-        "color_theme": "#10B981", # Emerald Green
-        "bio": "Expert in React 19, Design System tokens, microfrontends, and accessible UI/UX."
+        "color_theme": "#10B981",  # Emerald Green
+        "bio": "Expert in React 19, Design System tokens, microfrontends, and accessible UI/UX.",
     },
     "devops-agent": {
         "human_name": "Alex",
         "role_title": "DevOps & SRE Specialist",
         "functional_domain": "devops",
-        "color_theme": "#F59E0B", # Amber
-        "bio": "Coordinates Kubernetes clusters, ArgoCD GitOps syncs, Prometheus alerting, and cloud security."
+        "color_theme": "#F59E0B",  # Amber
+        "bio": "Coordinates Kubernetes clusters, ArgoCD GitOps syncs, Prometheus alerting, and cloud security.",
     },
     "qa-agent": {
         "human_name": "Elena",
         "role_title": "Lead Quality & Test Engineer",
         "functional_domain": "qa",
-        "color_theme": "#8B5CF6", # Purple
-        "bio": "Designs end-to-end Playwright suites, API contract validation, and load testing pipelines."
-    }
+        "color_theme": "#8B5CF6",  # Purple
+        "bio": "Designs end-to-end Playwright suites, API contract validation, and load testing pipelines.",
+    },
 }
+
 
 class AgentPersona(BaseModel):
     agent_id: str
@@ -61,7 +63,9 @@ class AgentPersona(BaseModel):
     color_theme: str = "#6366F1"
 
 
-def generate_svg_avatar(human_name: str, role_title: str, seed: Optional[str] = None) -> str:
+def generate_svg_avatar(
+    human_name: str, role_title: str, seed: Optional[str] = None
+) -> str:
     """
     Generates a sleek, modern SVG avatar with dual-tone gradient background,
     geometric avatar silhouette, and stylized initials badge.
@@ -71,11 +75,11 @@ def generate_svg_avatar(human_name: str, role_title: str, seed: Optional[str] = 
 
     # Deterministic palette selection
     palettes = [
-        ("#6366F1", "#8B5CF6"), # Indigo to Purple
-        ("#3B82F6", "#06B6D4"), # Blue to Cyan
-        ("#10B981", "#14B8A6"), # Emerald to Teal
-        ("#F59E0B", "#EF4444"), # Amber to Red
-        ("#EC4899", "#8B5CF6"), # Pink to Purple
+        ("#6366F1", "#8B5CF6"),  # Indigo to Purple
+        ("#3B82F6", "#06B6D4"),  # Blue to Cyan
+        ("#10B981", "#14B8A6"),  # Emerald to Teal
+        ("#F59E0B", "#EF4444"),  # Amber to Red
+        ("#EC4899", "#8B5CF6"),  # Pink to Purple
     ]
     color_idx = int(h[:2], 16) % len(palettes)
     c1, c2 = palettes[color_idx]
@@ -118,7 +122,7 @@ class AgentPersonaService:
                 color_theme=data["color_theme"],
                 bio=data["bio"],
                 avatar_svg=svg,
-                avatar_url=f"/api/v1/agents/{aid}/avatar"
+                avatar_url=f"/api/v1/agents/{aid}/avatar",
             )
 
     def get_persona(self, agent_id: str) -> AgentPersona:
@@ -134,7 +138,7 @@ class AgentPersonaService:
             human_name=human_name,
             role_title=role_title,
             avatar_svg=svg,
-            avatar_url=f"/api/v1/agents/{agent_id}/avatar"
+            avatar_url=f"/api/v1/agents/{agent_id}/avatar",
         )
         self._personas[agent_id] = persona
         return persona
@@ -145,7 +149,7 @@ class AgentPersonaService:
         human_name: Optional[str] = None,
         role_title: Optional[str] = None,
         bio: Optional[str] = None,
-        organization_id: str = "org_default"
+        organization_id: str = "org_default",
     ) -> AgentPersona:
         current = self.get_persona(agent_id)
         if human_name:
@@ -156,7 +160,9 @@ class AgentPersonaService:
             current.bio = bio
 
         # Regenerate avatar
-        current.avatar_svg = generate_svg_avatar(current.human_name, current.role_title, seed=agent_id)
+        current.avatar_svg = generate_svg_avatar(
+            current.human_name, current.role_title, seed=agent_id
+        )
 
         # Upload to S3 bucket if available
         brain_id = f"brain_agent_{agent_id}"
@@ -167,7 +173,7 @@ class AgentPersonaService:
                 data=current.avatar_svg.encode("utf-8"),
                 filename=f"{agent_id}_avatar.svg",
                 category="avatars",
-                content_type="image/svg+xml"
+                content_type="image/svg+xml",
             )
         except Exception as e:
             logger.warning(f"Could not persist avatar to S3: {e}")
@@ -177,6 +183,7 @@ class AgentPersonaService:
 
     def list_personas(self) -> List[AgentPersona]:
         return list(self._personas.values())
+
 
 # Global persona service instance
 agent_persona_service = AgentPersonaService()
