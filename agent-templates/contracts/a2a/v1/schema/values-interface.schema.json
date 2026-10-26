@@ -113,7 +113,7 @@
     "tenant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tenant", "repo", "enabled"],
+      "required": ["tenant", "enabled"],
       "properties": {
         "tenant": {
           "type": "string",
@@ -123,7 +123,7 @@
         "repo": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
-          "description": "owner/name of the repo whose .fuze/manifest.json and agent-templates/roles/ are the projection source."
+          "description": "owner/name of the repo whose .fuze/manifest.json and agent-templates/roles/ are the projection source. Required for the default dynamic-projection topology. Omit only when the product image bakes in a pre-generated card via AGENT_CARD_FILE (static-card topology) — in that case the init container clone is also skipped via deploy.skipRepoSync."
         },
         "ref": { "type": "string", "default": "main", "description": "Git ref the manifest/roles are read from. GitOps: this is the source of truth, never live-mutated state." },
         "enabled": { "type": "boolean", "default": false, "description": "Per-tenant gate, independent of the server gate." },

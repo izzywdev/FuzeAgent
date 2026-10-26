@@ -28,12 +28,14 @@ spec:
         runAsNonRoot: true
         runAsUser: 10001
         fsGroup: 10001
-      {{- if .Values.a2a.tenants }}
+      {{- if and .Values.a2a.tenants (not .Values.deploy.skipRepoSync) }}
       # Repo checkout: runtime.py's LocalRepoResolver reads each tenant's projection
       # inputs (.fuze/manifest.json + agent-templates/roles/) from A2A_REPOS_DIR/<name>.
       # The server comment states the chart provides this checkout out of band, so an
       # init container shallow-clones each enabled tenant's repo at its GitOps `ref`.
       # GitOps: the ref is the source of truth, never live-mutated in /repos.
+      # Skip with deploy.skipRepoSync: true when the product image bakes in the card
+      # via AGENT_CARD_FILE (static-card topology) — no GitHub clone needed.
       initContainers:
         - name: repo-sync
           image: {{ .Values.deploy.gitImage }}
@@ -121,6 +123,12 @@ spec:
               value: /state
             - name: PYTHONUNBUFFERED
               value: "1"
+            {{- if .Values.deploy.agentCardFile }}
+            # Static-card topology: the product image bakes in the pre-generated card.
+            # Server serves it directly from this path instead of projecting from a repo.
+            - name: AGENT_CARD_FILE
+              value: {{ .Values.deploy.agentCardFile | quote }}
+            {{- end }}
             {{- with .Values.deploy.providerApiKeySecretRef }}
             # Managed-Agents API key for session provisioning (sync/common.py _api_key()).
             - name: ANTHROPIC_API_KEY

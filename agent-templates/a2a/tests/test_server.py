@@ -273,3 +273,43 @@ def test_extended_card_allowlisted(client):
 def test_extended_card_denied_is_404(client):
     r = client.get("/extendedAgentCard?tenant=FuzePlan", headers=_hdr("tok-mal"))
     assert r.status_code == 404
+
+
+# --- static-card topology (AGENT_CARD_FILE) ----------------------------------
+
+def test_static_card_file_served_without_tenant_lookup(tmp_path, monkeypatch):
+    """When AGENT_CARD_FILE is set the server returns the baked-in JSON directly,
+    bypassing the repo-clone path. No adapter, no tenants needed."""
+    baked = {"name": "FuzeFront A2A", "staticCard": True}
+    card_path = tmp_path / "agent-card.json"
+    card_path.write_text(json.dumps(baked))
+
+    monkeypatch.setenv("AGENT_CARD_FILE", str(card_path))
+
+    # Build a server with NO tenants (as a per-product static image would look)
+    from a2a.config import AuthConfig, ServerConfig
+    from a2a.identity import StaticAuthenticator
+    from a2a.server import build_app
+
+    cfg = ServerConfig(enabled=True, tenants=())
+    # adapter needs a resolver, but well_known_card never calls it when AGENT_CARD_FILE is set
+    from a2a.adapter import A2AAdapter
+    adapter = A2AAdapter(cfg, FakeProvider(), lambda t: ({}, {}))
+    app = build_app(adapter, StaticAuthenticator({}))
+    sc = TestClient(app)
+
+    r = sc.get("/.well-known/agent-card.json")
+    assert r.status_code == 200
+    assert r.json() == baked
+    assert r.headers["cache-control"] == "public, max-age=60"
+
+
+def test_static_card_file_falls_through_on_missing_file(monkeypatch, client):
+    """If AGENT_CARD_FILE points to a non-existent path, fall through to dynamic
+    projection — no 500, just the normally projected card."""
+    monkeypatch.setenv("AGENT_CARD_FILE", "/does/not/exist/card.json")
+
+    r = client.get("/.well-known/agent-card.json?tenant=FuzePlan")
+    assert r.status_code == 200
+    # dynamic projection returns the FuzePlan card, not the missing file
+    assert r.json()["supportedInterfaces"][0]["tenant"] == "FuzePlan"

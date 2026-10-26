@@ -264,21 +264,127 @@ non-disclosing), which reads like an authz failure and is not.
 
 ---
 
+---
+
+## Static-card topology — bake the card into the product image
+
+The default topology clones the product repo at pod startup to generate the card.
+That clone requires GitHub access. There is an alternative: **bake the pre-generated
+card JSON into the product image** so the pod needs no external git access at all.
+
+**Why you'd want this:**
+
+- The pod represents a specific product (FuzeFront, FuzeKeys, FuzePlan …) and
+  should talk TO it over MCP/REST, not clone its own GitHub repo.
+- Simpler startup — no init container, no git token secret, faster first-ready.
+- Clearer blast-radius isolation — each product's image ships its own card; there
+  is no runtime dependency on GitHub availability.
+
+### How it works
+
+1. The product writes a `Dockerfile` that extends the shared base image and bakes in
+   a pre-generated card:
+
+   ```dockerfile
+   FROM ghcr.io/izzywdev/fuze-a2a:<tag>
+
+   # Pre-generated card — no GitHub clone needed at runtime.
+   COPY agent-card.json /app/agent-card.json
+   ENV AGENT_CARD_FILE=/app/agent-card.json
+   ```
+
+2. The chart sets two deploy-block values:
+
+   ```yaml
+   deploy:
+     agentCardFile: /app/agent-card.json   # maps to AGENT_CARD_FILE in the container
+     skipRepoSync: true                    # skip the repo-clone init container entirely
+   ```
+
+3. The `tenant.repo` field in `a2a.tenants[]` may be omitted — the server never
+   reads the cloned repo when `AGENT_CARD_FILE` is set.
+
+### Generating the card
+
+Run this **before building the image**, from the product repo root:
+
+```bash
+cd /path/to/agent-templates/a2a
+python -c "
+import json
+from a2a import card_generator as cg
+from a2a.loader import load_repo
+m, r = load_repo('/path/to/your/repo')
+card = cg.project_product_card(
+    m, r,
+    in_cluster_url='http://a2a-<product>.<ns>.svc.cluster.local:8080/rpc')
+print(json.dumps(card, indent=2))
+" > /path/to/your/repo/agent-card.json
+```
+
+Then commit `agent-card.json` and include it in the image via `COPY`.
+
+### Static card values example (FuzeFront)
+
+```yaml
+a2a:
+  enabled: true
+  image:
+    repository: ghcr.io/izzywdev/fuzefront-a2a   # product-specific image
+    tag: <immutable-sha>
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  protocolVersion: "1.0"
+  inClusterUrl: http://a2a-fuzefront.fuzefront.svc.cluster.local:8080/rpc
+  auth:
+    oidcIssuerUrl: https://app.fuzefront.com/application/o/fuzefront/
+    oidcDiscoveryUrl: http://authentik-server.fuzefront.svc.cluster.local:9000/application/o/fuzefront/.well-known/openid-configuration
+    audience: a2a
+    callerClaim: repo
+  cardSigning:
+    keySecretRef: { name: a2a-card-signing, key: jws.key }
+    keyId: a2a-v1
+  tenants:
+    - tenant: FuzeFront
+      enabled: true           # repo: omitted — card is baked in
+      entryRole: app-shell-platform
+      external: false
+
+deploy:
+  agentCardFile: /app/agent-card.json
+  skipRepoSync: true          # no init container, no git token
+  # ... rest of deploy values unchanged
+```
+
+**`/rpc`, auth, and all other endpoints still require a live OIDC token.** The static
+card replaces the card-generation path only. A `POST /rpc` request is still fully
+authenticated by the OIDC/mTLS stack regardless of how the card was produced.
+
+---
+
 ## Two topologies, one server
 
-| | Shared server (`a2a-shared`) | Per-product pod |
-|---|---|---|
-| Deployments | 1, namespace `fuzeagent` | 1 per product, in its own namespace |
-| `a2a.tenants[]` | many | exactly one (plus that repo's `Exec-<role>` tenants, if it serves any) |
-| `a2a.inClusterUrl` | unset → default | **set to its own Service** |
-| Card discovery | `?tenant=` selects | no query param needed |
-| Blast radius | all tenants | one product |
-| Image / server code | identical | identical |
+| | Shared server (`a2a-shared`) | Per-product pod (dynamic) | Per-product pod (static card) |
+|---|---|---|---|
+| Deployments | 1, namespace `fuzeagent` | 1 per product | 1 per product |
+| Card source | cloned repo | cloned repo | baked into image |
+| `tenant.repo` | required | required | optional |
+| Init container | yes | yes | **no** |
+| GitHub access at runtime | yes | yes | **no** |
+| `deploy.skipRepoSync` | false | false | **true** |
+| `deploy.agentCardFile` | unset | unset | **set** |
+| `a2a.inClusterUrl` | unset → default | **set** | **set** |
+| Blast radius | all tenants | one product | one product |
+| Image | shared | shared | product-specific |
 
 Onboarding onto the shared server is still just a `tenants` entry —
 [enable-your-pod.md](enable-your-pod.md) covers that path and remains correct.
 
 ## Checklist
+
+### Dynamic projection (default)
 
 1. [ ] `providesTo` present in your `.fuze/manifest.json`, naming every allowed caller.
 2. [ ] `agent-templates/roles/<entryRole>/role.json` exists on the served `ref`, with a non-empty `description`.
@@ -289,3 +395,13 @@ Onboarding onto the shared server is still just a `tenants` entry —
 7. [ ] SealedSecrets sealed **for your namespace** (they are not portable).
 8. [ ] `HOST=0.0.0.0` set; `/config`, `/repos`, `/state` mounted; repo-sync init container clones to `/repos/<tenant>`.
 9. [ ] Card fetched after rollout advertises YOUR endpoint.
+
+### Static-card topology (baked image)
+
+1. [ ] `agent-card.json` generated from the product repo and committed.
+2. [ ] Product `Dockerfile` `FROM ghcr.io/izzywdev/fuze-a2a:<tag>`, `COPY agent-card.json /app/agent-card.json`, `ENV AGENT_CARD_FILE=/app/agent-card.json`.
+3. [ ] `deploy.agentCardFile: /app/agent-card.json` in values.
+4. [ ] `deploy.skipRepoSync: true` in values.
+5. [ ] `tenant.repo` may be omitted; `tenant.enabled: true` still required.
+6. [ ] `a2a.inClusterUrl` set to YOUR Service (same as dynamic topology).
+7. [ ] Card fetched after rollout advertises YOUR endpoint and is the correct content.

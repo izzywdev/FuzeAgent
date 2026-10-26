@@ -40,6 +40,46 @@ Core tables are UUID-keyed (`gen_random_uuid()`), `organizations` at the root, w
 - **MCP** — `mcp-servers/fuzeagent-server` (declared in `.mcp.json`). Changes here belong to `mcp-engineer`.
 - **CLI** — `migrate-cli.py` + `dbctl.sh`. Changes here belong to `cli-engineer`.
 
+## A2A deployment — static-card vs dynamic-projection topology
+
+The shared A2A server image (`ghcr.io/izzywdev/fuze-a2a`) supports two topologies for serving an Agent Card:
+
+### Static-card topology (preferred for product pods — no GitHub access)
+The product writes a thin product-specific Dockerfile that extends the shared image and bakes the card in:
+```dockerfile
+FROM ghcr.io/izzywdev/fuze-a2a:<tag>
+COPY agent-card.json /app/agent-card.json
+ENV AGENT_CARD_FILE=/app/agent-card.json
+```
+Helm values for a product pod using this topology:
+```yaml
+a2a:
+  enabled: true
+  inClusterUrl: http://a2a-<product>.<namespace>.svc.cluster.local:8080/rpc
+  tenants:
+    - tenant: <ProductName>
+      enabled: true
+      # repo is OMITTED — no GitHub clone
+      entryRole: <role>
+deploy:
+  agentCardFile: /app/agent-card.json   # maps to AGENT_CARD_FILE
+  skipRepoSync: true                     # skips the git init container entirely
+```
+When `AGENT_CARD_FILE` is set and the file exists, `well_known_card()` in `server.py` (`agent-templates/a2a/server.py`) serves it directly with `Cache-Control: public, max-age=60`, bypassing all repo/projection logic. If the file is missing, it falls through to dynamic projection (never a 500).
+
+**Key invariant:** `tenant.repo` is optional in this topology (the values-interface schema requires only `tenant` + `enabled`). `deploy.skipRepoSync: true` prevents the repo-sync init container from running; without it the container would crash-loop trying to clone a repo that is not declared.
+
+### Dynamic-projection topology (default / shared server)
+The init container shallow-clones each enabled tenant's repo at startup (`/repos/<tenant>/`). The server reads `.fuze/manifest.json` + `agent-templates/roles/*/role.json` via `LocalRepoResolver`. `tenant.repo` is required. `deploy.skipRepoSync` defaults to `false`. This topology requires GitHub access at pod start time.
+
+### Card generation (static-card)
+Generate the initial card JSON from a live dynamic server and then commit it:
+```bash
+curl -s "http://localhost:8080/.well-known/agent-card.json?tenant=<ProductName>" \
+  | python3 -m json.tool > agent-card.json
+```
+The card is product-owned and version-controlled alongside the product Dockerfile.
+
 ## App builds (FuzeFront "Build your application")
 - `services/orchestrator/app_builds/` — accepts build requests from FuzeFront's applications-service at `POST /api/v1/app-builds` (also `GET /{buildSessionId}`, `POST /{buildSessionId}/cancel`); bearer auth against `APP_BUILD_API_TOKEN`, **fail-closed** when unset. Release flag `fuzeagent.app-builds.enabled`, default OFF (env-evaluated: `FEATURE_FLAG_FUZEAGENT_APP_BUILDS_ENABLED`; Helm `orchestrator.appBuilds.enabled`).
 - Sessions are idempotent on `buildSessionId`, forward-only (`accepted → building → deploying → deployed | failed`, plus `cancelled`), and persisted in `app_build_sessions`. Status goes back to FuzeFront via a persisted callback outbox (retry/backoff; 409 `ORG_MISMATCH` is terminal). `deployed` is only reported after the app is registered through FuzeFront's registry **in the session's own org**.

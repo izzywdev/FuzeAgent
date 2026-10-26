@@ -103,8 +103,18 @@ deploy:
   ingressClassName: traefik
   # Managed-Agents provider id set as AGENT_PROVIDER (runtime.build_from_env default).
   agentProvider: anthropic
+  # Static-card topology: path inside the container where the pre-generated agent card
+  # JSON file lives (e.g. /app/agent-card.json). When set, the server serves this file
+  # directly at /.well-known/agent-card.json without projecting from a cloned repo.
+  # Pair with skipRepoSync: true. Unset = dynamic projection from /repos/<tenant>.
+  agentCardFile: ""
+  # Set true when the product image bakes the card via agentCardFile / AGENT_CARD_FILE
+  # (static-card topology). Skips the repo-sync init container entirely — no GitHub
+  # clone, no git token needed. The tenant.repo field may be omitted in this topology.
+  skipRepoSync: false
   # Init-container image that shallow-clones each enabled tenant's repo into /repos
-  # (runtime.LocalRepoResolver reads the projection inputs from there).
+  # (runtime.LocalRepoResolver reads the projection inputs from there). Unused when
+  # skipRepoSync is true.
   gitImage: alpine/git:latest
   # Optional token (SealedSecret ref {name,key}) for cloning PRIVATE tenant repos in
   # the repo-sync init container. Unset = anonymous clone (public repos only).
