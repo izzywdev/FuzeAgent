@@ -16,6 +16,7 @@ import ApiPlayground from './ApiPlayground'
 import { Layout } from './layout/Layout'
 import BillingPage from '../pages/BillingPage'
 import { IdentityOrgPage } from '../pages/IdentityPage'
+import { StandaloneChatPage } from '../pages/StandaloneChatPage'
 import App from '../App'
 
 export default function AppRouter() {
@@ -29,6 +30,8 @@ export default function AppRouter() {
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/workspace" element={<App />} />
+        <Route path="/chat/window" element={<StandaloneChatPage />} />
+        <Route path="/chat" element={<StandaloneChatPage />} />
         <Route path="/classic-dashboard" element={<FixedDashboard />} />
         <Route path="/simple" element={<SimpleApp />} />
         <Route path="/dashboard" element={<DashboardPage />} />

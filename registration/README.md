@@ -6,7 +6,7 @@ FuzeAgent self-registers with the FuzeFront portal at deploy time.
 |---|---|
 | `manifest.json` | App identity, Module-Federation contract, `nav` placement |
 | `policy.json` | FuzeAgent's own Permit resources/roles, bare keys |
-| `register.sh` | Idempotent registration script from `@fuzefront/onboarding-kit` |
+| `register.sh` | Idempotent registration script from `@izzywdev/fuzefront-onboarding-kit` |
 
 ## This replaces a hardcoded entry in FuzeFront
 
@@ -77,6 +77,6 @@ verifying the card projects schema-valid against the frozen contract, which is
 exactly one deployment must run registration; wiring more than one would have them race
 and duplicate-register. Choosing the owner is `devops-engineer`'s call and is flagged
 rather than guessed. To finish: paste the init container from
-[`@fuzefront/onboarding-kit`](https://github.com/izzywdev/FuzeFront/blob/master/packages/onboarding-kit/helm/initcontainer.yaml)
+[`@izzywdev/fuzefront-onboarding-kit`](https://github.com/izzywdev/FuzeFront/blob/master/packages/onboarding-kit/helm/initcontainer.yaml)
 into that one pod spec, and create the `fuzefront-registration` Secret plus a ConfigMap
 of this directory.

@@ -65,6 +65,28 @@ class FuzeAgentClient:
             logger.error("API request failed", url=url, error=str(e))
             raise RuntimeError(f"Failed to post data to {url}: {e}")
 
+    async def put(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Make PUT request to FuzeAgent API"""
+        url = urljoin(self.base_url, endpoint)
+        try:
+            response = await self.client.put(url, json=data)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            logger.error("API request failed", url=url, error=str(e))
+            raise RuntimeError(f"Failed to put data to {url}: {e}")
+
+    async def delete(self, endpoint: str) -> Dict[str, Any]:
+        """Make DELETE request to FuzeAgent API"""
+        url = urljoin(self.base_url, endpoint)
+        try:
+            response = await self.client.delete(url)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            logger.error("API request failed", url=url, error=str(e))
+            raise RuntimeError(f"Failed to delete data at {url}: {e}")
+
     async def close(self):
         """Close the HTTP client"""
         await self.client.aclose()
@@ -637,6 +659,248 @@ class FuzeAgentMCPServer:
                         "required": ["organization_id"],
                     },
                 ),
+                # -----------------------------------------------------------
+                # Multi-Tier Brains & Cross-Functional Memory Tools
+                # -----------------------------------------------------------
+                Tool(
+                    name="list_brains",
+                    description="List brains for company/organization with optional scope, domain, team, or agent filtering",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "organization_id": {
+                                "type": "string",
+                                "description": "Optional organization ID filter",
+                            },
+                            "scope": {
+                                "type": "string",
+                                "enum": [
+                                    "organization",
+                                    "team",
+                                    "agent",
+                                    "cross_functional",
+                                ],
+                                "description": "Filter by scope level",
+                            },
+                            "functional_domain": {
+                                "type": "string",
+                                "description": "Filter by cross-functional domain (frontend, devops, backend, etc.)",
+                            },
+                            "team_id": {
+                                "type": "string",
+                                "description": "Filter by team ID",
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Filter by agent persona ID",
+                            },
+                        },
+                    },
+                ),
+                Tool(
+                    name="get_brain",
+                    description="Get detailed metadata, configuration, and document/vector counts for a specific brain",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "brain_id": {
+                                "type": "string",
+                                "description": "ID of the brain to retrieve",
+                            }
+                        },
+                        "required": ["brain_id"],
+                    },
+                ),
+                Tool(
+                    name="create_brain",
+                    description="Create a new brain scoped to org, team, agent persona, or cross-functional domain",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Name of the brain",
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Brain description and guidelines",
+                            },
+                            "organization_id": {
+                                "type": "string",
+                                "description": "Organization ID (default: org_default)",
+                            },
+                            "scope": {
+                                "type": "string",
+                                "enum": [
+                                    "organization",
+                                    "team",
+                                    "agent",
+                                    "cross_functional",
+                                ],
+                                "description": "Scope level of the brain",
+                            },
+                            "functional_domain": {
+                                "type": "string",
+                                "description": "Functional domain for cross-functional brains (e.g. frontend, devops)",
+                            },
+                            "team_id": {
+                                "type": "string",
+                                "description": "Associated team ID (for team scope)",
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Associated agent persona ID (for agent scope)",
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Tags for search and classification",
+                            },
+                            "metadata": {
+                                "type": "object",
+                                "description": "Arbitrary metadata key-value pairs",
+                            },
+                        },
+                        "required": ["name", "scope"],
+                    },
+                ),
+                Tool(
+                    name="update_brain",
+                    description="Update brain metadata, scope, functional domain, tags, or active status",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "brain_id": {
+                                "type": "string",
+                                "description": "ID of the brain to update",
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "Updated brain name",
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Updated description",
+                            },
+                            "scope": {
+                                "type": "string",
+                                "enum": [
+                                    "organization",
+                                    "team",
+                                    "agent",
+                                    "cross_functional",
+                                ],
+                                "description": "Updated scope",
+                            },
+                            "functional_domain": {
+                                "type": "string",
+                                "description": "Updated domain",
+                            },
+                            "team_id": {
+                                "type": "string",
+                                "description": "Updated team ID",
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Updated agent ID",
+                            },
+                            "is_active": {
+                                "type": "boolean",
+                                "description": "Active status",
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "metadata": {"type": "object"},
+                        },
+                        "required": ["brain_id"],
+                    },
+                ),
+                Tool(
+                    name="delete_brain",
+                    description="Delete a brain and its associated wiki documents",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "brain_id": {
+                                "type": "string",
+                                "description": "ID of the brain to delete",
+                            }
+                        },
+                        "required": ["brain_id"],
+                    },
+                ),
+                Tool(
+                    name="associate_brain",
+                    description="Associate a brain with an organization, team, agent persona, or cross-functional domain",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "brain_id": {
+                                "type": "string",
+                                "description": "ID of the brain to associate",
+                            },
+                            "scope": {
+                                "type": "string",
+                                "enum": [
+                                    "organization",
+                                    "team",
+                                    "agent",
+                                    "cross_functional",
+                                ],
+                                "description": "Target association scope",
+                            },
+                            "organization_id": {
+                                "type": "string",
+                                "description": "Target organization ID",
+                            },
+                            "team_id": {
+                                "type": "string",
+                                "description": "Target team ID",
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Target agent ID",
+                            },
+                            "functional_domain": {
+                                "type": "string",
+                                "description": "Target functional domain (e.g. frontend, devops)",
+                            },
+                            "metadata": {
+                                "type": "object",
+                                "description": "Association metadata",
+                            },
+                        },
+                        "required": ["brain_id", "scope"],
+                    },
+                ),
+                Tool(
+                    name="get_agent_brains",
+                    description="Resolve the multi-tier brain hierarchy for an agent (agent persona, team, cross-functional e.g. frontend/devops, and org global)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Agent persona ID (e.g. react-dev, python-dev)",
+                            },
+                            "team_id": {
+                                "type": "string",
+                                "description": "Optional team ID",
+                            },
+                            "functional_domain": {
+                                "type": "string",
+                                "description": "Optional functional domain (frontend, devops, backend)",
+                            },
+                            "organization_id": {
+                                "type": "string",
+                                "description": "Organization ID (default: org_default)",
+                            },
+                        },
+                        "required": ["agent_id"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -692,6 +956,21 @@ class FuzeAgentMCPServer:
                     return await self._get_organization_goals_dashboard(
                         arguments["organization_id"]
                     )
+                # Brain Management Tool Handlers
+                elif name == "list_brains":
+                    return await self._list_brains(arguments)
+                elif name == "get_brain":
+                    return await self._get_brain(arguments["brain_id"])
+                elif name == "create_brain":
+                    return await self._create_brain(arguments)
+                elif name == "update_brain":
+                    return await self._update_brain(arguments)
+                elif name == "delete_brain":
+                    return await self._delete_brain(arguments["brain_id"])
+                elif name == "associate_brain":
+                    return await self._associate_brain(arguments)
+                elif name == "get_agent_brains":
+                    return await self._get_agent_brains(arguments)
                 else:
                     return CallToolResult(
                         content=[TextContent(type="text", text=f"Unknown tool: {name}")]
@@ -1811,6 +2090,375 @@ class FuzeAgentMCPServer:
                 content=[
                     TextContent(
                         type="text", text=f"Failed to get goals dashboard: {str(e)}"
+                    )
+                ]
+            )
+
+    # ---------------------------------------------------------------------------
+    # Multi-Tier Brains & Cross-Functional Memory Methods
+    # ---------------------------------------------------------------------------
+
+    async def _list_brains(self, filter_data: Dict[str, Any]) -> CallToolResult:
+        """List brains with optional filtering, with resilient store fallback"""
+        try:
+            params = {}
+            for key in [
+                "organization_id",
+                "scope",
+                "functional_domain",
+                "team_id",
+                "agent_id",
+            ]:
+                if key in filter_data and filter_data[key]:
+                    params[key] = filter_data[key]
+
+            brains = None
+            try:
+                brains = await self.api_client.get("/brains", params=params)
+            except Exception:
+                try:
+                    brains = await self.api_client.get("/api/brains", params=params)
+                except Exception:
+                    # In-process / direct store fallback
+                    try:
+                        import sys
+
+                        sys.path.insert(0, "services/orchestrator")
+                        import brain_store
+
+                        brains = await brain_store.list_brains(
+                            organization_id=params.get("organization_id"),
+                            scope=params.get("scope"),
+                            functional_domain=params.get("functional_domain"),
+                            team_id=params.get("team_id"),
+                            agent_id=params.get("agent_id"),
+                        )
+                    except Exception as e_fb:
+                        logger.warning(f"Direct brain_store fallback failed: {e_fb}")
+
+            if not brains:
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text="No brains found matching specified criteria.",
+                        )
+                    ]
+                )
+
+            result = f"🧠 **Company Brains ({len(brains)} found)**\n\n"
+            for b in brains:
+                scope_str = b.get("scope", "organization")
+                if b.get("functional_domain"):
+                    scope_str += f" ({b['functional_domain']})"
+                result += f"- **{b['name']}** (`{b['id']}`)\n"
+                result += f"  - Scope: `{scope_str}`\n"
+                result += f"  - Description: {b.get('description', 'No description')}\n"
+                result += f"  - Docs / Vectors: {b.get('document_count', 0)} docs / {b.get('vector_count', 0)} vectors\n"
+                if b.get("tags"):
+                    result += f"  - Tags: {', '.join(b['tags'])}\n"
+                result += "\n"
+
+            return CallToolResult(content=[TextContent(type="text", text=result)])
+        except Exception as e:
+            return CallToolResult(
+                content=[
+                    TextContent(type="text", text=f"Failed to list brains: {str(e)}")
+                ]
+            )
+
+    async def _get_brain(self, brain_id: str) -> CallToolResult:
+        """Get details for a specific brain"""
+        try:
+            brain = None
+            try:
+                brain = await self.api_client.get(f"/brains/{brain_id}")
+            except Exception:
+                try:
+                    brain = await self.api_client.get(f"/api/brains/{brain_id}")
+                except Exception:
+                    import sys
+
+                    sys.path.insert(0, "services/orchestrator")
+                    import brain_store
+
+                    brain = await brain_store.get_brain(brain_id)
+
+            if not brain:
+                return CallToolResult(
+                    content=[
+                        TextContent(type="text", text=f"Brain '{brain_id}' not found.")
+                    ]
+                )
+
+            result = f"🧠 **Brain Details: {brain.get('name', 'Unknown')}**\n\n"
+            result += f"- **ID**: `{brain.get('id')}`\n"
+            result += f"- **Scope**: `{brain.get('scope')}`\n"
+            if brain.get("functional_domain"):
+                result += f"- **Functional Domain**: `{brain.get('functional_domain')}` (Cross-Functional)\n"
+            if brain.get("team_id"):
+                result += f"- **Team ID**: `{brain.get('team_id')}`\n"
+            if brain.get("agent_id"):
+                result += f"- **Agent Persona ID**: `{brain.get('agent_id')}`\n"
+            result += f"- **Organization ID**: `{brain.get('organization_id')}`\n"
+            result += f"- **Description**: {brain.get('description', '')}\n"
+            result += f"- **Active**: {brain.get('is_active', True)}\n"
+            result += f"- **Document Count**: {brain.get('document_count', 0)}\n"
+            result += f"- **Vector Count**: {brain.get('vector_count', 0)}\n"
+            if brain.get("tags"):
+                result += f"- **Tags**: {', '.join(brain['tags'])}\n"
+            if brain.get("metadata"):
+                result += f"- **Metadata**: {brain['metadata']}\n"
+            return CallToolResult(content=[TextContent(type="text", text=result)])
+        except Exception as e:
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=f"Failed to get brain '{brain_id}': {str(e)}",
+                    )
+                ]
+            )
+
+    async def _create_brain(self, brain_data: Dict[str, Any]) -> CallToolResult:
+        """Create a new brain"""
+        try:
+            payload = {
+                "name": brain_data["name"],
+                "description": brain_data.get("description", ""),
+                "organization_id": brain_data.get("organization_id", "org_default"),
+                "scope": brain_data.get("scope", "organization"),
+                "functional_domain": brain_data.get("functional_domain"),
+                "team_id": brain_data.get("team_id"),
+                "agent_id": brain_data.get("agent_id"),
+                "tags": brain_data.get("tags", []),
+                "metadata": brain_data.get("metadata", {}),
+            }
+            if "id" in brain_data:
+                payload["id"] = brain_data["id"]
+
+            res = None
+            try:
+                res = await self.api_client.post("/brains", payload)
+            except Exception:
+                try:
+                    res = await self.api_client.post("/api/brains", payload)
+                except Exception:
+                    import sys
+
+                    sys.path.insert(0, "services/orchestrator")
+                    import brain_store
+
+                    res = await brain_store.create_brain(payload)
+
+            response = f"✅ **Brain Created Successfully**\n\n"
+            response += f"- **ID**: `{res.get('id')}`\n"
+            response += f"- **Name**: {res.get('name')}\n"
+            response += f"- **Scope**: `{res.get('scope')}`\n"
+            if res.get("functional_domain"):
+                response += f"- **Functional Domain**: `{res.get('functional_domain')}` (Cross-Functional)\n"
+            response += f"- **Description**: {res.get('description')}\n"
+            return CallToolResult(content=[TextContent(type="text", text=response)])
+        except Exception as e:
+            return CallToolResult(
+                content=[
+                    TextContent(type="text", text=f"Failed to create brain: {str(e)}")
+                ]
+            )
+
+    async def _update_brain(self, update_data: Dict[str, Any]) -> CallToolResult:
+        """Update brain configuration"""
+        try:
+            brain_id = update_data["brain_id"]
+            payload = {
+                k: v
+                for k, v in update_data.items()
+                if k != "brain_id" and v is not None
+            }
+
+            res = None
+            try:
+                res = await self.api_client.put(f"/brains/{brain_id}", payload)
+            except Exception:
+                try:
+                    res = await self.api_client.put(f"/api/brains/{brain_id}", payload)
+                except Exception:
+                    import sys
+
+                    sys.path.insert(0, "services/orchestrator")
+                    import brain_store
+
+                    res = await brain_store.update_brain(brain_id, payload)
+
+            if not res:
+                return CallToolResult(
+                    content=[
+                        TextContent(type="text", text=f"Brain '{brain_id}' not found.")
+                    ]
+                )
+
+            response = f"✅ **Brain Updated Successfully**\n\n"
+            response += f"- **ID**: `{res.get('id')}`\n"
+            response += f"- **Name**: {res.get('name')}\n"
+            response += f"- **Scope**: `{res.get('scope')}`\n"
+            if res.get("functional_domain"):
+                response += f"- **Functional Domain**: `{res.get('functional_domain')}`\n"
+            return CallToolResult(content=[TextContent(type="text", text=response)])
+        except Exception as e:
+            return CallToolResult(
+                content=[
+                    TextContent(type="text", text=f"Failed to update brain: {str(e)}")
+                ]
+            )
+
+    async def _delete_brain(self, brain_id: str) -> CallToolResult:
+        """Delete a brain"""
+        try:
+            try:
+                await self.api_client.delete(f"/brains/{brain_id}")
+            except Exception:
+                try:
+                    await self.api_client.delete(f"/api/brains/{brain_id}")
+                except Exception:
+                    import sys
+
+                    sys.path.insert(0, "services/orchestrator")
+                    import brain_store
+
+                    await brain_store.delete_brain(brain_id)
+
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=f"✅ Brain `{brain_id}` deleted successfully.",
+                    )
+                ]
+            )
+        except Exception as e:
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=f"Failed to delete brain '{brain_id}': {str(e)}",
+                    )
+                ]
+            )
+
+    async def _associate_brain(self, assoc_data: Dict[str, Any]) -> CallToolResult:
+        """Associate brain with org, team, agent persona, or cross-functional domain"""
+        try:
+            brain_id = assoc_data["brain_id"]
+            payload = {
+                "scope": assoc_data["scope"],
+                "organization_id": assoc_data.get("organization_id"),
+                "team_id": assoc_data.get("team_id"),
+                "agent_id": assoc_data.get("agent_id"),
+                "functional_domain": assoc_data.get("functional_domain"),
+                "metadata": assoc_data.get("metadata"),
+            }
+
+            res = None
+            try:
+                res = await self.api_client.post(
+                    f"/brains/{brain_id}/associate", payload
+                )
+            except Exception:
+                try:
+                    res = await self.api_client.post(
+                        f"/api/brains/{brain_id}/associate", payload
+                    )
+                except Exception:
+                    import sys
+
+                    sys.path.insert(0, "services/orchestrator")
+                    import brain_store
+
+                    res = await brain_store.associate_brain(brain_id, payload)
+
+            if not res:
+                return CallToolResult(
+                    content=[
+                        TextContent(type="text", text=f"Brain '{brain_id}' not found.")
+                    ]
+                )
+
+            response = f"🔗 **Brain Association Updated**\n\n"
+            response += f"- **Brain ID**: `{res.get('id')}`\n"
+            response += f"- **New Scope**: `{res.get('scope')}`\n"
+            if res.get("functional_domain"):
+                response += f"- **Cross-Functional Domain**: `{res.get('functional_domain')}`\n"
+            if res.get("team_id"):
+                response += f"- **Team ID**: `{res.get('team_id')}`\n"
+            if res.get("agent_id"):
+                response += f"- **Agent Persona ID**: `{res.get('agent_id')}`\n"
+            return CallToolResult(content=[TextContent(type="text", text=response)])
+        except Exception as e:
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text", text=f"Failed to associate brain: {str(e)}"
+                    )
+                ]
+            )
+
+    async def _get_agent_brains(self, query_data: Dict[str, Any]) -> CallToolResult:
+        """Resolve full brain hierarchy for an agent persona"""
+        try:
+            agent_id = query_data["agent_id"]
+            params = {}
+            if "team_id" in query_data and query_data["team_id"]:
+                params["team_id"] = query_data["team_id"]
+            if "functional_domain" in query_data and query_data["functional_domain"]:
+                params["functional_domain"] = query_data["functional_domain"]
+            if "organization_id" in query_data and query_data["organization_id"]:
+                params["organization_id"] = query_data["organization_id"]
+
+            data = None
+            try:
+                data = await self.api_client.get(
+                    f"/agents/{agent_id}/brains", params=params
+                )
+            except Exception:
+                try:
+                    data = await self.api_client.get(
+                        f"/api/agents/{agent_id}/brains", params=params
+                    )
+                except Exception:
+                    import sys
+
+                    sys.path.insert(0, "services/orchestrator")
+                    import brain_store
+
+                    data = await brain_store.get_agent_brains(
+                        agent_id=agent_id,
+                        team_id=params.get("team_id"),
+                        functional_domain=params.get("functional_domain"),
+                        organization_id=params.get("organization_id", "org_default"),
+                    )
+
+            domain = data.get("functional_domain", "general")
+            result = f"🧠 **Brain Hierarchy for Agent `{agent_id}`** (Domain: `{domain}`)\n\n"
+            result += f"Total Resolved Brains: {data.get('total_brains', 0)}\n\n"
+
+            for layer in data.get("hierarchy", []):
+                tier = layer.get("tier")
+                scope = layer.get("scope")
+                name = layer.get("name")
+                bid = layer.get("brain_id")
+                result += f"**Tier {tier}: {scope.upper()} BRAIN**\n"
+                result += f"- Name: {name}\n"
+                result += f"- Brain ID: `{bid}`\n"
+                if layer.get("functional_domain"):
+                    result += f"- Functional Domain: `{layer.get('functional_domain')}` (Shared across all {layer.get('functional_domain')} agents)\n"
+                result += "\n"
+
+            return CallToolResult(content=[TextContent(type="text", text=result)])
+        except Exception as e:
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text", text=f"Failed to resolve agent brains: {str(e)}"
                     )
                 ]
             )

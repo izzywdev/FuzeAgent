@@ -43,7 +43,7 @@ async def get_db_connection() -> AsyncGenerator[asyncpg.Connection, None]:
     """Get database connection with automatic cleanup"""
     conn = None
     try:
-        conn = await asyncpg.connect(DATABASE_URL)
+        conn = await asyncpg.connect(DATABASE_URL, timeout=1.0)
         await _register_connection_codecs(conn)
         yield conn
     finally:

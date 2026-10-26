@@ -1,26 +1,18 @@
 /**
  * FuzeFront Security contract — types.
  *
- * These mirror `@fuzefront/security-client` (the package generated from FuzeFront's
- * `packages/security/openapi.yaml`) one-for-one. They are NOT a FuzeAgent invention:
- * every shape and every path here exists in the published contract.
+ * These mirror `@izzywdev/fuzefront-security-client` (published under `@izzywdev/` on GitHub Packages,
+ * generated from FuzeFront's `packages/security/openapi.yaml`) one-for-one.
  *
- * WHY VENDORED RATHER THAN IMPORTED
- * ---------------------------------
- * `@fuzefront/security-client` publishes to the private GitHub Packages registry
- * (`npm.pkg.github.com`, access "restricted"). This workspace's CI runs `npm ci` with
- * no registry credentials and no `.npmrc`, so adding it to `package.json` would fail
- * the install for every build — the same reason `@fuzefront/identity-ui` and
- * `@izzywdev/fuzefront-sdk-react` are `require()`d optionally rather than declared.
+ * Package Scope Convention:
+ * GitHub Packages mandates that published package scopes match the owning account (`@izzywdev/`).
+ * Internal workspace packages named `@fuzefront/<pkg>` publish as `@izzywdev/fuzefront-<pkg>`.
  *
- * When the private registry is wired up for this repo, delete this file and replace the
- * imports with:
+ * When the private registry is wired up for this repo, replace imports with:
  *
- *     import type { Identity, AuthMethods, SessionResult } from '@fuzefront/security-client'
+ *     import type { Identity, AuthMethods, SessionResult } from '@izzywdev/fuzefront-security-client'
  *
- * The names below are deliberately identical so that swap is mechanical.
- *
- * Contract: FuzeFront Security API v0.4.0 / `@fuzefront/security-client` v0.2.0.
+ * Contract: FuzeFront Security API v0.4.0 / `@izzywdev/fuzefront-security-client` v0.2.0.
  */
 
 /** Which verifier produced an identity. Provider-neutral by contract. */

@@ -266,3 +266,8 @@ sandboxes:
     inClusterHost: "harbor-core.harbor.svc.cluster.local"
     project: "sandboxes"
     pullSecretName: "harbor-pull-secret"
+
+# Post-sync verification job executed by ArgoCD hook after rollout reaches healthy state
+postSyncVerification:
+  enabled: false
+  image: "curlimages/curl:8.8.0"

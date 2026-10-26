@@ -153,6 +153,55 @@ class BrainChatRequest(BaseModel):
     sessionHistory: Optional[List[Dict[str, str]]] = Field(default_factory=list)
 
 
+class BrainCreateRequest(BaseModel):
+    id: Optional[str] = Field(None, description="Optional custom brain ID")
+    name: str = Field(..., description="Brain name")
+    description: Optional[str] = Field("", description="Brain description")
+    organization_id: Optional[str] = Field("org_default", description="Organization ID")
+    scope: str = Field(
+        "organization",
+        description="Scope: organization, team, agent, or cross_functional",
+    )
+    functional_domain: Optional[str] = Field(
+        None,
+        description="Domain for cross-functional brain (e.g. frontend, devops, backend)",
+    )
+    team_id: Optional[str] = Field(None, description="Team ID if scope is team")
+    agent_id: Optional[str] = Field(None, description="Agent ID if scope is agent")
+    is_active: Optional[bool] = Field(True, description="Whether brain is active")
+    tags: Optional[List[str]] = Field(
+        default_factory=list, description="Categorization tags"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, description="Metadata key-value pairs"
+    )
+
+
+class BrainUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    organization_id: Optional[str] = None
+    scope: Optional[str] = None
+    functional_domain: Optional[str] = None
+    team_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    is_active: Optional[bool] = None
+    tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class BrainAssociateRequest(BaseModel):
+    scope: str = Field(
+        ...,
+        description="Scope to associate with: organization, team, agent, cross_functional",
+    )
+    organization_id: Optional[str] = None
+    team_id: Optional[str] = None
+    agent_id: Optional[str] = None
+    functional_domain: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
 # ---------------------------------------------------------------------------
 # In-Memory Platform Registry State
 # ---------------------------------------------------------------------------
@@ -612,6 +661,108 @@ async def get_brains_hierarchy():
             },
         ]
     }
+
+
+@router.get("/brains", summary="List Brains for Company/Organization")
+async def list_brains(
+    organization_id: Optional[str] = None,
+    scope: Optional[str] = None,
+    functional_domain: Optional[str] = None,
+    team_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+):
+    """List brains for company/organization with optional scope, team, or domain filters."""
+    return await brain_store.list_brains(
+        organization_id=organization_id,
+        scope=scope,
+        functional_domain=functional_domain,
+        team_id=team_id,
+        agent_id=agent_id,
+    )
+
+
+@router.post("/brains", summary="Create Brain (Org, Team, Agent, Cross-Functional)")
+async def create_brain(req: BrainCreateRequest):
+    """Create a new brain scoped to organization, team, agent persona, or cross-functional domain."""
+    data = req.model_dump() if hasattr(req, "model_dump") else req.dict()
+    return await brain_store.create_brain(data)
+
+
+@router.get("/brains/{brain_id}", summary="Get Brain Details")
+async def get_brain(brain_id: str):
+    """Retrieve metadata, status, and vector counts for a specific brain."""
+    brain = await brain_store.get_brain(brain_id)
+    if not brain:
+        raise HTTPException(status_code=404, detail=f"Brain '{brain_id}' not found")
+    return brain
+
+
+@router.put("/brains/{brain_id}", summary="Update Brain Configuration")
+async def update_brain(brain_id: str, req: BrainUpdateRequest):
+    """Update brain metadata, scope, tags, or active status."""
+    data = (
+        req.model_dump(exclude_unset=True)
+        if hasattr(req, "model_dump")
+        else req.dict(exclude_unset=True)
+    )
+    brain = await brain_store.update_brain(brain_id, data)
+    if not brain:
+        raise HTTPException(status_code=404, detail=f"Brain '{brain_id}' not found")
+    return brain
+
+
+@router.delete("/brains/{brain_id}", summary="Delete Brain")
+async def delete_brain(brain_id: str):
+    """Delete a brain and its associated wiki documents."""
+    success = await brain_store.delete_brain(brain_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Brain '{brain_id}' not found")
+    return {"status": "deleted", "brain_id": brain_id}
+
+
+@router.post(
+    "/brains/{brain_id}/associate",
+    summary="Associate Brain with Org, Team, Agent, or Cross-Functional Domain",
+)
+async def associate_brain(brain_id: str, req: BrainAssociateRequest):
+    """Dynamically associate or re-assign a brain to an org, team, agent, or functional domain."""
+    try:
+        data = (
+            req.model_dump(exclude_unset=True)
+            if hasattr(req, "model_dump")
+            else req.dict(exclude_unset=True)
+        )
+        updated = await brain_store.associate_brain(brain_id, data)
+        if not updated:
+            raise HTTPException(status_code=404, detail=f"Brain '{brain_id}' not found")
+        return updated
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get(
+    "/agents/{agent_id}/brains",
+    summary="Get Multi-Tier Brain Hierarchy for Agent (Including Cross-Functional)",
+)
+async def get_agent_brains(
+    agent_id: str,
+    team_id: Optional[str] = None,
+    functional_domain: Optional[str] = None,
+    organization_id: Optional[str] = "org_default",
+):
+    """
+    Resolve complete brain hierarchy for an agent:
+    1. Agent Persona Brain (e.g. react-dev, python-dev)
+    2. Team Brain (e.g. platform team)
+    3. Cross-Functional Brain (e.g. frontend agents share frontend brain, devops share devops brain)
+    4. Organization Global Brain (enterprise-wide baselines)
+    """
+    return await brain_store.get_agent_brains(
+        agent_id=agent_id,
+        team_id=team_id,
+        functional_domain=functional_domain,
+        organization_id=organization_id,
+    )
 
 
 @router.get("/brains/{brain_id}/documents", summary="List Documents in Brain Wiki")
@@ -1148,3 +1299,51 @@ async def multi_agent_websocket(websocket: WebSocket):
     finally:
         if websocket in ACTIVE_CHAT_CLIENTS:
             ACTIVE_CHAT_CLIENTS.remove(websocket)
+
+
+# ---------------------------------------------------------------------------
+# Direct /brains Root Router (for callers not using /api prefix)
+# ---------------------------------------------------------------------------
+brain_router = APIRouter(tags=["brains"])
+brain_router.add_api_route(
+    "/brains",
+    list_brains,
+    methods=["GET"],
+    summary="List Brains for Company/Organization",
+)
+brain_router.add_api_route(
+    "/brains",
+    create_brain,
+    methods=["POST"],
+    summary="Create Brain (Org, Team, Agent, Cross-Functional)",
+)
+brain_router.add_api_route(
+    "/brains/{brain_id}",
+    get_brain,
+    methods=["GET"],
+    summary="Get Brain Details",
+)
+brain_router.add_api_route(
+    "/brains/{brain_id}",
+    update_brain,
+    methods=["PUT"],
+    summary="Update Brain Configuration",
+)
+brain_router.add_api_route(
+    "/brains/{brain_id}",
+    delete_brain,
+    methods=["DELETE"],
+    summary="Delete Brain",
+)
+brain_router.add_api_route(
+    "/brains/{brain_id}/associate",
+    associate_brain,
+    methods=["POST"],
+    summary="Associate Brain with Org, Team, Agent, or Domain",
+)
+brain_router.add_api_route(
+    "/agents/{agent_id}/brains",
+    get_agent_brains,
+    methods=["GET"],
+    summary="Get Multi-Tier Brain Hierarchy for Agent",
+)

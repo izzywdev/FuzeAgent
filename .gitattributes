@@ -11,3 +11,12 @@
 # (deliberately not done here -- it would bury this security fix under ~20k
 # whitespace-only diff lines and collide with the PRs currently in flight).
 *.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf

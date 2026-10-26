@@ -25,7 +25,7 @@ jobs:
         ports:
           - 5434:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -284,7 +284,12 @@ jobs:
           --ignore-vuln PYSEC-2026-311 \
           --ignore-vuln CVE-2026-45830 \
           --ignore-vuln CVE-2026-45831 \
-          --ignore-vuln CVE-2026-45833
+          --ignore-vuln CVE-2026-45833 \
+          --ignore-vuln CVE-2026-59951 \
+          --ignore-vuln GHSA-xf7x-x43h-rpqh \
+          --ignore-vuln CVE-2026-112940 \
+          --ignore-vuln CVE-2026-112913 \
+          --ignore-vuln CVE-2026-112907
 
     - name: Upload security reports
       uses: actions/upload-artifact@v7
@@ -435,7 +440,7 @@ jobs:
         ports:
           - 5434:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5

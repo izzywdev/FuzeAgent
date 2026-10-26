@@ -28,6 +28,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@izzywdev/fuzefront-design-system": path.resolve(__dirname, "../../../FuzeFront/design-system"),
       "@fuzefront/design-system": path.resolve(__dirname, "../../../FuzeFront/design-system"),
     },
   },

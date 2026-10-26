@@ -77,7 +77,9 @@ export function usePortalTheme() {
     setThemeState(newTheme);
     try {
       localStorage.setItem('theme', newTheme);
-    } catch {}
+    } catch {
+      // Ignore local storage errors in sandboxed/restricted frames
+    }
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-theme', newTheme);
       if (newTheme === 'dark') {
