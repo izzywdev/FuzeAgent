@@ -36,8 +36,9 @@ export default defineConfig({
   build: {
     target: 'esnext',
     minify: false,
-    cssCodeSplit: false,
-    assetsDir: 'assets',
+    // Flat output (no nested assets/ subdir): mirrors other Fuze federated apps
+    // and ensures remoteEntry.js is emitted directly at /apps/fuzeagent/remoteEntry.js
+    assetsDir: '',
   },
   server: {
     host: '0.0.0.0',

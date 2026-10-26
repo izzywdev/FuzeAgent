@@ -37,6 +37,11 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY --from=build /app/dist /usr/share/nginx/html/apps/fuzeagent
 
+# Ensure remoteEntry.js is always reachable at /apps/fuzeagent/remoteEntry.js even if bundled under assets
+RUN if [ -f /usr/share/nginx/html/apps/fuzeagent/assets/remoteEntry.js ] && [ ! -f /usr/share/nginx/html/apps/fuzeagent/remoteEntry.js ]; then \
+      cp /usr/share/nginx/html/apps/fuzeagent/assets/remoteEntry.js /usr/share/nginx/html/apps/fuzeagent/remoteEntry.js; \
+    fi
+
 
 # Add healthcheck
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

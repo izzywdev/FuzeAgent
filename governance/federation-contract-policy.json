@@ -85,10 +85,7 @@
         "layers": ["L4b image-layout"],
         "note": "packages/fuzesocial-ui/Dockerfile copies dist flat to /usr/share/nginx/html while base is /apps/fuzesocial/, and its `location = /remoteEntry.js` matches the bare path, not the based one. Fix either by copying the build to /usr/share/nginx/html/apps/fuzesocial, or by adding an alias mount the way fuzeservice now does."
       },
-      "fuzeagent": {
-        "layers": ["L1 manifest", "L2 build-base"],
-        "note": "L1: deploy/helm/fuzeagent/files/registration/manifest.json declares slug \"agent\" while the root declares \"fuzeagent\", AND still carries the old cross-origin https://fuzeagent.prod.fuzefront.com/remoteEntry.js. The init container POSTs the VENDORED copy, so this registers a SECOND, WRONG app rather than serving a broken one. Fix the vendored copy, never the root — the slug is immutable. FuzeAgent#177 is in flight for exactly this; remove L1 from this entry when it merges (the gate prints a stale-entry notice once it no longer fires). This finding was INVISIBLE until the ownership rule became positional: the stale slug made the copy read as a different product. L2: services/ui-react/vite.config.ts has base '/' with the default assetsDir, so the entry builds at /assets/remoteEntry.js while the manifest advertises /apps/fuzeagent/remoteEntry.js."
-      },
+
       "fuzedeploy": {
         "layers": ["L4b image-layout"],
         "note": "frontend/Dockerfile copies /app/build flat to /usr/share/nginx/html; base is /apps/deploy/."

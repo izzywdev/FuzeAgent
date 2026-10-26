@@ -99,7 +99,7 @@ MF_TYPES = {"module-federation", "module_federation", "mf-remote", "mf_remote"}
 
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", "out", ".next", "coverage",
-    "__pycache__", ".venv", "venv", "vendor", ".turbo", ".cache",
+    "__pycache__", ".venv", "venv", "vendor", ".turbo", ".cache", ".claude",
 }
 
 DEFAULT_DOCROOT = "/usr/share/nginx/html"
