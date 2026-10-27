@@ -40,8 +40,7 @@
     "path": "/app/fuzeagent",
     "host": "fuzeagent.fuzefront.com"
   },
-  "visibility": "organization",
-  "scopeLevel": "organization",
-  "requiresOrgContext": true,
+  "visibility": "public",
+  "scopeLevel": "both",
   "roles": []
 }
