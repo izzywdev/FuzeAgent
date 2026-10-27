@@ -273,3 +273,38 @@
   background: var(--seam);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
+
+/* Modals & Overlays */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  z-index: 99999 !important;
+}
+
+.modal-dialog {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 960px !important;
+  max-height: 90vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background-color: var(--bg-secondary, #0b0e15) !important;
+  border: 1px solid var(--border-color, #232c3d) !important;
+  border-radius: var(--radius-xl, 14px) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7) !important;
+  color: var(--text-primary, #e7ecf5) !important;
+  overflow: hidden !important;
+}
+

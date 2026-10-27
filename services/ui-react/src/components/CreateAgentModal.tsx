@@ -186,12 +186,39 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
   }, [registeredBlueprints, categoryFilter, searchQuery]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+    <div 
+      className="modal-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        zIndex: 99999,
+      }}
+    >
       <div 
-        className="w-full max-w-4xl max-h-[92vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col"
+        className="modal-dialog panel"
         style={{
+          width: '100%',
+          maxWidth: '960px',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
           backgroundColor: 'var(--bg-secondary, #0b0e15)',
           borderColor: 'var(--border-color, #232c3d)',
+          borderRadius: 'var(--radius-xl, 14px)',
+          overflow: 'hidden',
+          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.75)',
           color: 'var(--text-primary, #e7ecf5)',
         }}
       >
@@ -205,7 +232,7 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
         >
           <div className="flex items-center gap-3">
             <span 
-              className="p-2 rounded-xl border flex items-center justify-center text-indigo-400"
+              className="p-2.5 rounded-xl border flex items-center justify-center text-indigo-400"
               style={{
                 backgroundColor: 'var(--accent-soft, rgba(110, 92, 255, 0.14))',
                 borderColor: 'rgba(110, 92, 255, 0.3)',
@@ -214,10 +241,10 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
               <Workflow className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="text-base font-bold" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
+              <h3 className="text-base font-bold" style={{ color: 'var(--text-primary, #e7ecf5)', margin: 0 }}>
                 Deploy New Agent
               </h3>
-              <p className="text-xs" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
+              <p className="text-xs" style={{ color: 'var(--text-secondary, #9fa9bc)', marginTop: '2px', margin: 0 }}>
                 Select an assembled Agent Blueprint (Image + Policy + Connectors + Brains) or configure a custom agent.
               </p>
             </div>
@@ -225,7 +252,8 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
 
           <button 
             onClick={onClose}
-            className="p-1.5 rounded-lg opacity-60 hover:opacity-100 hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg opacity-60 hover:opacity-100 hover:bg-slate-800 transition-colors"
+            title="Close dialog"
           >
             <FiX className="w-5 h-5" />
           </button>
@@ -233,7 +261,7 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
 
         {/* Tab Switcher */}
         <div 
-          className="px-6 pt-4 border-b flex items-center justify-between"
+          className="px-6 pt-3 border-b flex items-center justify-between"
           style={{
             backgroundColor: 'var(--bg-tertiary, #141a26)',
             borderColor: 'var(--border-color, #232c3d)',
@@ -245,7 +273,7 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
               className={`pb-3 px-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
                 activeTab === 'blueprint'
                   ? 'border-indigo-500 text-indigo-400'
-                  : 'border-transparent opacity-60 hover:opacity-100'
+                  : 'border-transparent opacity-60 hover:opacity-100 text-[var(--text-secondary)]'
               }`}
             >
               <Workflow className="w-3.5 h-3.5" />
@@ -260,7 +288,7 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
               className={`pb-3 px-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
                 activeTab === 'custom'
                   ? 'border-indigo-500 text-indigo-400'
-                  : 'border-transparent opacity-60 hover:opacity-100'
+                  : 'border-transparent opacity-60 hover:opacity-100 text-[var(--text-secondary)]'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -293,9 +321,15 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
 
           {/* TAB 1: FROM AGENT BLUEPRINT */}
           {activeTab === 'blueprint' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div 
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(300px, 1fr) minmax(340px, 1fr)',
+                gap: '24px',
+              }}
+            >
               {/* Left Column: Blueprint Selector */}
-              <div className="lg:col-span-6 space-y-3">
+              <div className="space-y-3" style={{ minWidth: 0 }}>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
@@ -383,10 +417,12 @@ export const CreateAgentModal: React.FC<CreateAgentModalProps> = React.memo(({
 
               {/* Right Column: Selected Blueprint Form & Deployment Options */}
               <div 
-                className="lg:col-span-6 p-4 rounded-xl border flex flex-col justify-between space-y-4"
+                className="p-5 rounded-xl border flex flex-col justify-between space-y-4"
                 style={{
+                  minWidth: 0,
                   backgroundColor: 'var(--bg-tertiary, #141a26)',
                   borderColor: 'var(--border-color, #232c3d)',
+                  borderRadius: 'var(--radius-lg, 10px)',
                 }}
               >
                 {selectedBlueprint ? (
