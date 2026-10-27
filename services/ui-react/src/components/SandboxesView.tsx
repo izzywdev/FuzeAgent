@@ -3,9 +3,12 @@ import {
   Shield, 
   Clock, 
   Cpu, 
-  Square, 
+  Terminal,
   Radio, 
-  CheckCircle2
+  CheckCircle2,
+  Trash2,
+  PlusCircle,
+  ExternalLink
 } from 'lucide-react';
 import { Button, Badge } from '../design-system';
 import { api } from '../services/api';
@@ -29,15 +32,15 @@ interface ActiveSandbox {
 const INITIAL_SANDBOXES: ActiveSandbox[] = [
   {
     id: 'sbx-py-7721',
-    podName: 'fuzeagent-runner-py-9df82',
-    agentName: 'Python Dev #1',
-    templateId: 'python-dev',
+    podName: 'agent-sbx-python-dev-prod',
+    agentName: 'Python Developer Agent',
+    templateId: 'claude-runner-base:latest',
     team: 'Core Engineering',
     status: 'running',
     uptimeSeconds: 420,
     timeoutSeconds: 1800,
-    cpuPercent: 34.2,
-    memoryMb: 412,
+    cpuPercent: 14.2,
+    memoryMb: 512,
     memoryLimitMb: 4096,
     lastEvent: 'Running pytest tests/test_fuzekeys_bridge.py',
     logs: [
@@ -52,10 +55,10 @@ const INITIAL_SANDBOXES: ActiveSandbox[] = [
   },
   {
     id: 'sbx-react-3190',
-    podName: 'fuzeagent-runner-react-4aa12',
-    agentName: 'React Developer #2',
-    templateId: 'react-dev',
-    team: 'Core Engineering',
+    podName: 'agent-sbx-docker-builder',
+    agentName: 'App Builder Sandbox',
+    templateId: 'fuzeagent-builder:v1.2',
+    team: 'DevOps & SRE',
     status: 'idle',
     uptimeSeconds: 980,
     timeoutSeconds: 1800,
@@ -74,7 +77,7 @@ const INITIAL_SANDBOXES: ActiveSandbox[] = [
 
 export const SandboxesView: React.FC = () => {
   const [sandboxes, setSandboxes] = useState<ActiveSandbox[]>(INITIAL_SANDBOXES);
-  const [selectedSandbox, setSelectedSandbox] = useState<ActiveSandbox>(INITIAL_SANDBOXES[0]);
+  const [selectedSandboxId, setSelectedSandboxId] = useState<string>(INITIAL_SANDBOXES[0].id);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   // Sync live sandboxes from orchestrator backend
@@ -127,45 +130,52 @@ export const SandboxesView: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const handleTerminate = async (id: string) => {
+  const handleTerminate = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     try {
       await api.terminateSandbox(id);
     } catch {
       // ignore
     }
-    setSandboxes(prev => prev.filter(sb => sb.id !== id));
-    if (selectedSandbox?.id === id) {
-      setSelectedSandbox(sandboxes.find(s => s.id !== id) || INITIAL_SANDBOXES[0]);
-    }
-    setActionNotice(`Terminated sandbox ${id} and reclaimed cluster pod resources.`);
-    setTimeout(() => setActionNotice(null), 4000);
+    setSandboxes(prev => prev.map(sb => sb.id === id ? { ...sb, status: 'terminating' as const } : sb));
+    setActionNotice(`Terminating sandbox ${id} and releasing cluster PVC...`);
+    setTimeout(() => {
+      setSandboxes(prev => prev.filter(sb => sb.id !== id));
+    }, 1500);
   };
 
-  const handleExtend = (id: string) => {
+  const handleExtend = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      await api.extendSandboxTimeout(id, 900);
+    } catch {
+      // ignore
+    }
     setSandboxes(prev => prev.map(sb => {
       if (sb.id === id) {
         return { ...sb, timeoutSeconds: sb.timeoutSeconds + 900 };
       }
       return sb;
     }));
-    setActionNotice(`Extended sandbox timeout by +15 minutes (900s).`);
-    setTimeout(() => setActionNotice(null), 4000);
+    setActionNotice(`Added +15m timeout to sandbox ${id}.`);
   };
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return `${m}m ${s < 10 ? '0' : ''}${s}s`;
+    return `${m}m ${s.toString().padStart(2, '0')}s`;
   };
 
+  const selectedSandbox = sandboxes.find(s => s.id === selectedSandboxId) || sandboxes[0];
+
   return (
-    <div className="space-y-6">
-      {/* Toast Notice */}
+    <div className="space-y-6" data-frame="03-active-sandboxes-teardown" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
+      {/* Action Notification */}
       {actionNotice && (
         <div 
-          className="p-3.5 rounded-xl border flex items-center justify-between text-xs animate-in fade-in shadow-lg"
+          className="p-3.5 rounded-xl border flex items-center justify-between text-xs animate-in fade-in"
           style={{
-            backgroundColor: 'var(--bg-tertiary, #141a26)',
+            backgroundColor: 'var(--bg-secondary, #0b0e15)',
             borderColor: 'var(--accent-color, #6e5cff)',
             color: 'var(--text-primary, #e7ecf5)',
           }}
@@ -178,24 +188,20 @@ export const SandboxesView: React.FC = () => {
         </div>
       )}
 
-      {/* Top Banner (FuzeFront Dark Seam) */}
+      {/* Top Banner (aligned with 03-active-sandboxes-teardown.html) */}
       <div 
-        className="p-6 rounded-2xl border relative overflow-hidden shadow-2xl"
+        className="panel p-6 shadow-2xl"
         style={{
-          background: 'linear-gradient(135deg, rgba(20, 26, 38, 0.95) 0%, rgba(11, 14, 21, 0.98) 100%)',
+          background: 'linear-gradient(135deg, rgba(20, 26, 38, 0.98) 0%, rgba(11, 14, 21, 0.99) 100%)',
           borderColor: 'var(--border-color, #232c3d)',
+          color: 'var(--text-primary, #e7ecf5)',
         }}
       >
-        <div 
-          className="absolute top-0 left-0 right-0 h-[2px]"
-          style={{ background: 'var(--seam, linear-gradient(90deg, #6e5cff 0%, #29d3e6 100%))' }}
-        />
-
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <span 
-                className="p-2 rounded-xl border flex items-center justify-center text-emerald-400"
+                className="p-2.5 rounded-xl border flex items-center justify-center text-emerald-400"
                 style={{
                   backgroundColor: 'rgba(52, 211, 153, 0.12)',
                   borderColor: 'rgba(52, 211, 153, 0.3)',
@@ -204,211 +210,172 @@ export const SandboxesView: React.FC = () => {
                 <Shield className="w-5 h-5" />
               </span>
               <div>
-                <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
-                  Active Agents & Isolation Monitor
-                </h2>
-                <p className="text-xs" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
-                  Live Kubernetes pods executing containerized agent runtimes with strict resource boundaries and auto-shutdown timers.
+                <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
+                  Active Sandboxes & Teardown Flow
+                </h1>
+                <p className="text-xs" style={{ color: 'var(--text-secondary, #9fa9bc)', marginTop: '2px' }}>
+                  Monitors isolated Kubernetes sandbox pods executing agent tasks and Claude runner base sessions with clean cluster deallocation.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <span 
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-mono"
-              style={{
-                backgroundColor: 'rgba(52, 211, 153, 0.12)',
-                borderColor: 'rgba(52, 211, 153, 0.3)',
-                color: 'var(--success-color, #34d399)',
-              }}
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="font-semibold">{sandboxes.length} Active Pods</span>
+            <span className="pill running">
+              <span className="dot" />
+              <span>{sandboxes.length} Active Pods</span>
             </span>
           </div>
         </div>
       </div>
 
-      {/* Grid: Active Pods List + Live Stream Console */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Active Pods Roster */}
-        <div className="lg:col-span-5 space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
-              Active Sandboxed Runtimes ({sandboxes.length})
-            </span>
+      {/* Main Panel matching 03-active-sandboxes-teardown.html */}
+      <div className="panel" data-sandboxes-panel style={{ borderRadius: 'var(--radius-xl, 12px)' }}>
+        <div className="table-header">
+          <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+            Running Sandbox Pods ({sandboxes.length} Active)
           </div>
-
-          {sandboxes.length === 0 ? (
-            <div 
-              className="p-8 text-center rounded-2xl border text-xs"
-              style={{
-                backgroundColor: 'var(--bg-tertiary, #141a26)',
-                borderColor: 'var(--border-color, #232c3d)',
-                color: 'var(--text-secondary, #9fa9bc)',
-              }}
-            >
-              No active agent sandboxes running. Launch a new container from the Image Registry or deploy an Agent Blueprint.
-            </div>
-          ) : (
-            sandboxes.map(sb => {
-              const isSelected = selectedSandbox?.id === sb.id;
-              const remaining = Math.max(0, sb.timeoutSeconds - sb.uptimeSeconds);
-              return (
-                <div
-                  key={sb.id}
-                  onClick={() => setSelectedSandbox(sb)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                    isSelected ? 'ring-1 ring-emerald-500/50 shadow-lg' : 'hover:border-slate-700'
-                  }`}
-                  style={{
-                    backgroundColor: isSelected ? 'rgba(52, 211, 153, 0.08)' : 'var(--bg-tertiary, #141a26)',
-                    borderColor: isSelected ? 'var(--success-color, #34d399)' : 'var(--border-color, #232c3d)',
-                    color: 'var(--text-primary, #e7ecf5)',
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span 
-                          className="w-2 h-2 rounded-full"
-                          style={{
-                            backgroundColor: sb.status === 'running' ? 'var(--success-color, #34d399)' : '#9fa9bc',
-                            boxShadow: sb.status === 'running' ? '0 0 6px var(--success-color, #34d399)' : 'none',
-                          }}
-                        />
-                        <h4 className="text-xs font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                          {sb.agentName}
-                        </h4>
-                      </div>
-                      <p className="text-[11px] font-mono mt-1 opacity-70" style={{ color: 'var(--text-secondary)' }}>
-                        {sb.podName}
-                      </p>
-                    </div>
-
-                    <Badge variant={sb.status === 'running' ? 'success' : 'default'} size="sm">
-                      {sb.team}
-                    </Badge>
-                  </div>
-
-                  <div className="mt-3.5 pt-2.5 border-t grid grid-cols-2 gap-2 text-xs" style={{ borderColor: 'var(--border-color)' }}>
-                    <div className="flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                      <Clock className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                      <span className="text-[11px]">Shutdown: <strong className="text-amber-300 font-mono">{formatTime(remaining)}</strong></span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 font-mono text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                      <Cpu className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-                      <span>{sb.cpuPercent}% | {sb.memoryMb}MB</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+            Namespace: fuzeagent
+          </div>
         </div>
 
-        {/* Right Column: Live Stream Console */}
-        {selectedSandbox && (
+        {sandboxes.length === 0 ? (
           <div 
-            className="lg:col-span-7 rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
+            className="p-8 text-center text-xs"
+            style={{ color: 'var(--text-secondary, #9fa9bc)' }}
+          >
+            No active agent sandboxes running. Launch a new container from the Image Registry or deploy an Agent Blueprint.
+          </div>
+        ) : (
+          sandboxes.map(sb => {
+            const isSelected = selectedSandbox?.id === sb.id;
+            const remaining = Math.max(0, sb.timeoutSeconds - sb.uptimeSeconds);
+            const isTerminating = sb.status === 'terminating';
+
+            return (
+              <div 
+                key={sb.id}
+                className="pod-row cursor-pointer"
+                onClick={() => setSelectedSandboxId(sb.id)}
+                style={{
+                  backgroundColor: isSelected ? 'rgba(110, 92, 255, 0.08)' : 'transparent',
+                  borderLeft: isSelected ? '3px solid var(--accent-color, #6e5cff)' : '3px solid transparent',
+                }}
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+                      {sb.podName}
+                    </span>
+                    <span className="text-[11px] font-mono opacity-60">({sb.agentName})</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+                    Session: {sb.id} · Image: {sb.templateId} · CPU: {sb.cpuPercent}% · Mem: {sb.memoryMb}MB · Timeout: {formatTime(remaining)}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {isTerminating ? (
+                    <span className="pill terminating">⏳ Terminating</span>
+                  ) : (
+                    <span className="pill running">● Running</span>
+                  )}
+
+                  {!isTerminating && (
+                    <>
+                      <button
+                        onClick={(e) => handleExtend(sb.id, e)}
+                        className="prompt-btn"
+                        title="Add 15m timeout"
+                      >
+                        +15m
+                      </button>
+                      <button 
+                        className="btn-terminate"
+                        data-action="terminate-sandbox"
+                        onClick={(e) => handleTerminate(sb.id, e)}
+                      >
+                        Terminate
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Selected Pod Live Stream Terminal Console */}
+      {selectedSandbox && (
+        <div 
+          className="panel shadow-2xl overflow-hidden flex flex-col"
+          style={{
+            backgroundColor: 'var(--bg-tertiary, #141a26)',
+            borderColor: 'var(--border-color, #232c3d)',
+            borderRadius: 'var(--radius-xl, 12px)',
+          }}
+        >
+          <div 
+            className="p-3.5 border-b flex items-center justify-between"
             style={{
-              backgroundColor: 'var(--bg-tertiary, #141a26)',
+              backgroundColor: 'var(--bg-secondary, #0b0e15)',
               borderColor: 'var(--border-color, #232c3d)',
             }}
           >
-            {/* Console Header */}
-            <div 
-              className="p-4 border-b flex items-center justify-between"
-              style={{
-                backgroundColor: 'var(--bg-secondary, #0b0e15)',
-                borderColor: 'var(--border-color, #232c3d)',
-              }}
-            >
-              <div className="flex items-center gap-2.5">
-                <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
-                <span className="text-xs font-bold font-mono text-slate-200">{selectedSandbox.podName}</span>
-                <span className="text-[11px] opacity-70 font-mono" style={{ color: 'var(--text-secondary)' }}>
-                  ({selectedSandbox.templateId})
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleExtend(selectedSandbox.id)}
-                  title="Add 15m to shutdown timer"
-                >
-                  +15m Timeout
-                </Button>
-
-                <Button
-                  variant="danger"
-                  size="sm"
-                  icon={<Square className="w-3 h-3" />}
-                  onClick={() => handleTerminate(selectedSandbox.id)}
-                >
-                  Stop Container
-                </Button>
-              </div>
+            <div className="flex items-center gap-2.5">
+              <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <span className="text-xs font-bold font-mono text-slate-200">{selectedSandbox.podName}</span>
+              <span className="text-[11px] font-mono" style={{ color: 'var(--text-tertiary)' }}>
+                stdout/stderr bus relay
+              </span>
             </div>
 
-            {/* Terminal Body */}
-            <div 
-              className="p-4 flex-1 overflow-y-auto font-mono text-xs space-y-1.5 min-h-[340px]"
-              style={{
-                backgroundColor: '#080b11',
-                color: '#e2e8f0',
-              }}
-            >
-              <div 
-                className="text-[11px] pb-2 border-b flex items-center justify-between font-mono"
-                style={{ borderColor: '#1c2433', color: 'var(--success-color, #34d399)' }}
-              >
-                <span>[Centralized Bus Relay Stream Connected — wss://orchestrator:8000/ws]</span>
-                <span className="text-slate-500">Namespace: fuzeagent</span>
-              </div>
-
-              {selectedSandbox.logs.map((log, idx) => (
-                <div key={idx} className="leading-relaxed flex items-start gap-2">
-                  <span className="text-slate-600 select-none text-[10px] w-5 text-right">{idx + 1}</span>
-                  <span 
-                    className={
-                      log.includes('error') || log.includes('fail')
-                        ? 'text-rose-400 font-semibold'
-                        : log.includes('passed') || log.includes('success')
-                        ? 'text-emerald-400 font-bold'
-                        : log.includes('[init]') || log.includes('[runner]')
-                        ? 'text-indigo-400'
-                        : 'text-slate-300'
-                    }
-                  >
-                    {log}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Console Footer */}
-            <div 
-              className="p-3 border-t text-[11px] flex items-center justify-between"
-              style={{
-                backgroundColor: 'var(--bg-secondary, #0b0e15)',
-                borderColor: 'var(--border-color, #232c3d)',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              <span>Streaming active stdout/stderr over WebSocket bridge</span>
-              <span className="font-mono text-emerald-400 flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                Heartbeat OK (ping 29s)
+                Heartbeat OK
               </span>
             </div>
           </div>
-        )}
-      </div>
+
+          <div 
+            className="p-4 font-mono text-xs space-y-1.5 min-h-[260px] max-h-[360px] overflow-y-auto"
+            style={{
+              backgroundColor: '#080b11',
+              color: '#e2e8f0',
+            }}
+          >
+            <div 
+              className="text-[11px] pb-2 border-b flex items-center justify-between font-mono"
+              style={{ borderColor: '#1c2433', color: 'var(--success-color, #34d399)' }}
+            >
+              <span>[Centralized Bus Relay Stream Connected — wss://orchestrator:8000/ws]</span>
+              <span className="text-slate-500">Namespace: fuzeagent</span>
+            </div>
+
+            {selectedSandbox.logs.map((log, idx) => (
+              <div key={idx} className="leading-relaxed flex items-start gap-2">
+                <span className="text-slate-600 select-none text-[10px] w-5 text-right">{idx + 1}</span>
+                <span 
+                  className={
+                    log.includes('error') || log.includes('fail')
+                      ? 'text-rose-400 font-semibold'
+                      : log.includes('passed') || log.includes('success')
+                      ? 'text-emerald-400 font-bold'
+                      : log.includes('[init]') || log.includes('[runner]')
+                      ? 'text-indigo-400'
+                      : 'text-slate-300'
+                  }
+                >
+                  {log}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

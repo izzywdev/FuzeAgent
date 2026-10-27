@@ -311,7 +311,10 @@ export const AgentChatWorkspace: React.FC = () => {
       </div>
 
       {/* Main 2-Column Chat Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[760px]">
+      <div 
+        className="grid grid-cols-1 lg:grid-cols-12 gap-5"
+        style={{ minHeight: '720px', overflowX: 'hidden' }}
+      >
         {/* Left Column: Agent Selector Roster */}
         <div 
           className="lg:col-span-4 rounded-2xl border p-4 flex flex-col justify-between shadow-xl"
@@ -448,25 +451,20 @@ export const AgentChatWorkspace: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Prompts Bar */}
+          {/* Quick Prompts Bar (matching 01-chat-streaming-la-time.html) */}
           <div 
-            className="px-5 py-2.5 border-t flex items-center gap-2 overflow-x-auto"
+            className="px-5 py-2.5 border-t flex flex-wrap items-center gap-2"
             style={{
               backgroundColor: 'var(--bg-secondary, #0b0e15)',
               borderColor: 'var(--border-color, #232c3d)',
             }}
           >
-            <span className="text-[10px] uppercase font-bold text-slate-500 whitespace-nowrap">Quick:</span>
+            <span className="text-[10px] uppercase font-mono font-bold tracking-wider" style={{ color: 'var(--text-tertiary, #66718a)' }}>Quick:</span>
             {quickPrompts.map(p => (
               <button
                 key={p.label}
                 onClick={() => setInput(p.prompt)}
-                className="px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap border transition-all hover:border-indigo-500"
-                style={{
-                  backgroundColor: 'var(--bg-quaternary, #1c2433)',
-                  borderColor: 'var(--border-color, #232c3d)',
-                  color: 'var(--text-secondary, #9fa9bc)',
-                }}
+                className="prompt-btn"
               >
                 {p.label}
               </button>

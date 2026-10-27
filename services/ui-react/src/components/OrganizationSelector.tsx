@@ -63,66 +63,103 @@ const OrganizationSelector: React.FC<OrganizationSelectorProps> = React.memo(({
     )
   }
 
-  // Platform mode: in-app org creation and switcher are killed via Unleash kill switch
+  // Platform mode: organization management is centralized in the FuzeFront portal shell
   if (!allowInAppOrgManagement) {
     return (
       <div 
-        className="rounded-xl border shadow-sm p-5 space-y-3"
+        className="panel shadow-lg p-5 space-y-4"
         style={{
           backgroundColor: 'var(--bg-tertiary, #141a26)',
           borderColor: 'var(--border-color, #232c3d)',
-          color: 'var(--text-primary, #e7ecf5)'
+          color: 'var(--text-primary, #e7ecf5)',
+          borderRadius: 'var(--radius-xl, 12px)'
         }}
       >
         <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--border-color, #232c3d)' }}>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg border text-indigo-400" style={{ backgroundColor: 'rgba(110, 92, 255, 0.15)', borderColor: 'rgba(110, 92, 255, 0.3)' }}>
+          <div className="flex items-center gap-2.5">
+            <span 
+              className="p-1.5 rounded-lg border flex items-center justify-center text-cyan-400"
+              style={{ backgroundColor: 'rgba(41, 211, 230, 0.1)', borderColor: 'rgba(41, 211, 230, 0.3)' }}
+            >
               <FiHome />
             </span>
-            <h2 className="text-sm font-bold tracking-tight">Active Organization Context</h2>
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
+                Active Workspace Context
+              </h2>
+              <p className="text-[11px]" style={{ color: 'var(--text-tertiary, #66718a)' }}>
+                Synchronized with your portal session
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded-full border" style={{ backgroundColor: 'var(--bg-secondary, #0b0e15)', borderColor: 'var(--border-color, #232c3d)', color: 'var(--text-secondary, #9fa9bc)' }}>
-            <FiLock className="w-3 h-3 text-amber-400" />
-            <span>Portal Controlled</span>
-          </div>
+          <span className="pill running">
+            <span className="dot" />
+            <span>Portal Synced</span>
+          </span>
         </div>
 
-        <div className="p-3.5 rounded-lg border" style={{ backgroundColor: 'var(--bg-secondary, #0b0e15)', borderColor: 'var(--border-color, #232c3d)' }}>
+        <div 
+          className="p-4 rounded-xl border flex items-center justify-between"
+          style={{ 
+            backgroundColor: 'var(--bg-secondary, #0b0e15)', 
+            borderColor: 'var(--border-color, #232c3d)' 
+          }}
+        >
           {isPersonal || !activeOrg ? (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-cyan-400 text-lg border"
+                style={{ 
+                  backgroundColor: 'rgba(41, 211, 230, 0.12)', 
+                  borderColor: 'rgba(41, 211, 230, 0.3)' 
+                }}
+              >
+                <FiUser />
+              </div>
               <div>
-                <div className="flex items-center gap-2 font-bold text-cyan-400 text-sm">
-                  <FiUser />
-                  <span>Personal Account Context</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
+                    Personal Account
+                  </span>
+                  <span className="pill" style={{ color: 'var(--cyan-400)', background: 'rgba(41, 211, 230, 0.12)', border: '1px solid rgba(41, 211, 230, 0.3)' }}>
+                    Individual Sandbox
+                  </span>
                 </div>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
-                  {orgUser?.email || 'Individual user workspace'}. Operating in personal developer sandbox.
+                <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
+                  {orgUser?.email || 'Individual user workspace'}
                 </p>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(41, 211, 230, 0.15)', color: '#29d3e6' }}>
-                Personal
-              </span>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-indigo-400 text-lg border"
+                style={{ 
+                  backgroundColor: 'rgba(110, 92, 255, 0.12)', 
+                  borderColor: 'rgba(110, 92, 255, 0.3)' 
+                }}
+              >
+                <FiHome />
+              </div>
               <div>
-                <div className="flex items-center gap-2 font-bold text-indigo-300 text-sm">
-                  <FiHome />
-                  <span>{activeOrg.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
+                    {activeOrg.name}
+                  </span>
+                  <span className="pill" style={{ color: '#a78bfa', background: 'rgba(110, 92, 255, 0.15)', border: '1px solid rgba(110, 92, 255, 0.35)' }}>
+                    {activeOrg.tier || 'Enterprise'}
+                  </span>
                 </div>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
-                  Organization ID: <span className="font-mono">{activeOrg.id}</span>
+                <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
+                  Org ID: {activeOrg.id}
                 </p>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(110, 92, 255, 0.2)', color: '#a78bfa' }}>
-                {activeOrg.tier || 'Enterprise'}
-              </span>
             </div>
           )}
         </div>
 
-        <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-tertiary, #66718a)' }}>
-          🔒 Organization switching and creation are centralized in the FuzeFront portal shell (Unleash kill switch <code>fuzeagent.in-app-org-management: false</code>).
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
+          Organization and account switching is managed centrally via the FuzeFront portal navigation bar. Squads and agent instances automatically inherit this active context.
         </p>
       </div>
     )

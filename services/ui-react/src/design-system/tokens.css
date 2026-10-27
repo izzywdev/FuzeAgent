@@ -1,10 +1,20 @@
 /* ============================================================
    FuzeFront Design System Tokens — FuzeAgent Consuming Layer
    Matches FuzeFront DS tokens 1:1 for seamless host embedding
+   and standalone execution
    ============================================================ */
 
 :root,
 [data-theme='dark'] {
+  /* Brand / accent */
+  --indigo-500: #6e5cff;
+  --cyan-400: #29d3e6;
+  --accent-color: var(--indigo-500);
+  --accent-hover: #5a48e6;
+  --accent-soft: rgba(110, 92, 255, 0.14);
+  --accent-2: var(--cyan-400);
+  --seam: linear-gradient(90deg, var(--accent-color) 0%, var(--accent-2) 100%);
+
   /* Surface hierarchy */
   --bg-secondary:  #0b0e15;  /* Deepest shell / top bar */
   --bg-primary:    #0f131c;  /* Main content canvas */
@@ -20,13 +30,6 @@
   --text-secondary: #9fa9bc;
   --text-tertiary:  #66718a;
 
-  /* The Fuse — signature brand gradient */
-  --accent-color: #6e5cff;
-  --accent-hover: #5847e6;
-  --accent-soft:  rgba(110, 92, 255, 0.14);
-  --accent-2:     #29d3e6;
-  --seam:         linear-gradient(90deg, #6e5cff 0%, #29d3e6 100%);
-
   /* Status Colors */
   --success-color: #34d399;
   --success-soft:  rgba(52, 211, 153, 0.12);
@@ -39,15 +42,27 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-accent: 0 8px 24px rgba(110, 92, 255, 0.35);
 
   /* Radii */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+  --radius-pill: 9999px;
   --radius-full: 9999px;
 
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
   /* Fonts */
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 
@@ -59,29 +74,26 @@
 
 [data-theme='light'],
 .light {
-  /* Light surface hierarchy */
-  --bg-primary:    #f6f8fb;  /* Main canvas */
-  --bg-secondary:  #ffffff;  /* Top bar / navbar */
-  --bg-tertiary:   #edf1f7;  /* Cards, panels, sidebars */
-  --bg-quaternary: #e2e8f0;  /* Hover states, inputs */
+  --indigo-500: #6e5cff;
+  --cyan-400: #0284c7;
+  --accent-color: #6e5cff;
+  --accent-hover: #5847e6;
+  --accent-soft: rgba(110, 92, 255, 0.08);
+  --accent-2: #0284c7;
+  --seam: linear-gradient(90deg, #6e5cff 0%, #0284c7 100%);
 
-  /* Light borders */
+  --bg-primary:    #f6f8fb;
+  --bg-secondary:  #ffffff;
+  --bg-tertiary:   #edf1f7;
+  --bg-quaternary: #e2e8f0;
+
   --border-color:  #d8e0eb;
   --border-strong: #c2cddb;
 
-  /* Light typography */
   --text-primary:   #0f172a;
   --text-secondary: #475569;
   --text-tertiary:  #64748b;
 
-  /* Accent remains electric indigo & fuse seam */
-  --accent-color: #6e5cff;
-  --accent-hover: #5847e6;
-  --accent-soft:  rgba(110, 92, 255, 0.08);
-  --accent-2:     #0284c7;
-  --seam:         linear-gradient(90deg, #6e5cff 0%, #0284c7 100%);
-
-  /* Status Colors */
   --success-color: #059669;
   --success-soft:  rgba(5, 150, 105, 0.1);
   --warning-color: #d97706;
@@ -89,7 +101,6 @@
   --error-color:   #dc2626;
   --error-soft:    rgba(220, 38, 38, 0.1);
 
-  /* Elevation */
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
@@ -99,11 +110,166 @@
   --dockview-theme-header-color: var(--bg-secondary);
 }
 
-body {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+/* ============================================================
+   Component & Layout Primitives matching FuzeFront Design Frames
+   ============================================================ */
+
+/* Status Pills */
+.pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pill.running {
+  color: var(--success-color);
+  background: var(--success-soft);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+.pill.terminating {
+  color: var(--warning-color);
+  background: var(--warning-soft);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+}
+
+.pill.idle {
+  color: var(--text-tertiary);
+  background: var(--bg-quaternary);
+  border: 1px solid var(--border-color);
+}
+
+/* Terminate button */
+.btn-terminate {
+  background: transparent;
+  color: var(--error-color);
+  border: 1px solid rgba(243, 105, 127, 0.35);
+  padding: 5px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-terminate:hover {
+  background: var(--error-soft);
+  border-color: var(--error-color);
+}
+
+/* Panels with Seam */
+.panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: var(--seam);
+}
+
+.table-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-tertiary);
+}
+
+.pod-row {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.15s ease;
+}
+
+.pod-row:hover {
+  background: var(--bg-quaternary);
+}
+
+.pod-row:last-child {
+  border-bottom: none;
+}
+
+/* Quick Prompts */
+.quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.prompt-btn {
   font-family: var(--font-sans);
-  margin: 0;
-  padding: 0;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  font-size: 12px;
+  background: var(--bg-quaternary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.prompt-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
+}
+
+/* Chat bubbles */
+.bubble {
+  padding: 12px 16px;
+  border-radius: var(--radius-xl);
+  font-size: 13px;
+  line-height: 1.6;
+  position: relative;
+  max-width: 85%;
+}
+
+.bubble.user {
+  background: var(--accent-color);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+  align-self: flex-end;
+}
+
+.bubble.assistant {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+  align-self: flex-start;
+}
+
+.bubble.assistant.streaming {
+  border-color: rgba(110, 92, 255, 0.6);
+  box-shadow: 0 0 16px rgba(110, 92, 255, 0.15);
+}
+
+.bubble.assistant.streaming::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: var(--seam);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }

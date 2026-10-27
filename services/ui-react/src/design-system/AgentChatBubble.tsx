@@ -33,8 +33,12 @@ export const AgentChatBubble: React.FC<AgentChatBubbleProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Check if message is a time response
-  const isTimeResponse = !isUser && content.toLowerCase().includes('time in');
+  // Check if message is specifically a time response (strict match, not false-positive greeting)
+  const isTimeResponse = !isUser && (
+    /^(the )?current time in/i.test(content.trim()) ||
+    /^time in [a-z\s]+ is:?\s*\d/i.test(content.trim()) ||
+    /^\d{1,2}:\d{2}(:\d{2})?\s*(am|pm)?\s*(pdt|pst|utc|est|edt|gmt)/i.test(content.trim())
+  );
 
   return (
     <div className={`flex flex-col gap-1.5 my-2 ${isUser ? 'items-end' : 'items-start'}`}>

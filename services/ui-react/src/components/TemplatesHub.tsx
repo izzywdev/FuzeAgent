@@ -254,26 +254,22 @@ export const TemplatesHub: React.FC<TemplatesHubProps> = ({ onUseTemplateToCreat
 
       {/* Hero Header with Two-Tiered Architecture Description */}
       <div 
-        className="p-6 rounded-2xl border relative overflow-hidden shadow-2xl"
+        className="panel p-6 shadow-2xl"
         style={{
-          background: 'linear-gradient(135deg, rgba(20, 26, 38, 0.95) 0%, rgba(11, 14, 21, 0.98) 100%)',
+          background: 'linear-gradient(135deg, rgba(20, 26, 38, 0.98) 0%, rgba(11, 14, 21, 0.99) 100%)',
           borderColor: 'var(--border-color, #232c3d)',
+          color: 'var(--text-primary, #e7ecf5)',
+          borderRadius: 'var(--radius-xl, 12px)',
         }}
       >
-        <div 
-          className="absolute top-0 left-0 right-0 h-[2px]"
-          style={{ background: 'var(--seam, linear-gradient(90deg, #6e5cff 0%, #29d3e6 100%))' }}
-        />
-
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <span 
-                className="p-2 rounded-xl border flex items-center justify-center"
+                className="p-2.5 rounded-xl border flex items-center justify-center text-indigo-400"
                 style={{
                   backgroundColor: 'var(--accent-soft, rgba(110, 92, 255, 0.14))',
                   borderColor: 'rgba(110, 92, 255, 0.3)',
-                  color: 'var(--accent-color, #6e5cff)',
                 }}
               >
                 <Layers className="w-5 h-5" />
@@ -282,7 +278,7 @@ export const TemplatesHub: React.FC<TemplatesHubProps> = ({ onUseTemplateToCreat
                 <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
                   Templates & Blueprints Hub
                 </h2>
-                <p className="text-xs" style={{ color: 'var(--text-secondary, #9fa9bc)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-secondary, #9fa9bc)', marginTop: '2px' }}>
                   Two-tier architecture: Foundation Image Runtimes layered with Network Policies, Connectors, and Knowledge Brains.
                 </p>
               </div>
@@ -299,12 +295,12 @@ export const TemplatesHub: React.FC<TemplatesHubProps> = ({ onUseTemplateToCreat
           >
             <button
               onClick={() => setHubTab('blueprints')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                hubTab === 'blueprints' ? 'shadow-md' : 'opacity-70 hover:opacity-100'
-              }`}
+              className="prompt-btn flex items-center gap-2"
               style={{
                 backgroundColor: hubTab === 'blueprints' ? 'var(--accent-color, #6e5cff)' : 'transparent',
                 color: hubTab === 'blueprints' ? '#ffffff' : 'var(--text-secondary, #9fa9bc)',
+                borderColor: hubTab === 'blueprints' ? 'var(--accent-color, #6e5cff)' : 'transparent',
+                fontWeight: 600,
               }}
             >
               <Workflow className="w-4 h-4" />
@@ -322,12 +318,12 @@ export const TemplatesHub: React.FC<TemplatesHubProps> = ({ onUseTemplateToCreat
 
             <button
               onClick={() => setHubTab('images')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all ${
-                hubTab === 'images' ? 'shadow-md' : 'opacity-70 hover:opacity-100'
-              }`}
+              className="prompt-btn flex items-center gap-2"
               style={{
                 backgroundColor: hubTab === 'images' ? 'var(--accent-color, #6e5cff)' : 'transparent',
                 color: hubTab === 'images' ? '#ffffff' : 'var(--text-secondary, #9fa9bc)',
+                borderColor: hubTab === 'images' ? 'var(--accent-color, #6e5cff)' : 'transparent',
+                fontWeight: 600,
               }}
             >
               <Box className="w-4 h-4" />
@@ -353,21 +349,21 @@ export const TemplatesHub: React.FC<TemplatesHubProps> = ({ onUseTemplateToCreat
         <div className="space-y-6">
           {/* Subheader & Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary, #66718a)', marginRight: '4px' }}>
                 Filter Category:
               </span>
               {['all', 'development', 'devops', 'marketing', 'qa'].map(cat => (
                 <button
                   key={cat}
                   onClick={() => setCategoryFilter(cat)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize transition-all border ${
-                    categoryFilter === cat ? 'font-bold' : 'opacity-70 hover:opacity-100'
-                  }`}
+                  className="prompt-btn capitalize"
                   style={{
-                    backgroundColor: categoryFilter === cat ? 'var(--bg-quaternary, #1c2433)' : 'transparent',
+                    backgroundColor: categoryFilter === cat ? 'var(--accent-soft, rgba(110, 92, 255, 0.14))' : 'var(--bg-quaternary, #1c2433)',
                     borderColor: categoryFilter === cat ? 'var(--accent-color, #6e5cff)' : 'var(--border-color, #232c3d)',
-                    color: categoryFilter === cat ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    color: categoryFilter === cat ? 'var(--text-primary, #e7ecf5)' : 'var(--text-secondary, #9fa9bc)',
+                    fontWeight: categoryFilter === cat ? 600 : 500,
+                    marginRight: '6px',
                   }}
                 >
                   {cat}

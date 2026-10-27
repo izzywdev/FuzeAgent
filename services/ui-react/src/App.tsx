@@ -1,3 +1,4 @@
+import './index.css'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { FiRefreshCw, FiPlus, FiUser, FiActivity, FiCheckCircle, FiUsers } from 'react-icons/fi'
 import AgentDashboard from './components/AgentDashboard'
@@ -40,7 +41,8 @@ function FuzeAgentDashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'workspace' | 'builds' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
   const [showEventsDropdown, setShowEventsDropdown] = useState(false)
-  const { activeOrg, isPersonal, user: orgUser, organizations: platformOrgs, switchOrg, recentEvents, allowInAppOrgManagement } = useOrgContext()
+  const { activeOrg, isPersonal, user: orgUser, organizations: platformOrgs, switchOrg, recentEvents, allowInAppOrgManagement, isPlatformMode } = useOrgContext()
+  const isEmbedded = isPlatformMode || (typeof window !== 'undefined' && (Boolean((window as any).__FUZEFRONT__) || window.self !== window.top))
   const { theme, isDark, toggleTheme } = usePortalTheme()
 
   // FuzeFront Platform Bridge: Register app-specific menu items into host shell
@@ -360,212 +362,166 @@ function FuzeAgentDashboard() {
 
   return (
     <div className={`min-h-screen text-[var(--text-primary)] transition-colors duration-200 ${isDark ? 'dark' : 'light'}`} style={{ backgroundColor: 'var(--bg-primary, #0f131c)' }}>
-      {/* Header */}
-      <nav className="border-b shadow-sm" style={{ backgroundColor: 'var(--bg-secondary, #0b0e15)', borderColor: 'var(--border-color, #232c3d)' }}>
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('overview')}>
-                <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
-                  <span className="p-1.5 rounded-lg border text-indigo-400" style={{ backgroundColor: 'rgba(110, 92, 255, 0.15)', borderColor: 'rgba(110, 92, 255, 0.3)' }}>
-                    <FiUser className="text-xl" />
-                  </span>
-                  <span>FuzeAgent</span>
-                </h1>
-                <span className="ml-2 text-xs font-mono opacity-50 text-[var(--text-secondary)]">v2.0</span>
-              </div>
-
-              {/* In-App Tab Switcher (mirrors FuzeFront Left-Side Menu) */}
-              <div className="hidden md:flex items-center space-x-1">
-                {[
-                  { id: 'overview', label: 'Overview', icon: '🤖' },
-                  { id: 'workspace', label: 'Agent Chat', icon: '💬' },
-                  { id: 'builds', label: 'App Builds', icon: '🚀' },
-                  { id: 'templates', label: 'Templates', icon: '📦' },
-                  { id: 'brains', label: 'Brains & Memory', icon: '🧠' },
-                  { id: 'sandboxes', label: 'Active Agents', icon: '🛡️' },
-                  { id: 'teams', label: 'Teams', icon: '👥' },
-                  { id: 'escalations', label: 'Escalations', icon: '⚡' },
-                ].map(tab => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as any)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-                        isActive
-                          ? 'font-bold shadow-sm'
-                          : 'hover:opacity-100 opacity-70'
-                      }`}
-                      style={{
-                        backgroundColor: isActive ? 'var(--bg-quaternary, #1c2433)' : 'transparent',
-                        color: isActive ? 'var(--text-primary, #e7ecf5)' : 'var(--text-secondary, #9fa9bc)',
-                        border: isActive ? '1px solid var(--accent-color, #6e5cff)' : '1px solid transparent',
-                      }}
-                    >
-                      <span>{tab.icon}</span>
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {/* Organization & Context Indicator */}
-              <div 
-                className="flex items-center gap-3 px-3.5 py-1.5 rounded-xl border text-xs shadow-sm"
-                style={{
-                  backgroundColor: 'var(--bg-tertiary, #141a26)',
-                  borderColor: 'var(--border-color, #232c3d)'
-                }}
-              >
-                {isPersonal || !activeOrg ? (
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-cyan-400 font-semibold flex items-center gap-1.5">
-                      👤 Personal Context
-                    </span>
-                    {orgUser && (
-                      <span className="text-[11px] opacity-75 font-mono text-[var(--text-secondary)] pl-2 border-l" style={{ borderColor: 'var(--border-color)' }}>
-                        {orgUser.email || orgUser.name}
-                      </span>
-                    )}
-                    <span className="text-[9px] uppercase px-2 py-0.5 rounded font-bold tracking-wide" style={{ backgroundColor: 'rgba(41, 211, 230, 0.15)', color: '#29d3e6' }}>
-                      Portal Context
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-indigo-400 font-semibold flex items-center gap-1.5">
-                      🏢 {activeOrg.name}
-                    </span>
-                    {activeOrg.tier && (
-                      <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md" style={{ backgroundColor: 'rgba(110, 92, 255, 0.2)', color: '#a78bfa', border: '1px solid rgba(110, 92, 255, 0.35)' }}>
-                        {activeOrg.tier}
-                      </span>
-                    )}
-                    {orgUser && (
-                      <span className="text-[11px] text-[var(--text-secondary)] pl-2 border-l flex items-center gap-1" style={{ borderColor: 'var(--border-color)' }}>
-                        <span>👤</span>
-                        <span>{orgUser.name || orgUser.email}</span>
-                      </span>
-                    )}
-                    <span className="text-[9px] uppercase px-2 py-0.5 rounded-md font-bold tracking-wide" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
-                      Platform Managed
-                    </span>
-                  </div>
-                )}
-
-                {/* Fallback selector only active when Unleash flag 'fuzeagent.in-app-org-management' is explicitly enabled */}
-                {allowInAppOrgManagement && (
-                  <select
-                    value={activeOrg?.id || ''}
-                    onChange={(e) => switchOrg(e.target.value)}
-                    className="text-xs font-semibold bg-transparent outline-none cursor-pointer ml-1"
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    {platformOrgs.map((org) => (
-                      <option key={org.id} value={org.id} style={{ background: '#141a26', color: '#e7ecf5' }}>
-                        {org.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Real-time Global Event Notifications */}
-              <div className="relative">
+      {/* Header / Sub-Navigation */}
+      {isEmbedded ? (
+        <div 
+          className="border-b px-6 py-2.5 flex items-center justify-between"
+          style={{ 
+            backgroundColor: 'var(--bg-secondary, #0b0e15)', 
+            borderColor: 'var(--border-color, #232c3d)' 
+          }}
+        >
+          {/* In-App Tab Switcher */}
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            {[
+              { id: 'overview', label: 'Overview', icon: '🤖' },
+              { id: 'workspace', label: 'Agent Chat', icon: '💬' },
+              { id: 'builds', label: 'App Builds', icon: '🚀' },
+              { id: 'templates', label: 'Templates', icon: '📦' },
+              { id: 'brains', label: 'Brains & Memory', icon: '🧠' },
+              { id: 'sandboxes', label: 'Active Agents', icon: '🛡️' },
+              { id: 'teams', label: 'Teams', icon: '👥' },
+              { id: 'escalations', label: 'Escalations', icon: '⚡' },
+            ].map(tab => {
+              const isActive = activeTab === tab.id;
+              return (
                 <button
-                  onClick={() => setShowEventsDropdown(!showEventsDropdown)}
-                  className="px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors border"
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className="prompt-btn"
+                  style={{
+                    backgroundColor: isActive ? 'var(--accent-soft, rgba(110, 92, 255, 0.14))' : 'transparent',
+                    borderColor: isActive ? 'var(--accent-color, #6e5cff)' : 'transparent',
+                    color: isActive ? 'var(--text-primary, #e7ecf5)' : 'var(--text-secondary, #9fa9bc)',
+                    fontWeight: isActive ? 600 : 500,
+                  }}
+                >
+                  <span>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="prompt-btn flex items-center gap-1.5"
+              title="Refresh status"
+            >
+              <FiRefreshCw className={loading ? 'animate-spin' : ''} />
+              <span>Refresh</span>
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="prompt-btn flex items-center gap-1.5"
+              style={{
+                background: 'var(--seam, linear-gradient(90deg, #6e5cff 0%, #29d3e6 100%))',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 600,
+              }}
+            >
+              <FiPlus />
+              <span>Create Agent</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <nav className="border-b shadow-sm" style={{ backgroundColor: 'var(--bg-secondary, #0b0e15)', borderColor: 'var(--border-color, #232c3d)' }}>
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex justify-between h-16">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center cursor-pointer" onClick={() => setActiveTab('overview')}>
+                  <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary, #e7ecf5)' }}>
+                    <span className="p-1.5 rounded-lg border text-indigo-400" style={{ backgroundColor: 'rgba(110, 92, 255, 0.15)', borderColor: 'rgba(110, 92, 255, 0.3)' }}>
+                      <FiUser className="text-xl" />
+                    </span>
+                    <span>FuzeAgent</span>
+                  </h1>
+                  <span className="ml-2 text-xs font-mono opacity-50 text-[var(--text-secondary)]">v2.0</span>
+                </div>
+
+                <div className="hidden md:flex items-center space-x-1">
+                  {[
+                    { id: 'overview', label: 'Overview', icon: '🤖' },
+                    { id: 'workspace', label: 'Agent Chat', icon: '💬' },
+                    { id: 'builds', label: 'App Builds', icon: '🚀' },
+                    { id: 'templates', label: 'Templates', icon: '📦' },
+                    { id: 'brains', label: 'Brains & Memory', icon: '🧠' },
+                    { id: 'sandboxes', label: 'Active Agents', icon: '🛡️' },
+                    { id: 'teams', label: 'Teams', icon: '👥' },
+                    { id: 'escalations', label: 'Escalations', icon: '⚡' },
+                  ].map(tab => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as any)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                          isActive
+                            ? 'font-bold shadow-sm'
+                            : 'hover:opacity-100 opacity-70'
+                        }`}
+                        style={{
+                          backgroundColor: isActive ? 'var(--bg-quaternary, #1c2433)' : 'transparent',
+                          color: isActive ? 'var(--text-primary, #e7ecf5)' : 'var(--text-secondary, #9fa9bc)',
+                          border: isActive ? '1px solid var(--accent-color, #6e5cff)' : '1px solid transparent',
+                        }}
+                      >
+                        <span>{tab.icon}</span>
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={toggleTheme}
+                  title={isDark ? "Switch to Portal Light Mode" : "Switch to Portal Dark Mode"}
+                  className="px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors border shadow-sm cursor-pointer"
                   style={{
                     backgroundColor: 'var(--bg-tertiary, #141a26)',
                     borderColor: 'var(--border-color, #232c3d)',
                     color: 'var(--text-primary, #e7ecf5)'
                   }}
-                  title="Global Platform Events"
                 >
-                  <span className="text-amber-400">⚡</span>
-                  <span className="font-semibold">{recentEvents.length}</span>
+                  <span>{isDark ? '🌙' : '☀️'}</span>
+                  <span className="capitalize font-mono hidden sm:inline text-[11px]">{theme}</span>
                 </button>
-                {showEventsDropdown && (
-                  <div 
-                    className="absolute right-0 mt-2 w-80 rounded-xl shadow-2xl border p-3 z-50 animate-in fade-in"
-                    style={{
-                      backgroundColor: 'var(--bg-secondary, #0b0e15)',
-                      borderColor: 'var(--border-color, #232c3d)',
-                      color: 'var(--text-primary, #e7ecf5)'
-                    }}
-                  >
-                    <div className="flex items-center justify-between border-b pb-2 mb-2" style={{ borderColor: 'var(--border-color)' }}>
-                      <span className="text-xs font-bold text-white">Global Events Feed</span>
-                      <span className="text-[10px] text-[var(--text-secondary)]">Live platform bus</span>
-                    </div>
-                    {recentEvents.length === 0 ? (
-                      <div className="text-xs text-[var(--text-secondary)] py-3 text-center">No recent events</div>
-                    ) : (
-                      <div className="max-h-48 overflow-y-auto space-y-1.5">
-                        {recentEvents.map((evt) => (
-                          <div 
-                            key={evt.id} 
-                            className="text-xs p-2 rounded border"
-                            style={{
-                              backgroundColor: 'var(--bg-tertiary, #141a26)',
-                              borderColor: 'var(--border-color, #232c3d)'
-                            }}
-                          >
-                            <div className="font-mono text-[10px] text-indigo-400 font-bold uppercase">{evt.type}</div>
-                            <div className="text-slate-300 text-[11px] mt-0.5">{evt.message}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+
+                <button
+                  onClick={handleRefresh}
+                  disabled={loading}
+                  className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors disabled:opacity-50 border"
+                  style={{
+                    backgroundColor: 'var(--bg-tertiary, #141a26)',
+                    borderColor: 'var(--border-color, #232c3d)',
+                    color: 'var(--text-primary, #e7ecf5)'
+                  }}
+                >
+                  <FiRefreshCw className={loading ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-3 py-1.5 text-white rounded-lg flex items-center gap-1.5 text-xs font-medium transition-colors shadow-md active:scale-95"
+                  style={{
+                    backgroundColor: 'var(--accent-color, #6e5cff)'
+                  }}
+                >
+                  <FiPlus />
+                  Create Agent
+                </button>
               </div>
-
-              {/* Contextual Theme Switcher (Syncs with FuzeFront Host) */}
-              <button
-                onClick={toggleTheme}
-                title={isDark ? "Switch to Portal Light Mode" : "Switch to Portal Dark Mode"}
-                className="px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors border shadow-sm cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--bg-tertiary, #141a26)',
-                  borderColor: 'var(--border-color, #232c3d)',
-                  color: 'var(--text-primary, #e7ecf5)'
-                }}
-              >
-                <span>{isDark ? '🌙' : '☀️'}</span>
-                <span className="capitalize font-mono hidden sm:inline text-[11px]">{theme}</span>
-              </button>
-
-              <button
-                onClick={handleRefresh}
-                disabled={loading}
-                className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs transition-colors disabled:opacity-50 border"
-                style={{
-                  backgroundColor: 'var(--bg-tertiary, #141a26)',
-                  borderColor: 'var(--border-color, #232c3d)',
-                  color: 'var(--text-primary, #e7ecf5)'
-                }}
-              >
-                <FiRefreshCw className={loading ? 'animate-spin' : ''} />
-                Refresh
-              </button>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-3 py-1.5 text-white rounded-lg flex items-center gap-1.5 text-xs font-medium transition-colors shadow-md active:scale-95"
-                style={{
-                  backgroundColor: 'var(--accent-color, #6e5cff)'
-                }}
-              >
-                <FiPlus />
-                Create Agent
-              </button>
             </div>
           </div>
-        </div>
-      </nav>
+        </nav>
+      )}
 
 
       {/* Main Content */}
