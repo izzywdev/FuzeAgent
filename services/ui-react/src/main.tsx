@@ -5,6 +5,26 @@ import './index.css'
 import AppRouter from './components/AppRouter.tsx'
 import { SecurityProvider } from './lib/security/SecurityProvider'
 import AuthGate from './components/auth/AuthGate'
+import { initBrowserRum, initBrowserTelemetry } from '@izzywdev/fuzefront-telemetry/browser'
+
+// ---------------------------------------------------------------------------
+// Observability (docs: FuzeFront governance/observability-standard.md P29-P36)
+// ---------------------------------------------------------------------------
+// As early as possible, before any fetch/XHR, so API calls carry `traceparent`
+// and continue the server trace. Same-origin OTLP and RUM ingest by default;
+// set VITE_TELEMETRY_ENABLED=false to turn both off.
+if (import.meta.env.VITE_TELEMETRY_ENABLED !== 'false') {
+  initBrowserTelemetry({
+    serviceName: 'fuzeagent-ui',
+    serviceVersion: import.meta.env.VITE_APP_RELEASE,
+    otlpEndpoint: import.meta.env.VITE_OTEL_EXPORTER_OTLP_ENDPOINT,
+  })
+  initBrowserRum({
+    serviceName: 'fuzeagent-ui',
+    release: import.meta.env.VITE_APP_RELEASE || import.meta.env.MODE,
+    sampleRate: Number(import.meta.env.VITE_RUM_SAMPLE_RATE ?? 1),
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Optional FuzeFront platform integration
