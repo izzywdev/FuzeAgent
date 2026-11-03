@@ -1,16 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Shield, 
-  Clock, 
-  Cpu, 
-  Terminal,
-  Radio, 
-  CheckCircle2,
-  Trash2,
-  PlusCircle,
-  ExternalLink
-} from 'lucide-react';
-import { Button, Badge } from '../design-system';
+import { Shield, Radio, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
 
 interface ActiveSandbox {
@@ -144,22 +133,6 @@ export const SandboxesView: React.FC = () => {
     }, 1500);
   };
 
-  const handleExtend = async (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    try {
-      await api.extendSandboxTimeout(id, 900);
-    } catch {
-      // ignore
-    }
-    setSandboxes(prev => prev.map(sb => {
-      if (sb.id === id) {
-        return { ...sb, timeoutSeconds: sb.timeoutSeconds + 900 };
-      }
-      return sb;
-    }));
-    setActionNotice(`Added +15m timeout to sandbox ${id}.`);
-  };
-
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -284,13 +257,6 @@ export const SandboxesView: React.FC = () => {
 
                   {!isTerminating && (
                     <>
-                      <button
-                        onClick={(e) => handleExtend(sb.id, e)}
-                        className="prompt-btn"
-                        title="Add 15m timeout"
-                      >
-                        +15m
-                      </button>
                       <button 
                         className="btn-terminate"
                         data-action="terminate-sandbox"

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react'
-import { FiHome, FiPlus, FiSettings, FiUsers, FiLock, FiUser } from 'react-icons/fi'
+import { FiHome, FiPlus, FiSettings, FiUsers, FiUser } from 'react-icons/fi'
 import { useOrgContext } from '../context/OrgContext'
 import type { Organization, OrganizationCreate } from '../types'
 
