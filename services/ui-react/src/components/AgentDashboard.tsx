@@ -139,6 +139,7 @@ const AgentDashboard: React.FC<AgentDashboardProps> = React.memo(({ agents, task
 
       {showAssignTaskModal && (
         <AssignTaskModal
+          agentId={selectedAgentId || ''}
           agentName={agents.find(a => a.id === selectedAgentId)?.name || ''}
           onClose={() => {
             setShowAssignTaskModal(false)

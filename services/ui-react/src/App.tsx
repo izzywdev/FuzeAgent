@@ -40,8 +40,7 @@ function FuzeAgentDashboard() {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'workspace' | 'builds' | 'templates' | 'brains' | 'sandboxes' | 'teams' | 'escalations'>('overview')
-  const [showEventsDropdown, setShowEventsDropdown] = useState(false)
-  const { activeOrg, isPersonal, user: orgUser, organizations: platformOrgs, switchOrg, recentEvents, allowInAppOrgManagement, isPlatformMode } = useOrgContext()
+  const { isPlatformMode } = useOrgContext()
   const isEmbedded = isPlatformMode || (typeof window !== 'undefined' && (Boolean((window as any).__FUZEFRONT__) || window.self !== window.top))
   const { theme, isDark, toggleTheme } = usePortalTheme()
 
