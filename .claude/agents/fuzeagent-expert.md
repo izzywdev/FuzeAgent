@@ -94,3 +94,4 @@ FuzeAgent is **class `oss-public`** (public repo, MIT licensed) and **tier `prod
 - The UI (`ui-react`) talks **directly** to `hierarchy_API` (`:8006`), bypassing the orchestrator for immediate DB reads — keep that contract in sync.
 - Compose ports are intentionally offset (`5434`, `6380`, `5673`) to avoid host collisions — don't "fix" them to defaults.
 - The MCP server defaults to `--api-url http://localhost:8006` (the hierarchy API), not the orchestrator.
+- **`prometheus_rule: "1"` ConfigMaps hold PromQL only** (`deploy/helm/fuzeagent/templates/incident-alerts.yaml`). FuzeInfra's Prometheus loads them from every namespace. From 2026-10-13, a LogQL `{...} |= "..."` expression here kept it crash-looping for 15 days. Log-based alerts belong in FuzeInfra's Loki rules (`helm/fuzeinfra/loki-rules/`; request them via `@fuze`). `PostgresVolumeCorrupted` lives there now.

@@ -6,28 +6,21 @@ metadata:
     {{- include "fuzeagent.labels" . | nindent 4 }}
     app.kubernetes.io/component: alerting
     prometheus_rule: "1"
+# PromQL ONLY. FuzeInfra's Prometheus loads every `prometheus_rule: "1"` ConfigMap in
+# the cluster, and one unparseable expression stops it from starting. This file used
+# to also carry PostgresVolumeCorrupted, a LogQL log query
+# (`{namespace=~"..."} |= "Input/output error"`). From 2026-10-13 it kept the shared
+# Prometheus crash-looping for 15 days, which turned off metric alerting for every
+# product. That alert now lives in Loki, where log queries belong:
+# izzywdev/FuzeInfra helm/fuzeinfra/loki-rules/fuzeinfra-log-alerts.yaml
+# (same alertname, labels and annotations). Log-based alerts go there via `@fuze`
+# to FuzeInfra, never here. Check edits with `promtool check rules`.
 data:
   incident-alerts.yaml: |
     groups:
       - name: fuzeagent.incident.rules
         rules:
-          # Alert 1: Filesystem / Volume I/O corruption (ext4 EIO or bad message)
-          - alert: PostgresVolumeCorrupted
-            expr: |
-              sum by (namespace, pod) (
-                count_over_time({namespace=~"fuzeinfra|fuzeagent"} |= "Input/output error"[5m]) +
-                count_over_time({namespace=~"fuzeinfra|fuzeagent"} |= "bad message"[5m])
-              ) > 0
-            for: 30s
-            labels:
-              severity: critical
-              component: fuzeinfra-postgres
-              action: auto-remediate
-            annotations:
-              summary: "Filesystem I/O corruption detected on {{ `{{ $labels.pod }}` }}"
-              description: "ext4 metadata or inode read error reported in logs on {{ `{{ $labels.pod }}` }}. Automated remediation triggered."
-
-          # Alert 2: FuzeFront Applications down or degraded
+          # FuzeFront Applications down or degraded
           - alert: FuzefrontApplicationsDown
             expr: |
               kube_pod_status_phase{namespace="fuzefront", pod=~"fuzefront-applications-.*", phase!="Running"} > 0
