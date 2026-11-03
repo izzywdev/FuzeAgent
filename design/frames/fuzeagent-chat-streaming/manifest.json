@@ -1,13 +1,13 @@
 {
   "name": "FuzeAgent Chat Streaming & Fuse Seam Design System",
-  "description": "Redesign of FuzeAgent UX/UI in accordance with FuzeFront Design System tokens, inherited components, live streaming chat, and contextual portal dark/light theme switching. Managed and planned via FuzeX SaaS product workflow.",
+  "description": "Redesign of FuzeAgent UX/UI in accordance with FuzeFront Design System tokens, inherited components, live streaming chat, modal dialog layout stability, high-contrast blueprint catalogs, multi-tier Brain RAG & S3 ingestion, and contextual portal dark/light theme switching. Managed and planned via FuzeX SaaS product workflow.",
   "designSystem": "fuse-seam (@fuzefront/design-system)",
   "fuzex": {
     "project": "fuzeagent",
     "workflow": "ux-flow-planning-and-approval",
     "flowStatus": "approved",
     "fuzexUrl": "https://fuzex.fuzefront.internal/flows/fuzeagent-chat-streaming",
-    "githubPagesUrl": "https://fuzefront.github.io/frames/fuzeagent-chat-streaming/"
+    "githubPagesUrl": "https://izzywdev.github.io/FuzeFront/fuzeagent-chat-streaming/"
   },
   "entry": "index.html",
   "contract": {
@@ -19,7 +19,11 @@
       "TimeInZoneCard",
       "StreamingThoughtIndicator",
       "SandboxStatusBadge",
-      "TerminalLogWindow"
+      "TerminalLogWindow",
+      "StandaloneChatWindow",
+      "CreateAgentModal",
+      "TemplatesHub",
+      "AssignTaskModal"
     ],
     "featureFlag": "fuzeagent.chat.streaming-fuse-seam"
   },
@@ -48,6 +52,42 @@
         "orchestrator": "StandaloneChatWindow",
         "route": "/chat/window",
         "approved": true
+      },
+      {
+        "id": "04-deploy-agent-modal",
+        "orchestrator": "CreateAgentModal",
+        "route": "/deploy",
+        "approved": true
+      },
+      {
+        "id": "05-templates-blueprints-hub",
+        "orchestrator": "TemplatesHub",
+        "route": "/templates",
+        "approved": true
+      },
+      {
+        "id": "05-multimodal-s3-resumable-uploader",
+        "orchestrator": "BrainMultimodalUploader",
+        "route": "/brains/upload",
+        "approved": true
+      },
+      {
+        "id": "06-task-assignment-orchestration",
+        "orchestrator": "MultiAgentOrchestration",
+        "route": "/tasks",
+        "approved": true
+      },
+      {
+        "id": "06-enlightening-multitier-context-pipeline",
+        "orchestrator": "MultiTierContextStepper",
+        "route": "/brains/context",
+        "approved": true
+      },
+      {
+        "id": "07-agent-persona-and-avatar-studio",
+        "orchestrator": "AgentPersonaStudio",
+        "route": "/brains/personas",
+        "approved": true
       }
     ],
     "components": [
@@ -57,7 +97,10 @@
       "StreamingThoughtIndicator",
       "SandboxStatusBadge",
       "TerminalLogWindow",
-      "StandaloneChatWindow"
+      "StandaloneChatWindow",
+      "CreateAgentModal",
+      "TemplatesHub",
+      "AssignTaskModal"
     ],
     "packages": [
       "@fuzefront/design-system",
@@ -125,7 +168,93 @@
         "[data-session-list]",
         "[data-composer-input]"
       ]
+    },
+    {
+      "id": "04-deploy-agent-modal",
+      "file": "04-deploy-agent-modal.html",
+      "label": "(e) Deploy New Agent Modal & Blueprint Selection",
+      "route": "/deploy",
+      "flow": "04-deploy-agent-modal",
+      "summary": "Rigid 2-column modal dialog with dark backdrop blur, blueprint search & category filters, and right-hand specification inspector.",
+      "acceptanceNotes": "Prevents flex/grid sliver collapse in federated portal shell via explicit .modal-overlay and .modal-dialog.panel CSS primitives.",
+      "testHooks": [
+        "[data-frame='04-deploy-agent-modal']",
+        "[data-modal-dialog='create-agent']",
+        "[data-blueprint-list]",
+        "[data-blueprint-inspector]",
+        "[data-action='launch-agent']"
+      ]
+    },
+    {
+      "id": "05-templates-blueprints-hub",
+      "file": "05-templates-blueprints-hub.html",
+      "label": "(f) Agent Blueprints & Templates Hub",
+      "route": "/templates",
+      "flow": "05-templates-blueprints-hub",
+      "summary": "High-contrast blueprint catalog with verified badges, rating metrics, spaced category filter pills, and 1-click launch.",
+      "acceptanceNotes": "Ensures luminous primary typography (--text-primary) on dark elevation cards and spaced pill buttons across all categories.",
+      "testHooks": [
+        "[data-frame='05-templates-blueprints-hub']",
+        "[data-templates-hero]",
+        "[data-category-filters]",
+        "[data-templates-grid]"
+      ]
+    },
+    {
+      "id": "05-multimodal-s3-resumable-uploader",
+      "file": "05-multimodal-s3-resumable-uploader.html",
+      "label": "(g) Multimodal S3 Resumable Uploader & Ingestion",
+      "route": "/brains/upload",
+      "flow": "05-multimodal-s3-resumable-uploader",
+      "summary": "Per-org 5GB S3 bucket quota tracker, resumable multipart upload controls, and live Kafka ingestion stage badges.",
+      "acceptanceNotes": "Supports pause/resume/cancel multipart uploads and tracks Whisper transcription, OCR, pgvector indexing, and Neo4j graph sync.",
+      "testHooks": [
+        "#quotaNumbers",
+        ".dropzone",
+        "#fileList"
+      ]
+    },
+    {
+      "id": "06-task-assignment-orchestration",
+      "file": "06-task-assignment-orchestration.html",
+      "label": "(h) Multi-Agent Task Assignment & Orchestration",
+      "route": "/tasks",
+      "flow": "06-task-assignment-orchestration",
+      "summary": "Interactive task dispatch modal and multi-agent execution queue with priority weighting, memory scope selection, and live step stream.",
+      "acceptanceNotes": "Dispatches structured tasks via POST /api/tasks with agent assignment, priority level (1-10), and real-time step telemetry.",
+      "testHooks": [
+        "[data-frame='06-task-assignment-orchestration']",
+        "[data-modal-dialog='assign-task']",
+        "[data-task-form]",
+        "[data-action='submit-task']"
+      ]
+    },
+    {
+      "id": "06-enlightening-multitier-context-pipeline",
+      "file": "06-enlightening-multitier-context-pipeline.html",
+      "label": "(i) Enlightening Multi-Tier Context Pipeline",
+      "route": "/brains/context",
+      "flow": "06-enlightening-multitier-context-pipeline",
+      "summary": "Interactive 5-stage RAG stepper: Fetching (4 tiers) -> Augmenting (Neo4j 2-hop) -> Distilling (RRF) -> Ready -> Streaming.",
+      "acceptanceNotes": "Displays transparent provenance chips across Agent, Team, Cross-Functional, and Organization brains.",
+      "testHooks": [
+        ".agent-title",
+        ".prompt-input"
+      ]
+    },
+    {
+      "id": "07-agent-persona-and-avatar-studio",
+      "file": "07-agent-persona-and-avatar-studio.html",
+      "label": "(j) Agent Persona & Avatar Studio",
+      "route": "/brains/personas",
+      "flow": "07-agent-persona-and-avatar-studio",
+      "summary": "Human persona naming studio, role specialization badges, 4-tier brain attachment matrix, and deterministic SVG avatar generator.",
+      "acceptanceNotes": "Persists persona configuration and custom SVG avatar seed to orchestrator brain store.",
+      "testHooks": [
+        "#personaNameInput",
+        "#avatarPreviewBox"
+      ]
     }
   ],
-  "stamp": "0c86e9e85ff463ea10edd142a75d72d981da825064d378f8a3239a170152723c"
+  "stamp": "0e86f80e7676cb4861cceb35ab93761bc0a1539b213454aba3c3bcdf560bb5e5"
 }
