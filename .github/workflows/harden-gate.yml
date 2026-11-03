@@ -157,6 +157,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan (report-only, SARIF)
+        continue-on-error: true  # report-only: Trivy install/network errors (e.g. DNS failure in install.sh) must not gate the PR; exit-code:'0' only covers the vuln scan, not the install step
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           scan-type: fs
@@ -165,6 +166,10 @@ jobs:
           output: trivy.sarif
           severity: CRITICAL,HIGH
           exit-code: '0'
+      - name: Ensure SARIF placeholder exists for upload
+        if: always()
+        shell: bash
+        run: test -f trivy.sarif || echo '{"version":"2.1.0","runs":[]}' > trivy.sarif
       - uses: github/codeql-action/upload-sarif@v4
         continue-on-error: true  # private repos lack code-scanning; report-only must stay green
         if: always()
